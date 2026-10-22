@@ -1,0 +1,21 @@
+# 비밀값: 각자 .env에만 둔다
+.env
+.env.*
+!.env.example
+
+# 운영체제 · 편집기
+.DS_Store
+.idea/
+.vscode/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
