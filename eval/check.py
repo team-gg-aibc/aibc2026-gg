@@ -5,7 +5,8 @@ python3 eval/check.py --write    걸린 문항의 note에 「[사람 확인: 자
 python3 eval/check.py --selftest 점검기 자체 시험
 
 점검하는 것
-- 형식: 키 8개(id · type · question · gold · answer_key · note · made_by · checked_by), 유형 이름, id 중복
+- 형식: 키 8개(id · type · question · gold · answer_key · note · made_by · checked_by), 유형 이름, id 중복.
+  말투를 고친 문항은 question 바로 뒤에 원래 질문 question_orig를 두고 note에 「말투 바꿈」을 쓴다
 - gold: 모든 라벨이 원문에 실제로 있는 조 · 항 · 별표인가. 함정은 [], 결합형은 근거 묶음 2개 이상
 - 조건 판단: answer_key가 「네」 또는 「아니요」로 시작하나
 - 함정이 아닌 문항: answer_key의 숫자와 「」로 감싼 핵심어가 gold 조항 원문에 있나
@@ -22,6 +23,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 KEYS = ["id", "type", "question", "gold", "answer_key", "note", "made_by", "checked_by"]
+REWORDED = KEYS[:3] + ["question_orig"] + KEYS[3:]  # 말투를 고친 문항(검수자가 원래 질문과 비교)
 TYPES = ["단순 조회", "조건 판단", "여러 조항 결합", "근거 없음 (함정)"]  # 스타터 킷 sample_questions.json과 같은 이름
 TRAP = TYPES[3]
 AUTO = "[사람 확인: 자동 점검]"
@@ -55,9 +57,11 @@ def load_sources() -> dict[str, str]:
 
 def problems(q: dict, units: dict[str, str]) -> tuple[list[str], list[str]]:
     """(형식 오류, 사람이 볼 것). 형식 오류는 파일을 고쳐야 하고, 사람이 볼 것은 note에 남긴다."""
-    if list(q) != KEYS:
-        return [f"키가 {KEYS} 순서와 달라요: {list(q)}"], []
+    if list(q) not in (KEYS, REWORDED):
+        return [f"키가 {KEYS} 순서와 달라요(말투를 고쳤으면 question 뒤에 question_orig): {list(q)}"], []
     errors, review = [], []
+    if ("question_orig" in q) != ("말투 바꿈" in q["note"]):
+        errors.append("question_orig가 있으면 note에 「말투 바꿈」, 없으면 둘 다 없어야 해요")
     if q["type"] not in TYPES:
         errors.append(f"유형 이름이 틀려요: {q['type']}")
     gold = q["gold"]
@@ -178,6 +182,9 @@ def selftest() -> None:
     assert problems({**trap, "note": f"점검 핵심어: 헬멧 {AUTO} 함정 핵심어 「경차」가 원문에 있음"}, units) == ([], [])
     assert problems({**base, "question": "감면율은 100분의 80으로 한다. 경차는 5,000원인가요"}, units)[1]
     assert problems({k: base[k] for k in KEYS[:-1]}, units)[0]
+    reworded = {k: base[k] for k in KEYS[:3]} | {"question_orig": "경차 할인돼요?"} | {k: base[k] for k in KEYS[3:]}
+    assert problems({**reworded, "note": "말투 바꿈"}, units) == ([], [])
+    assert problems(reworded, units)[0]
     print("selftest ok")
 
 
