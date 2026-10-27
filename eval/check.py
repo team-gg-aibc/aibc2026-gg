@@ -1,4 +1,4 @@
-"""평가셋(eval/questions_*.json) 자동 점검. 원문은 eval/source/*.json(fetch_source.py가 받은 2026-10-01 기준판).
+"""평가셋(eval/questions_*.json · eval/stress_*.json) 자동 점검. 원문은 eval/source/*.json(fetch_source.py가 받은 2026-10-01 기준판).
 
 python3 eval/check.py            점검 결과만 보여 준다 (파일 이름을 주면 그 파일만: python3 eval/check.py questions_parking.json)
 python3 eval/check.py --write    걸린 문항의 note에 「[사람 확인: 자동 점검] …」을 새로 적는다(지난번 자동 표시는 지우고 다시 씀)
@@ -6,13 +6,14 @@ python3 eval/check.py --selftest 점검기 자체 시험
 
 점검하는 것
 - 형식: 키 8개(id · type · question · gold · answer_key · note · made_by · checked_by), 유형 이름, id 중복.
-  말투를 고친 문항은 question 바로 뒤에 원래 질문 question_orig를 두고 note에 「말투 바꿈」을 쓴다
+  말투를 고친 문항은 question 바로 뒤에 원래 질문 question_orig를 두고 note에 「말투 바꿈」을 쓴다.
+  questions_* 문항은 맨 끝에 split(dev · holdout), stress_* 문항은 맨 끝에 tags(극한 종류 목록)를 둔다
 - gold: 모든 라벨이 원문에 실제로 있는 조 · 항 · 별표인가. 함정은 [], 결합형은 근거 묶음 2개 이상
 - 조건 판단: answer_key가 「네」 또는 「아니요」로 시작하나
 - 함정이 아닌 문항: answer_key의 숫자와 「」로 감싼 핵심어가 gold 조항 원문에 있나
 - 함정: note의 「점검 핵심어: a, b」가 6종 원문 어디에도 없나
 - 질문이 조문을 그대로 베꼈나(띄어쓰기 빼고 20자 넘게 같으면)
-회색지대(note에 [회색지대])는 정답을 아직 정하지 않았으므로 숫자 · 핵심어 점검을 건너뛴다.
+회색지대(note에 [회색지대])는 정답을 아직 정하지 않았으므로 숫자 · 핵심어 점검을 건너뛴다. tags에 「계산」이 있으면 숫자 점검만 건너뛴다(계산한 값은 원문에 없다).
 """
 import json
 import re
@@ -23,7 +24,9 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 KEYS = ["id", "type", "question", "gold", "answer_key", "note", "made_by", "checked_by"]
-REWORDED = KEYS[:3] + ["question_orig"] + KEYS[3:]  # 말투를 고친 문항(검수자가 원래 질문과 비교)
+ORDER = KEYS[:3] + ["question_orig"] + KEYS[3:] + ["split", "tags"]  # question_orig = 말투를 고치기 전 질문(검수자가 비교)
+SPLITS = ["dev", "holdout"]
+TAGS = ["말투", "조건 여러 개", "계산", "3단 결합", "항 없는 조", "별표 계산", "함정 변형", "프롬프트 인젝션"]
 TYPES = ["단순 조회", "조건 판단", "여러 조항 결합", "근거 없음 (함정)"]  # 스타터 킷 sample_questions.json과 같은 이름
 TRAP = TYPES[3]
 AUTO = "[사람 확인: 자동 점검]"
@@ -57,9 +60,15 @@ def load_sources() -> dict[str, str]:
 
 def problems(q: dict, units: dict[str, str]) -> tuple[list[str], list[str]]:
     """(형식 오류, 사람이 볼 것). 형식 오류는 파일을 고쳐야 하고, 사람이 볼 것은 note에 남긴다."""
-    if list(q) not in (KEYS, REWORDED):
-        return [f"키가 {KEYS} 순서와 달라요(말투를 고쳤으면 question 뒤에 question_orig): {list(q)}"], []
+    keys = list(q)
+    if not set(KEYS) <= set(keys) <= set(ORDER) or keys != [k for k in ORDER if k in q]:
+        return [f"키는 {ORDER} 가운데 이 순서로(필수 {KEYS}): {keys}"], []
     errors, review = [], []
+    if "split" in q and q["split"] not in SPLITS:
+        errors.append(f"split은 {SPLITS} 중 하나여야 해요")
+    tags = q.get("tags", [])
+    if "tags" in q and (not tags or not set(tags) <= set(TAGS)):
+        errors.append(f"tags는 {TAGS} 가운데 하나 이상이어야 해요")
     if ("question_orig" in q) != ("말투 바꿈" in q["note"]):
         errors.append("question_orig가 있으면 note에 「말투 바꿈」, 없으면 둘 다 없어야 해요")
     if q["type"] not in TYPES:
@@ -87,7 +96,7 @@ def problems(q: dict, units: dict[str, str]) -> tuple[list[str], list[str]]:
     if gold:
         text = " ".join(units[x] for g in gold for x in g)
         flat = squash(text)
-        lost = sorted(numbers(REF.sub(" ", q["answer_key"])) - numbers(text), key=len)
+        lost = [] if "계산" in tags else sorted(numbers(REF.sub(" ", q["answer_key"])) - numbers(text), key=len)
         if lost:
             review.append(f"answer_key의 숫자 {', '.join(lost)}이(가) gold 원문에 없음")
         terms = [t for t in re.findall(r"「([^」]+)」", q["answer_key"]) if squash(t) not in flat]
@@ -113,8 +122,8 @@ def problems(q: dict, units: dict[str, str]) -> tuple[list[str], list[str]]:
 def main(write: bool) -> int:
     units = load_sources()
     only = [a for a in sys.argv[1:] if not a.startswith("--")]
-    files = [p for p in sorted(HERE.glob("questions_*.json")) if not only or p.name in only]
-    seen, counts, flagged, grays, manual, failed = Counter(), Counter(), [], [], [], False
+    files = [p for p in sorted(HERE.glob("questions_*.json")) + sorted(HERE.glob("stress_*.json")) if not only or p.name in only]
+    seen, counts, splits, flagged, grays, manual, failed = Counter(), Counter(), Counter(), [], [], [], False
     loaded = {}
     for path in files:
         try:
@@ -126,10 +135,16 @@ def main(write: bool) -> int:
         for q in questions:
             seen[q.get("id")] += 1
             errors, review = problems(q, units)
+            need = "tags" if path.name.startswith("stress_") else "split"
+            if need not in q:
+                errors.append(f"이 파일 문항에는 {need} 칸이 있어야 해요")
+            if path.name.startswith("stress_") and "split" in q:
+                errors.append("극한 세트에는 split을 두지 않아요")
             if errors:
                 failed = True
                 print(f"✗ {path.name} {q.get('id')}: {' / '.join(errors)}")
             counts[(path.stem.removeprefix("questions_"), q.get("type"))] += 1
+            splits[q.get("split", "-")] += 1
             if GRAY in q.get("note", ""):
                 grays.append(q["id"])
             if MANUAL in q.get("note", "").split(AUTO)[0]:
@@ -146,12 +161,13 @@ def main(write: bool) -> int:
         if n > 1:
             failed = True
             print(f"✗ id 중복: {qid} ({n}번)")
-    covered = {x for questions in loaded.values() for q in questions for g in q.get("gold") or [] for x in g}
+    covered = {x for path, questions in loaded.items() if path.name.startswith("questions_") for q in questions for g in q.get("gold") or [] for x in g}
     leaves = [label for label, _ in units.items() if not any(other.startswith(label + " 제") for other in units)]
     marked = len({qid for qid, _ in manual} | {qid for qid, _ in flagged})
-    print(f"\n문항 {sum(counts.values())}개 · 사람 확인 {marked}개(자동 점검 {len(flagged)} · 쓴 사람이 단 것 {len(manual)}) · 회색지대 {len(grays)}개 · gold가 닿지 않은 조 · 항 · 별표 {len([x for x in leaves if x not in covered])}개 / {len(leaves)}개")
+    print(f"\n문항 {sum(counts.values())}개 · 사람 확인 {marked}개(자동 점검 {len(flagged)} · 쓴 사람이 단 것 {len(manual)}) · 회색지대 {len(grays)}개 · 실제 세트 gold가 닿지 않은 조 · 항 · 별표 {len([x for x in leaves if x not in covered])}개 / {len(leaves)}개")
     for (name, typ), n in sorted(counts.items()):
-        print(f"  {name:8} {typ}: {n}")
+        print(f"  {name:15} {typ}: {n}")
+    print("  " + " · ".join(f"{k} {v}" for k, v in sorted(splits.items())))
     for qid, review in flagged:
         print(f"  자동 점검 {qid}: {' / '.join(review)}")
     for qid, note in manual:
@@ -185,6 +201,12 @@ def selftest() -> None:
     reworded = {k: base[k] for k in KEYS[:3]} | {"question_orig": "경차 할인돼요?"} | {k: base[k] for k in KEYS[3:]}
     assert problems({**reworded, "note": "말투 바꿈"}, units) == ([], [])
     assert problems(reworded, units)[0]
+    assert problems({**base, "split": "dev"}, units) == ([], [])
+    assert problems({**base, "split": "test"}, units)[0]
+    assert problems({"split": "dev", **base}, units)[0]
+    assert problems({**base, "tags": ["말투"]}, units) == ([], [])
+    assert problems({**base, "tags": ["아무거나"]}, units)[0]
+    assert problems({**base, "answer_key": "7,000원 「경차」", "tags": ["계산"]}, units) == ([], [])
     print("selftest ok")
 
 
