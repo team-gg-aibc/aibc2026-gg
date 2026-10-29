@@ -48,7 +48,7 @@ RULES = """너는 서울특별시 조례 질의응답의 정답을 검토하는 
 
 def items():
     """(파일 키, 문항) 전부. 파일 키 = questions_parking.json · stress_parking.json → parking."""
-    for path in sorted(EVAL.glob("questions_*.json")) + sorted(EVAL.glob("stress_*.json")):
+    for path in sorted(EVAL.glob("questions_*.json")) + sorted(EVAL.glob("stress_*.json")) + sorted(EVAL.glob("demo_*.json")):
         for q in json.loads(path.read_text(encoding="utf-8")):
             yield path.stem.split("_", 1)[1], q
 
@@ -252,8 +252,9 @@ def compare():
     for key, q in every:
         flags = judge(q, answers.get(q["id"]), check.values)
         gray = "[회색지대]" in q["note"]
-        rows[q["id"]] = {"flags": flags, "gray": gray, "astra": answers.get(q["id"])}
-        group = "회색지대" if gray else ("함정" if not q["gold"] else q["type"])
+        demo = "시연" in q.get("tags", [])  # 시연 질문은 채점 세트가 아니라 따로 센다
+        rows[q["id"]] = {"flags": flags, "gray": gray or demo, "astra": answers.get(q["id"])}
+        group = "시연" if demo else "회색지대" if gray else ("함정" if not q["gold"] else q["type"])
         c = counts.setdefault(group, [0, 0, 0])
         c[0] += 1
         c[1] += bool(strong(flags))

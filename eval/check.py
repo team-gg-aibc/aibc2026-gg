@@ -36,7 +36,7 @@ KEYS = ["id", "type", "question", "gold", "answer_key", "note", "made_by", "chec
 ORDER = KEYS[:3] + ["question_orig"] + KEYS[3:5] + ["calc"] + KEYS[5:] + ["split", "tags"]  # question_orig = 말투를 고치기 전 질문(검수자가 비교)
 SPLITS = ["dev", "holdout"]
 TAGS = ["말투", "조건 여러 개", "계산", "3단 결합", "항 없는 조", "별표 계산", "함정 변형", "프롬프트 인젝션",
-        "섞인 질문", "없는 조 번호", "틀린 전제", "기준 시점"]  # 뒤의 넷은 10-30 동규 몫 함정(stress_common.json)
+        "섞인 질문", "없는 조 번호", "틀린 전제", "기준 시점", "시연"]  # 뒤의 넷은 10-30 동규 몫 함정(stress_common.json), 「시연」은 demo_*.json
 TYPES = ["단순 조회", "조건 판단", "여러 조항 결합", "근거 없음 (함정)"]  # 스타터 킷 sample_questions.json과 같은 이름
 TRAP = TYPES[3]
 AUTO = "[사람 확인: 자동 점검]"
@@ -261,7 +261,8 @@ def scan_traps(questions: list[dict], units: dict[str, str]) -> tuple[dict, list
 def main(write: bool) -> int:
     units = load_sources()
     only = [a for a in sys.argv[1:] if not a.startswith("--")]
-    files = [p for p in sorted(HERE.glob("questions_*.json")) + sorted(HERE.glob("stress_*.json")) if not only or p.name in only]
+    files = [p for p in sorted(HERE.glob("questions_*.json")) + sorted(HERE.glob("stress_*.json")) + sorted(HERE.glob("demo_*.json"))
+             if not only or p.name in only]  # demo_* = 시연 질문(채점 점수에 넣지 않음), 형식은 극한 세트와 같다
     seen, counts, splits, flagged, grays, manual, failed = Counter(), Counter(), Counter(), [], [], [], False
     loaded = {}
     for path in files:
@@ -274,10 +275,10 @@ def main(write: bool) -> int:
         for q in questions:
             seen[q.get("id")] += 1
             errors, review = problems(q, units)
-            need = "tags" if path.name.startswith("stress_") else "split"
+            need = "split" if path.name.startswith("questions_") else "tags"
             if need not in q:
                 errors.append(f"이 파일 문항에는 {need} 칸이 있어야 해요")
-            if path.name.startswith("stress_") and "split" in q:
+            if not path.name.startswith("questions_") and "split" in q:
                 errors.append("극한 세트에는 split을 두지 않아요")
             if errors:
                 failed = True
