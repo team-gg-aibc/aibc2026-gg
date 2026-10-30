@@ -6,7 +6,7 @@ python3 eval/verify/astra.py compare               비교 결과 eval/verify/ast
 
 보내는 것: 조례 원문(source/*.md)과 질문 글뿐. 정답 · 메모 · 태그 · 원래 질문 · 문항 번호는 보내지 않는다
 (번호의 T · G · X 글자가 함정 · 극한 문항임을 알려 준다). 묶음 안에서는 q01 … 으로만 부른다.
-조례 6종 전체를 주는 묶음: 공통 파일 문항과 gold가 빈 문항(함정 · 회색지대), 그리고 같은 수만큼 고른 답 있는 문항(함정만 모이면 모델이 눈치채므로 섞는다).
+조례 6종 전체를 주는 묶음: 조례 하나에 묶이지 않은 파일(공통 · 시연)의 문항과 gold가 빈 문항(함정 · 회색지대), 그리고 같은 수만큼 고른 답 있는 문항(함정만 모이면 모델이 눈치채므로 섞는다).
 나머지는 그 문항의 조례 하나만 준다(공통 파일 밖 문항의 gold는 모두 자기 조례 안에 있다).
 """
 import hashlib
@@ -59,7 +59,7 @@ def h(text):
 
 def plan():
     every = list(items())
-    wide = [q["id"] for key, q in every if key == "common" or not q["gold"]]
+    wide = [q["id"] for key, q in every if key not in KEYS or not q["gold"]]  # 공통 · 시연(한강)처럼 원문 파일이 없는 키는 6종 전체로
     rest = sorted((q["id"] for key, q in every if q["id"] not in set(wide)), key=h)
     mix = set(rest[:len(wide)])  # 함정과 같은 수만큼 답 있는 문항을 섞는다
     groups = {"all": sorted(set(wide) | mix, key=h)}
