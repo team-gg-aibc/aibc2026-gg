@@ -62,7 +62,7 @@
 
 ## Code Review Rules
 
-Codex 자동 리뷰는 이 절과 [REVIEW.md](REVIEW.md)를 기준으로 한다. 리뷰 코멘트는 한국어로 쓴다. 병합 판단은 리뷰가 아니라 CI와 PM(동규)이 한다.
+자동 리뷰(GG비서가 Claude로 한다, [REVIEW.md](REVIEW.md) 8절)는 이 절과 [REVIEW.md](REVIEW.md)를 기준으로 한다. 리뷰 코멘트는 한국어로 쓴다. 병합 판단은 리뷰가 아니라 CI와 PM(동규)이 한다.
 
 ### 막아야 하는 것 (P0)
 - 근거 조항(제○조 제○항)과 원문 출처 없이 답을 내보내는 길이 생김
