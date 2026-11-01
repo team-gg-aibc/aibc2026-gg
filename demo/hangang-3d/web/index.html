@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>한강 3D 지도</title>
+<title></title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
 <link rel="stylesheet" href="style.css?v=1101c">
@@ -11,52 +11,53 @@
 <body>
 <div id="map"></div>
 <canvas id="fx" hidden></canvas>
+<!-- 화면 글자는 모두 data/text.json(= docs/content/*.md를 build_text.py로 옮긴 것)에서 채운다. data-t = text.json 안의 자리 -->
 
-<!-- 낮 화면. 문구는 vault content/A-04_한강지도.md 그대로 -->
+<!-- 낮 화면: docs/content/A-04_한강지도.md -->
 <section class="panel head day">
-  <h1>한강 3D 지도</h1>
-  <p>끌어서 이동 · 오른쪽 버튼(또는 Ctrl)으로 돌리기·기울이기 · 휠로 확대</p>
+  <h1 data-t="a04.title"></h1>
+  <p data-t="a04.lead"></p>
   <div class="btns">
-    <button id="btn-all" type="button">한강 전체</button>
-    <button id="btn-demo" type="button">여의도 시연 장면</button>
-    <button id="btn-fly" type="button">한강 따라 날기 ▶</button>
+    <button id="btn-all" type="button" data-t="a04.all"></button>
+    <button id="btn-demo" type="button" data-t="a04.demo"></button>
+    <button id="btn-fly" type="button"></button>
   </div>
-  <label class="sel">다리로 이동
-    <select id="sel-bridge"><option value="">다리 고르기 (서→동)</option></select>
+  <label class="sel"><span data-t="a04.bridge"></span>
+    <select id="sel-bridge"><option value="" data-t="a04.bridgePick"></option></select>
   </label>
-  <p class="virtual">가상 데이터로 만든 시연 화면이에요</p>
+  <p class="virtual" data-t="a04.virtual"></p>
 </section>
 
-<button id="btn-scene" class="scene-btn day" type="button">예시</button>
+<button id="btn-scene" class="scene-btn day" type="button" data-t="a04.scene"></button>
 
 <details class="panel jobs day" open>
-  <summary>들어온 일 <span id="day-n">0</span>건</summary>
+  <summary id="day-sum"></summary>
   <div id="day-chips" class="chips"></div>
-  <div class="segs"><span class="seg" data-k="group"><button type="button" data-v="">들어온 순서</button><button type="button" data-v="1">부서별로 모아 보기</button></span><span class="seg" data-k="status"><button type="button" data-v="">전체</button><button type="button" data-v="open">미해결</button><button type="button" data-v="done">해결</button></span></div>
+  <div class="segs"><span class="seg" data-k="group"><button type="button" data-v="" data-t="a01.views.0.0"></button><button type="button" data-v="1" data-t="a01.views.0.1"></button></span><span class="seg" data-k="status"><button type="button" data-v="" data-t="a01.views.1.0"></button><button type="button" data-v="open" data-t="a01.views.1.1"></button><button type="button" data-v="done" data-t="a01.views.1.2"></button></span></div>
   <ol id="day-rows" class="rows"></ol>
 </details>
 
 <!-- 판정 카드(낮·밤 공용): 낮에는 오른쪽 위, 밤에는 상황판 오른쪽 칸 -->
 <article id="card" class="card glass" hidden></article>
 
-<!-- 예시: 불꽃축제 밤 상황판. 문구는 vault content/A-01_상황판.md · U-01_현장휴대폰.md · U-02_시민신고.md 그대로 -->
+<!-- 예시: 불꽃축제 밤 상황판. docs/content/A-01_상황판.md · U-01_현장휴대폰.md · U-02_시민신고.md -->
 <div id="board">
   <header class="b-head glass">
-    <div class="b-title"><h1>현장 상황판</h1><p>들어온 일에 서울시 조례 근거를 붙여, 그 조례를 맡은 부서로 바로 보내 드려요.</p></div>
-    <button id="b-exit" type="button">낮 화면으로</button>
+    <div class="b-title"><h1 data-t="a01.title"></h1><p data-t="a01.lead"></p></div>
+    <button id="b-exit" type="button" data-t="a01.exit"></button>
     <div class="b-basis">
-      <span class="tag">서울시 조례 6종 · 2026-10-01 시행본 기준</span>
-      <span class="tag dashed">가상 데이터로 만든 시연 화면이에요</span>
+      <span class="tag" data-t="a01.basis.0"></span>
+      <span class="tag dashed" data-t="a01.basis.1"></span>
     </div>
     <dl class="kpi">
-      <div><dt id="k-n">0건</dt><dd>들어온 일<br>· 19:00부터</dd></div>
-      <div><dt id="k-open">0건</dt><dd>미해결<br>· 승인 기다림</dd></div>
-      <div class="ok"><dt id="k-done">0건</dt><dd>해결<br>· 현장에 안내를 보냄</dd></div>
+      <div><dt id="k-n"></dt><dd data-kpi="0"></dd></div>
+      <div><dt id="k-open"></dt><dd data-kpi="1"></dd></div>
+      <div class="ok"><dt id="k-done"></dt><dd data-kpi="2"></dd></div>
     </dl>
-    <div class="b-filter"><h2>부서별 보기</h2><p>서울시 조례 6종을 맡은 여섯 부서가 함께 봐요. 부서를 누르면 그 부서 일만 보여요.</p></div>
+    <div class="b-filter"><h2 data-t="a01.filter"></h2><p data-t="a01.filterLead"></p></div>
     <div class="b-play">
       <span class="clock"><b id="b-clock">19:00</b><i><i id="b-bar"></i></i></span>
-      <button id="b-play" type="button">▶ 재생</button>
+      <button id="b-play" type="button"></button>
     </div>
     <div id="b-chips" class="chips"></div>
   </header>
@@ -65,52 +66,52 @@
     <div class="phone" id="phone">
       <div class="screen">
         <section class="p-report">
-          <small>신고하기</small>
-          <h3>본 것을 보내 주시면, 그 일을 맡은 서울시 부서로 바로 전해 드려요.</h3>
-          <small>무엇을 봤나요</small>
-          <div class="field"><small>무엇을 봤나요?</small><span id="u-what"></span></div>
-          <div class="field"><small>어디인가요?</small><span id="u-where"></span></div>
-          <div class="field"><small>연락처(선택)</small><span id="u-phone"></span></div>
-          <button id="u-send" type="button">보내기</button>
-          <p class="hint">연락처는 담당 부서가 다시 물어볼 때만 써요.</p>
+          <small data-t="u02.title"></small>
+          <h3 data-t="u02.lead"></h3>
+          <small data-t="u02.section"></small>
+          <div class="field"><small data-t="u02.fields.0"></small><span id="u-what"></span></div>
+          <div class="field"><small data-t="u02.fields.1"></small><span id="u-where"></span></div>
+          <div class="field"><small data-t="u02.fields.2"></small><span id="u-phone"></span></div>
+          <button id="u-send" type="button" data-t="u02.send"></button>
+          <p class="hint" data-t="u02.hint"></p>
           <div class="after">
-            <small>보낸 뒤</small>
+            <small data-t="u02.after"></small>
             <div class="box">
-              <b class="box-head">보냈어요. 맡은 부서가 확인하고 있어요.</b>
+              <b class="box-head" data-t="u02.afterLead"></b>
               <dl id="u-sent"></dl>
             </div>
           </div>
         </section>
         <section class="p-inbox">
-          <small>현장 휴대폰</small>
-          <h3>담당 부서가 승인한 안내가 여기로 와요. 근거와 함께 그대로 안내해 주세요.</h3>
-          <span class="new">새 안내가 왔어요.</span>
-          <small>받은 안내</small>
+          <small data-t="u01.title"></small>
+          <h3 data-t="u01.lead"></h3>
+          <span class="new" data-t="u01.new"></span>
+          <small data-t="u01.section"></small>
           <div class="box" id="u-recv"></div>
         </section>
-        <p class="foot">가상 데이터로 만든 시연 화면이에요.</p>
+        <p class="foot" data-t="u02.foot"></p>
       </div>
     </div>
     <div class="notes glass">
-      <p>재생은 시연용이에요. 미리 정한 30분치 신고 · 보고가 차례로 들어와요.</p>
-      <p>들어온 일 · 시각 · 출처는 시연용 가상 정보예요. 조항 원문은 2026-10-01 시행본이에요.</p>
+      <p data-t="a01.playNote"></p>
+      <p data-t="a01.footNote"></p>
     </div>
   </aside>
 
   <div class="b-mid">
-    <span class="b-place glass">여의도 한강공원 · 불꽃축제 날 저녁(예시)</span>
+    <span class="b-place glass" data-t="a01.basis.2"></span>
     <ul id="b-approved"></ul>
   </div>
   <div class="b-card-slot" id="card-slot"></div>
 
   <section class="b-list glass">
-    <h2>들어온 일 <small>일을 누르면 안내 초안과 근거, 맡은 부서가 열려요.</small><span class="segs"><span class="seg" data-k="group"><button type="button" data-v="">들어온 순서</button><button type="button" data-v="1">부서별로 모아 보기</button></span><span class="seg" data-k="status"><button type="button" data-v="">전체</button><button type="button" data-v="open">미해결</button><button type="button" data-v="done">해결</button></span></span><output id="b-toast"></output></h2>
+    <h2><span data-t="a01.list"></span> <small data-t="a01.listLead"></small><span class="segs"><span class="seg" data-k="group"><button type="button" data-v="" data-t="a01.views.0.0"></button><button type="button" data-v="1" data-t="a01.views.0.1"></button></span><span class="seg" data-k="status"><button type="button" data-v="" data-t="a01.views.1.0"></button><button type="button" data-v="open" data-t="a01.views.1.1"></button><button type="button" data-v="done" data-t="a01.views.1.2"></button></span></span><output id="b-toast"></output></h2>
     <ol id="b-rows" class="rows"></ol>
   </section>
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
 <script src="fireworks.js?v=1101b"></script>
-<script src="app.js?v=1101f"></script>
+<script src="app.js?v=1101g"></script>
 </body>
 </html>

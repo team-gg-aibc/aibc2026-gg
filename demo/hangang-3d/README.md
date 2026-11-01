@@ -32,10 +32,12 @@ python3 -m http.server 8765 --bind 127.0.0.1 --directory demo/hangang-3d/web
 | `web/index.html` · `app.js` · `style.css` · `fireworks.js` | 화면 (MapLibre GL JS 5.6.0 + OpenFreeMap 3D 건물, 키 없음) |
 | `web/data/*.geojson` | OSM에서 뽑은 한강 다리 판 · 교각 · 이름표, 한강공원 면, 1번 자리 10m 범위, 핵심 7건 자리 |
 | `web/data/complaints.json` | 들어온 일 102건(가상)과 판정 카드 틀 20개 |
+| `web/data/text.json` | 화면 글자 전부. `docs/content/`에서 `build_text.py`가 만든 결과라 손으로 고치지 않는다 |
 | `scripts/prep_web.py` | OSM 원본 → `web/data/*.geojson` |
-| `scripts/make_complaints.py` · `background.py` | 들어온 일 102건 만들기(같은 입력이면 같은 결과) |
+| `scripts/build_text.py` · `content.py` | `docs/content/*.md`를 읽어 `web/data/text.json`을 만든다 |
+| `scripts/make_complaints.py` · `background.py` | 들어온 일 102건 만들기(같은 입력이면 같은 결과). 카드 문장 · 부서 이름 · 전화 · 핵심 7건은 `docs/content/`에서 읽는다 |
 
-스크립트가 읽는 OSM 원본(`data/`, 약 13MB)은 이 레포에 넣지 않았다. 다시 만들 일이 있으면 PM에게 받는다. 화면은 `web/`만으로 그대로 뜬다.
+스크립트가 읽는 OSM 원본(`data/`, 약 13MB)은 이 레포에 넣지 않았다. `make_complaints.py`를 다시 돌릴 일이 있으면 PM에게 받아 `HANGANG_DATA=<그 data 폴더> python3 -I demo/hangang-3d/scripts/make_complaints.py`로 돌린다. 화면은 `web/`만으로 그대로 뜬다.
 
 ## 데이터 출처 · 라이선스
 
@@ -46,7 +48,7 @@ python3 -m http.server 8765 --bind 127.0.0.1 --directory demo/hangang-3d/web
 
 ## 알아 둘 것
 
-- 화면 문구의 원본은 PM이 관리하는 화면 문구 파일(A-01 현장 상황판 · A-04 한강 3D 지도 · U-01 현장 휴대폰 · U-02 시민 신고)이다. 팀 레포 `docs/content/`로 옮기는 일은 따로 한다. 문구를 바꾸고 싶으면 이슈나 PR 댓글로 알려 준다.
+- **화면 문구의 원본은 `docs/content/`다**(A-01 현장 상황판 · A-04 한강 3D 지도 · U-01 현장 휴대폰 · U-02 시민 신고 · C-01 판정 카드 예시). 화면은 글자를 `web/data/text.json`에서만 읽는다. 문구를 고치면 레포 맨 위에서 `python3 -I demo/hangang-3d/scripts/build_text.py`를 돌린다. 카드 문장이나 핵심 7건을 고쳤으면 `make_complaints.py`도 다시 돌린다.
 - 조례가 「지정할 수 있다」 · 「할인할 수 있다」고만 정한 곳은 판정을 「확인 필요」로 둔다.
 - 다리 높이와 교각 자리는 규칙으로 놓은 근사값이다(실제 위치가 아니다).
 - 잠실 · 강서한강공원은 OSM에 이름 붙은 공원 면이 없어 초록 면과 이름표가 없다.

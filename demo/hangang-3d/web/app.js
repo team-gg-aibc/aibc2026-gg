@@ -28,19 +28,10 @@ const LIGHT = {
 };
 // 부서 색(유형 6개와 담당 부서 6곳은 하나씩 맞물린다): 밝은 낮 지도·어두운 밤 지도 모두에서 서로 구별되게. 늘 부서 이름 · 번호와 함께 쓴다.
 const TYPE_COLOR = { 금연: '#ff7a59', 자전거: '#3fa9ff', 동물보호: '#ffc53d', 주차장: '#b18cff', 도시공원: '#2fd4b8', 청년: '#ff6fb5' };
-// 화면 문구: vault content/A-01_상황판.md · U-01_현장휴대폰.md · U-02_시민신고.md의 상황별 안내·고정 입력 그대로
-const SAY = {
-  loading: '들어온 일을 상황판에 올리고 있어요.',
-  empty: '아직 들어온 일이 없어요.',
-  deptEmpty: '이 부서에 온 일이 아직 없어요. 전체 보기로 돌아갈게요.',
-  failed: '들어온 일을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-  approved: '현장에 안내를 보냈어요.',
-  sending: '보내고 있어요.',
-  doneEmpty: '아직 해결한 일이 없어요.',
-  openEmpty: '남은 일이 없어요. 모두 해결했어요.',
-};
-const U02 = { what: '여의나루역 출구 앞에서 담배 피우는 사람이 많아요', where: '여의나루역 출구 앞', phone: '010-0000-0000' };
-const APPROVED_1 = '출구 10m 금연구역 안내';   // A-01 「승인한 안내」 표의 1번 안내
+// 화면 글자: data/text.json(= docs/content/*.md를 scripts/build_text.py로 옮긴 것). main()이 맨 처음 읽는다
+let TX = null;
+// 꼴의 자리를 채운다: {부서}{로} · {부서}{가} · {시각} · {전화} · {시행일} · {n}
+const fill = (tpl, v) => tpl.replace(/\{(\S+?)\}/g, (_, k) => (k === '로' ? ro(v.부서) : k === '가' ? iga(v.부서) : String(v[k] ?? '')));
 const KO = ['coalesce', ['get', 'name:ko'], ['get', 'name']];
 const IS_RAIL = ['match', ['get', 'class'], ['rail', 'transit'], true, false];
 const FILES = ['bridges', 'bridge_mask', 'piers', 'bridge_labels', 'parks', 'park_labels', 'ring10'];
@@ -295,6 +286,12 @@ function prefetch(template, path) {
 }
 
 async function main() {
+  TX = await getJSON('data/text.json', { cache: 'no-cache' });
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = el.dataset.t.split('.').reduce((o, k) => o?.[k], TX) ?? '';
+  for (const el of document.querySelectorAll('[data-kpi]')) el.innerHTML = TX.a01.kpi[el.dataset.kpi].map(esc).join('<br>· ');
+  document.title = TX.a04.title;
+  document.getElementById('b-play').textContent = `▶ ${TX.a01.play}`;
+  const SAY = TX.say, U02 = TX.u02.fixed;
   const [style, ...data] = await Promise.all([getJSON(STYLE_URL), ...FILES.map((f) => getJSON(`data/${f}.geojson`))]);
   const D = Object.fromEntries(FILES.map((f, i) => [f, data[i]]));
   const tj = await getJSON(style.sources.openmaptiles.url);
@@ -322,7 +319,7 @@ async function main() {
   window.hangangMap = map;   // 콘솔 점검용
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
-  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '핀은 시연용 가상 예시' }), 'bottom-right');
+  map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: TX.a04.attrib }), 'bottom-right');
   map.on('styleimagemissing', (e) => {
     if (e.id === 'chip' && !map.hasImage('chip')) map.addImage('chip', ...chipImage());
     if (e.id === 'windows' && !map.hasImage('windows')) map.addImage('windows', ...windowsImage());
@@ -331,18 +328,19 @@ async function main() {
   const labels = D.bridge_labels.features;   // 경도순(서→동)
   const path = riverPath(labels);
   const flyBtn = document.getElementById('btn-fly');
+  flyBtn.textContent = `${TX.a04.fly} ▶`;
   let flight = null;
 
   const stopFlight = () => {
     if (!flight) return;
     cancelAnimationFrame(flight.raf);
     flight = null;
-    flyBtn.textContent = '한강 따라 날기 ▶';
+    flyBtn.textContent = `${TX.a04.fly} ▶`;
     flyBtn.classList.remove('on');
   };
   const startFlight = () => {
     flight = { raf: 0 };
-    flyBtn.textContent = '한강 따라 날기 ■';
+    flyBtn.textContent = `${TX.a04.fly} ■`;
     flyBtn.classList.add('on');
     const speed = path.total / FLY.seconds;
     let brg = (bearingOf(path.pointAt(0), path.pointAt(FLY.lookAhead)) + 360) % 360;
@@ -424,8 +422,8 @@ async function main() {
     return `<li class="${cls}"><button type="button" class="row${picked === it ? ' on' : ''}${done ? ' done' : ''}" data-id="${it.id}">${numHTML(it)}`
       + `<span class="when">${it.time} · ${esc(it.src)}</span><span class="text">「${esc(it.text)}」</span>`
       + `<span class="verdict"><b class="badge ${badgeCls(b)}">${esc(b)}</b>${esc(d)}</span>`
-      + `<span class="dept">${esc(it.type.dept)}</span><span class="state">${done ? `해결 · ${done}` : '미해결'}</span>`
-      + '<span class="open">근거 보기</span></button></li>';
+      + `<span class="dept">${esc(it.type.dept)}</span><span class="state">${done ? `${TX.a01.done} · ${done}` : TX.a01.open}</span>`
+      + `<span class="open">${esc(TX.a01.openBtn)}</span></button></li>`;
   };
   const emptyHTML = (text) => `<li class="empty">${esc(text)}</li>`;
   // 칩: 낮은 「● 건강관리과 22」, 밤은 「건강관리과 / 금연 · 22건 · 미해결 16」
@@ -433,15 +431,15 @@ async function main() {
     const chip = (key, top, bottom, color) => `<button type="button" class="chip${filter.type === key ? ' on' : ''}" data-type="${key}" aria-pressed="${filter.type === key}">`
       + `${color ? `<i class="tdot" style="--c:${color}"></i>` : ''}<b>${top}</b><span>${bottom}</span></button>`;
     const all = stat(pool);
-    return chip('', '전체', `${all.n}건${night ? ` · 미해결 ${all.open}` : ''}`) + types.map((t) => {
+    return chip('', esc(TX.a01.all), `${all.n}${TX.a01.unit}${night ? ` · ${TX.a01.open} ${all.open}` : ''}`) + types.map((t) => {
       const k = stat(pool.filter((it) => it.type.key === t.key));
-      return chip(t.key, esc(t.dept), night ? `${esc(t.key)} · ${k.n}건 · 미해결 ${k.open}` : `${k.n}`, TYPE_COLOR[t.key]);
+      return chip(t.key, esc(t.dept), night ? `${esc(t.key)} · ${k.n}${TX.a01.unit} · ${TX.a01.open} ${k.open}` : `${k.n}`, TYPE_COLOR[t.key]);
     }).join('');
   };
   const groupHTML = (t, pool) => {
     const k = stat(pool);
     return `<li class="group"><i class="tdot" style="--c:${TYPE_COLOR[t.key]}"></i><b>${esc(t.dept)}</b>`
-      + `<span>${esc(t.key)} · ${k.n}건 · 미해결 ${k.open} · 해결 ${k.done}</span></li>`;
+      + `<span>${esc(t.key)} · ${k.n}${TX.a01.unit} · ${TX.a01.open} ${k.open} · ${TX.a01.done} ${k.done}</span></li>`;
   };
   // 목록: 낮은 번호 순, 밤은 새로 들어온 일이 위. 「부서별로 모아 보기」면 부서마다 묶는다
   function listHTML(pool, newest, fresh) {
@@ -466,7 +464,7 @@ async function main() {
     }
   }
   function renderAll(fresh) {
-    $('day-n').textContent = items.length;
+    $('day-sum').textContent = fill(TX.a04.list, { n: items.length });
     $('day-chips').innerHTML = chipsHTML(items, false);
     $('b-chips').innerHTML = chipsHTML(board.arrived, true);
     renderSegs();
@@ -528,18 +526,18 @@ async function main() {
   function openCard(it) {
     select(it);
     const T = it.T, [b, d] = verdictOf(T.verdict), q = T.basis.indexOf('「');
-    const done = doneMap().has(it.id);
-    card.innerHTML = '<button class="x" type="button" aria-label="카드 닫기">×</button>'
+    const done = doneMap().has(it.id), L = TX.a01.labels;
+    card.innerHTML = `<button class="x" type="button" aria-label="${esc(TX.a01.close)}">×</button>`
       + `<p class="eyebrow">${numHTML(it)}${it.time} · ${esc(it.src)} · ${esc(it.place)}</p><h2>${esc(T.title)}</h2>`
-      + `<div class="draft"><small>안내 초안</small><p>${esc(T.draft)}</p></div><dl>`
-      + `<dt>판정</dt><dd><b class="badge ${badgeCls(b)}">${esc(b)}</b> ${esc(d)}</dd>`
-      + `<dt>근거</dt><dd>${q < 0 ? esc(T.basis) : `${esc(T.basis.slice(0, q).trim())}<span class="quote">${esc(T.basis.slice(q))}</span>`}</dd>`
-      + `<dt>시행일</dt><dd>${esc(T.effective)}</dd><dt>${esc(T.extra_label)}</dt><dd>${esc(T.extra)}</dd>`
-      + `<dt>맡은 부서</dt><dd><span class="dept">${esc(it.type.dept)}</span> ${esc(it.type.phone)}</dd>`
-      + (it.citizen ? `<dt>신고한 시민</dt><dd>${esc(it.citizen)}</dd>` : '')
-      + `</dl><footer><button type="button" class="approve"${done ? ' disabled' : ''}>✓ 안내 승인</button>`
-      + `<a class="law" href="${esc(T.law)}" target="_blank" rel="noopener">조례 원문 보기</a>`
-      + `<button type="button" class="close">카드 닫기</button><output class="said">${done ? SAY.approved : ''}</output></footer>`;
+      + `<div class="draft"><small>${esc(L.draft)}</small><p>${esc(T.draft)}</p></div><dl>`
+      + `<dt>${esc(L.verdict)}</dt><dd><b class="badge ${badgeCls(b)}">${esc(b)}</b> ${esc(d)}</dd>`
+      + `<dt>${esc(L.basis)}</dt><dd>${q < 0 ? esc(T.basis) : `${esc(T.basis.slice(0, q).trim())}<span class="quote">${esc(T.basis.slice(q))}</span>`}</dd>`
+      + `<dt>${esc(L.effective)}</dt><dd>${esc(T.effective)}</dd><dt>${esc(T.extra_label)}</dt><dd>${esc(T.extra)}</dd>`
+      + `<dt>${esc(L.dept)}</dt><dd><span class="dept">${esc(it.type.dept)}</span> ${esc(it.type.phone)}</dd>`
+      + (it.citizen ? `<dt>${esc(L.citizen)}</dt><dd>${esc(it.citizen)}</dd>` : '')
+      + `</dl><footer><button type="button" class="approve"${done ? ' disabled' : ''}>✓ ${esc(TX.a01.approve)}</button>`
+      + `<a class="law" href="${esc(T.law)}" target="_blank" rel="noopener">${esc(TX.a01.law)}</a>`
+      + `<button type="button" class="close">${esc(TX.a01.close)}</button><output class="said">${done ? SAY.approved : ''}</output></footer>`;
     card.hidden = false;
     card.scrollTop = 0;
   }
@@ -619,9 +617,9 @@ async function main() {
   };
   function renderKpi() {
     const s = stat(board.arrived);
-    bump('k-n', `${s.n}건`);
-    bump('k-open', `${s.open}건`);
-    bump('k-done', `${s.done}건`);
+    bump('k-n', `${s.n}${TX.a01.unit}`);
+    bump('k-open', `${s.open}${TX.a01.unit}`);
+    bump('k-done', `${s.done}${TX.a01.unit}`);
   }
   function renderClock() {
     $('b-clock').textContent = hhmm(play.t);
@@ -650,7 +648,7 @@ async function main() {
     board.arrived = []; board.approved.clear(); board.note = '';
     clearTimeout(phoneTimer);
     phone.className = 'phone';
-    $('u-send').textContent = '보내기';
+    $('u-send').textContent = TX.u02.send;
     $('b-approved').innerHTML = '';
     card.hidden = true;
     select(null);
@@ -671,7 +669,7 @@ async function main() {
       if (animate) {
         for (const it of fresh) {
           pulse(it);
-          if (it.n) toast(`${it.type.dept}${ro(it.type.dept)} 보냈어요.`);   // content 상황별 안내 「맡은 부서로 보냄」
+          if (it.n) toast(fill(SAY.sent, { 부서: it.type.dept }));   // content 상황별 안내 「맡은 부서로 보냄」
         }
       }
       renderAll(animate ? new Set(fresh) : null);
@@ -696,7 +694,7 @@ async function main() {
       };
       play.raf = requestAnimationFrame(tick);
     }
-    $('b-play').textContent = on ? '❚❚ 일시정지' : '▶ 재생';
+    $('b-play').textContent = on ? `❚❚ ${TX.a01.pause}` : `▶ ${TX.a01.play}`;
   }
 
   // 왼쪽 휴대폰: U-02 시민 신고(19:02에 1번을 보냄) → 안내 승인 뒤 U-01 받은 안내
@@ -704,26 +702,28 @@ async function main() {
   $('u-where').textContent = U02.where;
   $('u-phone').textContent = U02.phone;
   function phoneSent(animate) {
-    $('u-sent').innerHTML = `<dt>보낸 것</dt><dd>「${esc(U02.what)}」</dd><dt>보낸 시각</dt><dd>${one.time}</dd>`
-      + `<dt>맡은 부서</dt><dd>${esc(one.type.dept)}</dd>`;
+    const [what, when, who] = TX.u02.labels.map(esc);
+    $('u-sent').innerHTML = `<dt>${what}</dt><dd>「${esc(U02.what)}」</dd><dt>${when}</dt><dd>${one.time}</dd>`
+      + `<dt>${who}</dt><dd>${esc(one.type.dept)}</dd>`;
     clearTimeout(phoneTimer);
     if (!animate) { phone.classList.add('sent'); return; }
     phone.classList.add('sending');
     $('u-send').textContent = SAY.sending;
     phoneTimer = setTimeout(() => {
       phone.classList.replace('sending', 'sent');
-      $('u-send').textContent = '보내기';
+      $('u-send').textContent = TX.u02.send;
     }, 900);
   }
   $('u-send').onclick = () => { if (scene.on && one && play.t < one.sec) advance(one.sec, true); };
   function phoneReceived(it, time) {
     const T = it.T, q = T.basis.indexOf('「');
-    $('u-recv').innerHTML = `<b class="box-head">${esc(it.type.dept)}${iga(it.type.dept)} 승인한 안내예요. 이대로 안내해 주세요.</b><dl>`
-      + `<dt>안내</dt><dd class="big">${esc(T.draft)}</dd>`
-      + `<dt>장소</dt><dd>${esc(it === one ? U02.where : it.place)}</dd>`
-      + `<dt>근거</dt><dd>${esc((q < 0 ? T.basis : T.basis.slice(0, q)).trim())} · ${esc(T.effective)} 시행본</dd>`
-      + `<dt>승인</dt><dd>${esc(it.type.dept)} 담당 · ${time} · ${esc(it.type.phone)}</dd>`
-      + (it.citizen ? `<dt>신고한 시민</dt><dd>${esc(it.citizen)}</dd>` : '') + '</dl>';
+    const U = TX.u01, L = U.labels, v = { 부서: it.type.dept, 시각: time, 전화: it.type.phone, 시행일: T.effective };
+    $('u-recv').innerHTML = `<b class="box-head">${esc(fill(U.boxHead, v))}</b><dl>`
+      + `<dt>${esc(L.draft)}</dt><dd class="big">${esc(T.draft)}</dd>`
+      + `<dt>${esc(L.place)}</dt><dd>${esc(it === one ? U02.where : it.place)}</dd>`
+      + `<dt>${esc(L.basis)}</dt><dd>${esc((q < 0 ? T.basis : T.basis.slice(0, q)).trim())} · ${esc(fill(U.basisFmt, v))}</dd>`
+      + `<dt>${esc(L.approval)}</dt><dd>${esc(fill(U.approvalFmt, v))}</dd>`
+      + (it.citizen ? `<dt>${esc(L.citizen)}</dt><dd>${esc(it.citizen)}</dd>` : '') + '</dl>';
     phone.classList.remove('received');
     void phone.offsetWidth;
     phone.classList.add('received');
@@ -731,8 +731,8 @@ async function main() {
   function addApproved(it, time) {
     board.approved.set(it.id, time);
     const ul = $('b-approved');
-    ul.insertAdjacentHTML('afterbegin', `<li class="glass"><b>승인한 안내</b><span>${time}</span><span>${esc(it.type.dept)} 담당</span>`
-      + `<em>${esc(it === one ? APPROVED_1 : `${it.place} · ${verdictOf(it.T.verdict)[1]}`)}</em></li>`);
+    ul.insertAdjacentHTML('afterbegin', `<li class="glass"><b>${esc(TX.a01.approvedTitle)}</b><span>${time}</span><span>${esc(fill(TX.a01.staff, { 부서: it.type.dept }))}</span>`
+      + `<em>${esc(it === one ? TX.a01.approved1 : `${it.place} · ${verdictOf(it.T.verdict)[1]}`)}</em></li>`);
     while (ul.children.length > 3) ul.lastElementChild.remove();
   }
   function approve(it) {
@@ -797,6 +797,7 @@ async function main() {
 
   renderAll();
   map.once('load', () => {
+    map.setLayoutProperty('hg-ring10-label', 'text-field', TX.a04.ring);   // content A-04 「지도 위 글자」
     // 바로 가기: ?scene=fireworks[&t=재생 초][&card=번호]
     const q = new URLSearchParams(location.search);
     if (q.get('scene') === 'fireworks') {
@@ -808,5 +809,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  document.querySelector('.head p').textContent = '지도를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (TX) document.querySelector('.head p').textContent = TX.a04.mapFailed;
 });

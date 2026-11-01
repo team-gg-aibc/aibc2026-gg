@@ -16,7 +16,6 @@ LAT0, LON0 = 37.53, 126.98
 KX, KY = math.cos(math.radians(LAT0)) * 111320, 110574
 YEOUIDO = (126.9312, 37.5262)
 SPACING = 70                  # 핀끼리 최소 간격(m)
-CITIZEN = '010-0000-0000(가상) · 필요할 때만 연락'
 CITY_PARKS = {'여의도공원', '앙카라공원', '서울숲', '평화의공원', '하늘공원', '노을공원', '난지천공원', '사육신공원',
               '효사정공원', '용양봉저정공원', '응봉공원', '경의선숲길공원', '양화진공원', '올림픽공원', '보라매공원'}
 
@@ -236,7 +235,7 @@ PLAN = {
 }
 
 
-def make_background(templates, core, pois, rng):
+def make_background(templates, core, pois, rng, citizen):
     river = River(json.load(open(os.path.join(ROOT, 'web', 'data', 'bridge_labels.geojson')))['features'])
     parks = hangang_parks()
     P = pools(pois, river, parks, rng)
@@ -270,7 +269,7 @@ def make_background(templates, core, pois, rng):
                     'time': f'19:{sec // 60:02d}', 'sec': sec, 'src': src,
                     'place': place.format(**extra), 'lng': round(lon, 6), 'lat': round(lat, 6)}
             if src == '시민 신고':
-                item['citizen'] = CITIZEN
+                item['citizen'] = citizen   # A-01 판정 카드의 「신고한 시민」 줄
             out.append(item)
 
     # 스스로 점검: 서울 쪽, 간격, 몫
