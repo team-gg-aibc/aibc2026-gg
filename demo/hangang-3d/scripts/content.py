@@ -85,11 +85,11 @@ def quoted(text):
 
 
 def cards(doc):
-    """판정 카드 구역마다 {name, key, title, rows: [(항목, 내용)…]}. key는 메모의 「틀 이름: …」(없으면 None)."""
+    """판정 카드 구역마다 {name, key, title, smalls, rows: [(항목, 내용)…]}. key는 메모의 「틀 이름: …」(없으면 None)."""
     out = []
     for name, b in doc['sections'].items():
         if not name.startswith('판정 카드'):
             continue
         key = next((m.group(1) for n in b['notes'] for m in [re.search(r'틀 이름: ([a-z0-9-]+)', n)] if m), None)
-        out.append({'name': name, 'key': key, 'title': b['lead'], 'rows': [tuple(r[:2]) for r in table(b)['rows']]})
+        out.append({'name': name, 'key': key, 'title': b['lead'], 'smalls': b['smalls'], 'rows': [tuple(r[:2]) for r in table(b)['rows']]})
     return out

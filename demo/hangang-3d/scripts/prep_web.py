@@ -219,16 +219,17 @@ def write(name, feats):
     print(f'  → web/data/{name}: {len(feats)}개')
 
 
-# 핀 7개 (시연용 가상 예시). dx·dy = 칩 위치(화면 px, 땅 점 기준)
+# 핀 7개 자리 (시연용 가상 예시). 장소 이름은 docs/content/A-01 판정 카드의 기울임 줄에서 읽는다(make_complaints.py).
+# dx·dy = 예전 칩 위치(화면 px, 땅 점 기준)
 PINS = [
-    (1, '여의나루역 출구', '건강관리과', 37.5269648, 126.9322458, 70, -125),
-    (2, '따릉이 대여소', '자전거PM과', 37.5271568, 126.9319, 112, -58),
+    (1, 37.5269648, 126.9322458, 70, -125),
+    (2, 37.5271568, 126.9319, 112, -58),
     # 카카오맵 장소 20519172 「여의도공원 공영주차장」(여의도동 2-11) 표시 좌표
-    (3, '공영주차장(예시)', '주차계획과', 37.527195, 126.922534, 60, -90),
-    (4, '강변 산책로', '동물보호과', 37.531485, 126.929177, 0, -70),
-    (5, '여의도공원', '정원도시정책과', 37.528005, 126.925394, 0, -70),
-    (6, '따릉이 대여소', '자전거PM과', 37.526455, 126.933365, -95, -122),
-    (7, '안내센터', '청년정책담당관', 37.527353, 126.932934, -112, -56),
+    (3, 37.527195, 126.922534, 60, -90),
+    (4, 37.531485, 126.929177, 0, -70),
+    (5, 37.528005, 126.925394, 0, -70),
+    (6, 37.526455, 126.933365, -95, -122),
+    (7, 37.527353, 126.932934, -112, -56),
 ]
 
 
@@ -313,16 +314,15 @@ def main():
 
     # ---- 핀
     pins = []
-    for i, name, dept, lat, lon, dx, dy in PINS:
-        pins.append(feat({'type': 'Point', 'coordinates': [round(lon, 6), round(lat, 6)]},
-                         id=i, name=name, dept=dept, dx=dx, dy=dy))
+    for i, lat, lon, dx, dy in PINS:
+        pins.append(feat({'type': 'Point', 'coordinates': [round(lon, 6), round(lat, 6)]}, id=i, dx=dx, dy=dy))
         pins.append(feat({'type': 'Polygon', 'coordinates': [circle(lon, lat, 14)]}, id=i, kind='ring14'))
     write('pins.geojson', pins)
-    _, _, _, lat1, lon1, _, _ = PINS[0]
+    _, lat1, lon1, _, _ = PINS[0]
     kx = math.cos(math.radians(lat1)) * 111320
     write('ring10.geojson', [
         feat({'type': 'Polygon', 'coordinates': [circle(lon1, lat1, 10)]}, kind='ring'),
-        feat({'type': 'Point', 'coordinates': [round(lon1 + 7.1 / kx, 6), round(lat1 - 7.1 / KY, 6)]}, label='출구 10m'),
+        feat({'type': 'Point', 'coordinates': [round(lon1 + 7.1 / kx, 6), round(lat1 - 7.1 / KY, 6)]}, kind='label'),   # 글자는 content A-04(화면이 text.json에서 넣는다)
     ])
 
 

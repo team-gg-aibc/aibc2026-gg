@@ -798,6 +798,7 @@ async function main() {
   renderAll();
   map.once('load', () => {
     map.setLayoutProperty('hg-ring10-label', 'text-field', TX.a04.ring);   // content A-04 「지도 위 글자」
+    applyPins();   // 처음 renderAll() 때는 레이어가 아직 없어서, 다 뜬 뒤 낮 지도의 해결한 일을 흐리게 한다(리뷰 P1)
     // 바로 가기: ?scene=fireworks[&t=재생 초][&card=번호]
     const q = new URLSearchParams(location.search);
     if (q.get('scene') === 'fireworks') {

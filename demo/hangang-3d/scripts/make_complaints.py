@@ -50,7 +50,9 @@ def load():
                           'effective': r['시행일'], 'extra_label': extra[0], 'extra': extra[1], 'law': LAW[typ]}
     t = C.table(C.section(a01, '들어온 일'))
     col = {h: i for i, h in enumerate(t['head'])}
-    rows = [(C.quoted(r[col['들어온 일']]), r[col['시각']], r[col['어디서']]) for r in t['rows']]
+    # 장소는 그 카드의 기울임 줄(「19:02 · 시민 신고 · 여의나루역 출구」)의 마지막 칸
+    rows = [(C.quoted(r[col['들어온 일']]), r[col['시각']], r[col['어디서']], c['smalls'][0].rsplit(' · ', 1)[1])
+            for r, c in zip(t['rows'], core_cards)]
     assert len(rows) == len(CORE), 'A-01 「들어온 일」 표가 핵심 7건과 다르다'
     return types, templates, dict(core_cards[0]['rows'])['신고한 시민'], rows
 
@@ -59,12 +61,12 @@ def core_items(rows, citizen):
     pins = json.load(open(os.path.join(ROOT, 'web', 'data', 'pins.geojson')))
     at = {f['properties']['id']: f for f in pins['features'] if f['geometry']['type'] == 'Point'}
     out = []
-    for n, (key, (text, hhmm, src)) in enumerate(zip(CORE, rows), 1):
+    for n, (key, (text, hhmm, src, place)) in enumerate(zip(CORE, rows), 1):
         p = at[n]
         lng, lat = p['geometry']['coordinates']
         h, m = map(int, hhmm.split(':'))
         item = {'id': n, 'n': n, 'tpl': key, 'text': text, 'time': hhmm, 'sec': (h - 19) * 3600 + m * 60,
-                'src': src, 'place': p['properties']['name'], 'lng': lng, 'lat': lat,
+                'src': src, 'place': place, 'lng': lng, 'lat': lat,
                 'dx': p['properties']['dx'], 'dy': p['properties']['dy']}
         if src == '시민 신고':
             item['citizen'] = citizen
