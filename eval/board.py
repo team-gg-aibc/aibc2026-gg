@@ -387,7 +387,7 @@ def write_tree(tree, out=DOCS):
     """tree.json(손으로 고치지 않음)과, 데이터를 안에 넣은 한 파일 화면 tree.html(인터넷 없이 열림)."""
     (out / "tree.json").write_text(json.dumps(tree, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     page = (ROOT / "eval" / "tree_template.html").read_text(encoding="utf-8")
-    data = json.dumps(tree, ensure_ascii=False).replace("</", "<\\/").replace("<!--", "<\\!--")
+    data = json.dumps(tree, ensure_ascii=False).replace("<", "\\u003c")   # JSON 이스케이프라 </script> · <!-- 둘 다 막히고 JSON.parse는 그대로 읽는다
     (out / "tree.html").write_text(page.replace("/*DATA*/null", data), encoding="utf-8")
     return out / "tree.html"
 
@@ -415,7 +415,7 @@ def selftest():
     assert nodes[2]["title"] == "바깥 근거 대조" and nodes[3]["title"] == "출력 규격 강제"
 
     def summ(gid, name, issue, w, conclusion="", created="2026-11-08T10:00:00+09:00"):
-        return {"group": gid, "run_id": gid, "created": created, "conclusion": conclusion, "lesson": ["</script><b>x</b>"],
+        return {"group": gid, "run_id": gid, "created": created, "conclusion": conclusion, "lesson": ["</script><b>x</b>", "<!-- <script> 주석"],
                 "experiment": {"name": name, "issue": issue, "cycle": 1}, "args": {"mode": "full", "split": "dev", "sample": None, "seed": 0},
                 "settings": {"top_k": 6}, "switches": {}, "cost_usd": 0.4,
                 "env": {"questions_hash": "q", "code_commit": "abc", "code_dirty": False, "code_hash": "c", "eval_commit": "e",
@@ -442,7 +442,9 @@ def selftest():
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         page = write_tree(tree, Path(d)).read_text(encoding="utf-8")
-        assert "</script><b>" not in page and page.count("</script>") == 2   # 배운 점 속 태그가 화면 코드를 끊지 않는다
+        raw = page.split('<script id="data" type="application/json">')[1].split("</script>")[0]
+        assert "<" not in raw and page.count("</script>") == 2              # 배운 점 속 </script> · <!-- 가 화면 코드를 끊지 않는다
+        assert json.loads(raw) == tree                                      # 브라우저 JSON.parse처럼 읽으면 그대로 돌아온다
     print("selftest ok")
 
 
