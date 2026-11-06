@@ -270,6 +270,10 @@ def verdict(r):
     return "⛔ 막힘(" + " · ".join(why) + ")"
 
 
+def conclusion(r):
+    return f"릴리스 {r['tag']} — {verdict(r)}(docs/engine/releases.md)"
+
+
 def cost(r):
     return "—" if r["cost"] is None else f"${r['cost']:.2f}"
 
@@ -384,6 +388,10 @@ def make(cycle, extra):
     print(f"④ 계약 점검: 응답 {ct['n']}개 · 위반 {ct['problems'] or 0} · 엔진 오류 {ct['errors']} · 75초 {ct['timeouts']} · "
           f"지연 95% {ct['latency_p95']}초 · 최대 {ct['latency_max']}초 ({ct['latency_rule']})")
     rec = record(want, cfg, sm, summaries, ct)
+    for run_id in rec["runs"]:        # 리더보드 · 실험 기록에서 이 줄이 무엇인지 보이게(채택 실험 고르기는 release-* 실행을 늘 뺀다)
+        f = R.RUNS / f"{run_id}.json"
+        f.write_text(json.dumps(dict(json.loads(f.read_text(encoding="utf-8")), conclusion=conclusion(rec)),
+                                ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     RECORDS.mkdir(parents=True, exist_ok=True)
     out = RECORDS / f"{want['tag']}.json"
     out.write_text(json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
@@ -484,6 +492,7 @@ def selftest():
            "base": {"group": "b", "weighted": 68.1, "date": "2026-11-06", "code": "50fa76d", "same_code": False},
            "band": 1.1, "band_note": " (출발 판 4번)", "contract": ct, "smoke": sm, "ok": False}
     assert verdict(dict(rec, smoke=dict(sm, ok=True), code_dirty=True)) == "⛔ 막힘(재는 동안 커밋 안 한 수정)"
+    assert conclusion(dict(rec, ok=True)) == "릴리스 rc-c1 — ✅ 통과(docs/engine/releases.md)" and not conclusion(rec).startswith("채택")
     page = render([dict(rec, tag="rc-c0", cycle=0, ok=True, experiments=[], engine={}, smoke=dict(sm, ok=True)), rec])
     assert "**가장 최근 통과 판: `rc-c0`**" in page and "⛔ 막힘(연기 시험)" in page and "+2.4 ✅ 폭의 2배 넘게 오름" in page
     assert "[#24](https://github.com/team-gg-aibc/aibc2026-gg/issues/24) 24-top20" in page and "⚠ 함정에 답함" in page
