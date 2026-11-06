@@ -13,7 +13,7 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 - 내 컴퓨터가 팀과 같은 결과를 내는지 먼저 본다(키 없이, 크레딧 0, 2초):
 
 ```bash
-python3 eval/run.py --check eval/runs/20261106-191423-baseline-dev.json
+python3 eval/run.py --check eval/runs/20261106-194852-baseline-dev.json
 ```
 
 「✅ 같은 결과」가 나오면 된다. 「다름」이면 표에서 「다름」인 항목부터 맞춘다(7절).
@@ -53,7 +53,7 @@ python3 eval/run.py --check eval/runs/20261106-191423-baseline-dev.json
 
 | 무엇 | 요약 파일의 칸 |
 |---|---|
-| 코드: 커밋, 코드 지문(엔진 · 점수 틀 파일 글자의 해시, squash 병합 뒤에도 같음), 커밋 안 한 수정이 있었나 | `env.code_commit` · `env.code_hash` · `env.code_dirty` |
+| 코드: 커밋, 엔진 코드 지문(`engine/`의 파이썬 파일과 `requirements.txt` 글자의 해시, squash 병합 뒤에도 같음), 채점 코드 지문(`eval/run.py`), 커밋 안 한 수정이 있었나(`engine/` · `eval/run.py` · 설정 파일) | `env.code_commit` · `env.code_hash` · `env.eval_code_hash` · `env.code_dirty` |
 | 평가셋: 마지막으로 바뀐 커밋, 실제로 잰 문항의 지문(id · 유형 · 질문 · 정답 조항) | `env.eval_commit` · `env.questions_hash` |
 | 설정 전체(모델 이름 · 숫자 · 스위치 · 프롬프트 판), 설정 지문, 출발 판과 다른 칸, 설정 파일 지문 | `settings` · `settings_hash` · `switches` · `experiment` |
 | 색인 지문(조각 · 임베딩 파일 해시), 실제로 쓴 검색(hybrid · keyword), 키가 있었나 | `env.index` · `env.retrieval_used` · `env.key_present` |
@@ -103,9 +103,9 @@ python3 eval/run.py --check eval/runs/<실행>.json
 ```
 
 - 그 실행과 같은 설정 파일 · 묶음 · 표본 · 씨앗으로 한 번 더 돌려 항목별 「같음 · 다름」 표와 결론을 낸다. 새 결과는 `eval/runs/`에 남기지 않는다.
-- 검색만 잰 실행: 문항마다 검색 후보가 모두 같아야 「✅ 같은 결과」다(키 없이, 크레딧 0).
+- 검색만 잰 실행: 문항마다 검색 후보가 모두 같아야 「✅ 같은 결과」다. 키워드로 잰 실행은 키가 있어도 키워드로 다시 잰다(크레딧 0). 혼합 검색으로 잰 실행은 키가 있어야 하고, 질문 임베딩이 실행마다 조금 달라 「다름」이 날 수 있다(5절).
 - 끝까지 돌린 실행: 가중 차이가 그 실행의 반복 폭 안이면 「✅ 같은 결과」다(크레딧을 쓴다). 반복 없이 한 번만 잰 실행은 폭을 몰라 「다름」으로 나온다. 먼저 `--repeat 3`으로 재 둔다.
-- 「다름」이면: 코드 지문 → `git pull` · 같은 커밋으로, 패키지 → `pip install -r engine/requirements.txt` 다시, 색인 → `git pull`(색인 파일이 레포에 있다), 평가셋 → 같은 커밋으로, 설정 파일 → 그때 판으로.
+- 「다름」이면: 엔진 코드 지문 → `git pull` · 같은 커밋으로(채점 코드 지문만 다르면 점수 규칙이 바뀌었는지 PR을 본다), 패키지 → `pip install -r engine/requirements.txt` 다시, 색인 → `git pull`(색인 파일이 레포에 있다), 평가셋 → 같은 커밋으로, 설정 파일 → 그때 판으로.
 
 ## 8. 기록 남기기 (PR)
 
