@@ -19,3 +19,6 @@ coverage/
 __pycache__/
 *.pyc
 .venv/
+
+# 엔진: 별표 원본 파일(engine.parse_annex가 받음)
+engine/data/annex_files/
