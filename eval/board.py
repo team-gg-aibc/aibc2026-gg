@@ -105,7 +105,8 @@ def leaderboard(gs, n_runs):
         for i, g in enumerate(rows, 1):
             m = g["m"]
             base = next((b for b in reversed(bases) if b["code_hash"] == g["code_hash"]), bases[-1] if bases else None)
-            delta = None if base is None or base is g else round(m["weighted"] - base["m"]["weighted"], 1)
+            delta = None if base is None or base is g or None in (m["weighted"], base["m"]["weighted"]) \
+                else round(m["weighted"] - base["m"]["weighted"], 1)
             d, flag = mark(delta, band) if base is not g else ("기준", "—")
             spread = f" ({min(g['w']):.1f}~{max(g['w']):.1f})" if len(g["w"]) > 1 else ""
             cost = "—" if g["cost"] is None else f"${g['cost']:.2f}"
@@ -113,9 +114,9 @@ def leaderboard(gs, n_runs):
                        + " | ".join(num(m["by_type"].get(k)) for k in WEIGHTS)
                        + f" | {num(m['over_abstain'])} | {num(m['citations_per_answer'], digits=2)} | {num(m['latency_p95'], '초')} | "
                        f"{cost} | {g['repeats']} | {g['code']} · {g['eval']} | {g['date']} |")
-        laws = sorted({k for g in rows for k in g["m"]["by_law"]}, key=list(LAWS).index)
+        laws = sorted({k for g in rows for k in g["m"]["by_law"]}, key=lambda k: (list(LAWS).index(k) if k in LAWS else 99, k))
         out += ["", "조례별 근거 정확도(함정 뺌):", "",
-                "| 실험 | " + " | ".join(LAWS[k] for k in laws) + " |", "|---|" + "---|" * len(laws)]
+                "| 실험 | " + " | ".join(LAWS.get(k, k) for k in laws) + " |", "|---|" + "---|" * len(laws)]
         out += [f"| {g['name']} | " + " | ".join(num(g["m"]["by_law"].get(k)) for k in laws) + " |" for g in rows]
         out += ["", "틀린 원인(문항 수, 「답이 있는데 확인 불가」는 까닭별 합):", "",
                 "| 실험 | 검색 적중률 | " + " | ".join(CAUSES) + " |", "|---|---|" + "---|" * len(CAUSES)]

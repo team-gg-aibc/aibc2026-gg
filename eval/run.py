@@ -108,8 +108,8 @@ def grade(q, resp, tr, sec, err, cfg):
     timeout = tr is not None and sec > cfg["timeout_sec"]
     if timeout:                       # 서버라면 이때 「확인 불가」로 답한다(server.py)
         resp, sec = contract.unknown(), cfg["timeout_sec"]
-    shape = isinstance(resp, dict) and set(resp) == FIELDS and isinstance(resp["citation"], list) \
-        and isinstance(resp["answer"], str)
+    shape = isinstance(resp, dict) and set(resp) == FIELDS and isinstance(resp["answer"], str) \
+        and isinstance(resp["citation"], list) and all(isinstance(c, str) for c in resp["citation"])
     unknown = shape and resp["answer"].startswith("확인 불가") and resp["citation"] == []
     fmt_ok = shape and (unknown or (str(resp["source_url"]).startswith("http")
                                     and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(resp["effective_date"])) is not None))
@@ -136,6 +136,8 @@ def grade(q, resp, tr, sec, err, cfg):
                 cause = REJECTED_OK
             elif cand == 0:
                 cause = NOT_IN
+            elif tr and tr["reason"] == pipeline.REJECTED and tr["draft"]:
+                cause = MISPICK               # 후보에 정답이 있었는데 틀린 근거를 골랐고, 판정이 그 답을 버림
             else:
                 cause = f"{ABSTAIN} ({tr['reason']})" if tr else ABSTAIN
         elif cand is not None:
@@ -456,6 +458,8 @@ def selftest():
     assert grade(gold_q, unk, tr(pipeline.NOT_FOUND), 1, None, cfg)["cause"] == f"{ABSTAIN} ({pipeline.NOT_FOUND})"
     assert grade(gold_q, unk, tr(pipeline.REJECTED, draft=ok), 1, None, cfg)["cause"] == REJECTED_OK
     assert grade(gold_q, unk, tr(pipeline.NOT_FOUND, cands=(b,)), 1, None, cfg)["cause"] == NOT_IN
+    assert grade(gold_q, unk, tr(pipeline.REJECTED, draft=dict(ok, citation=[b])), 1, None, cfg)["cause"] == MISPICK
+    assert grade(gold_q, dict(ok, citation=[7]), tr(), 1, None, cfg)["cause"] == BROKEN
     assert grade(trap_q, ok, tr(), 1, None, cfg)["cause"] == TRAP_ANSWERED
     r = grade(trap_q, ok, tr(), 80, None, cfg)          # 75초 넘으면 서버가 확인 불가로 답한다
     assert r["score"] == 1.0 and r["timeout"] and r["sec"] == 75
