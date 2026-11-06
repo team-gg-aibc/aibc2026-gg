@@ -1,0 +1,6 @@
+{
+  "name": "baseline",
+  "issue": "#21",
+  "note": "출발 판: 스타터 킷 그대로 + 검증을 solar-pro4 판정으로 (engine/config.py DEFAULTS 그대로)",
+  "engine": {}
+}
