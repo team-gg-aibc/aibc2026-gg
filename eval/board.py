@@ -339,12 +339,14 @@ def build_tree(plan_nodes, gs, issues, prs, repo, as_of, example=False):
         base = base_of(gs, g)
         if g["full"]:
             band, score, metric = noise(gs, g["table"])[0], g["m"]["weighted"], "가중 점수"
-            delta = None if base is None or base is g else round(score - base["m"]["weighted"], 1)
+            delta = None if base is None or base is g or None in (score, base["m"]["weighted"]) \
+                else round(score - base["m"]["weighted"], 1)               # 리더보드와 같이 None이면 차이를 건너뛴다
             d, flag = mark(delta, band)
         else:
             k = str(g["top_k"])
             score, metric = g["m"]["hit"].get(k), f"검색 적중률 top-{k}"
-            delta = None if base is None or base is g or score is None else round(score - base["m"]["hit"].get(k, 0), 1)
+            delta = None if base is None or base is g or None in (score, base["m"]["hit"].get(k)) \
+                else round(score - base["m"]["hit"][k], 1)                 # 기준이 이 top-k를 안 쟀으면 0으로 보지 않고 건너뛴다
             d, flag = ("—" if delta is None else f"{delta:+.1f}"), "검색만"
         return {"id": f"e-{g['group']}", "kind": "experiment", "title": name(g), "label": label(g), "cycle": g["cycle"],
                 "owner": owner, "status": next((s for s in ("채택", "버림", "보류") if g["conclusion"].startswith(s)), "진행 중"),
@@ -422,7 +424,8 @@ def selftest():
                             "citations_per_answer": 1.5, "latency_p95": 6.0}}
     runs = [summ("b1", "baseline", "#21", 68.0, created="2026-11-06T10:00:00+09:00"),
             summ("b2", "baseline", "#21", 69.0, created="2026-11-06T11:00:00+09:00"),
-            summ("x", "23-chunks", "#23", 71.5, "채택 — 올랐다"), summ("y", "22-contract", "#22", 68.6)]
+            summ("x", "23-chunks", "#23", 71.5, "채택 — 올랐다"), summ("y", "22-contract", "#22", 68.6),
+            summ("z", "22-small", "#22", None)]                               # 가중이 None인 실행(빠진 문항 종류가 있는 표본 등)
     tree = build_tree(nodes, groups([(r, None) for r in runs]), [{"number": 26, "state": "OPEN"}],
                       [{"number": 40, "state": "OPEN", "title": "t", "url": "https://x/pr/40", "body": "Closes #23"}], "https://x", "now")
     root = tree["tree"]
@@ -434,6 +437,8 @@ def selftest():
     e = h2["children"][0]
     assert (e["score"], e["delta"], e["flag"]) == ("71.5", "+2.5", "✅ 폭의 2배 넘게 오름")
     assert kids["h-22"]["status"] == "진행 중" and h2["children"][1]["status"] == "대기"
+    z = kids["h-22"]["children"][1]                                     # 가중이 None이어도 멈추지 않고 차이를 「—」로
+    assert (z["id"], z["score"], z["delta"], z["flag"]) == ("e-z", "—", "—", "—")
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         page = write_tree(tree, Path(d)).read_text(encoding="utf-8")
