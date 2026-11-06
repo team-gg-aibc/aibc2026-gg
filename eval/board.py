@@ -1,0 +1,186 @@
+"""리더보드 · 실험 기록 만들기: eval/runs/*.json(실행 요약)을 모아 docs/engine/leaderboard.md · experiments.md를 다시 쓴다.
+
+  python3 eval/board.py
+두 파일은 손으로 고치지 않는다. PR끼리 충돌하면 main을 받은 뒤 이 명령을 다시 돌린다(같은 실행 파일이면 늘 같은 표).
+결론(채택 · 버림 · 보류)은 그 실행 파일의 "conclusion" 칸에 적고 다시 돌린다.
+"""
+import json
+from collections import defaultdict
+from pathlib import Path
+
+from run import CAUSES, RUNS, WEIGHTS
+
+ROOT = Path(__file__).resolve().parent.parent
+DOCS = ROOT / "docs" / "engine"
+LAWS = {"parking": "주차장", "park": "도시공원", "smoking": "금연", "animal": "동물보호", "bicycle": "자전거",
+        "youth": "청년", "common": "공통", "kit": "킷 예시"}
+HEAD = ("> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 {n}개로 만든다. 손으로 고치지 않는다. "
+        "규칙: [재현 규칙](reproducibility.md)")
+
+
+def avg(xs):
+    """반복 실행의 숫자를 평균한다(dict는 칸마다). None이 섞이면 None."""
+    if isinstance(xs[0], dict):     # 칸이 빠진 반복(틀린 원인 0개 등)은 0으로 본다
+        keys = list(dict.fromkeys(k for x in xs for k in x))
+        return {k: avg([x.get(k, 0) for x in xs]) for k in keys}
+    if any(x is None for x in xs) or not isinstance(xs[0], (int, float)) or isinstance(xs[0], bool):
+        return xs[0] if all(x == xs[0] for x in xs) else None
+    return round(sum(xs) / len(xs), 2)
+
+
+def groups():
+    by = defaultdict(list)
+    for p in sorted(RUNS.glob("*.json")):
+        r = json.loads(p.read_text(encoding="utf-8"))
+        by[r["group"]].append(r)
+    out = []
+    for rs in by.values():
+        r0, e = rs[0], rs[0]["env"]
+        full = r0["args"]["mode"] == "full"
+        w = [r["metrics"]["weighted"] for r in rs if full and r["metrics"]["weighted"] is not None]
+        out.append({
+            "group": r0["group"], "name": r0["experiment"]["name"], "issue": r0["experiment"]["issue"] or "",
+            "conclusion": next((r["conclusion"] for r in rs if r["conclusion"]), ""), "full": full,
+            "split": r0["args"]["split"], "sample": r0["args"]["sample"], "seed": r0["args"]["seed"],
+            "table": (r0["args"]["split"], r0["args"]["sample"], r0["args"]["seed"], e["questions_hash"]),
+            "n": r0["metrics"]["n"], "date": r0["created"][:10], "created": r0["created"],
+            "code": e["code_commit"] + (" ⚠수정" if e["code_dirty"] else ""), "code_hash": e["code_hash"],
+            "eval": e["eval_commit"],
+            "search": "/".join(e["retrieval_used"]), "switches": r0["switches"], "repeats": len(rs),
+            "w": w, "m": avg([r["metrics"] for r in rs]), "top_k": r0["settings"]["top_k"],
+            "cost": None if any(r["cost_usd"] is None for r in rs) else round(sum(r["cost_usd"] for r in rs), 3),
+        })
+    return sorted(out, key=lambda g: g["created"])
+
+
+def num(x, unit="", digits=1):
+    return "—" if x is None else f"{x:g}{unit}" if isinstance(x, int) else f"{x:.{digits}f}{unit}"
+
+
+def label(g):
+    return g["split"] + (f" {g['sample']}문항 표본(씨앗 {g['seed']})" if g["sample"] else " 전체") + f" · {g['n']}문항"
+
+
+def mark(delta, band):
+    if delta is None:
+        return "—", "—"
+    if band is None:
+        return f"{delta:+.1f}", "폭 모름"
+    if delta > 2 * band:
+        return f"{delta:+.1f}", "✅ 폭의 2배 넘게 오름"
+    if abs(delta) <= band:
+        return f"{delta:+.1f}", "흔들림 안"
+    return f"{delta:+.1f}", "↑ 흔들림 밖" if delta > 0 else "↓ 흔들림 밖"
+
+
+def noise(gs, table):
+    """흔들림 폭: 같은 표(같은 문항)의 출발 판 반복 → 없으면 같은 묶음의 출발 판 반복(문항 수 표시)."""
+    reps = [g for g in gs if g["name"] == "baseline" and len(g["w"]) > 1]
+    same = [g for g in reps if g["table"] == table] or [g for g in reps if g["split"] == table[0]]
+    if not same:
+        return None, ""
+    g = same[-1]
+    return round(max(g["w"]) - min(g["w"]), 1), ("" if g["table"] == table else f" ({g['n']}문항 반복으로 잰 폭)")
+
+
+def leaderboard(gs, n_runs):
+    out = ["# 엔진 리더보드", "", HEAD.format(n=n_runs) + " · 기록 표: [실험 기록](experiments.md)", "",
+           "## 끝까지 돌린 점수", "",
+           "같은 문항끼리만 견준다(묶음 · 표본 · 문항 지문이 같은 표). 숫자는 % 점수다. **가중** = (3 × 단순 + 3 × 조건 + 3 × 결합 + 2 × 함정) ÷ 11. "
+           "**출발 판 대비** = 같은 표의 출발 판(baseline, 코드 지문이 같은 것이 있으면 그것, 없으면 가장 최근 것)과의 가중 차이. "
+           "**흔들림** = 출발 판을 같은 설정으로 여러 번 돌린 가중 폭과 견준 것. 채택 기준(계획 5-2절)은 「폭의 2배 넘게 오름」.", ""]
+    full = [g for g in gs if g["full"] and g["split"] != "holdout"]
+    if not full:
+        out += ["아직 없음. 키를 넣고 `python3 eval/run.py --split dev`(출발 판)와 "
+                "`python3 eval/run.py --sample 100 --repeat 3`(흔들림 폭)을 돌린 뒤 이 명령을 다시 돌린다.", ""]
+    tables = sorted({g["table"] for g in full}, key=lambda t: (t[0] != "dev", t[1] or 0, t[0]))
+    for t in tables:
+        rows = sorted([g for g in full if g["table"] == t], key=lambda g: -(g["m"]["weighted"] or 0))
+        bases = [g for g in rows if g["name"] == "baseline"]
+        band, band_note = noise(gs, t)
+        out += [f"### {label(rows[0])} (문항 지문 `{t[3]}`)", "",
+                f"흔들림 폭: {num(band, '점')}{band_note}", "",
+                "| 순위 | 실험 | 이슈 | 가중 | 출발 판 대비 | 흔들림 | 단순 | 조건 | 결합 | 함정 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 반복 | 코드 · 평가셋 | 날짜 |",
+                "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        for i, g in enumerate(rows, 1):
+            m = g["m"]
+            base = next((b for b in reversed(bases) if b["code_hash"] == g["code_hash"]), bases[-1] if bases else None)
+            delta = None if base is None or base is g else round(m["weighted"] - base["m"]["weighted"], 1)
+            d, flag = mark(delta, band) if base is not g else ("기준", "—")
+            spread = f" ({min(g['w']):.1f}~{max(g['w']):.1f})" if len(g["w"]) > 1 else ""
+            cost = "—" if g["cost"] is None else f"${g['cost']:.2f}"
+            out.append(f"| {i} | {g['name']} | {g['issue']} | **{num(m['weighted'])}**{spread} | {d} | {flag} | "
+                       + " | ".join(num(m["by_type"].get(k)) for k in WEIGHTS)
+                       + f" | {num(m['over_abstain'])} | {num(m['citations_per_answer'], digits=2)} | {num(m['latency_p95'], '초')} | "
+                       f"{cost} | {g['repeats']} | {g['code']} · {g['eval']} | {g['date']} |")
+        laws = sorted({k for g in rows for k in g["m"]["by_law"]}, key=list(LAWS).index)
+        out += ["", "조례별 근거 정확도(함정 뺌):", "",
+                "| 실험 | " + " | ".join(LAWS[k] for k in laws) + " |", "|---|" + "---|" * len(laws)]
+        out += [f"| {g['name']} | " + " | ".join(num(g["m"]["by_law"].get(k)) for k in laws) + " |" for g in rows]
+        out += ["", "틀린 원인(문항 수, 「답이 있는데 확인 불가」는 까닭별 합):", "",
+                "| 실험 | 검색 적중률 | " + " | ".join(CAUSES) + " |", "|---|---|" + "---|" * len(CAUSES)]
+        for g in rows:
+            c = defaultdict(float)
+            for k, v in (g["m"].get("causes") or {}).items():
+                c[next((x for x in CAUSES if k.startswith(x)), CAUSES[-1])] += v or 0
+            out.append(f"| {g['name']} | {num(g['m']['retrieval_hit'])} | " + " | ".join(f"{c.get(x, 0):g}" for x in CAUSES) + " |")
+        out.append("")
+
+    ret = sorted([g for g in gs if not g["full"]], key=lambda g: (g["split"], -(g["m"]["hit"].get(str(g["top_k"])) or 0)))
+    out += ["## 검색 적중률 (키 없이도 잰다)", "",
+            "정답 근거가 검색 후보 안에 드는 비율(함정 · 회색지대 뺌, 킷 채점식). 「유형별」은 실험의 후보 수(top-k) 기준.", "",
+            "| 실험 | 이슈 | 묶음 | 검색 | top-1 | top-3 | top-k | top-10 | top-20 | 단순 | 조건 | 결합 | 코드 · 평가셋 | 날짜 |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"] if ret else ["## 검색 적중률 (키 없이도 잰다)", "", "아직 없음. `python3 eval/run.py --split dev --mode retrieval`"]
+    for g in ret:
+        h, k = g["m"]["hit"], str(g["top_k"])
+        out.append(f"| {g['name']} | {g['issue']} | {label(g)} | {g['search']} | {num(h.get('1'))} | {num(h.get('3'))} | "
+                   f"**{num(h.get(k))}** (top-{k}) | {num(h.get('10'))} | {num(h.get('20'))} | "
+                   + " | ".join(num(g["m"]["by_type"].get(t)) for t in ("단순", "조건", "결합")) + f" | {g['code']} · {g['eval']} | {g['date']} |")
+    reps = [g for g in gs if len(g["w"]) > 1]
+    out += ["", "## 흔들림 (같은 설정 반복)", ""]
+    out += ["| 실험 | 묶음 | 가중 (회마다) | 폭 | 코드 |", "|---|---|---|---|---|"] + [
+        f"| {g['name']} | {label(g)} | {' · '.join(f'{x:.1f}' for x in g['w'])} | {max(g['w']) - min(g['w']):.1f} | {g['code']} |"
+        for g in reps] if reps else ["아직 없음. `python3 eval/run.py --sample 100 --repeat 3`"]
+    hold = [g for g in gs if g["full"] and g["split"] == "holdout"]
+    out += ["", "## holdout (요약만, 큰 이정표에서만)", ""]
+    out += ["| 날짜 | 실험 | 가중 | 단순 | 조건 | 결합 | 함정 | 과잉 포기 | 코드 · 평가셋 |", "|---|---|---|---|---|---|---|---|---|"] + [
+        f"| {g['date']} | {g['name']} | {num(g['m']['weighted'])} | " + " | ".join(num(g["m"]["by_type"].get(k)) for k in WEIGHTS)
+        + f" | {num(g['m']['over_abstain'])} | {g['code']} · {g['eval']} |" for g in hold] if hold else ["아직 없음(11/18 동결 판에서 한 번)."]
+    return "\n".join(out) + "\n"
+
+
+def experiments(gs, n_runs):
+    out = ["# 실험 기록", "", HEAD.format(n=n_runs) + " · 한눈에 비교: [리더보드](leaderboard.md)", "",
+           "- 실험마다 켠 판과 끈 판을 **같은 main 커밋 · 같은 문항**으로 같은 날 잰다(계획 5-2절). 「켠 스위치」는 출발 판(`engine/config.py` DEFAULTS)과 다른 설정이다.",
+           "- 결론은 그 실행 파일(`eval/runs/<실행>.json`)의 `\"conclusion\"`에 「채택 · 버림 · 보류 — 한 줄 이유」로 적고 `python3 eval/board.py`를 다시 돌린다. 채택 · 버림은 동규가 정한다.",
+           "- 「검색만」 줄의 단순 · 조건 · 결합은 근거 정확도가 아니라 검색 적중률(top-k)이다.", "",
+           "| 날짜 | 이슈 | main · 평가셋 커밋 | 켠 스위치 | 묶음(문항) | 단순 | 조건 | 결합 | 함정 | 가중 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 결론 |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for g in gs:
+        m = g["m"]
+        sw = ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in g["switches"].items()) or "출발 판"
+        what = f"{g['name']} · {label(g)}" + (f" · {g['repeats']}회 평균" if g["repeats"] > 1 else "")
+        cost = "—" if g["cost"] is None else f"${g['cost']:.2f}"
+        if g["full"]:
+            cells = [num(m["by_type"].get(k)) for k in WEIGHTS] + [num(m["weighted"]), num(m["over_abstain"]),
+                                                                   num(m["citations_per_answer"], digits=2), num(m["latency_p95"], "초")]
+        else:
+            k = str(g["top_k"])
+            what += f" · 검색만({g['search']}) top-{k} {num(m['hit'].get(k))}"
+            cells = [num(m["by_type"].get(t)) for t in ("단순", "조건", "결합")] + ["—"] * 5
+        out.append(f"| {g['date']} | {g['issue']} | {g['code']} · {g['eval']} | {sw} | {what} | " + " | ".join(cells)
+                   + f" | {cost} | {g['conclusion']} |")
+    return "\n".join(out) + "\n"
+
+
+def main():
+    gs = groups()
+    n = sum(1 for _ in RUNS.glob("*.json"))
+    DOCS.mkdir(parents=True, exist_ok=True)
+    (DOCS / "leaderboard.md").write_text(leaderboard(gs, n), encoding="utf-8")
+    (DOCS / "experiments.md").write_text(experiments(gs, n), encoding="utf-8")
+    print(f"실행 요약 {n}개 → docs/engine/leaderboard.md · experiments.md")
+
+
+if __name__ == "__main__":
+    main()

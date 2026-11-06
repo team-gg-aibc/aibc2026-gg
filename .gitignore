@@ -22,3 +22,6 @@ __pycache__/
 
 # 엔진: 별표 원본 파일(engine.parse_annex가 받음)
 engine/data/annex_files/
+
+# 점수 틀: 문항별 결과(요약은 eval/runs/에 남기고 남길 것만 커밋)
+eval/results/
