@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent
@@ -73,10 +74,9 @@ def _env_files():
         pass
 
 
-def api_key():
-    """환경 변수 → 레포 .env 순서로 찾는다. 값은 돌려주기만 하고 출력하지 않는다."""
-    if os.environ.get("UPSTAGE_API_KEY") is not None:   # 빈 값으로 두면 「키 없이」로 돈다
-        return os.environ["UPSTAGE_API_KEY"].strip()
+@lru_cache(maxsize=None)
+def _key_in_env_file():
+    """.env는 한 번만 읽는다(문항마다 git을 띄우지 않게. 하위 프로세스가 동시 계산과 겹치면 멈출 수 있다)."""
     for f in _env_files():
         if f.is_file():
             for line in f.read_text(encoding="utf-8").splitlines():
@@ -84,3 +84,10 @@ def api_key():
                 if sep and k.strip() == "UPSTAGE_API_KEY":
                     return v.strip().strip("'\"")
     return ""
+
+
+def api_key():
+    """환경 변수 → 레포 .env 순서로 찾는다. 값은 돌려주기만 하고 출력하지 않는다."""
+    if os.environ.get("UPSTAGE_API_KEY") is not None:   # 빈 값으로 두면 「키 없이」로 돈다
+        return os.environ["UPSTAGE_API_KEY"].strip()
+    return _key_in_env_file()
