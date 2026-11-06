@@ -9,7 +9,7 @@
 
 결과: eval/runs/<실행>.json(요약, 리더보드 재료, 남길 것만 커밋) · eval/results/<실행>.jsonl(문항별) · <실행>.html(문항마다
 단계별 궤적 화면). eval/results/는 git에 안 올린다. holdout은 요약만 남긴다. 비용 상한은 기본으로 없다(동규 11-06).
-리더보드 · 실험 기록은 python3 eval/board.py. 규칙은 docs/engine/reproducibility.md.
+리더보드 · 실험 기록은 python3 eval/board.py, 기준과 문항별 비교는 python3 eval/compare.py. 규칙은 docs/engine/reproducibility.md.
 """
 import argparse
 import hashlib
@@ -287,6 +287,7 @@ def record(args, cfg, exp, qs, rows, mode, wall, run_id, group, rep):
         "run_id": run_id, "group": group, "repeat": rep, "repeats": args.repeat,
         "created": created,
         "experiment": dict(exp, cycle=cycle_of(created) if exp.get("cycle") is None else exp["cycle"]), "conclusion": "",
+        "lesson": [],   # 배운 점 세 줄(사람이 적는다): 무엇이 좋아지고 나빠졌나 / 왜 그런 것 같나 / 다음에 해 볼 것
         "args": {"config": args.config, "split": args.split, "sample": args.sample, "seed": args.seed,
                  "mode": mode, "url": args.url, "workers": args.workers},
         "settings": cfg, "settings_hash": config.digest(cfg),
