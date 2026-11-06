@@ -1,0 +1,119 @@
+{
+ "run_id": "20261107-012551-release-c0-dev-r1",
+ "group": "20261107-012551-release-c0-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-07T01:35:11+09:00",
+ "experiment": {
+  "name": "release-c0",
+  "issue": "",
+  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
+  "cycle": 0,
+  "file": "eval/configs/release.json",
+  "file_sha": "7bff8153ff00"
+ },
+ "conclusion": "릴리스 rc-c0 — ✅ 통과(docs/engine/releases.md)",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/release.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false
+ },
+ "settings_hash": "698ee7f958d5",
+ "switches": {},
+ "env": {
+  "code_commit": "e1f01ef",
+  "code_hash": "c0e1af2fbe29",
+  "eval_code_hash": "ac989cd5d33d",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.4",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 67.0,
+  "by_type": {
+   "단순": 70.6,
+   "조건": 67.8,
+   "결합": 45.5,
+   "함정": 92.9
+  },
+  "trap": 92.9,
+  "by_law": {
+   "animal": 71.7,
+   "bicycle": 67.9,
+   "common": 30.0,
+   "park": 58.8,
+   "parking": 53.5,
+   "smoking": 72.6,
+   "youth": 72.5
+  },
+  "over_abstain": 28.1,
+  "citations_per_answer": 1.52,
+  "retrieval_hit": 82.9,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.212,
+  "latency_p95": 5.695,
+  "latency_max": 11.255,
+  "causes": {
+   "판정이 맞는 답을 거절": 114,
+   "정답이 후보에 없음": 110,
+   "답이 있는데 확인 불가 (found 거짓)": 10,
+   "후보에 있는데 잘못 고름": 7,
+   "함정에 답함": 3,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 1
+  }
+ },
+ "cost_usd": 0.336,
+ "tokens": {
+  "in": 1186816,
+  "cached": 350336,
+  "out": 61209
+ },
+ "calls": 1905,
+ "wall_sec": 560.2,
+ "hashes": {
+  "retrieval": "62aa4d71507d",
+  "answers": "b0461a8968ef"
+ }
+}

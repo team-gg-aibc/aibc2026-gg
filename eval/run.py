@@ -248,7 +248,7 @@ def summarize(rows, mode, top_k):
 
 def git(*args):
     try:
-        return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=10).stdout.strip()
+        return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, encoding="utf-8", timeout=10).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -381,7 +381,8 @@ def run(args):
         out.append(s)
     if args.repeat > 1 and mode == "full":
         w = [s["metrics"]["weighted"] for s in out]
-        print(f"\n흔들림: 가중 {w} → 폭 {round(max(w) - min(w), 1)}점")
+        print(f"\n흔들림: 가중 {w} → 폭 {round(max(w) - min(w), 1)}점" if None not in w
+              else f"\n흔들림: 가중 {w} → 폭을 못 낸다(표본에 빠진 문항 종류가 있어 가중이 None. --sample을 키운다)")
     print("\n리더보드 · 실험 기록 다시 만들기: python3 eval/board.py")
     return out
 
