@@ -2,15 +2,62 @@
 
 스타터 킷(커밋 `8866d0e`: 받은 그대로 + 없어진 groundedness-check 대신 solar-pro4 판정)을 옮겨 단계별 파일로 나눈 판이다. 동작은 킷과 같다. 이 판이 모든 실험의 **출발 판**이고, 실험은 `eval/configs/`의 설정 파일로 스위치를 켜서 잰다(규칙은 `docs/engine/reproducibility.md`).
 
-## 설치
+## 설치 (처음 한 번)
 
-파이썬 3.10~3.13. 레포 맨 위 폴더에서:
+1. **파이썬 3.10~3.13**(3.12를 권한다). `python3 --version`(윈도우는 `py -0`)으로 판을 본다. 맥에 기본으로 깔린 3.9와 Homebrew 최신 3.14로는 설치가 막힌다. 3.9는 고정한 패키지 판을 못 깔고, 3.14는 고정한 numpy 2.2.6의 설치 파일이 없다. 그럴 때는 python.org에서 3.12를 깔고 아래 `python3` 자리에 `python3.12`(윈도우는 `py -3.12`)를 쓴다.
+2. 레포를 받고 가상 환경을 만든다(설치는 1분 안쪽):
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
+git clone https://github.com/team-gg-aibc/aibc2026-gg.git
+cd aibc2026-gg
+python3 -m venv .venv
+.venv/bin/pip install -r engine/requirements.txt
 ```
 
-키는 레포 맨 위 `.env`의 `UPSTAGE_API_KEY` 하나다(`.env.example`을 복사). git worktree에서 돌리면 원래 레포 폴더의 `.env`도 읽는다. **키가 없어도 키워드 검색은 돈다.** 키 값은 어디에도 출력하지 않는다.
+3. **이 뒤의 명령은 모두 가상 환경의 파이썬으로 돌린다.** 맥은 `.venv/bin/python`, 윈도우는 `.venv\Scripts\python`이다. 이 문서 · 재현 규칙 · 이슈에 `python3 eval/…`로 적힌 명령도 이것으로 돌린다. 그냥 `python3`로 돌리면 `No module named 'requests'`가 난다.
+4. 키: `.env.example`을 `.env`로 복사하고(`cp .env.example .env`) `UPSTAGE_API_KEY=` 뒤에 자기 업스테이지 콘솔 키를 붙인다(크레딧은 각자 신청, 결정 10-26). 엔진은 이 칸 하나만 쓴다. git worktree에서 돌리면 원래 레포 폴더의 `.env`도 읽는다. **키가 없어도 키워드 검색은 돈다.** 키 값은 어디에도 출력하지 않는다.
+
+## 처음 해 보기 (5분, 약 2센트)
+
+처음 받은 컴퓨터에서 위에서부터 차례로 돌린다. 맥 기준이고, 윈도우는 아래 「윈도우에서 다른 것」 표대로 바꾼다.
+
+```bash
+.venv/bin/python eval/run.py --check eval/runs/20261106-201622-baseline-dev.json
+.venv/bin/python -m engine.pipeline "경차 주차요금 할인돼요?"
+.venv/bin/python eval/run.py --config eval/configs/baseline.json --split dev --sample 20 --repeat 2
+.venv/bin/python eval/compare.py <두 번째 실행 이름> --base <첫 번째 실행 이름>
+.venv/bin/python eval/board.py --tree
+open docs/engine/tree.html
+```
+
+| 단계 | 되면 이렇게 보인다 |
+|---|---|
+| ① 재현 점검 (키 없이, 2초) | 마지막 줄이 `결론: ✅ 같은 결과`. 그 위 점검 표에서 이름에 「참고」가 붙은 줄과 「파이썬」 줄은 「다름」이어도 된다 |
+| ② 한 문항 (키 필요, 6초) | 답 · 인용 · 원문 주소 · 시행일 4칸과 판단 기록 |
+| ③ dev 20문항 두 번 (키 필요, 45초쯤, 2센트쯤) | 실행 이름 두 개(`…-baseline-dev-n20-r1` · `…-r2`)와 「흔들림」 폭. 20문항은 맛보기라 폭이 20점을 넘기도 한다. 채택 판단은 dev 전체로 한다(재현 규칙 3절) |
+| ④ 비교 | `docs/engine/compare/<두 번째 실행 이름>.md`. 설정과 코드가 같은 두 실행이라 「모두 흔들림」 경고가 붙는다 |
+| ⑤ 리더보드 · 나무 | `docs/engine/leaderboard.md` · `experiments.md` · `tree.html`이 바뀌고 나무 화면이 열린다. gh가 없으면 경고 한 줄 뒤 이슈 · PR 상태 없이 그린다 |
+
+- 표본은 12문항 이상으로 뽑는다. 10문항 이하면 함정 문항이 빠져 가중 점수가 None이 된다.
+- 연습한 결과는 올리지 않는다. 끝나면 `git restore docs/engine` 뒤 `git clean -f eval/runs docs/engine/compare`로 되돌린다. 처음 받은 폴더라서 지워지는 것은 연습 결과뿐이다(아직 커밋 안 한 실험 결과가 있는 폴더에서는 쓰지 않는다).
+
+## 윈도우에서 다른 것
+
+PowerShell 기준이다.
+
+| 맥 | 윈도우 |
+|---|---|
+| `python3 -m venv .venv` | `py -3.12 -m venv .venv` |
+| `.venv/bin/python` · `.venv/bin/pip` | `.venv\Scripts\python` · `.venv\Scripts\pip` |
+| `cp .env.example .env` | `copy .env.example .env` 뒤 `notepad .env` |
+| `open docs/engine/tree.html` | `start docs\engine\tree.html` |
+| `ENGINE_CONFIG=eval/configs/baseline.json .venv/bin/uvicorn …` | `$env:ENGINE_CONFIG="eval/configs/baseline.json"` 뒤 `.venv\Scripts\uvicorn …` |
+| `명령1 && 명령2` | 두 줄로 나눠 친다(윈도우에 기본으로 깔린 PowerShell 5.1은 `&&`를 모른다) |
+
+- 파이썬은 python.org 설치 파일로 깔고 「Add python.exe to PATH」에 체크한다. `py -0`에 3.12가 보이면 된다.
+- 터미널을 열 때마다 먼저 `$env:PYTHONUTF8=1`(cmd는 `set PYTHONUTF8=1`)을 친다. 한국어 윈도우는 글자를 cp949로 다뤄서, 결과를 파일로 넘기면 ✅ 같은 글자에서 멈추고 다른 프로그램의 한글 출력을 읽다 멈출 수 있다. 매번 치기 싫으면 `setx PYTHONUTF8 1`을 한 번 치고 터미널을 다시 연다.
+- 가상 환경을 켜는 `Activate.ps1`은 실행 정책에 막힐 수 있다. 켜지 말고 위처럼 `.venv\Scripts\python`을 바로 부른다.
+- 줄 끝: 레포의 `.gitattributes`가 윈도우에서도 줄 끝을 LF로 받게 한다. 이 파일이 들어오기 전에 윈도우에서 clone한 폴더는 ① 재현 점검에서 「엔진 코드 지문」 · 「색인 지문」이 「다름」으로 나온다. 그러면 새 폴더에 다시 clone한다.
 
 ## 돌리기
 
@@ -28,13 +75,13 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 
 | 하려는 것 | 명령 · 문서 |
 |---|---|
-| 내 컴퓨터가 팀과 같은 결과를 내나 (키 없이, 2초) | `python3 eval/run.py --check eval/runs/<키워드 dev 실행>.json` (파일 이름은 재현 규칙 1절) |
+| 내 컴퓨터가 팀과 같은 결과를 내나 (키 없이, 2초) | `python3 eval/run.py --check eval/runs/20261106-201622-baseline-dev.json` (재현 규칙 1절) |
 | 실험 하나 재기 | 설정 파일 `eval/configs/<이슈>-<이름>.json`을 만들고 `python3 eval/run.py --config <설정 파일>` |
 | 리더보드 · 실험 기록 다시 만들기 | `python3 eval/board.py` → [리더보드](../docs/engine/leaderboard.md) · [실험 기록](../docs/engine/experiments.md) |
 | 탐색 모드(1~3주기: 90초 조건 없이, 문항당 300초까지) | 설정에 `"explore": true, "timeout_sec": 300` (바탕: `eval/configs/explore.json`) |
 | 문항마다 단계별 입력 · 프롬프트 · 모델 출력 · 시간 · 토큰 보기 | 끝까지 잰 실행이 `eval/results/<실행>.html`을 만든다. 문항 하나는 `python3 eval/trajectory.py <실행> <문항 id>` |
-| 병합 전 브랜치들의 결과까지 한 표로 (배분일) | `git fetch origin` 뒤 `python3 eval/board.py --from-branches 'origin/*'` (화면에만) |
-| 가설이 실험 · 배운 점을 거쳐 다음 가설로 가는 나무 (배분일) | `python3 eval/board.py --tree` → `docs/engine/tree.html`. **로컬에서 보기: `open docs/engine/tree.html`**(데이터가 안에 있어 인터넷 없이 열리고, 화면 폭에 맞춰 움직인다). 디스코드 그림용 정적 보기는 주소 뒤에 `?snapshot=1`(모든 가지 펼침, 폭 1200, 옆 칸 없음) |
+| 병합 전 브랜치들의 결과까지 한 표로 (배분일) | `git fetch origin` 뒤 `python3 eval/board.py --from-branches "origin/*"` (화면에만. 큰따옴표는 윈도우 cmd에서도 된다) |
+| 가설이 실험 · 배운 점을 거쳐 다음 가설로 가는 나무 (배분일) | `python3 eval/board.py --tree` → `docs/engine/tree.html`. **로컬에서 보기: `open docs/engine/tree.html`**(윈도우는 `start docs\engine\tree.html`. 데이터가 안에 있어 인터넷 없이 열리고, 화면 폭에 맞춰 움직인다). 디스코드 그림용 정적 보기는 주소 뒤에 `?snapshot=1`(모든 가지 펼침, 폭 1200, 옆 칸 없음) |
 | 기준과 문항마다 견주기 (버린 실험도) | `python3 eval/compare.py <실행>` → `docs/engine/compare/<실행>.md` |
 | 규칙(실험 하나 = 설정 파일 하나, 고정한 것 · 흔들리는 것, 기록 · 비교 · 색인 바꾸기 · 크레딧) | [재현 규칙](../docs/engine/reproducibility.md) |
 

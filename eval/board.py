@@ -45,7 +45,7 @@ def local_runs():
 
 
 def git(*args):
-    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, check=True).stdout
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, encoding="utf-8", check=True).stdout
 
 
 def branch_runs(pattern):
@@ -299,7 +299,7 @@ def repo_url(origin=None):
 def gh_json(*args):
     """GitHub 이슈 · PR 상태. gh가 없거나 실패하면 빈 목록(나무는 그려지고 상태는 실행 요약만으로 정한다)."""
     try:
-        return json.loads(subprocess.run(["gh", *args], capture_output=True, text=True, timeout=60, check=True).stdout)
+        return json.loads(subprocess.run(["gh", *args], capture_output=True, encoding="utf-8", timeout=60, check=True).stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
         print("⚠ gh로 이슈 · PR 상태를 못 읽었다. 상태는 실행 요약만으로 정한다.")
         return []

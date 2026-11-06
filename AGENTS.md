@@ -58,7 +58,7 @@
 2. `docs/decisions.md`: 정한 것. 어긋나는 일이면 멈추고 PM에게 묻는다
 3. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
 4. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
-5. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법)
+5. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다
 
 맡은 이슈가 없으면 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`)로 지금 어디까지 왔는지 보고 PM에게 묻는다.
 
