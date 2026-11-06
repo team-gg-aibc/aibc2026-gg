@@ -6,7 +6,7 @@
  "created": "2026-11-07T02:00:03+09:00",
  "experiment": {
   "name": "judge_lenient",
-  "issue": "",
+  "issue": "#55",
   "note": "PM 실험(동규 11-07, 이슈는 올린 뒤 채움): 판정 프롬프트 v2-lenient. 근거와 어긋나거나 근거에 없는 주장만 거절하고, 숫자 · 표현 차이 · 질문 상황에 대입한 결론 · 안내 문구는 통과",
   "cycle": 1,
   "file": "eval/configs/pm-judge-lenient.json",

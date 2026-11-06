@@ -259,7 +259,7 @@ flowchart LR
 
 | 사람 | 이슈 (마감) | 왜 이 사람인가 |
 |---|---|---|
-| 동규 | **엔진 성능 책임**(리딩 · 검수 · 통합 · 채택 결정). [#20](https://github.com/team-gg-aibc/aibc2026-gg/issues/20) 뼈대 · [#21](https://github.com/team-gg-aibc/aibc2026-gg/issues/21) 점수 틀과 출발 점수는 「엔진 바탕」 Claude 세션이 11/7 19:00 회의 전까지 만든다. 그 뒤 배분일마다 결과를 보고 다음 실험을 나누고, 못 끝낸 실험을 받아 마저 돌린다. 실험 기간에는 시각 · 행정을 준비한다 | PM · 리딩이고 엔진 성능을 책임진다(11-06 정정) |
+| 동규 | **엔진 성능 책임**(리딩 · 검수 · 통합 · 채택 결정). [#20](https://github.com/team-gg-aibc/aibc2026-gg/issues/20) 뼈대 · [#21](https://github.com/team-gg-aibc/aibc2026-gg/issues/21) 점수 틀과 출발 점수는 「엔진 바탕」 Claude 세션이 11/7 19:00 회의 전까지 만든다. 그 뒤 배분일마다 결과를 보고 다음 실험을 나누고, 못 끝낸 실험을 받아 마저 돌린다. 실험 기간에는 시각 · 행정을 준비한다. 1주기 PM 쪽 실험: [#55](https://github.com/team-gg-aibc/aibc2026-gg/issues/55) 판정 너그럽게 (11/8) | PM · 리딩이고 엔진 성능을 책임진다(11-06 정정) |
 | 동욱 | [#22](https://github.com/team-gg-aibc/aibc2026-gg/issues/22) 출력 규격 강제 · 0점 방어 (11/8 24:00), [#31](https://github.com/team-gg-aibc/aibc2026-gg/issues/31) 채점 서버 (주기와 따로: 빈 서버 11/13, 리허설 11/19) | 10/27부터 채점 서버 담당이다. 0점 조건(서버 꺼짐 · 오류 · 시간 초과)은 출구 검사부터 서버까지 한 사람이 끝까지 책임진다 |
 | 건영 | [#23](https://github.com/team-gg-aibc/aibc2026-gg/issues/23) 조각 다듬기 (11/8 24:00) | 정규식 · 데이터 처리가 많고 키 없이 먼저 잴 수 있는 일이다. 리뷰 봇을 운영해 본 자동화 경험이 맞고, 크레딧을 적게 쓴다 |
 | 종희 | [#24](https://github.com/team-gg-aibc/aibc2026-gg/issues/24) 후보 넓히기 (11/8 24:00) | 근거 고르기 · 답 쓰기 파일(`answer.py`)을 고친다. 같은 파일을 고치는 다음 후보(#27 · #29)를 이어서 맡으면 충돌이 없다 |
