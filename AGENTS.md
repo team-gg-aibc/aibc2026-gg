@@ -32,7 +32,7 @@
 
 ## 4. 일하는 순서
 
-1. 일 하나 = GitHub 이슈 하나. 시작 전에 이슈에서 담당자로 선점한다.
+1. 일 하나 = GitHub 이슈 하나. PM(동규)이 이슈로 담당과 마감을 정한다. 보고 · 마감 · 이어받기는 [docs/work-method.md](docs/work-method.md)를 따른다.
 2. 브랜치를 만들고, 작게 커밋하고, PR을 올린다. 규칙: [CONTRIBUTING.md](CONTRIBUTING.md)
 3. 리뷰는 [REVIEW.md](REVIEW.md) 기준으로 한다. GG 비서 리뷰는 참고용이다.
 4. **최종 리뷰와 병합은 PM(동규)이 한다.** 병합 조건은 CI 통과다.
@@ -50,7 +50,7 @@
 팀원마다 AI가 달라서, 각자의 대화에서 정한 것은 레포에 남겨야 다음 사람의 AI가 이어받는다.
 
 **시작 전**
-- 이 파일, `docs/decisions.md`, 맡은 이슈를 먼저 읽는다.
+- 이 파일, `docs/decisions.md`, `docs/work-method.md`, 맡은 이슈를 먼저 읽는다.
 - 지금 어디까지 왔는지 본다: 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`).
 
 **끝난 뒤**
