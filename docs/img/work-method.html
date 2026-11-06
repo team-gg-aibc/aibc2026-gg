@@ -136,7 +136,7 @@ td.dist{color:var(--orange);font-weight:700}
       <div class="term"><b>1주기만 11/8(일) 21시까지.</b> 11/7은 특화교육과 19시 회의 뒤에 시작해서요.</div></div></div>
     <div class="step g"><div><span class="chip">둘째 날 20시</span></div><div class="txt">GG비서가 「오늘 마감」을 알려요.</div></div>
     <div class="step g"><div><span class="chip">둘째 날 24시<br>= 마감</span></div><div class="txt"><b>끝 보고</b>: 결과 표 · 의견 · 배운 점. <b>다 못 했어도, 버림 · 보류여도</b> 달아요. 일찍 끝났으면 예비 하나를 가져가요(3장).</div></div>
-    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기(배운 점 모음부터) <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 다음 배분안(가설 제안 · 남은 예비도 후보) <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
+    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기(배운 점 모음부터) <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 채택된 스위치를 <b>릴리스 판</b>에 모아 다시 재기(3장) <span class="arrow">→</span> 다음 배분안(가설 제안 · 남은 예비도 후보) <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
   </div>
 
   <h2>주기 달력</h2>
@@ -153,8 +153,8 @@ td.dist{color:var(--orange);font-weight:700}
     <div class="v1"><b>수렴 (4~5주기)</b><br>시간을 줄여요. 응답의 95%가 30초 안, 가장 느려도 90초 안.</div>
   </div>
   <div class="after">
-    <div class="d">11/17(화)부터</div><div>동결: 새 실험 없이 버그만 고쳐요(동규 승인)</div>
-    <div class="d">11/18(수)</div><div>holdout 한 번 · 동결 판 배포<span class="gl">holdout = 마지막 확인용 문제(174문항). 팀원은 재지 않아요</span></div>
+    <div class="d">11/17(화)부터</div><div>동결: <b>그때의 릴리스 판이 동결 판</b>.<br>새 실험 없이 버그만 고쳐요(동규 승인)</div>
+    <div class="d">11/18(수)</div><div>holdout 한 번 · 동결 판을 채점 서버(#31)에 올려요<span class="gl">holdout = 마지막 확인용 문제(174문항). 팀원은 재지 않아요</span></div>
     <div class="d">11/19(목)</div><div>리허설 · 채점 API 가동</div>
     <div class="d">11/22(일) 24:00</div><div>최종 제출</div>
   </div>
@@ -216,17 +216,16 @@ td.dist{color:var(--orange);font-weight:700}
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
 </section>
 
-<!-- ===================== 3장: 함께 쓰는 것 ===================== -->
+<!-- ===================== 3장: 가설에서 제출할 판까지 ===================== -->
 <section class="page" id="p3">
   <div>
     <div class="label">TEAM GG · 우리가 일하는 방식 · 3/3</div>
-    <h1>가설은 누구나,<br>일찍 끝나면 예비로</h1>
+    <h1>가설에서 제출할 판까지</h1>
   </div>
 
   <h2>가설 제안 (누구나, 아무 때나)</h2>
   <div class="boxes">
-    <div class="box">GitHub에서 <b>「가설 제안」</b> 양식으로 이슈를 열어요: 가설 한 문장 · 근거(어느 문항이 왜 틀렸나) · 켜고 끌 스위치와 고칠 파일 · 기대 효과 · 걸릴 시간.</div>
-    <div class="box">배분일에 동규가 고르면 「앞뒤 맥락」을 붙인 실험 이슈로 바뀌고, <b>되도록 제안한 사람이 맡아요.</b> 안 고른 제안은 닫지 않고 이유 한 줄과 함께 다음 후보로 남아요.</div>
+    <div class="box">GitHub에서 <b>「가설 제안」</b> 양식으로 이슈를 열어요: 가설 한 문장 · 근거(어느 문항이 왜 틀렸나) · 켜고 끌 스위치와 고칠 파일 · 기대 효과 · 걸릴 시간.<br>배분일에 동규가 고르면 「앞뒤 맥락」을 붙인 실험 이슈로 바뀌고, <b>되도록 제안한 사람이 맡아요.</b> 안 고른 제안은 닫지 않고 이유 한 줄과 함께 다음 후보로 남아요.</div>
   </div>
 
   <h2>예비 실험과 일찍 끝나면</h2>
@@ -237,6 +236,10 @@ td.dist{color:var(--orange);font-weight:700}
     <div class="step v2"><div><span class="chip">남으면</span></div><div class="txt">아무도 안 가져간 예비는 다음 주기 배정 후보로 넘겨요.</div></div>
   </div>
   <div class="note">가져갈 예비가 없으면: 평가셋 검수 · 비교 문서 · 배운 점 다듬기 · 흔들림 확인용 추가 측정 가운데 하나.</div>
+
+  <h2>채택된 것은 어디로 가나</h2>
+  <div class="box">배분일에 채택된 실험(스위치)을 모아 <b>릴리스 판</b>(rc-c1, rc-c2 …)을 만들어요 <span class="arrow">→</span> 합친 판을 dev 전체로 다시 재고, API(<code>POST /ask</code>, 네 칸 JSON)로 끝까지 도는지 확인 <span class="arrow">→</span> <code>docs/engine/releases.md</code>에 남겨요 <span class="arrow">→</span> 실험이 마무리되면 채점 서버(#31)로.
+    <div class="term"><b>릴리스 판</b> = 제출할 채점 API의 설정. <b>11/17 동결 판 = 그때의 릴리스 판</b>이에요.</div></div>
 
   <h2>어디서 보나</h2>
   <div class="boxes">
