@@ -4,14 +4,13 @@
 <meta charset="utf-8">
 <title>일하는 방식 한눈에</title>
 <!--
-  docs/work-method.md 맨 위 그림 두 장(work-method-1.png · work-method-2.png)의 원본이다.
-  글 · 숫자 · 날짜는 docs/work-method.md와 같게 쓴다. 문서를 바꾸면 여기도 바꾸고 PNG를 다시 만든다.
+  docs/work-method.md 맨 위 그림 세 장(work-method-1.png · work-method-2.png · work-method-3.png)의 원본이다.
+  글 · 숫자 · 날짜는 docs/work-method.md(와 AGENTS.md 6절)와 같게 쓴다. 문서를 바꾸면 여기도 바꾸고 PNG를 다시 만든다.
   글꼴: 제목 도현체(Do Hyeon), 본문 Pretendard. 컴퓨터에 깔려 있어야 한다.
   PNG 다시 만들기 (레포 맨 위 폴더에서, 맥):
     C="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-1.png" "file://$PWD/docs/img/work-method.html#p1"
-    "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-2.png" "file://$PWD/docs/img/work-method.html#p2"
-  주소 끝 #p1 · #p2가 그 장만 보이게 한다. 2340은 휴대폰 화면 비율(9 : 19.5)이다.
+    for n in 1 2 3; do "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-$n.png" "file://$PWD/docs/img/work-method.html#p$n"; done
+  주소 끝 #p1 · #p2 · #p3이 그 장만 보이게 한다. 2340은 휴대폰 화면 비율(9 : 19.5)이다.
   글이 길어져 아래 줄(자세한 문서 · 질문)이 잘리면 .page의 height와 창 높이를 함께 늘린다.
 -->
 <style>
@@ -28,8 +27,9 @@
 html,body{margin:0;background:var(--bg)}
 body{font-family:"Pretendard",sans-serif;color:var(--ink);font-size:28px;line-height:1.4;word-break:keep-all;-webkit-font-smoothing:antialiased}
 b,strong{font-weight:700}
+code{font-family:"Pretendard",sans-serif;font-weight:600;background:#ECE8DD;border-radius:6px;padding:0 6px;white-space:nowrap}
 .nb{white-space:nowrap}
-.page{width:1080px;height:2340px;padding:48px 56px 34px;display:flex;flex-direction:column;gap:20px;overflow:hidden}
+.page{width:1080px;height:2340px;padding:48px 56px 34px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
 .page + .page{border-top:16px solid #D8D3C6}
 body:has(.page:target) .page:not(:target){display:none}
 body:has(.page:target) .page{border-top:0}
@@ -45,69 +45,78 @@ h2::before{content:"";width:11px;height:34px;border-radius:6px;background:var(--
 
 /* 한 줄 요약 */
 .sum{display:flex;flex-direction:column;gap:8px}
-.sum .row{display:grid;grid-template-columns:48px 1fr;gap:14px;align-items:start;background:var(--card);border:2px solid var(--line);border-radius:20px;padding:13px 18px}
+.sum .row{display:grid;grid-template-columns:48px 1fr;gap:14px;align-items:start;background:var(--card);border:2px solid var(--line);border-radius:20px;padding:12px 18px}
 .num{width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;font-weight:700;font-size:25px;display:flex;align-items:center;justify-content:center}
 .sum .row div:last-child{font-size:27px;line-height:1.36}
 
 /* 주기 흐름 */
 .flow{display:flex;flex-direction:column;gap:8px}
-.step{display:grid;grid-template-columns:178px 1fr;gap:14px;align-items:start;background:var(--card);border-radius:18px;padding:12px 18px 12px 14px;border-left:10px solid var(--c)}
+.step{display:grid;grid-template-columns:178px 1fr;gap:14px;align-items:start;background:var(--card);border-radius:18px;padding:11px 18px 11px 14px;border-left:10px solid var(--c)}
 .chip{display:inline-block;background:var(--cl);color:var(--c);font-weight:700;font-size:23px;line-height:1.25;border-radius:12px;padding:7px 11px}
-.step .txt{font-size:27px;line-height:1.36}
+.step .txt{font-size:26px;line-height:1.36}
 .o{--c:var(--orange);--cl:var(--orange-l)}
 .b{--c:var(--blue);--cl:var(--blue-l)}
 .g{--c:var(--green);--cl:var(--green-l)}
+.v2{--c:var(--violet);--cl:var(--violet-l)}
 .arrow{color:var(--orange);font-weight:700}
 
 /* 달력 */
-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:18px;overflow:hidden;border:2px solid var(--line);font-size:27px}
-th{background:var(--ink);color:#fff;text-align:left;font-weight:700;font-size:23px;padding:9px 16px}
-td{padding:7px 16px;border-top:2px solid var(--line);vertical-align:top}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:18px;overflow:hidden;border:2px solid var(--line);font-size:26px}
+th{background:var(--ink);color:#fff;text-align:left;font-weight:700;font-size:23px;padding:8px 16px}
+td{padding:6px 16px;border-top:2px solid var(--line);vertical-align:top}
 td.cy{font-weight:700;white-space:nowrap}
 .tag{display:inline-block;font-size:21px;font-weight:700;border-radius:9px;padding:2px 9px;margin-left:8px;vertical-align:2px}
 .t{background:var(--blue-l);color:var(--blue)}
 .v{background:var(--violet-l);color:var(--violet)}
 td.dist{color:var(--orange);font-weight:700}
 .phase{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.phase div{border-radius:16px;padding:11px 16px;font-size:24px;line-height:1.36}
+.phase div{border-radius:16px;padding:10px 16px;font-size:24px;line-height:1.36}
 .phase .t1{background:var(--blue-l)}
 .phase .v1{background:var(--violet-l)}
-.phase b{font-size:26px}
-.after{display:grid;grid-template-columns:226px 1fr;gap:6px 14px;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:13px 18px;font-size:26px;line-height:1.36}
+.phase b{font-size:25px}
+.after{display:grid;grid-template-columns:226px 1fr;gap:4px 14px;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:12px 18px;font-size:25px;line-height:1.36}
 .after .d{font-weight:700}
-.after .gl{display:block;font-size:23px;color:var(--muted)}
+.after .gl{display:block;font-size:22px;color:var(--muted)}
 
-/* 누가 무엇을 */
-.who{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:16px 20px}
-.card .role{font-size:22px;font-weight:700;color:var(--muted)}
-.card h3{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:36px;margin:2px 0 6px;line-height:1.15}
-.card p{margin:0;font-size:26px;line-height:1.38}
+/* 시작 순서 */
+.seq{display:flex;flex-direction:column;gap:8px}
+.seq .s{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:12px 18px;font-size:26px;line-height:1.36}
+.seq .n{width:44px;height:44px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:23px;display:flex;align-items:center;justify-content:center}
+.five{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:8px}
+.five span{background:var(--blue-l);color:var(--blue);font-weight:700;font-size:22px;border-radius:10px;padding:4px 10px}
 
 /* 보고 */
-.cmt{background:var(--code);color:var(--code-ink);border-radius:20px;padding:18px 24px;font-size:27px;line-height:1.48}
-.cmt .h{font-size:21px;color:var(--code-dim);margin-bottom:6px;font-weight:600}
+.cmt{background:var(--code);color:var(--code-ink);border-radius:20px;padding:16px 24px;font-size:26px;line-height:1.46}
+.cmt .h{font-size:21px;color:var(--code-dim);margin-bottom:4px;font-weight:600}
 .cmt .first{font-weight:700;color:#fff}
 .cmt .dim{color:var(--code-dim)}
 .types{display:flex;flex-wrap:wrap;gap:8px}
-.types span{background:var(--card);border:2px solid var(--line);border-radius:999px;padding:6px 14px;font-size:24px}
+.types span{background:var(--card);border:2px solid var(--line);border-radius:999px;padding:5px 14px;font-size:23px}
 .types b{margin-right:6px}
-.alert{background:var(--red-l);border:2px solid #F5C2BD;border-radius:20px;padding:15px 20px;font-size:27px;line-height:1.38}
+.alert{background:var(--red-l);border:2px solid #F5C2BD;border-radius:20px;padding:13px 20px;font-size:26px;line-height:1.38}
 .alert .k{color:var(--red);font-weight:700}
 
-/* 점수 */
-.score{display:flex;flex-direction:column;gap:8px}
-.score .it{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:13px 20px;font-size:27px;line-height:1.38}
+/* 상자 목록 */
+.boxes{display:flex;flex-direction:column;gap:8px}
+.box{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:12px 20px;font-size:26px;line-height:1.38}
+.box .k{font-weight:700}
+
+/* 누가 무엇을 */
+.who{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:14px 20px}
+.card .role{font-size:22px;font-weight:700;color:var(--muted)}
+.card h3{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:36px;margin:2px 0 6px;line-height:1.15}
+.card p{margin:0;font-size:25px;line-height:1.38}
 
 .foot{margin-top:auto;font-size:24px;color:var(--muted);border-top:2px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;gap:20px}
 </style>
 </head>
 <body>
 
-<!-- ===================== 1장: 언제 무엇을 ===================== -->
+<!-- ===================== 1장: 2일 주기 ===================== -->
 <section class="page" id="p1">
   <div>
-    <div class="label">TEAM GG · 우리가 일하는 방식 · 1/2</div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 1/3</div>
     <h1>이틀 실험하고,<br>배분일에 나눠요</h1>
     <div class="sub">11/7(토) ~ 11/17(화) · 엔진 실험은 2일 주기</div>
   </div>
@@ -120,14 +129,14 @@ td.dist{color:var(--orange);font-weight:700}
 
   <h2>한 주기 = 이틀</h2>
   <div class="flow">
-    <div class="step o"><div><span class="chip">배분일</span></div><div class="txt">동규가 승인하면 이슈를 올려요. GG비서가 <b>15분 안에</b> 개인 채널로 알려요.</div></div>
-    <div class="step b"><div><span class="chip">첫날</span></div><div class="txt">이슈 맨 위 「앞뒤 맥락」부터 읽고 <b>시작 보고</b>. 브랜치를 만들고 첫 push 때 <b>draft PR</b>을 열어요.
-      <div class="term"><b>draft PR</b> = 아직 검수를 부탁하지 않은 초안 PR. 하던 일을 남이 볼 수 있게 일찍 열어 둬요.</div></div></div>
+    <div class="step o"><div><span class="chip">배분일</span></div><div class="txt">동규가 승인하면 이슈를 올려요: 사람마다 하나, 담당 없는 「예비」 몇 개. GG비서가 <b>15분 안에</b> 개인 채널로 알려요.</div></div>
+    <div class="step b"><div><span class="chip">첫날</span></div><div class="txt">AI가 코드 전에 다섯 줄로 답하고, 사람이 「마감까지」를 정하면 <b>시작 보고</b>를 올리고 바로 시작해요(2장). 첫 push 때 <b>draft PR</b>.
+      <div class="term"><b>draft PR</b> = 아직 검수를 부탁하지 않은 초안 PR.</div></div></div>
     <div class="step b"><div><span class="chip">첫날 24시까지</span></div><div class="txt"><b>중간 보고</b>. 「마감까지」에 지킬 수 있음 · 어려움 · 모름 중 하나를 써요.
       <div class="term"><b>1주기만 11/8(일) 21시까지.</b> 11/7은 특화교육과 19시 회의 뒤에 시작해서요.</div></div></div>
     <div class="step g"><div><span class="chip">둘째 날 20시</span></div><div class="txt">GG비서가 「오늘 마감」을 알려요.</div></div>
-    <div class="step g"><div><span class="chip">둘째 날 24시<br>= 마감</span></div><div class="txt"><b>끝 보고</b>. 결과 표 + 채택 · 버림 의견. <b>다 못 했어도 달아요.</b></div></div>
-    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기 <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 다음 배분안 <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
+    <div class="step g"><div><span class="chip">둘째 날 24시<br>= 마감</span></div><div class="txt"><b>끝 보고</b>: 결과 표 · 의견 · 배운 점. <b>다 못 했어도, 버림 · 보류여도</b> 달아요. 일찍 끝났으면 예비 하나를 가져가요(3장).</div></div>
+    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기(배운 점 모음부터) <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 다음 배분안(가설 제안 · 남은 예비도 후보) <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
   </div>
 
   <h2>주기 달력</h2>
@@ -153,20 +162,22 @@ td.dist{color:var(--orange);font-weight:700}
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
 </section>
 
-<!-- ===================== 2장: 누가 · 보고 · 점수 ===================== -->
+<!-- ===================== 2장: 실험 하나 ===================== -->
 <section class="page" id="p2">
   <div>
-    <div class="label">TEAM GG · 우리가 일하는 방식 · 2/2</div>
-    <h1>누가 무엇을 하고,<br>어떻게 보고하나요</h1>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 2/3</div>
+    <h1>실험 하나는 이렇게 해요</h1>
   </div>
 
-  <h2>누가 무엇을</h2>
-  <div class="who">
-    <div class="card"><div class="role">PM</div><h3>동규</h3><p>배분일에 이슈로 일 · 담당 · 마감을 정하고 승인해요. 채택 · 버림을 정하고 PR을 <span class="nb">검수 · 병합해요.</span></p></div>
-    <div class="card"><div class="role">팀원</div><h3>종희 · 동욱 · 건영</h3><p>한 주기에 이슈 하나(실험 하나)를 받아 이틀 동안 실험해요. 보고는 그 이슈의 댓글로.</p></div>
-    <div class="card"><div class="role">각자의</div><h3>AI 세션</h3><p>AGENTS.md 순서로 읽고 시작해요(이슈는 「앞뒤 맥락」부터). 끝낼 때 이슈에 「세션 끝」 보고. 올리기 전에 담당이 봐요.</p></div>
-    <div class="card"><div class="role">디스코드</div><h3>GG비서</h3><p>새로 맡은 이슈는 15분 안에 개인 채널로, 마감 날 20시 알림, 아침 8시 할 일 목록, <span class="nb">#대시보드</span> 「실험 현황」: 모두의 진행 · 점수.</p></div>
+  <h2>시작: 코드 전에 다섯 줄</h2>
+  <div class="seq">
+    <div class="s"><span class="n">1</span><div>사람이 <b>AGENTS.md 6절 「AI에게 처음 줄 지시」</b>를 AI에게 붙여 넣어요. 글 속 이슈 번호만 바꿔요.</div></div>
+    <div class="s"><span class="n">2</span><div>AI는 <b>코드를 고치기 전에 다섯 줄</b>로 먼저 답해요.
+      <div class="five"><span>① 이 이슈의 가설 한 문장</span><span>② 켜고 끌 스위치 이름과 고칠 파일</span><span>③ 「하지 않을 것」</span><span>④ 완료 조건과 잴 명령</span><span>⑤ 모르는 것 · 헷갈리는 것</span></div></div></div>
+    <div class="s"><span class="n">3</span><div>사람이 확인하고 <b>「마감까지」</b>를 정해 주면, AI가 <b>시작 보고</b>를 이슈에 올리고 <b>바로 시작</b>해요. 승인을 기다리지 않아요.</div></div>
+    <div class="s"><span class="n">4</span><div>PM 쪽(1주기는 동규의 Claude 세션)이 나중에 읽고, 다르면 이슈 댓글로 바로잡아요.</div></div>
   </div>
+  <div class="note">같은 이슈를 다음 세션에서 이어 갈 때는 시작 보고 없이 그 브랜치에서 이어 가요.</div>
 
   <h2>보고는 이슈 댓글로</h2>
   <div class="cmt">
@@ -185,18 +196,61 @@ td.dist{color:var(--orange);font-weight:700}
     <span><b>막힘</b>바로</span>
     <span><b>세션 끝</b>AI 세션을 끝낼 때</span>
   </div>
-  <div class="note">끝 보고는 「의견: 채택 · 버림 · 보류」와 「어디에」(PR · 커밋), 결과 표(리더보드에 올린 두 줄)를 더해요. 「마감까지」는 끝남 · <span class="nb">못 끝냄으로</span> 써요. 디스코드에는 이슈 링크만 올려요.</div>
   <div class="alert"><span class="k">막히면</span> 1시간 넘게 진전이 없으면 바로 「막힘」 보고. 무엇이 막혔는지 · 해 본 것 · 필요한 것을 써요.</div>
 
+  <h2>끝 보고와 배운 점</h2>
+  <div class="boxes">
+    <div class="box"><span class="k">끝 보고</span> = 결과 표 · 의견 · 배운 점. 「의견」은 채택 · 버림 · 보류와 이유. 디스코드에는 이슈 링크만 올려요.</div>
+    <div class="box"><span class="k">배운 점 세 줄</span>(버림 · 보류여도): 좋아지고 나빠진 것(종류 · 원인) · 왜 그런 것 같나 · 다음에 해 볼 것.</div>
+    <div class="box"><span class="k">문항별 비교</span>: <code>python3 eval/compare.py &lt;실행&gt;</code>이 <span class="nb">docs/engine/compare/</span>에 만들어요. 버린 · 보류 실험의 배운 점은 실험 기록 맨 아래 「배운 점 모음」에 모여요.</div>
+  </div>
+
   <h2>점수는 이렇게 봐요</h2>
-  <div class="score">
-    <div class="it"><b>dev로만 재요.</b>
-      <div class="term"><b>dev</b> = 개발용 문제(693문항). 점수는 회색지대를 뺀 661문항으로 재요. 마지막 확인용 holdout(174문항)은 팀원이 재지 않아요.</div></div>
-    <div class="it"><b>결과는 리더보드에.</b> dev 전체로 켠 판 · 끈 판을 각각 두 번 이상 재서 두 줄을 남겨요(100문항은 빠른 확인용).
-      <div class="term"><b>리더보드</b> = 실험마다 켠 판 · 끈 판 점수를 한 줄씩 모은 표(docs/engine/leaderboard.md).</div></div>
-    <div class="it"><b>채택 기준:</b> 가중 점수가 흔들림 폭의 두 배 넘게 오르고, 함정 정답률이 1점 넘게 떨어지지 않을 때. 정하는 사람은 배분일의 동규예요.
-      <div class="term"><b>흔들림 폭</b> = 아무것도 안 바꿔도 돌릴 때마다 생기는 차이. 출발 판을 dev 전체로 네 번 돌리니 <span class="nb">67.1 · 68.2 · 68.1 · 68.1점,</span> 폭 1.1점이라 2.2점 넘게 올라야 채택해요.</div>
-      <div class="term"><b>가중 점수</b> = 문제 유형마다 점수를 따로 내서 킷 예시 비율(단순 3 · 조건 3 · 결합 3 · 함정 2)로 <span class="nb">섞은 값.</span></div></div>
+  <div class="boxes">
+    <div class="box"><span class="k">dev 전체로, 켠 판 · 끈 판을 각각 두 번 이상</span> 재서 리더보드에 남겨요(100문항은 빠른 확인용).
+      <div class="term"><b>dev</b> = 개발용 문제(693문항). 점수는 회색지대를 뺀 661문항으로 재요. <b>리더보드</b> = 실험마다 켠 판 · 끈 판 점수를 한 줄씩 모은 표.</div></div>
+    <div class="box"><span class="k">채택 기준:</span> 가중 점수가 흔들림 폭의 두 배 넘게 오르고, 함정 정답률이 1점 넘게 떨어지지 않을 때. 정하는 사람은 배분일의 동규예요.
+      <div class="term"><b>흔들림 폭</b> = 아무것도 안 바꿔도 돌릴 때마다 생기는 차이. 출발 판을 dev 전체로 네 번 돌리니 <span class="nb">67.1 · 68.2 · 68.1 · 68.1점,</span> 폭 1.1점이라 2.2점 넘게 올라야 채택해요.</div></div>
+  </div>
+
+  <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
+</section>
+
+<!-- ===================== 3장: 함께 쓰는 것 ===================== -->
+<section class="page" id="p3">
+  <div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 3/3</div>
+    <h1>가설은 누구나,<br>일찍 끝나면 예비로</h1>
+  </div>
+
+  <h2>가설 제안 (누구나, 아무 때나)</h2>
+  <div class="boxes">
+    <div class="box">GitHub에서 <b>「가설 제안」</b> 양식으로 이슈를 열어요: 가설 한 문장 · 근거(어느 문항이 왜 틀렸나) · 켜고 끌 스위치와 고칠 파일 · 기대 효과 · 걸릴 시간.</div>
+    <div class="box">배분일에 동규가 고르면 「앞뒤 맥락」을 붙인 실험 이슈로 바뀌고, <b>되도록 제안한 사람이 맡아요.</b> 안 고른 제안은 닫지 않고 이유 한 줄과 함께 다음 후보로 남아요.</div>
+  </div>
+
+  <h2>예비 실험과 일찍 끝나면</h2>
+  <div class="flow">
+    <div class="step o"><div><span class="chip">배분일</span></div><div class="txt">예비 실험 몇 개를 미리 세워요. 라벨 <b>「예비」</b>, 담당은 비우고, 맨 위에 「가져갈 수 있는 조건」. 동규 승인은 배정과 함께.</div></div>
+    <div class="step b"><div><span class="chip">끝 보고 뒤</span></div><div class="txt">끝 보고(결과 표 · 의견 · 배운 점까지)를 올린 사람만, <b>번호가 작은 것부터 하나</b>. 「가져감」 댓글 + 자기를 담당으로. 남이 진행 중인 파일은 건드리지 않아요.</div></div>
+    <div class="step g"><div><span class="chip">그 주기 마감</span></div><div class="txt">가져간 실험도 둘째 날 24:00까지 끝 보고. 결과는 다음 배분일에 다른 실험과 같이 판단해요.</div></div>
+    <div class="step v2"><div><span class="chip">남으면</span></div><div class="txt">아무도 안 가져간 예비는 다음 주기 배정 후보로 넘겨요.</div></div>
+  </div>
+  <div class="note">가져갈 예비가 없으면: 평가셋 검수 · 비교 문서 · 배운 점 다듬기 · 흔들림 확인용 추가 측정 가운데 하나.</div>
+
+  <h2>어디서 보나</h2>
+  <div class="boxes">
+    <div class="box"><span class="k">#대시보드 「실험 현황」</span>: 모두의 진행 · 점수(15분마다), 출발 판 대비 점수 막대 그림, 「지금 가져갈 수 있는 실험」(담당 없는 예비).</div>
+    <div class="box"><span class="k">#대시보드 「가설 나무」</span>: 가설 → 실험 → 다음 가설 그림. 로컬에서 <code>open docs/engine/tree.html</code>로 열면 화면 폭에 맞춰 보여요.</div>
+    <div class="box"><span class="k">레포 docs/engine/</span>: 리더보드(leaderboard.md), 실험 기록과 맨 아래 「배운 점 모음」(experiments.md), 문항별 비교(compare/).</div>
+  </div>
+
+  <h2>누가 무엇을</h2>
+  <div class="who">
+    <div class="card"><div class="role">PM</div><h3>동규</h3><p>배분일에 이슈로 일 · 담당 · 마감을 정하고 승인해요(배정과 예비를 함께). 채택 · 버림을 정하고 PR을 <span class="nb">검수 · 병합해요.</span></p></div>
+    <div class="card"><div class="role">팀원</div><h3>종희 · 동욱 · 건영</h3><p>한 주기에 이슈 하나(실험 하나)를 받아 이틀 동안 실험해요. 가설은 누구나 「가설 제안」으로, 일찍 끝나면 예비를 가져가요.</p></div>
+    <div class="card"><div class="role">각자의</div><h3>AI 세션</h3><p>AGENTS.md 6절 순서로 읽고, 코드 전에 다섯 줄. 끝낼 때 이슈에 「세션 끝」 보고(올리기 전에 담당이 봐요).</p></div>
+    <div class="card"><div class="role">디스코드</div><h3>GG비서</h3><p>새로 맡은 이슈는 15분 안에 개인 채널로, 마감 날 20시 「오늘 마감」, 아침 8시 할 일 목록. PR은 Claude(Opus)로 리뷰하고, 마지막 커밋의 리뷰가 끝나야 병합.</p></div>
   </div>
 
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
