@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가설 나무 · 팀 GG</title>
+<!-- python3 eval/board.py --tree가 이 틀(eval/tree_template.html)에 데이터를 넣어 docs/engine/tree.html을 만든다. 손으로 고치지 않는다.
+     색: 사람 = GG비서 대시보드 4색, 상태 = 고정 상태 색(늘 아이콘 + 글자와 함께), 글자는 잉크색만. 외부 파일 없이 열린다. -->
+<style>
+  :root {
+    color-scheme: light;
+    --page:#F4F6F8; --card:#FFFFFF; --soft:#fafaf8; --ink:#0b0b0b; --sub:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --band:#ecebe6;
+    --good:#0ca30c; --warn:#fab219; --bad:#d03b3b; --good-wash:#e7f6e7; --warn-wash:#fef3d9; --bad-wash:#fbeaea;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font:15px/1.5 "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+         word-break:keep-all; overflow-wrap:anywhere; }
+  header { padding:20px 24px 6px; }
+  h1 { font-size:28px; line-height:1.2; margin:0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .chip-example { font-size:15px; background:var(--ink); color:#fff; border-radius:8px; padding:3px 10px; }
+  .banner { margin:10px 0 4px; padding:10px 14px; border-radius:10px; background:var(--warn-wash); border:1px solid var(--warn); font-weight:600; }
+  .meta { color:var(--sub); font-size:14px; margin:6px 0 10px; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--sub); align-items:center; }
+  .legend span { display:inline-flex; gap:6px; align-items:center; }
+  .controls { display:flex; gap:8px; margin:10px 0 0; flex-wrap:wrap; }
+  .controls button { font:inherit; font-size:13px; border:1px solid var(--axis); background:var(--card); border-radius:8px; padding:4px 10px; cursor:pointer; color:var(--ink); }
+  main { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr); gap:16px; padding:8px 24px 24px; align-items:start; }
+  .panel { background:var(--card); border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  #tree-wrap { padding:12px 12px 12px 6px; }
+  #detail { position:sticky; top:12px; padding:18px; max-height:calc(100vh - 24px); overflow:auto; }
+  footer { color:var(--muted); font-size:12.5px; padding:0 24px 24px; }
+  @media (max-width:860px) {
+    header { padding:14px 16px 4px; } h1 { font-size:24px; }
+    main { grid-template-columns:minmax(0,1fr); padding:8px 16px 20px; }
+    #detail { position:static; max-height:none; }
+    footer { padding:0 16px 20px; }
+  }
+  ul.tree, ul.tree ul { list-style:none; margin:0; padding:0; }
+  ul.tree ul { margin-left:13px; padding-left:12px; border-left:1px solid var(--axis); }
+  ul.tree li { position:relative; margin:6px 0; }
+  ul.tree ul > li::before { content:""; position:absolute; left:-12px; top:21px; width:10px; border-top:1px solid var(--axis); }
+  .row { display:flex; align-items:flex-start; gap:2px; }
+  .twisty { width:26px; height:26px; flex:none; margin-top:7px; border:0; background:none; border-radius:6px; cursor:pointer; color:var(--sub); font-size:13px; }
+  .twisty:hover { background:var(--band); }
+  .twisty.leaf { visibility:hidden; }
+  .node { flex:1; min-width:0; display:grid; gap:3px; text-align:left; font:inherit; color:inherit; cursor:pointer;
+          background:var(--card); border:1px solid var(--grid); border-radius:12px; padding:8px 11px; }
+  .node:hover { border-color:var(--axis); }
+  .node:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .node[aria-current="true"] { border:2px solid var(--ink); padding:7px 10px; }
+  .node.candidate, .node.group { border-style:dashed; background:var(--soft); }
+  .node.experiment { background:var(--soft); }
+  .node.root { background:var(--band); }
+  .top { display:flex; gap:6px 8px; align-items:center; flex-wrap:wrap; font-weight:700; }
+  .kind { color:var(--sub); font-weight:600; }
+  .sub { display:flex; gap:4px 10px; align-items:center; flex-wrap:wrap; font-size:12.5px; color:var(--sub); }
+  .badge { display:inline-flex; gap:4px; align-items:center; font-size:12px; font-weight:700; color:var(--ink); border-radius:999px; padding:1px 8px; border:1px solid var(--axis); background:var(--card); white-space:nowrap; }
+  .badge .ic { font-size:11px; }
+  .badge.s-채택 { background:var(--good-wash); border-color:var(--good); } .badge.s-채택 .ic { color:var(--good); }
+  .badge.s-버림 { background:var(--bad-wash); border-color:var(--bad); } .badge.s-버림 .ic { color:var(--bad); }
+  .badge.s-보류 { background:var(--warn-wash); border-color:var(--warn); } .badge.s-보류 .ic { color:#b37800; }
+  .badge.s-진행 { background:var(--card); border-color:var(--sub); } .badge.s-진행 .ic { color:var(--sub); }
+  .badge.s-대기 { background:var(--soft); border-style:dashed; color:var(--sub); } .badge.s-대기 .ic { color:var(--muted); }
+  .badge.base { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .who { display:inline-flex; gap:5px; align-items:center; white-space:nowrap; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; flex:none; }
+  .num { font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink); }
+  .up { color:var(--good); } .down { color:var(--bad); }
+  #detail h2 { font-size:20px; margin:0 0 6px; line-height:1.3; }
+  #detail h3 { font-size:14px; color:var(--sub); margin:16px 0 6px; }
+  #detail dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:10px 0 0; font-size:14px; }
+  #detail dt { color:var(--sub); white-space:nowrap; } #detail dd { margin:0; }
+  #detail p { margin:6px 0; } #detail ul { margin:4px 0; padding-left:18px; } #detail li { margin:3px 0; }
+  #detail table { width:100%; border-collapse:collapse; font-size:13px; } #detail td, #detail th { border-bottom:1px solid var(--grid); padding:4px 6px; text-align:left; vertical-align:top; }
+  #detail a { color:#1d5fb4; } .linkbtn { font:inherit; border:0; background:none; padding:0; color:#1d5fb4; text-decoration:underline; cursor:pointer; text-align:left; }
+  .hint { color:var(--muted); font-size:13px; }
+  /* 정적 보기(?snapshot=1): GG비서가 PNG로 찍어 디스코드 #대시보드에 올린다. 폭 1200 · 모든 가지 펼침 · 옆 칸 없음 · 마디마다 한 줄 */
+  body.snapshot { width:1200px; }
+  body.snapshot main { grid-template-columns:minmax(0,1fr); padding:8px 24px 16px; }
+  body.snapshot #detail, body.snapshot .controls, body.snapshot .twisty { display:none; }
+  body.snapshot .node { display:flex; flex-wrap:wrap; align-items:center; gap:2px 14px; padding:6px 11px; cursor:default; }
+  body.snapshot .node[aria-current="true"] { border:1px solid var(--grid); padding:6px 11px; }
+  body.snapshot ul.tree li { margin:4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>가설 나무 <span id="example-chip" class="chip-example" hidden>예시</span></h1>
+  <div id="banner" class="banner" hidden>예시 화면입니다. 1~2주기가 진행된 것처럼 꾸민 데이터로, 실제 실험 결과가 아닙니다.</div>
+  <div class="meta" id="meta"></div>
+  <div class="legend" id="legend"></div>
+  <div class="controls"><button type="button" id="open-all">모두 펴기</button><button type="button" id="close-all">모두 접기</button></div>
+</header>
+<main>
+  <section class="panel" id="tree-wrap" aria-label="가설 나무"><ul class="tree" id="tree"></ul></section>
+  <aside class="panel" id="detail" aria-live="polite"><p class="hint">마디를 누르면 가설 · 결과 · 배운 점과 이슈 · PR · 비교 문서 링크가 여기 뜹니다.</p></aside>
+</main>
+<footer id="footer"></footer>
+<script id="data" type="application/json">{"as_of": "2026-11-06 23:24", "example": false, "people": {"동규": "#2a78d6", "동욱": "#008300", "종희": "#eda100", "건영": "#e87ba4"}, "status": {"채택": "#0ca30c", "보류": "#fab219", "버림": "#d03b3b", "진행 중": "#52514e", "대기": "#898781"}, "tree": {"id": "root", "kind": "root", "title": "출발 판", "status": "채택", "children": [{"num": "2", "kind": "hypothesis", "title": "조각 다듬기", "what": "조각 다듬기: 꼬리표 떼기 · 삭제된 항 4개 빼기 · 항 없는 조 머리말 · 호 단위 · 별표 행 단위", "expect": "적중률 +1~4점, 「조 맞고 항 틀림」 51 → 40 이하", "issue": 23, "owner": "건영", "cycle": 1, "parent": "출발 판", "id": "h-2", "status": "진행 중", "children": [{"num": "1", "kind": "hypothesis", "title": "질문 다듬기", "what": "질문 다듬기: 시민 말을 조례 용어로(용어 사전 + Solar 다시 쓰기)", "expect": "적중률 top-6 +5~10점, 근거 정확도 +3~6점", "issue": 26, "owner": null, "cycle": null, "parent": "가설 2", "id": "h-1", "status": "대기", "children": [{"num": "11", "kind": "candidate", "title": "가상 질문 붙이기", "what": "가상 질문 붙이기(Reverse HyDE): 조각마다 시민 말투 질문 3~5개를 Solar로 만들어 색인에 더함", "expect": "말투 틈을 조문 쪽에서 메움, 적중률 +3~6점. 질문 시간은 늘지 않음", "issue": null, "owner": null, "cycle": null, "parent": "가설 1", "id": "c-11", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/26", "issue_state": "OPEN", "prs": []}, {"num": "5", "kind": "hypothesis", "title": "원칙 · 예외 · 참조 묶음", "what": "원칙 · 예외 · 참조 묶음: 함께 봐야 하는 조항을 연결표로 같이 가져오기", "expect": "결합 적중률 62 → 70% 이상, 결합 근거 정확도 +5~10점", "issue": 28, "owner": null, "cycle": null, "parent": "가설 2", "id": "h-5", "status": "대기", "children": [], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/28", "issue_state": "OPEN", "prs": []}], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/23", "issue_state": "OPEN", "prs": []}, {"num": "3", "kind": "hypothesis", "title": "후보 넓히고 다시 고르기", "what": "후보 넓히고 다시 고르기: 6개 → 10~20개에서 고르기", "expect": "근거 정확도 +4~8점(결합 +8~12), 함정 정답률이 떨어질 위험", "issue": 24, "owner": "종희", "cycle": 1, "parent": "출발 판", "id": "h-3", "status": "진행 중", "children": [{"num": "4", "kind": "hypothesis", "title": "조례 통째로 읽기", "what": "조례 통째로 읽기: 질문의 조례 원문 전체를 보고 근거 번호 고르기", "expect": "가장 불확실. 결합 · 조건 · 함정이 크게 오를 수도, 비용 · 지연으로 못 쓸 수도", "issue": 27, "owner": null, "cycle": null, "parent": "가설 3", "id": "h-4", "status": "대기", "children": [], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/27", "issue_state": "OPEN", "prs": []}, {"num": "8", "kind": "hypothesis", "title": "답 형식", "what": "답 형식: 네 · 아니요 결론 칸, 문장마다 근거 번호와 원문 구절, 숫자 · 구절 대조", "expect": "조건 판단 첫 낱말 일치 95% 이상, 근거에 없는 숫자 · 구절 0에 가깝게, 판정이 답 전체를 버리는 일 줄이기", "issue": 29, "owner": null, "cycle": null, "parent": "가설 3", "id": "h-8", "status": "대기", "children": [], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/29", "issue_state": "OPEN", "prs": []}], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/24", "issue_state": "OPEN", "prs": []}, {"num": "#22", "kind": "hypothesis", "title": "출력 규격 강제 · 0점 방어", "what": "출력 규격 강제 · 0점 방어", "expect": "", "issue": 22, "owner": "동욱", "cycle": 1, "parent": "출발 판", "id": "h-22", "status": "진행 중", "children": [], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/22", "issue_state": "OPEN", "prs": []}, {"num": "6", "kind": "hypothesis", "title": "질문 분석 게이트", "what": "질문 분석 게이트: 지시문 떼기 · 관할(자치구 · 다른 시도 · 상위 법률) 판별", "expect": "인젝션 30문항 지시 따름 0, 자치구 함정 10/10, 멀쩡한 질문 막음 0", "issue": 25, "owner": null, "cycle": null, "parent": "출발 판", "id": "h-6", "status": "대기", "children": [{"num": "9", "kind": "candidate", "title": "바깥 근거 대조", "what": "바깥 근거 대조(동규 11-06): 6종 밖 법령(상위 법률 · 시행규칙 · 자치구 조례)을 국가법령정보 OPEN API로 받아 6종과 함께 찾는다. 근거가 6종 밖에 있다고 확실하면 확인 불가로 보낸다. 인용은 6종만 한다", "expect": "함정 정답률 ↑ · 과잉 포기 ↓. 6종에 답이 있는데 바깥 근거 때문에 확인 불가로 보내는 오탐을 같이 잰다", "issue": null, "owner": null, "cycle": null, "parent": "가설 6", "id": "c-9", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/25", "issue_state": "OPEN", "prs": []}, {"num": "7", "kind": "hypothesis", "title": "확인 불가 신호등", "what": "확인 불가 신호등: 여러 신호(「질문에 답했나」 판정 포함)를 합쳐 답 · 한 번만 다시 확인 · 확인 불가를 점수로 정함", "expect": "과잉 포기 줄이고 함정 정답률 유지, 가중 점수 +1~3점", "issue": 30, "owner": null, "cycle": null, "parent": "출발 판", "id": "h-7", "status": "대기", "children": [], "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/30", "issue_state": "OPEN", "prs": []}, {"id": "g-later", "kind": "group", "title": "다음 후보 (이슈 없음, 배분일에 고름)", "status": "대기", "children": [{"num": "10", "kind": "candidate", "title": "혼합 검색 다듬기", "what": "혼합 검색 다듬기: 임베딩 중심 보정, 점수 대신 순위로 합치기(질문마다 점수 범위가 달라서), 6개 고정 대신 점수가 크게 떨어지는 곳에서 자르기(3~10개), 「제N조」 · 금액 · 일수가 든 질문은 키워드 비중을 올리기, 키워드 검색의 문서 길이 보정 값 맞추기(짧은 항과 긴 별표 행이 섞여 있음)", "expect": "적중률 +1~3점", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-10", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}, {"num": "12", "kind": "candidate", "title": "세 번 생성해 다수결, 인용이 서로 다르면 노랑", "what": "세 번 생성해 다수결, 인용이 서로 다르면 노랑", "expect": "실행마다 흔들림(M3) 줄이기, 함정 신호", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-12", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}, {"num": "13", "kind": "candidate", "title": "solar-pro4 생각하기 켜기", "what": "solar-pro4 생각하기(`reasoning_effort`) 켜기", "expect": "결합 · 조건 정확도 ↑?, 지연 ↑", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-13", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}, {"num": "14", "kind": "candidate", "title": "별표 정답표 · 계산은 코드가", "what": "별표 정답표 · 계산은 코드가", "expect": "극한 계산 52 · 별표 계산 17, 숫자 환각", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-14", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}, {"num": "15", "kind": "candidate", "title": "LangGraph로 흐름 옮기기", "what": "LangGraph로 흐름 옮기기(동규 11-06): 단계별 관찰 · 분기 · 반복이 필요해질 때 단계를 노드로 옮긴다. 단계는 이미 노드와 같은 경계의 함수다(3-1절)", "expect": "단계별 기록과 다시 하기 분기를 그래프로 다루기 쉬워짐", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-15", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}, {"num": "16", "kind": "candidate", "title": "11/7 특화교육 3주차 내용", "what": "11/7 특화교육 3주차 내용(도구 호출 · 멀티 에이전트 · 신뢰성 검증 · 평가)", "expect": "수업 뒤 판단", "issue": null, "owner": null, "cycle": null, "parent": "출발 판", "id": "c-16", "status": "대기", "children": [], "issue_url": null, "issue_state": null, "prs": []}]}], "metric": "가중 점수", "score": "68.1", "label": "dev 전체 · 661문항", "band": "1.1", "date": "2026-11-06", "by_type": {"단순": "72.7", "조건": "69.5", "결합": "47.8", "함정": "89.7"}, "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261106-203151-baseline-dev-r1.md", "links": {"리더보드": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/leaderboard.md", "실험 기록": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/experiments.md", "계획": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/plan.md"}}}</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const SNAPSHOT = new URLSearchParams(location.search).get("snapshot") === "1";
+const ICON = {"채택": "✓", "버림": "✕", "보류": "‖", "진행 중": "●", "대기": "○"};
+const byId = new Map(), parentOf = new Map();
+(function walk(n, p) { byId.set(n.id, n); if (p) parentOf.set(n.id, p.id); (n.children || []).forEach(c => walk(c, n)); })(DATA.tree, null);
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v);
+  }
+  return add(e, kids);
+}
+function add(e, ...kids) {   // 기본 append는 null을 「null」 글자로 넣어서, 빈 값을 거르는 이 함수로만 붙인다
+  for (const k of kids.flat(Infinity)) if (k !== null && k !== undefined && k !== false && k !== "") e.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return e;
+}
+const safe = u => (typeof u === "string" && /^https?:\/\//.test(u)) ? u : null;
+const link = (u, text) => safe(u) ? h("a", {href: safe(u), target: "_blank", rel: "noopener"}, text) : text;
+const badge = s => s ? h("span", {class: "badge s-" + s.split(" ")[0]}, h("span", {class: "ic", "aria-hidden": "true"}, ICON[s] || "•"), s) : null;
+const who = name => name ? h("span", {class: "who"}, h("span", {class: "dot", style: "background:" + (DATA.people[name] || "#898781")}), name) : null;
+const delta = d => { if (!d || d === "—" || d === "기준") return null; const up = d.startsWith("+") && d !== "+0.0";
+  const down = d.startsWith("-"); return h("span", {class: "num"}, h("span", {class: up ? "up" : down ? "down" : ""}, up ? "▲" : down ? "▼" : ""), " " + d); };
+const kindName = n => ({root: "", hypothesis: n.num && n.num.startsWith("#") ? "기반 " + n.num : "가설 " + n.num, candidate: "후보 " + n.num, experiment: "실험", group: ""})[n.kind];
+
+function card(n) {
+  const top = h("div", {class: "top"}, kindName(n) ? h("span", {class: "kind"}, kindName(n)) : null, n.title,
+                n.kind === "root" ? h("span", {class: "badge base"}, "기준") : badge(n.status));
+  const sub = h("div", {class: "sub"});
+  if (n.kind === "root") add(sub, h("span", {}, "dev 가중 ", h("span", {class: "num"}, n.score ?? "—")), h("span", {}, "흔들림 폭 " + (n.band ?? "—") + "점"), h("span", {}, n.label));
+  if (n.kind === "hypothesis" || n.kind === "candidate") {
+    add(sub, who(n.owner) || h("span", {}, "담당 없음"), n.cycle ? h("span", {}, n.cycle + "주기") : null, n.issue ? h("span", {}, "#" + n.issue) : null);
+    const exps = (n.children || []).filter(c => c.kind === "experiment");
+    if (exps.length) add(sub, h("span", {}, "실험 " + exps.length));
+  }
+  if (n.kind === "experiment") add(sub, h("span", {}, n.metric + " ", h("span", {class: "num"}, n.score)), delta(n.delta), n.flag && n.flag !== "—" ? h("span", {}, n.flag) : null, h("span", {}, n.cycle + "주기"), h("span", {}, n.label));
+  if (n.kind === "group") add(sub, h("span", {}, (n.children || []).length + "개" + (SNAPSHOT ? "" : " · 펴서 보기")));
+  return h("button", {type: "button", class: "node " + n.kind, id: "node-" + n.id, "data-id": n.id, onclick: () => select(n.id, true)}, top, sub);
+}
+
+function item(n) {
+  const kids = n.children || [];
+  const li = h("li", {});
+  const tw = h("button", {type: "button", class: "twisty" + (kids.length ? "" : " leaf"), "aria-label": "가지 접기 · 펴기", "aria-expanded": "true", tabindex: kids.length ? null : "-1"}, "▾");
+  const ul = h("ul", {}, kids.map(item));
+  tw.addEventListener("click", () => toggle(li, ul.hidden));
+  add(li, h("div", {class: "row"}, tw, card(n)), kids.length ? ul : null);
+  li._ul = ul; li._tw = tw; li.dataset.id = n.id;
+  if (n.kind === "group" && !SNAPSHOT) setTimeout(() => toggle(li, false));
+  return li;
+}
+function toggle(li, open) { if (!li._ul) return; li._ul.hidden = !open; li._tw.textContent = open ? "▾" : "▸"; li._tw.setAttribute("aria-expanded", open ? "true" : "false"); }
+function expandTo(id) { let p = parentOf.get(id); while (p) { const li = document.querySelector(`li[data-id="${CSS.escape(p)}"]`); if (li) toggle(li, true); p = parentOf.get(p); } }
+
+function dl(pairs) { const d = h("dl", {}); for (const [k, v] of pairs) if (v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && !v.length)) add(d, h("dt", {}, k), h("dd", {}, v)); return d; }
+function lessons(list) { return list && list.length ? [h("h3", {}, "배운 점"), h("ul", {}, list.map(x => h("li", {}, x)))] : []; }
+function jump(c) { return h("button", {type: "button", class: "linkbtn", onclick: () => select(c.id, true)}, (kindName(c) ? kindName(c) + " · " : "") + c.title); }
+
+function detail(n) {
+  const box = document.getElementById("detail"); box.replaceChildren();
+  add(box, h("h2", {}, (kindName(n) ? kindName(n) + " · " : "") + n.title), n.kind === "root" ? h("span", {class: "badge base"}, "기준") : badge(n.status));
+  const kids = n.children || [];
+  if (n.kind === "root") {
+    add(box, dl([["점수", h("span", {}, "dev 가중 ", h("span", {class: "num"}, n.score ?? "—"), " (" + n.label + ")")],
+                   ["유형별", Object.entries(n.by_type || {}).map(([k, v]) => k + " " + v).join(" · ")],
+                   ["흔들림 폭", (n.band ?? "—") + "점 — 같은 설정을 여러 번 돌린 가중 폭. 채택 기준은 이 폭의 2배 넘게 오름"],
+                   ["잰 날", n.date]]));
+    add(box, h("h3", {}, "링크"), h("ul", {}, Object.entries(n.links || {}).map(([k, u]) => h("li", {}, link(u, k))), n.compare ? h("li", {}, link(n.compare, "출발 판끼리 비교(흔들림 보기)")) : null));
+  }
+  if (n.kind === "hypothesis" || n.kind === "candidate") {
+    const parent = byId.get(parentOf.get(n.id));
+    add(box, dl([["담당", who(n.owner) || "아직 없음"], ["주기", n.cycle ? n.cycle + "주기" : null],
+                   ["이슈", n.issue ? h("span", {}, link(n.issue_url, "#" + n.issue), n.issue_state ? " (" + (n.issue_state === "OPEN" ? "열림" : "닫힘") + ")" : "") : "아직 없음(고르면 그때 만든다)"],
+                   ["PR", (n.prs || []).length ? h("span", {}, (n.prs || []).map((p, i) => [i ? " · " : "", link(p.url, "#" + p.number), " " + ({OPEN: "열림", MERGED: "병합", CLOSED: "닫힘"}[p.state] || p.state)])) : null],
+                   ["나온 곳", parent ? jump(parent) : null]]));
+    if (n.what) add(box, h("h3", {}, "무엇을 바꾸면"), h("p", {}, n.what));
+    if (n.expect) add(box, h("h3", {}, "기대"), h("p", {}, n.expect));
+    const exps = kids.filter(c => c.kind === "experiment");
+    if (exps.length) add(box, h("h3", {}, "실험"), h("table", {}, h("tr", {}, h("th", {}, "실험"), h("th", {}, "점수"), h("th", {}, "상태")),
+      exps.map(e => h("tr", {}, h("td", {}, jump(e), h("div", {class: "hint"}, e.label)), h("td", {}, h("span", {class: "num"}, e.score), " ", delta(e.delta) || ""), h("td", {}, badge(e.status))))));
+    add(box, ...lessons(exps.flatMap(e => e.lesson || [])));
+    const next = kids.filter(c => c.kind !== "experiment");
+    if (next.length) add(box, h("h3", {}, "여기서 나온 다음 가설"), h("ul", {}, next.map(c => h("li", {}, jump(c), " ", badge(c.status)))));
+  }
+  if (n.kind === "experiment") {
+    const hyp = byId.get(parentOf.get(n.id));
+    add(box, dl([["가설", hyp ? jump(hyp) : null], ["담당", who(n.owner)], ["주기", n.cycle + "주기"], ["묶음", n.label + (n.repeats > 1 ? " · " + n.repeats + "회 평균" : "")],
+                   [n.metric, h("span", {}, h("span", {class: "num"}, n.score), " ", delta(n.delta) || "", n.flag && n.flag !== "—" ? " · " + n.flag : "")],
+                   ["켠 스위치", n.switches], ["결론", n.conclusion || "아직 없음"], ["잰 날", n.date], ["코드", n.code]]));
+    add(box, ...lessons(n.lesson));
+    add(box, h("h3", {}, "링크"), h("ul", {}, n.compare ? h("li", {}, link(n.compare, "기준과 문항별 비교")) : h("li", {class: "hint"}, "비교 문서 없음(python3 eval/compare.py <실행>)"),
+               hyp && hyp.issue_url ? h("li", {}, link(hyp.issue_url, "이슈 #" + hyp.issue)) : null));
+  }
+  if (n.kind === "group") add(box, h("p", {}, "이슈가 아직 없는 후보다. 배분일에 버린 실험의 배운 점부터 읽고 여기서 다음 가설을 고른다."),
+                                     h("ul", {}, kids.map(c => h("li", {}, jump(c)))));
+}
+
+function select(id, scroll) {
+  const n = byId.get(id); if (!n) return;
+  document.querySelectorAll('.node[aria-current="true"]').forEach(e => e.removeAttribute("aria-current"));
+  expandTo(id);
+  const el = document.getElementById("node-" + id); if (el) el.setAttribute("aria-current", "true");
+  detail(n);
+  history.replaceState(null, "", "#n-" + id);
+  if (scroll && window.matchMedia("(max-width: 860px)").matches) document.getElementById("detail").scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+add(document.getElementById("tree"), item(DATA.tree));
+document.getElementById("meta").textContent = "뿌리는 출발 판, 가지는 가설 → 실험 → 다음 가설. 숫자는 리더보드와 같은 값 · 만든 때 " + DATA.as_of;
+const leg = document.getElementById("legend");
+for (const s of Object.keys(DATA.status)) add(leg, badge(s));
+for (const p of Object.keys(DATA.people)) add(leg, who(p));
+document.getElementById("open-all").onclick = () => document.querySelectorAll("#tree li").forEach(li => toggle(li, true));
+document.getElementById("close-all").onclick = () => document.querySelectorAll("#tree li").forEach(li => li.dataset.id !== "root" && toggle(li, false));
+document.getElementById("footer").textContent = "자료: 계획 표(docs/engine/plan.md 2-1 · 2-3 · 4-1절, 「부모」 칸) · 실행 요약(eval/runs) · 결론 · 배운 점 · GitHub 이슈 · PR 상태. python3 eval/board.py --tree가 만든다. holdout은 넣지 않는다.";
+if (DATA.example) { document.getElementById("example-chip").hidden = false; document.getElementById("banner").hidden = false; document.title = "[예시] " + document.title; }
+if (SNAPSHOT) {
+  document.body.classList.add("snapshot");
+  document.getElementById("meta").textContent += " · 정적 보기(모든 가지 펼침)";
+  setTimeout(() => { document.documentElement.dataset.h = document.body.scrollHeight; });   // 찍는 쪽이 이 높이로 자른다
+} else {
+  const start = location.hash.startsWith("#n-") ? location.hash.slice(3) : "root";
+  setTimeout(() => select(byId.has(start) ? start : "root", false));
+}
+</script>
+</body>
+</html>

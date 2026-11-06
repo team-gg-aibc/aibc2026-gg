@@ -5,14 +5,19 @@
                                                      파일을 쓰지 않는다. 먼저 git fetch origin. 브랜치 칸이 붙는다
 두 문서는 손으로 고치지 않는다. PR끼리 충돌하면 main을 받은 뒤 이 명령을 다시 돌린다(같은 실행 파일이면 늘 같은 표).
 결론(채택 · 버림 · 보류)은 그 실행 파일의 "conclusion" 칸에, 배운 점 세 줄은 "lesson" 칸에 적고 다시 돌린다.
+  python3 eval/board.py --tree                       가설 나무 docs/engine/tree.json · tree.html도 만든다(배분일, gh 필요)
 """
 import argparse
 import fnmatch
 import json
+import re
 import subprocess
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlsplit
 
-from run import CAUSES, ROOT, RUNS, WEIGHTS, cycle_of
+from run import CAUSES, KST, ROOT, RUNS, WEIGHTS, cycle_of
 
 DOCS = ROOT / "docs" / "engine"
 LAWS = {"parking": "주차장", "park": "도시공원", "smoking": "금연", "animal": "동물보호", "bicycle": "자전거",
@@ -109,6 +114,14 @@ def mark(delta, band):
     return f"{delta:+.1f}", "↑ 흔들림 밖" if delta > 0 else "↓ 흔들림 밖"
 
 
+def base_of(gs, g):
+    """리더보드 「출발 판 대비」의 기준: 같은 표(같은 문항)의 출발 판 가운데 엔진 코드 지문이 같은 것, 없으면 가장 최근 것.
+    검색만 잰 실행은 같은 검색 방식(keyword · hybrid)끼리."""
+    bases = sorted((b for b in gs if b["name"] == "baseline" and b["table"] == g["table"] and b["full"] == g["full"]
+                    and (g["full"] or b["search"] == g["search"])), key=lambda b: b["created"])
+    return next((b for b in reversed(bases) if b["code_hash"] == g["code_hash"]), bases[-1] if bases else None)
+
+
 def noise(gs, table):
     """흔들림 폭: 같은 표(같은 문항)에서 가장 최근 출발 판과 엔진 코드가 같은 출발 판 실행을 모두 모은 가중의 최대 − 최소.
     두 번이 안 되면 같은 묶음의 다른 표에서 같은 방법으로 잰 폭을 쓰고 그렇다고 적는다. 3번만 모으면 우연히 좁게 나올 수 있어서
@@ -140,7 +153,7 @@ def leaderboard(gs, n_runs):
            "**(탐색)** = 90초 조건 없이 잰 실행(1~3주기). **궤적** = 문항마다 단계별 입력 · 프롬프트 · 모델 출력을 보는 화면으로, "
            "그 실행을 돌린 컴퓨터에만 있다(`eval/results/`는 git에 안 올림). **비교** = 기준과 문항마다 견준 문서(`eval/compare.py`)로, "
            "커밋돼 있어 GitHub에서 열린다.", "",
-           DEFAULT, ""]
+           DEFAULT, "", "**가설 나무**(가설 → 실험 → 다음 가설): 로컬에서 보기 `open docs/engine/tree.html`(배분일에 `python3 eval/board.py --tree`로 다시 만든다).", ""]
     full = [g for g in gs if g["full"] and g["split"] != "holdout"]
     if not full:
         out += ["아직 없음. 키를 넣고 `python3 eval/run.py --split dev`(출발 판)와 "
@@ -148,7 +161,6 @@ def leaderboard(gs, n_runs):
     tables = sorted({g["table"] for g in full}, key=lambda t: (t[0] != "dev", t[1] or 0, t[0]))
     for t in tables:
         rows = sorted([g for g in full if g["table"] == t], key=lambda g: -(g["m"]["weighted"] or 0))
-        bases = sorted((g for g in rows if g["name"] == "baseline"), key=lambda g: g["created"])  # 오래된 것 → 최근 것
         band, band_note = noise(gs, t)
         out += [f"### {label(rows[0])} (문항 지문 `{t[3]}`)", "",
                 f"흔들림 폭: {num(band, '점')}{band_note}", "",
@@ -156,7 +168,7 @@ def leaderboard(gs, n_runs):
                 f"|---|{bs}---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for i, g in enumerate(rows, 1):
             m = g["m"]
-            base = next((b for b in reversed(bases) if b["code_hash"] == g["code_hash"]), bases[-1] if bases else None)
+            base = base_of(gs, g)
             delta = None if base is None or base is g or None in (m["weighted"], base["m"]["weighted"]) \
                 else round(m["weighted"] - base["m"]["weighted"], 1)
             d, flag = mark(delta, band) if base is not g else ("기준", "—")
@@ -252,10 +264,212 @@ def links(g):
     return out
 
 
+# ---- 가설 나무: python3 eval/board.py --tree → docs/engine/tree.json · tree.html (배분일에 오케스트레이터가 돌린다) ----
+PEOPLE = {"동규": "#2a78d6", "동욱": "#008300", "종희": "#eda100", "건영": "#e87ba4"}   # GG비서 대시보드(gg-bot CHART_COLORS)와 같은 색
+STATUS = {"채택": "#0ca30c", "보류": "#fab219", "버림": "#d03b3b", "진행 중": "#52514e", "대기": "#898781"}  # dataviz 상태 색, 늘 글자와 함께
+
+
+def plan_table(text, heading):
+    """plan.md에서 heading 절의 첫 표를 [{칸 이름: 값}]으로 읽는다."""
+    lines = text.split(heading, 1)[1].split("\n")
+    start = next(i for i, line in enumerate(lines) if line.startswith("| "))
+    cells = lambda line: [c.strip() for c in line.strip().strip("|").split(" | ")]  # noqa: E731
+    head, rows = cells(lines[start]), []
+    for line in lines[start + 2:]:
+        if not line.startswith("|"):
+            break
+        rows.append(dict(zip(head, cells(line))))
+    return rows
+
+
+REPO = "https://github.com/team-gg-aibc/aibc2026-gg"
+
+
+def repo_url(origin=None):
+    """나무 링크 · gh에 쓸 레포 주소. tree.html · tree.json에 그대로 들어가니, origin 주소의 사용자 · 토큰
+    (https://사람:토큰@…의 @ 앞)과 포트는 반드시 빼고 https://호스트/경로 꼴만 쓴다. 못 읽으면 팀 레포."""
+    try:
+        origin = origin or git("remote", "get-url", "origin").strip()
+    except (OSError, subprocess.CalledProcessError):
+        return REPO
+    u = urlsplit(origin.replace("git@github.com:", "https://github.com/"))
+    return f"https://{u.hostname}{u.path.rstrip('/').removesuffix('.git')}" if u.hostname else REPO
+
+
+def gh_json(*args):
+    """GitHub 이슈 · PR 상태. gh가 없거나 실패하면 빈 목록(나무는 그려지고 상태는 실행 요약만으로 정한다)."""
+    try:
+        return json.loads(subprocess.run(["gh", *args], capture_output=True, text=True, timeout=60, check=True).stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        print("⚠ gh로 이슈 · PR 상태를 못 읽었다. 상태는 실행 요약만으로 정한다.")
+        return []
+
+
+def read_plan(text):
+    """가설(2-1) · 후보(2-3) · 1주기 배정(4-1)을 마디 목록으로. 부모 칸: 「출발 판」 또는 「가설 N」."""
+    nodes = []
+    for r in plan_table(text, "### 2-1."):
+        who = re.search(r"(동규|동욱|종희|건영)\s*(\d)주기", r.get("1주기 담당 · 이슈", ""))
+        issue = re.search(r"#(\d+)", r.get("1주기 담당 · 이슈", ""))
+        what = r["가설 (무엇을 바꾸면)"]
+        nodes.append({"num": r["#"], "kind": "hypothesis", "title": what.split(":")[0].replace("**", "").strip(),
+                      "what": what.replace("**", ""), "expect": r.get("어떤 지표가 얼마나 (어림)", ""),
+                      "issue": int(issue.group(1)) if issue else None, "owner": who.group(1) if who else None,
+                      "cycle": int(who.group(2)) if who else None, "parent": r.get("부모") or "출발 판"})
+    for r in plan_table(text, "### 2-3."):
+        what = r["후보"].replace("**", "")
+        nodes.append({"num": r["#"], "kind": "candidate", "title": re.sub(r"\(.*?\)", "", what.split(":")[0]).strip(),
+                      "what": what, "expect": r.get("기대", ""), "issue": None, "owner": None, "cycle": None,
+                      "parent": r.get("부모") or "출발 판"})
+    known = {n["issue"] for n in nodes} | {20, 21, 31}                  # 뼈대 · 점수 틀은 뿌리, 채점 서버는 실험이 아니다
+    for r in plan_table(text, "### 4-1."):
+        for issue, title in re.findall(r"\[#(\d+)\]\([^)]*\)\s*([^(,\[]+)", r.get("이슈 (마감)", "")):
+            if int(issue) not in known:
+                nodes.append({"num": f"#{issue}", "kind": "hypothesis", "title": title.strip(), "what": title.strip(),
+                              "expect": "", "issue": int(issue), "owner": r["사람"], "cycle": 1, "parent": "출발 판"})
+    return nodes
+
+
+def build_tree(plan_nodes, gs, issues, prs, repo, as_of, example=False):
+    """마디: 뿌리(출발 판) → 가설 → 실험(실행 묶음) · 다음 가설. 숫자는 리더보드와 같은 함수(num · base_of · noise · mark)로 낸다."""
+    gs = [g for g in gs if g["split"] != "holdout"]                     # holdout은 나무에 넣지 않는다
+    state = {i["number"]: i["state"] for i in issues}
+    linked = defaultdict(list)
+    for pr in prs:
+        for issue in re.findall(r"(?:Closes|Refs|Fixes) #(\d+)", pr.get("body") or ""):
+            linked[int(issue)].append({"number": pr["number"], "state": pr["state"], "title": pr["title"], "url": pr["url"]})
+    blob = f"{repo}/blob/main/docs/engine"
+
+    def compare(g):
+        return f"{blob}/compare/{g['run_id']}.md" if (DOCS / "compare" / f"{g['run_id']}.md").exists() else None
+
+    def experiment(g, owner):
+        base = base_of(gs, g)
+        if g["full"]:
+            band, score, metric = noise(gs, g["table"])[0], g["m"]["weighted"], "가중 점수"
+            delta = None if base is None or base is g or None in (score, base["m"]["weighted"]) \
+                else round(score - base["m"]["weighted"], 1)               # 리더보드와 같이 None이면 차이를 건너뛴다
+            d, flag = mark(delta, band)
+        else:
+            k = str(g["top_k"])
+            score, metric = g["m"]["hit"].get(k), f"검색 적중률 top-{k}"
+            delta = None if base is None or base is g or None in (score, base["m"]["hit"].get(k)) \
+                else round(score - base["m"]["hit"][k], 1)                 # 기준이 이 top-k를 안 쟀으면 0으로 보지 않고 건너뛴다
+            d, flag = ("—" if delta is None else f"{delta:+.1f}"), "검색만"
+        return {"id": f"e-{g['group']}", "kind": "experiment", "title": name(g), "label": label(g), "cycle": g["cycle"],
+                "owner": owner, "status": next((s for s in ("채택", "버림", "보류") if g["conclusion"].startswith(s)), "진행 중"),
+                "metric": metric, "score": num(score), "delta": d, "flag": flag, "conclusion": g["conclusion"],
+                "lesson": g["lesson"], "repeats": g["repeats"], "date": g["date"], "code": g["code"], "compare": compare(g),
+                "switches": ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in g["switches"].items()) or "출발 판",
+                "children": []}
+
+    byn = {}
+    for n in plan_nodes:
+        exps = [experiment(g, n["owner"]) for g in gs if n["issue"] and re.sub(r"\D", "", g["issue"]) == str(n["issue"])]
+        decided = [e for e in exps if e["status"] != "진행 중"]
+        status = decided[-1]["status"] if decided else "진행 중" if exps or n["owner"] else "대기"
+        if n["issue"] and state.get(n["issue"]) == "CLOSED" and not decided:
+            status = "버림"
+        byn[n["num"]] = dict(n, id=("h-" if n["kind"] == "hypothesis" else "c-") + n["num"].lstrip("#"), status=status,
+                             children=exps, issue_url=f"{repo}/issues/{n['issue']}" if n["issue"] else None,
+                             issue_state=state.get(n["issue"]), prs=linked.get(n["issue"], []))
+    bases = [g for g in gs if g["name"] == "baseline" and g["full"] and g["split"] == "dev" and not g["sample"]]
+    b = bases[-1] if bases else None
+    root = {"id": "root", "kind": "root", "title": "출발 판", "status": "채택", "children": [],
+            "metric": "가중 점수", "score": num(b["m"]["weighted"]) if b else None, "label": label(b) if b else "아직 없음",
+            "band": num(noise(gs, b["table"])[0]) if b else None, "date": b["date"] if b else "",
+            "by_type": {k: num(b["m"]["by_type"].get(k)) for k in WEIGHTS} if b else {}, "compare": compare(b) if b else None,
+            "links": {"리더보드": f"{blob}/leaderboard.md", "실험 기록": f"{blob}/experiments.md", "계획": f"{blob}/plan.md"}}
+    later = {"id": "g-later", "kind": "group", "title": "다음 후보 (이슈 없음, 배분일에 고름)", "status": "대기", "children": []}
+    order = lambda n: (n["cycle"] is None, n["cycle"] or 0, n["kind"] != "hypothesis", int(re.sub(r"\D", "", n["num"]) or 0))  # noqa: E731
+    for n in sorted(byn.values(), key=order):
+        parent = re.search(r"가설\s*(\d+)", n["parent"])
+        (byn[parent.group(1)]["children"] if parent and parent.group(1) in byn
+         else later["children"] if n["kind"] == "candidate" else root["children"]).append(n)
+    if later["children"]:
+        root["children"].append(later)
+    return {"as_of": as_of, "example": example, "people": PEOPLE, "status": STATUS, "tree": root}
+
+
+def write_tree(tree, out=DOCS):
+    """tree.json(손으로 고치지 않음)과, 데이터를 안에 넣은 한 파일 화면 tree.html(인터넷 없이 열림)."""
+    (out / "tree.json").write_text(json.dumps(tree, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    page = (ROOT / "eval" / "tree_template.html").read_text(encoding="utf-8")
+    data = json.dumps(tree, ensure_ascii=False).replace("<", "\\u003c")   # JSON 이스케이프라 </script> · <!-- 둘 다 막히고 JSON.parse는 그대로 읽는다
+    (out / "tree.html").write_text(page.replace("/*DATA*/null", data), encoding="utf-8")
+    return out / "tree.html"
+
+
+def selftest():
+    plan = """### 2-1. 한 장 표
+| # | 가설 (무엇을 바꾸면) | 어떤 지표가 얼마나 (어림) | 재는 법 | 크기 | 1주기 담당 · 이슈 | 부모 |
+|---|---|---|---|---|---|---|
+| 1 | 질문 다듬기: 시민 말을 조례 용어로 | 적중률 +5 | 끝까지 | 1일 | 다음 후보 · #26 | 가설 2 |
+| 2 | 조각 다듬기: 꼬리표 떼기 | 적중률 +1 | 키 없이 | 1일 | 건영 1주기 · #23 | 출발 판 |
+
+### 2-3. 다음 후보
+| # | 후보 | 기대 | 크기 | 근거 | 부모 |
+|---|---|---|---|---|---|
+| 9 | **바깥 근거 대조**(동규 11-06): 6종 밖 법령 | 함정 ↑ | 2일 | 노트 22 | 출발 판 |
+
+### 4-1. 1주기 배정
+| 사람 | 이슈 (마감) | 왜 |
+|---|---|---|
+| 동욱 | [#22](https://x/22) 출력 규격 강제 (11/8), [#31](https://x/31) 채점 서버 | 서버 |
+"""
+    nodes = read_plan(plan)
+    assert [(n["num"], n["parent"], n["owner"], n["cycle"]) for n in nodes] == [
+        ("1", "가설 2", None, None), ("2", "출발 판", "건영", 1), ("9", "출발 판", None, None), ("#22", "출발 판", "동욱", 1)]
+    assert nodes[2]["title"] == "바깥 근거 대조" and nodes[3]["title"] == "출력 규격 강제"
+
+    def summ(gid, name, issue, w, conclusion="", created="2026-11-08T10:00:00+09:00"):
+        return {"group": gid, "run_id": gid, "created": created, "conclusion": conclusion, "lesson": ["</script><b>x</b>", "<!-- <script> 주석"],
+                "experiment": {"name": name, "issue": issue, "cycle": 1}, "args": {"mode": "full", "split": "dev", "sample": None, "seed": 0},
+                "settings": {"top_k": 6}, "switches": {}, "cost_usd": 0.4,
+                "env": {"questions_hash": "q", "code_commit": "abc", "code_dirty": False, "code_hash": "c", "eval_commit": "e",
+                        "retrieval_used": ["hybrid"]},
+                "metrics": {"n": 661, "weighted": w, "by_type": {}, "by_law": {}, "over_abstain": 20.0,
+                            "citations_per_answer": 1.5, "latency_p95": 6.0}}
+    runs = [summ("b1", "baseline", "#21", 68.0, created="2026-11-06T10:00:00+09:00"),
+            summ("b2", "baseline", "#21", 69.0, created="2026-11-06T11:00:00+09:00"),
+            summ("x", "23-chunks", "#23", 71.5, "채택 — 올랐다"), summ("y", "22-contract", "#22", 68.6),
+            summ("z", "22-small", "#22", None)]                               # 가중이 None인 실행(빠진 문항 종류가 있는 표본 등)
+    tok = "https://someone:ghp_secret123@github.com/team-gg-aibc/aibc2026-gg.git"     # 토큰이 든 origin
+    for origin in (tok, "https://x-access-token:ghs_abc@github.com:443/team-gg-aibc/aibc2026-gg/",
+                   "git@github.com:team-gg-aibc/aibc2026-gg.git", "ssh://git@github.com/team-gg-aibc/aibc2026-gg.git",
+                   "/Users/someone/aibc2026-gg"):                                     # 로컬 경로면 팀 레포
+        assert repo_url(origin) == REPO, origin
+    tree = build_tree(nodes, groups([(r, None) for r in runs]), [{"number": 26, "state": "OPEN"}],
+                      [{"number": 40, "state": "OPEN", "title": "t", "url": "https://x/pr/40", "body": "Closes #23"}], repo_url(tok), "now")
+    root = tree["tree"]
+    kids = {c["id"]: c for c in root["children"]}
+    assert root["score"] == "69.0" and root["band"] == "1.0"                   # 가장 최근 출발 판 · 출발 판 두 번의 폭(리더보드와 같은 값)
+    assert set(kids) == {"h-2", "h-22", "g-later"} and kids["g-later"]["children"][0]["id"] == "c-9"
+    h2 = kids["h-2"]
+    assert h2["status"] == "채택" and h2["prs"][0]["number"] == 40 and [c["id"] for c in h2["children"]] == ["e-x", "h-1"]
+    e = h2["children"][0]
+    assert (e["score"], e["delta"], e["flag"]) == ("71.5", "+2.5", "✅ 폭의 2배 넘게 오름")
+    assert kids["h-22"]["status"] == "진행 중" and h2["children"][1]["status"] == "대기"
+    z = kids["h-22"]["children"][1]                                     # 가중이 None이어도 멈추지 않고 차이를 「—」로
+    assert (z["id"], z["score"], z["delta"], z["flag"]) == ("e-z", "—", "—", "—")
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        page = write_tree(tree, Path(d)).read_text(encoding="utf-8")
+        raw = page.split('<script id="data" type="application/json">')[1].split("</script>")[0]
+        assert "<" not in raw and page.count("</script>") == 2              # 배운 점 속 </script> · <!-- 가 화면 코드를 끊지 않는다
+        assert json.loads(raw) == tree                                      # 브라우저 JSON.parse처럼 읽으면 그대로 돌아온다
+        assert "ghp_secret123" not in page + (Path(d) / "tree.json").read_text(encoding="utf-8")   # 토큰이 파일에 새지 않는다
+    print("selftest ok")
+
+
 def main():
     ap = argparse.ArgumentParser(description="리더보드 · 실험 기록 만들기 (eval/board.py 맨 위 설명 참고)")
     ap.add_argument("--from-branches", metavar="패턴", help="원격 브랜치 패턴(예: 'origin/*')의 실행 요약까지 모아 화면에만 보인다")
+    ap.add_argument("--tree", action="store_true", help="가설 나무 docs/engine/tree.json · tree.html도 만든다(gh로 이슈 · PR 상태를 읽음)")
+    ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest()
     if a.from_branches:
         runs = branch_runs(a.from_branches)
         gs = groups(runs)
@@ -268,6 +482,13 @@ def main():
     (DOCS / "leaderboard.md").write_text(leaderboard(gs, len(runs)), encoding="utf-8")
     (DOCS / "experiments.md").write_text(experiments(gs, len(runs)), encoding="utf-8")
     print(f"실행 요약 {len(runs)}개 → docs/engine/leaderboard.md · experiments.md")
+    if a.tree:
+        repo = repo_url()
+        issues = gh_json("issue", "list", "--repo", repo, "--state", "all", "--limit", "300", "--json", "number,state")
+        prs = gh_json("pr", "list", "--repo", repo, "--state", "all", "--limit", "300", "--json", "number,state,title,body,url")
+        tree = build_tree(read_plan((DOCS / "plan.md").read_text(encoding="utf-8")), gs, issues, prs, repo,
+                          datetime.now(KST).strftime("%Y-%m-%d %H:%M"))
+        print(f"가설 나무 → {write_tree(tree).relative_to(ROOT)} · tree.json")
 
 
 if __name__ == "__main__":
