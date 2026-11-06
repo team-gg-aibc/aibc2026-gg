@@ -1,0 +1,104 @@
+{
+ "run_id": "20261106-192619-baseline-kit",
+ "group": "20261106-192619-baseline-kit",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-06T19:26:31+09:00",
+ "experiment": {
+  "name": "baseline",
+  "issue": "#21",
+  "note": "출발 판: 스타터 킷 그대로 + 검증을 solar-pro4 판정으로 (engine/config.py DEFAULTS 그대로)",
+  "file": "eval/configs/baseline.json",
+  "file_sha": "f73fa66a9f35"
+ },
+ "conclusion": "출발 판 · 킷 예시 11문항(같은 날 세 번 77.3 · 68.2 · 72.7)",
+ "args": {
+  "config": "eval/configs/baseline.json",
+  "split": "kit",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75
+ },
+ "settings_hash": "cab5faf0d46c",
+ "switches": {},
+ "env": {
+  "code_commit": "d42f323",
+  "code_hash": "8a1f6d5fe027",
+  "code_dirty": false,
+  "eval_commit": "5b3b1df",
+  "questions_hash": "d70ac7ce555b",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 11,
+  "n_gold": 9,
+  "n_trap": 2,
+  "weighted": 72.7,
+  "by_type": {
+   "단순": 66.7,
+   "조건": 100.0,
+   "결합": 33.3,
+   "함정": 100.0
+  },
+  "trap": 100.0,
+  "by_law": {
+   "kit": 66.7
+  },
+  "over_abstain": 33.3,
+  "citations_per_answer": 2.17,
+  "retrieval_hit": 80.6,
+  "format_errors": 0,
+  "late": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.891,
+  "latency_p95": 6.047,
+  "latency_max": 6.047,
+  "causes": {
+   "판정이 맞는 답을 거절": 2,
+   "정답이 후보에 없음": 1
+  }
+ },
+ "cost_usd": 0.0079,
+ "tokens": {
+  "in": 27903,
+  "cached": 6528,
+  "out": 1041
+ },
+ "calls": 31,
+ "wall_sec": 11.7,
+ "hashes": {
+  "retrieval": "d88e88dab109",
+  "answers": "a243850bb8f2"
+ }
+}

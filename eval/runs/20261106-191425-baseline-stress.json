@@ -1,0 +1,98 @@
+{
+ "run_id": "20261106-191425-baseline-stress",
+ "group": "20261106-191425-baseline-stress",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-06T19:14:25+09:00",
+ "experiment": {
+  "name": "baseline",
+  "issue": "#21",
+  "note": "출발 판: 스타터 킷 그대로 + 검증을 solar-pro4 판정으로 (engine/config.py DEFAULTS 그대로)",
+  "file": "eval/configs/baseline.json",
+  "file_sha": "f73fa66a9f35"
+ },
+ "conclusion": "출발 판 · 키 없이 키워드 검색 기준",
+ "args": {
+  "config": "eval/configs/baseline.json",
+  "split": "stress",
+  "sample": null,
+  "seed": 0,
+  "mode": "retrieval",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75
+ },
+ "settings_hash": "cab5faf0d46c",
+ "switches": {},
+ "env": {
+  "code_commit": "515a3c1",
+  "code_hash": "8a1f6d5fe027",
+  "code_dirty": false,
+  "eval_commit": "5b3b1df",
+  "questions_hash": "f6a18b9a22bd",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "keyword"
+  ],
+  "key_present": false,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 230,
+  "hit": {
+   "1": 58.4,
+   "3": 73.8,
+   "6": 83.8,
+   "10": 88.2,
+   "20": 93.8
+  },
+  "by_type": {
+   "단순": 91.2,
+   "조건": 81.0,
+   "결합": 77.3
+  },
+  "by_law": {
+   "animal": 75.5,
+   "bicycle": 86.1,
+   "common": 78.8,
+   "park": 90.0,
+   "parking": 80.7,
+   "smoking": 84.6,
+   "youth": 92.8
+  }
+ },
+ "cost_usd": 0.0,
+ "tokens": {
+  "in": 0,
+  "cached": 0,
+  "out": 0
+ },
+ "calls": 0,
+ "wall_sec": 0.6,
+ "hashes": {
+  "retrieval": "7f4ef73032d9",
+  "answers": null
+ }
+}

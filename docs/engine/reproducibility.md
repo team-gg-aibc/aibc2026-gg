@@ -13,7 +13,7 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 - 내 컴퓨터가 팀과 같은 결과를 내는지 먼저 본다(키 없이, 크레딧 0, 2초):
 
 ```bash
-python3 eval/run.py --check eval/runs/20261106-183243-baseline-dev.json
+python3 eval/run.py --check eval/runs/20261106-191423-baseline-dev.json
 ```
 
 「✅ 같은 결과」가 나오면 된다. 「다름」이면 표에서 「다름」인 항목부터 맞춘다(7절).

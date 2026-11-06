@@ -118,7 +118,7 @@ def leaderboard(gs, n_runs):
         out += ["", "조례별 근거 정확도(함정 뺌):", "",
                 "| 실험 | " + " | ".join(LAWS.get(k, k) for k in laws) + " |", "|---|" + "---|" * len(laws)]
         out += [f"| {g['name']} | " + " | ".join(num(g["m"]["by_law"].get(k)) for k in laws) + " |" for g in rows]
-        out += ["", "틀린 원인(문항 수, 「답이 있는데 확인 불가」는 까닭별 합):", "",
+        out += ["", "틀린 원인(문항 수, 반복은 평균, 「답이 있는데 확인 불가」는 까닭별 합):", "",
                 "| 실험 | 검색 적중률 | " + " | ".join(CAUSES) + " |", "|---|---|" + "---|" * len(CAUSES)]
         for g in rows:
             c = defaultdict(float)
