@@ -152,7 +152,7 @@ def leaderboard(gs, n_runs):
            "**(탐색)** = 90초 조건 없이 잰 실행(1~3주기). **궤적** = 문항마다 단계별 입력 · 프롬프트 · 모델 출력을 보는 화면으로, "
            "그 실행을 돌린 컴퓨터에만 있다(`eval/results/`는 git에 안 올림). **비교** = 기준과 문항마다 견준 문서(`eval/compare.py`)로, "
            "커밋돼 있어 GitHub에서 열린다.", "",
-           DEFAULT, ""]
+           DEFAULT, "", "**가설 나무**(가설 → 실험 → 다음 가설): 로컬에서 보기 `open docs/engine/tree.html`(배분일에 `python3 eval/board.py --tree`로 다시 만든다).", ""]
     full = [g for g in gs if g["full"] and g["split"] != "holdout"]
     if not full:
         out += ["아직 없음. 키를 넣고 `python3 eval/run.py --split dev`(출발 판)와 "

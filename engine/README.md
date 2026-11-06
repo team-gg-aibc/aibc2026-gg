@@ -34,7 +34,7 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 | 탐색 모드(1~3주기: 90초 조건 없이, 문항당 300초까지) | 설정에 `"explore": true, "timeout_sec": 300` (바탕: `eval/configs/explore.json`) |
 | 문항마다 단계별 입력 · 프롬프트 · 모델 출력 · 시간 · 토큰 보기 | 끝까지 잰 실행이 `eval/results/<실행>.html`을 만든다. 문항 하나는 `python3 eval/trajectory.py <실행> <문항 id>` |
 | 병합 전 브랜치들의 결과까지 한 표로 (배분일) | `git fetch origin` 뒤 `python3 eval/board.py --from-branches 'origin/*'` (화면에만) |
-| 가설이 실험 · 배운 점을 거쳐 다음 가설로 가는 나무 (배분일) | `python3 eval/board.py --tree` → `docs/engine/tree.html`(한 파일, 브라우저로 열기) |
+| 가설이 실험 · 배운 점을 거쳐 다음 가설로 가는 나무 (배분일) | `python3 eval/board.py --tree` → `docs/engine/tree.html`. **로컬에서 보기: `open docs/engine/tree.html`**(데이터가 안에 있어 인터넷 없이 열리고, 화면 폭에 맞춰 움직인다). 디스코드 그림용 정적 보기는 주소 뒤에 `?snapshot=1`(모든 가지 펼침, 폭 1200, 옆 칸 없음) |
 | 기준과 문항마다 견주기 (버린 실험도) | `python3 eval/compare.py <실행>` → `docs/engine/compare/<실행>.md` |
 | 규칙(실험 하나 = 설정 파일 하나, 고정한 것 · 흔들리는 것, 기록 · 비교 · 색인 바꾸기 · 크레딧) | [재현 규칙](../docs/engine/reproducibility.md) |
 

@@ -75,6 +75,13 @@
   #detail table { width:100%; border-collapse:collapse; font-size:13px; } #detail td, #detail th { border-bottom:1px solid var(--grid); padding:4px 6px; text-align:left; vertical-align:top; }
   #detail a { color:#1d5fb4; } .linkbtn { font:inherit; border:0; background:none; padding:0; color:#1d5fb4; text-decoration:underline; cursor:pointer; text-align:left; }
   .hint { color:var(--muted); font-size:13px; }
+  /* 정적 보기(?snapshot=1): GG비서가 PNG로 찍어 디스코드 #대시보드에 올린다. 폭 1200 · 모든 가지 펼침 · 옆 칸 없음 · 마디마다 한 줄 */
+  body.snapshot { width:1200px; }
+  body.snapshot main { grid-template-columns:minmax(0,1fr); padding:8px 24px 16px; }
+  body.snapshot #detail, body.snapshot .controls, body.snapshot .twisty { display:none; }
+  body.snapshot .node { display:flex; flex-wrap:wrap; align-items:center; gap:2px 14px; padding:6px 11px; cursor:default; }
+  body.snapshot .node[aria-current="true"] { border:1px solid var(--grid); padding:6px 11px; }
+  body.snapshot ul.tree li { margin:4px 0; }
 </style>
 </head>
 <body>
@@ -94,6 +101,7 @@
 <script>
 "use strict";
 const DATA = JSON.parse(document.getElementById("data").textContent);
+const SNAPSHOT = new URLSearchParams(location.search).get("snapshot") === "1";
 const ICON = {"채택": "✓", "버림": "✕", "보류": "‖", "진행 중": "●", "대기": "○"};
 const byId = new Map(), parentOf = new Map();
 (function walk(n, p) { byId.set(n.id, n); if (p) parentOf.set(n.id, p.id); (n.children || []).forEach(c => walk(c, n)); })(DATA.tree, null);
@@ -129,7 +137,7 @@ function card(n) {
     if (exps.length) add(sub, h("span", {}, "실험 " + exps.length));
   }
   if (n.kind === "experiment") add(sub, h("span", {}, n.metric + " ", h("span", {class: "num"}, n.score)), delta(n.delta), n.flag && n.flag !== "—" ? h("span", {}, n.flag) : null, h("span", {}, n.cycle + "주기"), h("span", {}, n.label));
-  if (n.kind === "group") add(sub, h("span", {}, (n.children || []).length + "개 · 펴서 보기"));
+  if (n.kind === "group") add(sub, h("span", {}, (n.children || []).length + "개" + (SNAPSHOT ? "" : " · 펴서 보기")));
   return h("button", {type: "button", class: "node " + n.kind, id: "node-" + n.id, "data-id": n.id, onclick: () => select(n.id, true)}, top, sub);
 }
 
@@ -141,7 +149,7 @@ function item(n) {
   tw.addEventListener("click", () => toggle(li, ul.hidden));
   add(li, h("div", {class: "row"}, tw, card(n)), kids.length ? ul : null);
   li._ul = ul; li._tw = tw; li.dataset.id = n.id;
-  if (n.kind === "group") setTimeout(() => toggle(li, false));
+  if (n.kind === "group" && !SNAPSHOT) setTimeout(() => toggle(li, false));
   return li;
 }
 function toggle(li, open) { if (!li._ul) return; li._ul.hidden = !open; li._tw.textContent = open ? "▾" : "▸"; li._tw.setAttribute("aria-expanded", open ? "true" : "false"); }
@@ -209,8 +217,14 @@ document.getElementById("open-all").onclick = () => document.querySelectorAll("#
 document.getElementById("close-all").onclick = () => document.querySelectorAll("#tree li").forEach(li => li.dataset.id !== "root" && toggle(li, false));
 document.getElementById("footer").textContent = "자료: 계획 표(docs/engine/plan.md 2-1 · 2-3 · 4-1절, 「부모」 칸) · 실행 요약(eval/runs) · 결론 · 배운 점 · GitHub 이슈 · PR 상태. python3 eval/board.py --tree가 만든다. holdout은 넣지 않는다.";
 if (DATA.example) { document.getElementById("example-chip").hidden = false; document.getElementById("banner").hidden = false; document.title = "[예시] " + document.title; }
-const start = location.hash.startsWith("#n-") ? location.hash.slice(3) : "root";
-setTimeout(() => select(byId.has(start) ? start : "root", false));
+if (SNAPSHOT) {
+  document.body.classList.add("snapshot");
+  document.getElementById("meta").textContent += " · 정적 보기(모든 가지 펼침)";
+  setTimeout(() => { document.documentElement.dataset.h = document.body.scrollHeight; });   // 찍는 쪽이 이 높이로 자른다
+} else {
+  const start = location.hash.startsWith("#n-") ? location.hash.slice(3) : "root";
+  setTimeout(() => select(byId.has(start) ? start : "root", false));
+}
 </script>
 </body>
 </html>
