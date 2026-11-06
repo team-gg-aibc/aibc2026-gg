@@ -7,8 +7,9 @@
   python3 eval/run.py --url http://localhost:8000/ask --split kit   서버로 (응답만, 틀린 원인은 못 나눔)
   python3 eval/run.py --selftest
 
-결과: eval/runs/<실행>.json(요약, 리더보드 재료, 남길 것만 커밋) · eval/results/<실행>.jsonl(문항별, git에 안 올림).
-holdout은 요약만 남긴다. 리더보드 · 실험 기록은 python3 eval/board.py. 규칙은 docs/engine/reproducibility.md.
+결과: eval/runs/<실행>.json(요약, 리더보드 재료, 남길 것만 커밋) · eval/results/<실행>.jsonl(문항별) · <실행>.html(문항마다
+단계별 궤적 화면). eval/results/는 git에 안 올린다. holdout은 요약만 남긴다. 비용 상한은 기본으로 없다(동규 11-06).
+리더보드 · 실험 기록은 python3 eval/board.py. 규칙은 docs/engine/reproducibility.md.
 """
 import argparse
 import hashlib
@@ -47,6 +48,14 @@ TRAP_ANSWERED = "함정에 답함"
 TIMEOUT = "시간 초과"
 BROKEN = "오류 · 형식"
 CAUSES = [NOT_IN, MISPICK, REJECTED_OK, ABSTAIN, TRAP_ANSWERED, TIMEOUT, BROKEN]
+# 실험 주기(계획 0절 표): 이 시각 전에 만든 실행은 이 주기. 설정 파일에 "cycle"이 있으면 그 값을 쓴다.
+CYCLE_ENDS = [("2026-11-07T19:00", 0), ("2026-11-09T00:00", 1), ("2026-11-11T00:00", 2), ("2026-11-13T00:00", 3),
+              ("2026-11-15T00:00", 4), ("2026-11-17T00:00", 5)]
+
+
+def cycle_of(created):
+    """만든 시각(KST, ISO 꼴)으로 주기를 정한다. 동결(11/17) 뒤는 6."""
+    return next((c for end, c in CYCLE_ENDS if created[:16] < end), 6)
 
 # ---- 킷 채점식 그대로 (스타터 킷 check.py: 항까지 맞으면 1, 조까지 0.5, 별표 인용도 정답) ----
 CITE = re.compile(r"(서울특별시.*?(?:조례|규칙))\s*(제\d+조(?:의\d+)?|별표\s*\d*|별도\s*\d+)\s*(제\d+항)?")
@@ -114,7 +123,8 @@ def grade(q, resp, tr, sec, err, cfg):
     unknown = shape and resp["answer"].startswith("확인 불가") and resp["citation"] == []
     fmt_ok = shape and (unknown or (str(resp["source_url"]).startswith("http")
                                     and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(resp["effective_date"])) is not None))
-    late = sec > LIMIT_SEC
+    slow = sec > LIMIT_SEC
+    late = slow and not cfg["explore"]   # 탐색 모드는 90초를 넘어도 점수에서 빼지 않는다(시간은 기록만)
     broken = bool(err) or not fmt_ok or (tr is not None and tr["reason"] == pipeline.ERROR)
     if q["gold"]:
         score = 0.0 if err or late or not fmt_ok else score_citation(resp["citation"], q["gold"])
@@ -147,7 +157,7 @@ def grade(q, resp, tr, sec, err, cfg):
             cause = "틀림 (판단 기록 없음)"
     return {"id": q["id"], "type": q["type"], "law": law(q), "question": q["question"], "gold": q["gold"],
             "answer_key": q.get("answer_key", ""), "score": score, "cand": cand, "unknown": unknown,
-            "fmt_ok": fmt_ok, "late": late, "timeout": timeout, "error": err or (tr and tr["error"]),
+            "fmt_ok": fmt_ok, "slow": slow, "late": late, "timeout": timeout, "error": err or (tr and tr["error"]),
             "sec": round(sec, 3), "cause": cause, "response": resp, "trace": tr}
 
 
@@ -176,7 +186,7 @@ def calls_of(row):
 
 
 def execute(qs, cfg, mode, url, workers, max_cost):
-    """문항을 나란히 돌린다. 쓴 돈이 max_cost(달러)를 넘으면 남은 문항을 건너뛰고 None을 남긴다."""
+    """문항을 나란히 돌린다. max_cost(달러)를 주면 쓴 돈이 그것을 넘을 때 남은 문항을 건너뛰고 None을 남긴다(기본은 상한 없음)."""
     lock, stop, spent, done = threading.Lock(), threading.Event(), [0.0], [0]
 
     def one(q):
@@ -186,7 +196,7 @@ def execute(qs, cfg, mode, url, workers, max_cost):
         with lock:
             spent[0] += upstage.cost_usd(calls_of(row)) or 0.0
             done[0] += 1
-            if spent[0] > max_cost:
+            if max_cost is not None and spent[0] > max_cost:
                 stop.set()
             if done[0] % 50 == 0 or done[0] == len(qs):
                 print(f"  {done[0]}/{len(qs)} 문항, ${spent[0]:.3f}", flush=True)
@@ -229,6 +239,7 @@ def summarize(rows, mode, top_k):
             if answered else None,
             "retrieval_hit": pct(r["cand"] for r in gold if r["cand"] is not None),
             "format_errors": sum(not r["fmt_ok"] for r in rows), "late": sum(r["late"] for r in rows),
+            "over_90s": sum(r["slow"] for r in rows),
             "timeouts": sum(r["timeout"] for r in rows), "errors": sum(bool(r["error"]) for r in rows),
             "latency_p50": nearest_rank(secs, 0.5), "latency_p95": nearest_rank(secs, 0.95),
             "latency_max": secs[-1] if secs else None,
@@ -255,6 +266,7 @@ def version(pkg):
 
 
 def record(args, cfg, exp, qs, rows, mode, wall, run_id, group, rep):
+    created = datetime.now(KST).isoformat(timespec="seconds")
     calls = [c for r in rows for c in calls_of(r)]
     cost = upstage.cost_usd(calls) if not args.url else None
     retrieval_used = sorted({r["trace"]["retrieval"] for r in rows if r.get("trace") and r["trace"]["retrieval"]})
@@ -273,8 +285,8 @@ def record(args, cfg, exp, qs, rows, mode, wall, run_id, group, rep):
         cand_labels = [[r["id"], [c["label"] for c in (r["trace"] or {}).get("candidates", [])]] for r in rows]
     return {
         "run_id": run_id, "group": group, "repeat": rep, "repeats": args.repeat,
-        "created": datetime.now(KST).isoformat(timespec="seconds"),
-        "experiment": exp, "conclusion": "",
+        "created": created,
+        "experiment": dict(exp, cycle=cycle_of(created) if exp.get("cycle") is None else exp["cycle"]), "conclusion": "",
         "args": {"config": args.config, "split": args.split, "sample": args.sample, "seed": args.seed,
                  "mode": mode, "url": args.url, "workers": args.workers},
         "settings": cfg, "settings_hash": config.digest(cfg),
@@ -311,8 +323,9 @@ def show(s):
     else:
         print(f"  가중 {m['weighted']} · " + " · ".join(f"{k} {v}" for k, v in m["by_type"].items())
               + f" · 과잉 포기 {m['over_abstain']}% · 인용 수 {m['citations_per_answer']}")
-        print(f"  지연 95% {m['latency_p95']}초 · 형식 오류 {m['format_errors']} · 90초 넘음 {m['late']}"
-              f" · 오류 {m['errors']} · 검색 적중률 {m['retrieval_hit']}%")
+        print(f"  지연 95% {m['latency_p95']}초 · 형식 오류 {m['format_errors']} · 90초 넘음 {m.get('over_90s')}"
+              + (" (탐색: 점수에서 안 뺌)" if s["settings"].get("explore") else "")
+              + f" · 오류 {m['errors']} · 검색 적중률 {m['retrieval_hit']}%")
         if "causes" in m:                 # holdout은 틀린 원인을 남기지 않는다
             print(f"  틀린 원인: {m['causes']}")
     print("  조례별: " + " · ".join(f"{k} {v}" for k, v in m["by_law"].items()))
@@ -323,7 +336,7 @@ def prepare(args):
     cfg = config.load(ROOT / args.config)
     raw = json.loads((ROOT / args.config).read_text(encoding="utf-8"))
     exp = {"name": raw.get("name") or Path(args.config).stem, "issue": raw.get("issue", ""), "note": raw.get("note", ""),
-           "file": args.config, "file_sha": config.digest(raw)}
+           "cycle": raw.get("cycle"), "file": args.config, "file_sha": config.digest(raw)}
     for name, table in ((cfg["answer_prompt"], answer.PROMPTS), (cfg["verify_prompt"], verify.PROMPTS)):
         if name not in table:
             sys.exit(f"✗ 프롬프트 판 「{name}」이 없습니다. 있는 판: {sorted(table)}")
@@ -361,6 +374,9 @@ def run(args):
         RUNS.mkdir(parents=True, exist_ok=True)
         (RUNS / f"{run_id}.json").write_text(json.dumps(s, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         show(s)
+        if args.split != "holdout" and mode == "full":
+            import trajectory
+            print(f"  궤적 화면: {trajectory.write_html(s, done, RESULTS)}")
         out.append(s)
     if args.repeat > 1 and mode == "full":
         w = [s["metrics"]["weighted"] for s in out]
@@ -475,6 +491,11 @@ def selftest():
     bad = grade(gold_q, {"answer": "네", "citation": [a]}, tr(), 1, None, cfg)
     assert bad["score"] == 0 and bad["cause"] == BROKEN and not bad["fmt_ok"]
     assert grade(gold_q, ok, None, 95, None, cfg)["late"]
+    explore = dict(cfg, explore=True, timeout_sec=300)
+    r = grade(gold_q, ok, tr(), 120, None, explore)                 # 탐색: 120초 걸려도 점수는 그대로, 시간만 기록
+    assert r["score"] == 1.0 and r["slow"] and not r["late"] and r["cause"] is None
+    assert cycle_of("2026-11-06T19:14:24+09:00") == 0 and cycle_of("2026-11-07T20:00:00+09:00") == 1
+    assert cycle_of("2026-11-12T23:59:00+09:00") == 3 and cycle_of("2026-11-18T10:00:00+09:00") == 6
 
     rows = [grade(gold_q | {"type": t}, ok, tr(), 1, None, cfg) for t in list(TYPES)[:3]] + [grade(trap_q, unk, tr(), 1, None, cfg)]
     m = summarize(rows, "full", 6)
@@ -495,6 +516,11 @@ def selftest():
         assert len(rows) == 11 and all(r["fmt_ok"] for r in rows)
         m = summarize(rows, "full", 6)
         assert m["weighted"] is not None and m["errors"] == 0 and upstage.cost_usd([c for r in rows for c in calls_of(r)]) > 0
+        stages = {c["stage"] for r in rows for c in r["trace"]["calls"]}
+        assert stages == {"검색", "고르기 · 답 쓰기", "판정"} and all(c["sent"] for r in rows for c in r["trace"]["calls"])
+        import trajectory
+        page = trajectory.html_page({"run_id": "selftest", "metrics": m, "args": {"split": "kit"}, "cost_usd": 0.0}, rows)
+        assert page.count("<details") == len(rows) and "근거 1" in page and "&lt;" not in page.split("<body>")[0]
     finally:
         upstage._client, upstage.has_key = old
     print("selftest ok")
@@ -511,7 +537,7 @@ def main():
                     help="retrieval = 검색 적중률만, full = 끝까지. auto는 키가 있으면 full")
     ap.add_argument("--url", help="엔진 대신 서버 주소로 부르기 (예: http://localhost:8000/ask)")
     ap.add_argument("--workers", type=int, default=4, help="동시에 돌릴 문항 수")
-    ap.add_argument("--max-cost", type=float, default=5.0, help="한 실행에 쓸 최대 달러. 넘으면 멈춘다")
+    ap.add_argument("--max-cost", type=float, help="한 실행에 쓸 최대 달러(기본: 상한 없음, 동규 11-06). 넘으면 남은 문항을 건너뛴다")
     ap.add_argument("--check", help="재현 점검할 실행 요약 파일 (eval/runs/*.json)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()

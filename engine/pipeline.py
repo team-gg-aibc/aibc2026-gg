@@ -4,7 +4,8 @@
 확인 불가로 끝낼 때는 st["reason"]에 까닭을 적는다. 새 단계(게이트 · 질문 다듬기 · 묶음 등)는 STAGES에 끼운다.
 
 answer(question, cfg) → (응답 4칸, 판단 기록). 서버는 응답만 내보내고, 점수 틀은 판단 기록으로 틀린 원인을 나눈다.
-판단 기록에는 키 · 개인 정보를 남기지 않는다.
+판단 기록에는 단계마다 걸린 시간(steps)과, 업스테이지 호출마다 단계 이름 · 보낸 메시지 · 모델 출력 · 토큰 · 시간(calls)이 남는다.
+궤적 화면: python3 eval/trajectory.py <실행> [문항]. 키 · 개인 정보는 남기지 않는다.
 """
 import time
 from functools import lru_cache
@@ -85,12 +86,14 @@ def answer(question, cfg=None):
           "index": _index(cfg["chunk_unit"])}
     t0 = time.perf_counter()
     for name, fn in STAGES:
-        t = time.perf_counter()
+        t, n = time.perf_counter(), len(st["calls"])
         try:
             fn(st, cfg)
         except Exception as e:  # noqa: BLE001  어떤 오류든 확인 불가로 끝내고 까닭을 남긴다
             st["reason"], st["error"] = ERROR, _error(e)
         st["steps"][name] = round(time.perf_counter() - t, 3)
+        for c in st["calls"][n:]:
+            c["stage"] = name
         if st["reason"]:
             break
     st["sec"] = round(time.perf_counter() - t0, 3)

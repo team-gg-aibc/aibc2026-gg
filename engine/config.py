@@ -33,6 +33,7 @@ DEFAULTS = {
     "answer_prompt": "v1",           # answer.PROMPTS의 판 이름
     "verify_prompt": "v1",           # verify.PROMPTS의 판 이름
     "timeout_sec": 75,               # 넘으면 확인 불가로 답한다 (대회 제한 90초)
+    "explore": False,                # 탐색 모드(1~3주기): 90초 넘어도 점수에서 빼지 않고 시간은 기록만. 상한은 timeout_sec(탐색 설정은 300)
     # ---- #22 출력 규격 강제 (동욱) ----
     # ---- #23 조각 다듬기 (건영) ----
     # ---- #24 후보 넓히기 (종희) ----
