@@ -26,6 +26,7 @@
 | `docs/meetings/` | 회의 요약 (정한 것 · 할 일 · 일정) |
 | `docs/schedule.md` | 일정과 불참 |
 | `docs/` | 문제 정의, PRD, 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
+| `engine/` | 엔진 코드. 돌리는 법은 `engine/README.md` |
 | `app/` | 코드 (구현을 시작하면 만든다) |
 | `.github/` | CI, 이슈 · PR 양식 |
 
