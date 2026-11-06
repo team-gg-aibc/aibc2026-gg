@@ -15,6 +15,7 @@ import subprocess
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from run import CAUSES, KST, ROOT, RUNS, WEIGHTS, cycle_of
 
@@ -281,11 +282,18 @@ def plan_table(text, heading):
     return rows
 
 
-def repo_url():
+REPO = "https://github.com/team-gg-aibc/aibc2026-gg"
+
+
+def repo_url(origin=None):
+    """나무 링크 · gh에 쓸 레포 주소. tree.html · tree.json에 그대로 들어가니, origin 주소의 사용자 · 토큰
+    (https://사람:토큰@…의 @ 앞)과 포트는 반드시 빼고 https://호스트/경로 꼴만 쓴다. 못 읽으면 팀 레포."""
     try:
-        return git("remote", "get-url", "origin").strip().removesuffix(".git").replace("git@github.com:", "https://github.com/")
+        origin = origin or git("remote", "get-url", "origin").strip()
     except (OSError, subprocess.CalledProcessError):
-        return "https://github.com/team-gg-aibc/aibc2026-gg"
+        return REPO
+    u = urlsplit(origin.replace("git@github.com:", "https://github.com/"))
+    return f"https://{u.hostname}{u.path.rstrip('/').removesuffix('.git')}" if u.hostname else REPO
 
 
 def gh_json(*args):
@@ -426,8 +434,13 @@ def selftest():
             summ("b2", "baseline", "#21", 69.0, created="2026-11-06T11:00:00+09:00"),
             summ("x", "23-chunks", "#23", 71.5, "채택 — 올랐다"), summ("y", "22-contract", "#22", 68.6),
             summ("z", "22-small", "#22", None)]                               # 가중이 None인 실행(빠진 문항 종류가 있는 표본 등)
+    tok = "https://someone:ghp_secret123@github.com/team-gg-aibc/aibc2026-gg.git"     # 토큰이 든 origin
+    for origin in (tok, "https://x-access-token:ghs_abc@github.com:443/team-gg-aibc/aibc2026-gg/",
+                   "git@github.com:team-gg-aibc/aibc2026-gg.git", "ssh://git@github.com/team-gg-aibc/aibc2026-gg.git",
+                   "/Users/someone/aibc2026-gg"):                                     # 로컬 경로면 팀 레포
+        assert repo_url(origin) == REPO, origin
     tree = build_tree(nodes, groups([(r, None) for r in runs]), [{"number": 26, "state": "OPEN"}],
-                      [{"number": 40, "state": "OPEN", "title": "t", "url": "https://x/pr/40", "body": "Closes #23"}], "https://x", "now")
+                      [{"number": 40, "state": "OPEN", "title": "t", "url": "https://x/pr/40", "body": "Closes #23"}], repo_url(tok), "now")
     root = tree["tree"]
     kids = {c["id"]: c for c in root["children"]}
     assert root["score"] == "69.0" and root["band"] == "1.0"                   # 가장 최근 출발 판 · 출발 판 두 번의 폭(리더보드와 같은 값)
@@ -445,6 +458,7 @@ def selftest():
         raw = page.split('<script id="data" type="application/json">')[1].split("</script>")[0]
         assert "<" not in raw and page.count("</script>") == 2              # 배운 점 속 </script> · <!-- 가 화면 코드를 끊지 않는다
         assert json.loads(raw) == tree                                      # 브라우저 JSON.parse처럼 읽으면 그대로 돌아온다
+        assert "ghp_secret123" not in page + (Path(d) / "tree.json").read_text(encoding="utf-8")   # 토큰이 파일에 새지 않는다
     print("selftest ok")
 
 
