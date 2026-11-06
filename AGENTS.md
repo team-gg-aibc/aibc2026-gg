@@ -27,8 +27,9 @@
 | `docs/meetings/` | 회의 요약 (정한 것 · 할 일 · 일정) |
 | `docs/schedule.md` | 일정과 불참 |
 | `docs/` | 문제 정의, PRD, 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
-| `engine/` | 엔진 코드와 실험 설정. 돌리는 법 · 실험 규칙 · 리더보드는 `engine/README.md` |
-| `eval/` | 평가셋(문제집)과 점수 재는 도구. 쓰는 법은 `eval/README.md` |
+| `engine/` | 엔진 코드. 돌리는 법은 `engine/README.md` |
+| `docs/engine/` | 엔진 계획(`plan.md`), 재는 순서와 기록 남기는 법(`reproducibility.md`), 리더보드(`leaderboard.md`) |
+| `eval/` | 평가셋(문제집), 점수 재는 도구, 실험 설정 파일(`eval/configs/`). 평가셋 쓰는 법은 `eval/README.md` |
 | `demo/` | 시연 화면 (한강 3D 상황판) |
 | `app/` | 코드 (구현을 시작하면 만든다) |
 | `.github/` | CI, 이슈 · PR 양식 |
@@ -57,7 +58,7 @@
 2. `docs/decisions.md`: 정한 것. 어긋나는 일이면 멈추고 PM에게 묻는다
 3. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
 4. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
-5. `engine/README.md`: 엔진 일이면. 돌리는 법 · 실험 규칙 · 리더보드
+5. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법)
 
 맡은 이슈가 없으면 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`)로 지금 어디까지 왔는지 보고 PM에게 묻는다.
 
@@ -66,7 +67,7 @@
 - 마감은 주기 둘째 날 24:00이다. 그때까지 결과를 리더보드에 올리고 「끝」 보고(결과 표 + 채택 · 버림 의견)를 단다. 다 못 했어도 단다.
 - 브랜치 · 커밋 · PR은 [CONTRIBUTING.md](CONTRIBUTING.md)를 따른다: 브랜치 `이름/이슈번호-짧은설명`, 첫 push 때 draft PR, 하루가 끝나면 push.
 - 실험은 설정 파일의 스위치와 정해진 실행 명령으로만 켜고 잰다. 코드를 손으로 바꿔 가며 잰 숫자는 남이 다시 잴 수 없다.
-- 실험 결과는 리더보드에 남긴다(쓰는 법은 `engine/README.md`).
+- 실험 결과는 리더보드(`docs/engine/leaderboard.md`)에 남긴다. 남기는 법은 `docs/engine/reproducibility.md`.
 - 「됐다」고 말하기 전에 직접 실행하거나 눌러 본 결과를 PR 「검증」에 남긴다.
 
 **끝낼 때 남길 것**
