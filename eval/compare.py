@@ -94,8 +94,12 @@ def compare(es, er, bs, br, top=10):
            f"- 실험: **{exp['name']}** {exp.get('issue') or ''} · {exp.get('cycle', '—')}주기 · 켠 스위치 {sw} · 결론 {es.get('conclusion') or '—'}",
            f"- 기준: **{bs['experiment']['name']}** `{bs['run_id']}`",
            f"- 묶음: {es['args']['split']} {len(ids)}문항 (문항 지문 `{es['env']['questions_hash']}`)"]
-    if es["settings_hash"] == bs["settings_hash"]:
-        out.append("- ⚠ 두 실행의 설정이 같다. 아래 차이는 모두 흔들림(같은 설정을 다시 돌려 생긴 차이)이다.")
+    ec, bc = es["env"]["code_hash"], bs["env"]["code_hash"]
+    if ec != bc:   # 기준 고르기는 같은 코드 판이 없으면 코드가 다른 출발 판도 고른다
+        out.append(f"- ⚠ 두 실행의 엔진 코드가 다르다(코드 지문 `{bc}` → `{ec}`). 아래 차이에는 코드가 바뀐 몫도 섞여 있을 수 있다. "
+                   "스위치 몫만 보려면 같은 코드로 돌린 끈 판을 `--base`로 준다.")
+    elif es["settings_hash"] == bs["settings_hash"]:
+        out.append("- ⚠ 두 실행의 설정과 엔진 코드가 같다. 아래 차이는 모두 흔들림(같은 설정을 다시 돌려 생긴 차이)이다.")
     out += ["", "## 한눈에", "", "| | 기준 | 실험 | 차이 |", "|---|---|---|---|"]
     rows = [("가중", bm.get("weighted"), em.get("weighted"))]
     rows += [(k, bm["by_type"].get(k), em["by_type"].get(k)) for k in WEIGHTS]
@@ -149,7 +153,7 @@ def selftest():
             "p-3": row("p-3", "여러 조항 결합", 0.5, CAUSES[0], cand=0.5), "t-1": row("t-1", "근거 없음 (함정)", 1.0, None, gold=False)}
     exp = {"p-1": row("p-1", "단순 조회", 1.0, None), "p-2": row("p-2", "조건 판단", 0.0, f"{CAUSES[3]} (found 거짓)"),
            "p-3": row("p-3", "여러 조항 결합", 0.5, CAUSES[0], cand=0.5), "t-1": row("t-1", "근거 없음 (함정)", 0.0, CAUSES[4], gold=False)}
-    meta = {"env": {"questions_hash": "q"}, "settings_hash": "s", "switches": {}, "args": {"split": "dev"},
+    meta = {"env": {"questions_hash": "q", "code_hash": "c"}, "settings_hash": "s", "switches": {}, "args": {"split": "dev"},
             "metrics": {"weighted": 1.0, "by_type": {}}, "cost_usd": 0.1, "conclusion": ""}
     es = dict(meta, run_id="e", experiment={"name": "exp", "issue": "#1", "cycle": 1}, switches={"top_k": 20}, settings_hash="x")
     bs = dict(meta, run_id="b", experiment={"name": "baseline"})
@@ -158,7 +162,12 @@ def selftest():
     assert f"| {CAUSES[3]} | 0 | 1 | +1 |" in page and f"| {OK} | 2 | 1 | -1 |" in page
     assert "### p-2 · 조건 · 주차장 · 점수 1 → 0" in page and "### t-1" in page and "### p-3" not in page
     assert page.index("### p-2") < page.index("### t-1")   # 같은 폭이면 문항 id 순
-    assert "흔들림" not in page and "⚠" in compare(es, exp, dict(bs, settings_hash="x"), base)
+    assert "⚠" not in page                                              # 설정만 다르면 경고 없음
+    same = dict(bs, settings_hash="x")
+    assert "모두 흔들림" in compare(es, exp, same, base)                    # 설정 · 엔진 코드가 둘 다 같을 때만 흔들림
+    for b in (same, bs):                                                # 코드가 다르면 흔들림이라 하지 않고 그 사실을 적는다
+        other = compare(es, exp, dict(b, env={"questions_hash": "q", "code_hash": "d"}), base)
+        assert "흔들림" not in other and "엔진 코드가 다르다(코드 지문 `d` → `c`)" in other
     try:
         compare(es, exp, dict(bs, env={"questions_hash": "다름"}), base)
         raise AssertionError("문항이 다른데 견줬다")
