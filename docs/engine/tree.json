@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-06 23:24",
+ "as_of": "2026-11-07 02:10",
  "example": false,
  "people": {
   "동규": "#2a78d6",
@@ -323,17 +323,17 @@
    }
   ],
   "metric": "가중 점수",
-  "score": "68.1",
+  "score": "67.2",
   "label": "dev 전체 · 661문항",
-  "band": "1.1",
-  "date": "2026-11-06",
+  "band": "0.5",
+  "date": "2026-11-07",
   "by_type": {
-   "단순": "72.7",
-   "조건": "69.5",
-   "결합": "47.8",
-   "함정": "89.7"
+   "단순": "70.1",
+   "조건": "69.1",
+   "결합": "46.8",
+   "함정": "90.5"
   },
-  "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261106-203151-baseline-dev-r1.md",
+  "compare": null,
   "links": {
    "리더보드": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/leaderboard.md",
    "실험 기록": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/experiments.md",
