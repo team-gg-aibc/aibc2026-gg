@@ -178,7 +178,7 @@ top-6에서 만점이 아닌 문항 249개를 갈랐다.
 
 ### 3-1. 엔진 뼈대 (#20, 동규)
 
-킷의 `rag.py` 한 파일을 단계별 파일로 나눠, 사람마다 자기 파일만 고치게 한다. 폴더는 `engine/`이다(11-06 결정, AGENTS.md 폴더 표에 한 줄 더함). 단계 하나는 함수 하나이고, 경계는 LangGraph 노드와 같게 둔다. 지금은 LangGraph를 쓰지 않지만 나중에 노드로 옮기기 쉽다. 단계마다 판단 기록과 스위치를 둔다.
+킷의 `rag.py` 한 파일을 단계별 파일로 나눠, 사람마다 자기 파일만 고치게 한다. 폴더는 `engine/`이다(11-06 결정, AGENTS.md 폴더 표에 한 줄 더함). 단계 하나는 함수 하나이고, 경계는 LangGraph 노드와 같게 둔다. 지금은 LangGraph를 쓰지 않지만 나중에 노드로 옮기기 쉽다. 단계마다 판단 기록과 스위치를 둔다. 파일 이름은 파이썬 표준 모듈과 겹치지 않게 짓는다(근거 고르기 · 답 쓰기를 `select.py`로 두면 표준 `select`를 가려 서버가 깨져서 `answer.py`로 했다, 엔진 바탕 11-06).
 
 | 파일 | 하는 일 | 주로 고치는 사람 |
 |---|---|---|
@@ -187,7 +187,7 @@ top-6에서 만점이 아닌 문항 249개를 갈랐다.
 | `engine/build_index.py` | 조각 · 연결표 · 임베딩 | 건영 |
 | `engine/rewrite.py` · `engine/retrieve.py` | 질문 다듬기 · 검색 · 묶음 붙이기 | 건영 |
 | `engine/gate.py` · `engine/verify.py` · `engine/contract.py` | 게이트 · 확인 불가 판정 · 출력 규격 | 동욱 |
-| `engine/select.py` · `engine/whole.py` · `engine/answer_check.py` | 근거 고르기와 답 쓰기 · 통째로 읽기(실험) · 답 글 검사 | 종희 |
+| `engine/answer.py` · `engine/whole.py` · `engine/answer_check.py` | 근거 고르기와 답 쓰기 · 통째로 읽기(실험) · 답 글 검사 | 종희 |
 | `engine/pipeline.py` | 흐름(게이트 → 다듬기 → 검색 → 고르기 → 판정 → 출력)과 판단 기록 | 동규 (바꿀 땐 PM 리뷰) |
 | `engine/server.py` | 채점 API (`POST /ask`, `GET /health`) | 동욱 |
 | `eval/run.py` · `eval/sweep.py` | 점수 재기 · 문턱 고르기 | 동규 · 동욱 |
@@ -255,7 +255,7 @@ flowchart LR
 | 사람 | 맡는 일 (이슈 · 마감) | 왜 이 사람인가 |
 |---|---|---|
 | 동규 | **엔진 성능 책임**(리딩 · 검수 · 통합 · 채택 결정). [#20](https://github.com/team-gg-aibc/aibc2026-gg/issues/20) 뼈대 (11/8) · [#21](https://github.com/team-gg-aibc/aibc2026-gg/issues/21) 점수 틀과 출발 점수 (11/9)는 「엔진 바탕」 Claude 세션이 미리 만든다 → 리뷰 · 병합, 11/12 중간 점수표, 11/13 통합 판, 11/17 동결 판단, 11/18 holdout, 못 끝낸 일 인수 | PM · 리딩이고 엔진 성능을 책임진다(11-06 정정). 뼈대와 점수 틀은 모든 실험의 바탕이라 가장 먼저 있어야 해서 Claude 세션이 미리 만들고, 동규는 검수 · 통합 · 채택 결정 · 인수에 시간을 쓴다 |
-| 종희 | [#24](https://github.com/team-gg-aibc/aibc2026-gg/issues/24) 후보 넓히기 (11/11) → [#27](https://github.com/team-gg-aibc/aibc2026-gg/issues/27) 통째로 읽기 (11/13 18:00) → [#29](https://github.com/team-gg-aibc/aibc2026-gg/issues/29) 답 형식 (11/16) | 세 이슈가 같은 파일(`select.py`)을 고친다. 한 사람이 이어서 해야 충돌이 없다 |
+| 종희 | [#24](https://github.com/team-gg-aibc/aibc2026-gg/issues/24) 후보 넓히기 (11/11) → [#27](https://github.com/team-gg-aibc/aibc2026-gg/issues/27) 통째로 읽기 (11/13 18:00) → [#29](https://github.com/team-gg-aibc/aibc2026-gg/issues/29) 답 형식 (11/16) | 세 이슈가 같은 파일(`answer.py`)을 고친다. 한 사람이 이어서 해야 충돌이 없다 |
 | 건영 | [#23](https://github.com/team-gg-aibc/aibc2026-gg/issues/23) 조각 다듬기 (11/10) → [#26](https://github.com/team-gg-aibc/aibc2026-gg/issues/26) 질문 다듬기 (11/12) → [#28](https://github.com/team-gg-aibc/aibc2026-gg/issues/28) 원칙 · 예외 묶음 (11/15) | 정규식 · 데이터 처리가 많고 키 없이 키워드 검색으로 먼저 잴 수 있는 일이다. 다른 곳에서 리뷰 봇을 운영해 본 자동화 경험이 맞고, 크레딧을 적게 쓰며 혼자 이어 가기 쉽다. 강사도 「1~2명이 코드를 깊이, 나머지는 데이터 · 청킹」을 권했다(특강 1주차 3교시) |
 | 동욱 | [#22](https://github.com/team-gg-aibc/aibc2026-gg/issues/22) 출력 규격 (11/10) → [#25](https://github.com/team-gg-aibc/aibc2026-gg/issues/25) 게이트 (11/12) → [#31](https://github.com/team-gg-aibc/aibc2026-gg/issues/31) 빈 서버 (11/13) → [#30](https://github.com/team-gg-aibc/aibc2026-gg/issues/30) 신호등 (11/16) → [#31](https://github.com/team-gg-aibc/aibc2026-gg/issues/31) 리허설 (11/19) | 10/27부터 채점 서버 담당이다. 0점 조건(서버 꺼짐 · 오류 · 시간 초과)과 확인 불가는 「절대 틀리면 안 되는 쪽」이라, 출구 검사부터 서버까지 한 사람이 끝까지 책임진다 |
 
@@ -286,7 +286,7 @@ flowchart LR
 
 ### 5-2. 기록하는 법
 
-- **실험 기록 · 리더보드(대시보드) · 재현 규칙은 「엔진 바탕」 작업(#20 · #21, 브랜치 `donggyu/engine-base`)이 `engine/` · `eval/run.py` · `docs/engine/`의 파일로 만든다.** 남기는 꼴과 명령은 그 파일을 따르고, 이 문서는 아래 규칙만 정한다.
+- **실험 기록 · 리더보드(대시보드) · 재현 규칙은 「엔진 바탕」 작업(#20 · #21, 브랜치 `donggyu/engine-base`)이 만든다.** 실험 설정은 `eval/configs/<이름>.json`(실험 하나 = 파일 하나), 결과 요약은 `eval/runs/*.json`(커밋한다), 리더보드 · 실험 기록은 `docs/engine/leaderboard.md` · `docs/engine/experiments.md`(명령으로 만든다), 재현 규칙은 `docs/engine/reproducibility.md`다. 남기는 꼴과 명령은 그 파일을 따르고, 이 문서는 아래 규칙만 정한다.
 - 실험마다 켠 판과 끈 판을 둘 다 남긴다. 유형별 근거 정확도 · 가중 점수 · 함정 정답률 · 과잉 포기율 · 인용 수 · 지연 95% 지점 · 비용 · 결론(채택 · 버림 · 보류)이 있어야 비교가 된다.
 - 켠 판과 끈 판은 **같은 main 커밋 · 같은 문항**으로 같은 날 잰다. 기준선을 다른 날 잡으면 그 사이 바뀐 것이 섞인다.
 - 처음엔 100문항 표본으로 좁히고, 좋아 보이는 설정만 dev 전체로 잰다.
@@ -295,13 +295,13 @@ flowchart LR
 
 ### 5-3. 합치는 법
 
-- 이슈 하나 = 브랜치 하나(`이름/이슈번호-짧은설명`) = PR 하나 = 스위치 하나. 400줄이 넘으면 쪼갠다(CONTRIBUTING.md).
+- 이슈 하나 = 브랜치 하나(`이름/이슈번호-짧은설명`) = PR 하나 = 스위치 하나(실험 설정은 `eval/configs/<이름>.json` 하나). 400줄이 넘으면 쪼갠다(CONTRIBUTING.md).
 - 자기 파일과 `config.py`의 자기 절만 고친다. 남의 파일을 고쳐야 하면 그 사람 이슈에 댓글로 부탁한다.
 - 프롬프트를 고치면 덮어쓰지 말고 새 판 이름(예: 답 쓰기 2판)을 붙여 판단 기록에 남긴다. 예시 문항(few-shot)은 평가셋 문항에서 가져오지 않는다(점수가 부풀려진다).
 - 병합: GG비서 리뷰 completed + CI 초록 → 동규 「병합해」(팀 규칙 그대로).
 - 채택한 실험은 스위치 기본값을 켜고 병합한다. 버린 실험은 PR을 닫고 실험 기록에 한 줄만 남긴다(코드는 main에 넣지 않는다). 보류는 11/13 회의에서 정한다.
 - 11/13 통합 판: 채택한 것을 모두 켠 main으로 dev 전체를 다시 잰다(효과가 겹치는지). 그 뒤 실험은 이 판을 기준으로 잰다.
-- 색인을 바꾸는 PR(#23 · #28 · 2차 가상 질문)이 병합되면 모두 `git pull` 뒤 색인을 다시 만든다(명령은 재현 규칙 파일).
+- 색인을 바꾸는 PR(#23 · #28 · 2차 가상 질문)이 병합되면 모두 `git pull` 뒤 색인을 다시 만든다(명령은 `docs/engine/reproducibility.md`).
 - 11/17 동결 뒤에는 버그 고침만, 동규 승인으로.
 
 ### 5-4. 크레딧 · 비밀값
