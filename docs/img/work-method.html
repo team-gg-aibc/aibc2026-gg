@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>일하는 방식 한눈에</title>
+<!--
+  docs/work-method.md 맨 위 그림 두 장(work-method-1.png · work-method-2.png)의 원본이다.
+  글 · 숫자 · 날짜는 docs/work-method.md와 같게 쓴다. 문서를 바꾸면 여기도 바꾸고 PNG를 다시 만든다.
+  글꼴: 제목 도현체(Do Hyeon), 본문 Pretendard. 컴퓨터에 깔려 있어야 한다.
+  PNG 다시 만들기 (레포 맨 위 폴더에서, 맥):
+    C="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-1.png" "file://$PWD/docs/img/work-method.html#p1"
+    "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-2.png" "file://$PWD/docs/img/work-method.html#p2"
+  주소 끝 #p1 · #p2가 그 장만 보이게 한다. 2340은 휴대폰 화면 비율(9 : 19.5)이다.
+  글이 길어져 아래 줄(자세한 문서 · 질문)이 잘리면 .page의 height와 창 높이를 함께 늘린다.
+-->
+<style>
+:root{
+  --bg:#F6F4EF; --ink:#1D2230; --muted:#596070; --line:#E3DED2; --card:#FFFFFF;
+  --orange:#C2410C; --orange-l:#FFEDE0;
+  --blue:#1864AB; --blue-l:#E6EFFA;
+  --green:#2B7A3B; --green-l:#E6F4E9;
+  --violet:#5F3DC4; --violet-l:#EFEAFD;
+  --red:#B42318; --red-l:#FDECEA;
+  --code:#22272E; --code-ink:#E6EDF3; --code-dim:#9AA5B1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg)}
+body{font-family:"Pretendard",sans-serif;color:var(--ink);font-size:28px;line-height:1.4;word-break:keep-all;-webkit-font-smoothing:antialiased}
+b,strong{font-weight:700}
+.nb{white-space:nowrap}
+.page{width:1080px;height:2340px;padding:48px 56px 34px;display:flex;flex-direction:column;gap:20px;overflow:hidden}
+.page + .page{border-top:16px solid #D8D3C6}
+body:has(.page:target) .page:not(:target){display:none}
+body:has(.page:target) .page{border-top:0}
+
+.label{font-weight:700;font-size:23px;letter-spacing:.06em;color:var(--muted)}
+h1{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:72px;line-height:1.1;margin:4px 0 0}
+.sub{font-size:29px;color:var(--muted);margin-top:4px}
+h2{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:42px;line-height:1.15;margin:6px 0 0;display:flex;align-items:center;gap:12px}
+h2::before{content:"";width:11px;height:34px;border-radius:6px;background:var(--ink)}
+.note{font-size:24px;color:var(--muted);line-height:1.4}
+.term{font-size:24px;line-height:1.38;color:var(--muted);margin-top:4px}
+.term b{color:var(--ink)}
+
+/* 한 줄 요약 */
+.sum{display:flex;flex-direction:column;gap:8px}
+.sum .row{display:grid;grid-template-columns:48px 1fr;gap:14px;align-items:start;background:var(--card);border:2px solid var(--line);border-radius:20px;padding:13px 18px}
+.num{width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;font-weight:700;font-size:25px;display:flex;align-items:center;justify-content:center}
+.sum .row div:last-child{font-size:27px;line-height:1.36}
+
+/* 주기 흐름 */
+.flow{display:flex;flex-direction:column;gap:8px}
+.step{display:grid;grid-template-columns:178px 1fr;gap:14px;align-items:start;background:var(--card);border-radius:18px;padding:12px 18px 12px 14px;border-left:10px solid var(--c)}
+.chip{display:inline-block;background:var(--cl);color:var(--c);font-weight:700;font-size:23px;line-height:1.25;border-radius:12px;padding:7px 11px}
+.step .txt{font-size:27px;line-height:1.36}
+.o{--c:var(--orange);--cl:var(--orange-l)}
+.b{--c:var(--blue);--cl:var(--blue-l)}
+.g{--c:var(--green);--cl:var(--green-l)}
+.arrow{color:var(--orange);font-weight:700}
+
+/* 달력 */
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:18px;overflow:hidden;border:2px solid var(--line);font-size:27px}
+th{background:var(--ink);color:#fff;text-align:left;font-weight:700;font-size:23px;padding:9px 16px}
+td{padding:7px 16px;border-top:2px solid var(--line);vertical-align:top}
+td.cy{font-weight:700;white-space:nowrap}
+.tag{display:inline-block;font-size:21px;font-weight:700;border-radius:9px;padding:2px 9px;margin-left:8px;vertical-align:2px}
+.t{background:var(--blue-l);color:var(--blue)}
+.v{background:var(--violet-l);color:var(--violet)}
+td.dist{color:var(--orange);font-weight:700}
+.phase{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.phase div{border-radius:16px;padding:11px 16px;font-size:24px;line-height:1.36}
+.phase .t1{background:var(--blue-l)}
+.phase .v1{background:var(--violet-l)}
+.phase b{font-size:26px}
+.after{display:grid;grid-template-columns:226px 1fr;gap:6px 14px;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:13px 18px;font-size:26px;line-height:1.36}
+.after .d{font-weight:700}
+.after .gl{display:block;font-size:23px;color:var(--muted)}
+
+/* 누가 무엇을 */
+.who{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:16px 20px}
+.card .role{font-size:22px;font-weight:700;color:var(--muted)}
+.card h3{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:36px;margin:2px 0 6px;line-height:1.15}
+.card p{margin:0;font-size:26px;line-height:1.38}
+
+/* 보고 */
+.cmt{background:var(--code);color:var(--code-ink);border-radius:20px;padding:18px 24px;font-size:27px;line-height:1.48}
+.cmt .h{font-size:21px;color:var(--code-dim);margin-bottom:6px;font-weight:600}
+.cmt .first{font-weight:700;color:#fff}
+.cmt .dim{color:var(--code-dim)}
+.types{display:flex;flex-wrap:wrap;gap:8px}
+.types span{background:var(--card);border:2px solid var(--line);border-radius:999px;padding:6px 14px;font-size:24px}
+.types b{margin-right:6px}
+.alert{background:var(--red-l);border:2px solid #F5C2BD;border-radius:20px;padding:15px 20px;font-size:27px;line-height:1.38}
+.alert .k{color:var(--red);font-weight:700}
+
+/* 점수 */
+.score{display:flex;flex-direction:column;gap:8px}
+.score .it{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:13px 20px;font-size:27px;line-height:1.38}
+
+.foot{margin-top:auto;font-size:24px;color:var(--muted);border-top:2px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;gap:20px}
+</style>
+</head>
+<body>
+
+<!-- ===================== 1장: 언제 무엇을 ===================== -->
+<section class="page" id="p1">
+  <div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 1/2</div>
+    <h1>이틀 실험하고,<br>배분일에 나눠요</h1>
+    <div class="sub">11/7(토) ~ 11/17(화) · 엔진 실험은 2일 주기</div>
+  </div>
+
+  <div class="sum">
+    <div class="row"><div class="num">1</div><div><b>원본은 GitHub 이슈 · PR.</b> 일은 이슈로 받고, 보고는 그 이슈의 댓글로 해요. 디스코드와 GG비서는 「봐 달라」는 신호만 보내요.</div></div>
+    <div class="row"><div class="num">2</div><div><b>이틀 실험 → 배분일.</b> 이틀 동안 가설 하나를 실험하고, 사흘째 아침(배분일)에 결과를 모아 채택 · 버림을 정하고 다음 일을 나눠요.</div></div>
+    <div class="row"><div class="num">3</div><div><b>못 끝내면 PM 쪽이 이어받아요.</b> 배분일 아침에 동규와 동규의 Claude 세션이 마저 돌려요. 벌이 아니라 주기를 지키는 장치예요.</div></div>
+  </div>
+
+  <h2>한 주기 = 이틀</h2>
+  <div class="flow">
+    <div class="step o"><div><span class="chip">배분일</span></div><div class="txt">동규가 승인하면 이슈를 올려요. GG비서가 <b>15분 안에</b> 개인 채널로 알려요.</div></div>
+    <div class="step b"><div><span class="chip">첫날</span></div><div class="txt">이슈 맨 위 「앞뒤 맥락」부터 읽고 <b>시작 보고</b>. 브랜치를 만들고 첫 push 때 <b>draft PR</b>을 열어요.
+      <div class="term"><b>draft PR</b> = 아직 검수를 부탁하지 않은 초안 PR. 하던 일을 남이 볼 수 있게 일찍 열어 둬요.</div></div></div>
+    <div class="step b"><div><span class="chip">첫날 24시까지</span></div><div class="txt"><b>중간 보고</b>. 「마감까지」에 지킬 수 있음 · 어려움 · 모름 중 하나를 써요.
+      <div class="term"><b>1주기만 11/8(일) 21시까지.</b> 11/7은 특화교육과 19시 회의 뒤에 시작해서요.</div></div></div>
+    <div class="step g"><div><span class="chip">둘째 날 20시</span></div><div class="txt">GG비서가 「오늘 마감」을 알려요.</div></div>
+    <div class="step g"><div><span class="chip">둘째 날 24시<br>= 마감</span></div><div class="txt"><b>끝 보고</b>. 결과 표 + 채택 · 버림 의견. <b>다 못 했어도 달아요.</b></div></div>
+    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기 <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 다음 배분안 <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
+  </div>
+
+  <h2>주기 달력</h2>
+  <table>
+    <tr><th>주기</th><th>실험 (첫날 · 둘째 날 24:00 마감)</th><th>배분일</th></tr>
+    <tr><td class="cy">1<span class="tag t">탐색</span></td><td>11/7(토) · 11/8(일)</td><td class="dist">11/9(월)</td></tr>
+    <tr><td class="cy">2<span class="tag t">탐색</span></td><td>11/9(월) · 11/10(화)</td><td class="dist">11/11(수)</td></tr>
+    <tr><td class="cy">3<span class="tag t">탐색</span></td><td>11/11(수) · 11/12(목)</td><td class="dist">11/13(금) 19:00 정기회의</td></tr>
+    <tr><td class="cy">4<span class="tag v">수렴</span></td><td>11/13(금) · 11/14(토)</td><td class="dist">11/15(일)</td></tr>
+    <tr><td class="cy">5<span class="tag v">수렴</span></td><td>11/15(일) · 11/16(월)</td><td class="dist">11/17(화) 동결 판단</td></tr>
+  </table>
+  <div class="phase">
+    <div class="t1"><b>탐색 (1~3주기)</b><br>정답에 가까운 답부터 찾아요. 시간은 기록만(문항당 300초까지).</div>
+    <div class="v1"><b>수렴 (4~5주기)</b><br>시간을 줄여요. 응답의 95%가 30초 안, 가장 느려도 90초 안.</div>
+  </div>
+  <div class="after">
+    <div class="d">11/17(화)부터</div><div>동결: 새 실험 없이 버그만 고쳐요(동규 승인)</div>
+    <div class="d">11/18(수)</div><div>holdout 한 번 · 동결 판 배포<span class="gl">holdout = 마지막 확인용 문제(174문항). 팀원은 재지 않아요</span></div>
+    <div class="d">11/19(목)</div><div>리허설 · 채점 API 가동</div>
+    <div class="d">11/22(일) 24:00</div><div>최종 제출</div>
+  </div>
+
+  <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
+</section>
+
+<!-- ===================== 2장: 누가 · 보고 · 점수 ===================== -->
+<section class="page" id="p2">
+  <div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 2/2</div>
+    <h1>누가 무엇을 하고,<br>어떻게 보고하나요</h1>
+  </div>
+
+  <h2>누가 무엇을</h2>
+  <div class="who">
+    <div class="card"><div class="role">PM</div><h3>동규</h3><p>배분일에 이슈로 일 · 담당 · 마감을 정하고 승인해요. 채택 · 버림을 정하고 PR을 <span class="nb">검수 · 병합해요.</span></p></div>
+    <div class="card"><div class="role">팀원</div><h3>종희 · 동욱 · 건영</h3><p>한 주기에 이슈 하나(실험 하나)를 받아 이틀 동안 실험해요. 보고는 그 이슈의 댓글로.</p></div>
+    <div class="card"><div class="role">각자의</div><h3>AI 세션</h3><p>AGENTS.md 순서로 읽고 시작해요(이슈는 「앞뒤 맥락」부터). 끝낼 때 이슈에 「세션 끝」 보고. 올리기 전에 담당이 봐요.</p></div>
+    <div class="card"><div class="role">디스코드</div><h3>GG비서</h3><p>새로 맡은 이슈는 15분 안에 개인 채널로, 마감 날 20시 알림, 아침 8시 할 일 목록, <span class="nb">#대시보드</span> 「실험 현황」: 모두의 진행 · 점수.</p></div>
+  </div>
+
+  <h2>보고는 이슈 댓글로</h2>
+  <div class="cmt">
+    <div class="h">이슈 댓글 · 첫 줄 모양은 바꾸지 않아요</div>
+    <div class="first">**[보고] 중간**</div>
+    <div>- 한 일: <span class="dim">…</span></div>
+    <div>- 점수 · 결과: <span class="dim">숫자 · 명령 · 커밋을 함께</span></div>
+    <div>- 막힌 것: <span class="dim">없음</span></div>
+    <div>- 다음 할 일: <span class="dim">…</span></div>
+    <div>- 마감까지: 지킬 수 있음</div>
+  </div>
+  <div class="types">
+    <span><b>시작</b>첫날 안</span>
+    <span><b>중간</b>첫날 24시까지 (1주기만 11/8(일) 21시)</span>
+    <span><b>끝</b>둘째 날 24시까지</span>
+    <span><b>막힘</b>바로</span>
+    <span><b>세션 끝</b>AI 세션을 끝낼 때</span>
+  </div>
+  <div class="note">끝 보고는 「의견: 채택 · 버림 · 보류」와 「어디에」(PR · 커밋), 결과 표(리더보드에 올린 두 줄)를 더해요. 「마감까지」는 끝남 · <span class="nb">못 끝냄으로</span> 써요. 디스코드에는 이슈 링크만 올려요.</div>
+  <div class="alert"><span class="k">막히면</span> 1시간 넘게 진전이 없으면 바로 「막힘」 보고. 무엇이 막혔는지 · 해 본 것 · 필요한 것을 써요.</div>
+
+  <h2>점수는 이렇게 봐요</h2>
+  <div class="score">
+    <div class="it"><b>dev로만 재요.</b>
+      <div class="term"><b>dev</b> = 개발용 문제(693문항). 점수는 회색지대를 뺀 661문항으로 재요. 마지막 확인용 holdout(174문항)은 팀원이 재지 않아요.</div></div>
+    <div class="it"><b>결과는 리더보드에.</b> dev 전체로 켠 판 · 끈 판을 각각 두 번 이상 재서 두 줄을 남겨요(100문항은 빠른 확인용).
+      <div class="term"><b>리더보드</b> = 실험마다 켠 판 · 끈 판 점수를 한 줄씩 모은 표(docs/engine/leaderboard.md).</div></div>
+    <div class="it"><b>채택 기준:</b> 가중 점수가 흔들림 폭의 두 배 넘게 오르고, 함정 정답률이 1점 넘게 떨어지지 않을 때. 정하는 사람은 배분일의 동규예요.
+      <div class="term"><b>흔들림 폭</b> = 아무것도 안 바꿔도 돌릴 때마다 생기는 차이. 출발 판을 dev 전체로 네 번 돌리니 <span class="nb">67.1 · 68.2 · 68.1 · 68.1점,</span> 폭 1.1점이라 2.2점 넘게 올라야 채택해요.</div>
+      <div class="term"><b>가중 점수</b> = 문제 유형마다 점수를 따로 내서 킷 예시 비율(단순 3 · 조건 3 · 결합 3 · 함정 2)로 <span class="nb">섞은 값.</span></div></div>
+  </div>
+
+  <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
+</section>
+
+</body>
+</html>
