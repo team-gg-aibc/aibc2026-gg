@@ -101,9 +101,10 @@ def validate(engine):
     return cfg
 
 
-def committed(path):
-    """설정 파일이 커밋돼 있고 고친 것이 없나. 아니면 실행 요약에 「커밋 안 한 수정」이 찍혀 잰 판을 커밋으로 다시 찾을 수 없다."""
-    return R.git("ls-files", path) != "" and R.git("status", "--porcelain", "--", path) == ""
+def dirty():
+    """eval/run.py가 「커밋 안 한 수정」으로 보는 곳(engine/ 전체 · eval/run.py · 릴리스 설정)에 커밋 안 한 것이 있나.
+    있으면 잰 판을 커밋으로 다시 찾을 수 없다(11-07 rc-c0 첫 측정: 재는 도중 engine/README.md를 고쳐 두 번 다 ⚠수정)."""
+    return R.git("status", "--porcelain", "--", "engine", "eval/run.py", RELEASE)
 
 
 # ---- ② API 연기 시험 · ④ 계약 점검 ----
@@ -142,7 +143,7 @@ def free_port():
 
 
 def smoke(cfg, name):
-    """로컬에서 engine.server를 릴리스 설정으로 띄워 /ask에 킷 예시 · 함정 · 이상한 입력을 동시에 보내고 JSON 꼴 · 시간을 본다."""
+    """engine.server를 릴리스 설정으로 잠깐 띄워 /ask에 킷 예시 · 함정 · 이상한 입력을 동시에 보내고 JSON 꼴 · 시간을 본다."""
     import requests
     R.RESULTS.mkdir(parents=True, exist_ok=True)
     labels = labels_of(cfg)
@@ -244,7 +245,9 @@ def record(want, cfg, sm, summaries, ct):
             "base": None if base is None or base is me else {"group": base["group"], "weighted": base["m"]["weighted"],
                                                              "date": base["date"], "code": base["code"],
                                                              "same_code": base["code_hash"] == me["code_hash"]},
-            "band": band, "band_note": band_note, "contract": ct, "smoke": sm, "ok": ct["ok"] and sm["ok"]}
+            "band": band, "band_note": band_note, "contract": ct, "smoke": sm,
+            "code_dirty": any(s["env"]["code_dirty"] for s in summaries),
+            "ok": ct["ok"] and sm["ok"] and not any(s["env"]["code_dirty"] for s in summaries)}
 
 
 # ---- ⑤ docs/engine/releases.md ----
@@ -263,6 +266,7 @@ def verdict(r):
     why = [f"계약 위반 {sum(r['contract']['problems'].values())}"] if r["contract"]["problems"] else []
     why += ["지연 기준 넘음"] if r["contract"]["slow"] else []
     why += ["연기 시험"] if not r["smoke"]["ok"] else []
+    why += ["재는 동안 커밋 안 한 수정"] if r.get("code_dirty") else []
     return "⛔ 막힘(" + " · ".join(why) + ")"
 
 
@@ -292,16 +296,16 @@ def render(recs):
            f"> `python3 eval/release.py`가 `eval/releases/`의 릴리스 기록 {len(recs)}개로 만든다. 손으로 고치지 않는다. "
            "만드는 법: `engine/README.md` 「릴리스 만들기」 · 점수 규칙: [재현 규칙](reproducibility.md) · [리더보드](leaderboard.md)", "",
            "배분일마다 채택된 실험을 모두 켠 판(릴리스 설정 `eval/configs/release.json`)을 dev 전체로 두 번 재고, 출력 계약과 채점 API"
-           "(`engine.server`)를 점검한 기록이다. **채점 서버는 `ENGINE_CONFIG=eval/configs/release.json`으로 이 판을 읽는다.** "
-           "서버 `/health`의 `settings`가 아래 「설정 지문」과 같으면 그 판이 떠 있다. 판정이 통과인 릴리스만 PR 「릴리스 N주기」가 "
-           "병합된 main 커밋에 태그 `rc-c<주기>`를 붙인다(동규 승인 뒤). 지연은 탐색 주기(1~3)에는 기록만 하고, 수렴 주기(4~5)부터 "
-           "95%가 30초 · 가장 느린 것이 90초를 넘으면 막는다.", ""]
+           "(`engine.server`)를 점검한 기록이다. 판정이 통과인 릴리스만 PR 「릴리스 N주기」가 병합된 main 커밋에 태그 `rc-c<주기>`를 "
+           "붙인다(동규 승인 뒤). 실험이 마무리되면 마지막으로 통과한 판을 채점 서버(#31)에 올린다. 서버는 "
+           "`ENGINE_CONFIG=eval/configs/release.json`으로 그 판을 읽고, `/health`의 `settings`가 아래 「설정 지문」과 같으면 그 판이 떠 있다. "
+           "지연은 탐색 주기(1~3)에는 기록만 하고, 수렴 주기(4~5)부터 95%가 30초 · 가장 느린 것이 90초를 넘으면 막는다.", ""]
     if not recs:
         return "\n".join(out + ["아직 없음."]) + "\n"
     good = [r for r in recs if r["ok"]]
     if good:
         g = good[-1]
-        out += [f"**지금 올릴 판: `{g['tag']}`** ({g['cycle']}주기 · 설정 지문 `{g['settings_hash']}` · dev 가중 {board.num(g['mean'])})", ""]
+        out += [f"**가장 최근 통과 판: `{g['tag']}`** ({g['cycle']}주기 · 설정 지문 `{g['settings_hash']}` · dev 가중 {board.num(g['mean'])})", ""]
     out += ["| 주기 | 태그 | 판정 | 들어간 실험 | 가중 (회마다) | 출발 판 대비 | 앞 릴리스 대비 | 함정 | 과잉 포기 | 계약 위반 | "
             "지연 95% · 최대 | 연기 시험 | 비용 | 날짜 · 커밋 |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     prevs = [None] + recs[:-1]
@@ -313,7 +317,7 @@ def render(recs):
                    f"{board.num(r['by_type'].get('함정'))} | {board.num(r['over_abstain'])} | {sum(ct['problems'].values())} / {ct['n']:,} | "
                    f"{board.num(ct['latency_p95'], '초')} · {board.num(ct['latency_max'], '초')} ({ct['latency_rule']}) | "
                    f"{sum(x['status'] == 200 and not x['problems'] for x in sm['rows'])}/{len(sm['rows'])} | "
-                   f"{cost(r)} | {r['created'][:10]} · {r['code_commit']} |")
+                   f"{cost(r)} | {r['created'][:10]} · {r['code_commit']}{' ⚠수정' if r.get('code_dirty') else ''} |")
     for r, p in reversed(list(zip(recs, prevs))):
         ct, sm = r["contract"], r["smoke"]
         to_base, to_prev = deltas(r, p)
@@ -335,7 +339,7 @@ def render(recs):
                 + f" · 엔진 오류로 확인 불가 {ct['errors']} · 75초 넘어 확인 불가 {ct['timeouts']} · 지연 95% {board.num(ct['latency_p95'], '초')} · "
                 f"최대 {board.num(ct['latency_max'], '초')} ({ct['latency_rule']})"]
         out += [f"  - 예: `{x['id']}` {x['problem']} — `{json.dumps(x['response'], ensure_ascii=False)[:200]}`" for x in ct["examples"]]
-        out += [f"- 연기 시험(로컬 `engine.server`, 동시 {sm['workers']}): `/health` 설정 지문 {'같음' if sm['health_ok'] else '⚠ 다름'} · "
+        out += [f"- 연기 시험(release.py가 잠깐 띄운 `engine.server`에 동시 {sm['workers']}): `/health` 설정 지문 {'같음' if sm['health_ok'] else '⚠ 다름'} · "
                 f"요청 {len(sm['rows'])}개 중 HTTP 200 · 계약 지킴 {sum(x['status'] == 200 and not x['problems'] for x in sm['rows'])}개 · "
                 f"가장 느린 {board.num(sm['max_sec'], '초')} · 킷 11문항 점수 합 {sum(x['score'] or 0 for x in kit):g}/{len(kit)}", "",
                 "  | 종류 | 질문 | HTTP | 초 | 결과 |", "  |---|---|---|---|---|"]
@@ -363,8 +367,8 @@ def make(cycle, extra):
               f"출발 판과 다른 칸 {switches(want['engine'])})\n"
               f"   잰 판을 커밋으로 남기려고 여기서 멈춘다. git add {RELEASE} && git commit 뒤 같은 명령을 다시 돌린다.")
         return
-    if not committed(RELEASE):
-        sys.exit(f"✗ 릴리스 설정이 커밋돼 있지 않다({RELEASE}). git add {RELEASE} && git commit 뒤 다시 돌린다.")
+    if dirty():
+        sys.exit(f"✗ 커밋 안 한 수정이 있다. 커밋한 뒤 다시 돌리고, 재는 동안(25분) engine/ · 릴리스 설정을 고치지 않는다:\n{dirty()}")
     if not upstage.has_key():
         sys.exit("✗ 레포 맨 위 .env에 UPSTAGE_API_KEY가 있어야 한다(연기 시험 · dev 재기). 키 없이는 --check만.")
     print(f"① 릴리스 설정 {RELEASE}: {want['name']} · 채택 실험 {len(want['experiments'])}개 · 다른 칸 {switches(want['engine'])}"
@@ -479,8 +483,9 @@ def selftest():
            "weighted": [70.1, 70.9], "mean": 70.5, "by_type": {"함정": 90.0}, "over_abstain": 20.0, "citations": 1.5, "cost": 0.8,
            "base": {"group": "b", "weighted": 68.1, "date": "2026-11-06", "code": "50fa76d", "same_code": False},
            "band": 1.1, "band_note": " (출발 판 4번)", "contract": ct, "smoke": sm, "ok": False}
+    assert verdict(dict(rec, smoke=dict(sm, ok=True), code_dirty=True)) == "⛔ 막힘(재는 동안 커밋 안 한 수정)"
     page = render([dict(rec, tag="rc-c0", cycle=0, ok=True, experiments=[], engine={}, smoke=dict(sm, ok=True)), rec])
-    assert "**지금 올릴 판: `rc-c0`**" in page and "⛔ 막힘(연기 시험)" in page and "+2.4 ✅ 폭의 2배 넘게 오름" in page
+    assert "**가장 최근 통과 판: `rc-c0`**" in page and "⛔ 막힘(연기 시험)" in page and "+2.4 ✅ 폭의 2배 넘게 오름" in page
     assert "[#24](https://github.com/team-gg-aibc/aibc2026-gg/issues/24) 24-top20" in page and "⚠ 함정에 답함" in page
     assert "(빈 문자열)" in page and "$0.80" in page and "⚠ 엔진 코드가 다른 판" in page and "태그 붙이지 않음" in page
     assert render([]).endswith("아직 없음.\n")

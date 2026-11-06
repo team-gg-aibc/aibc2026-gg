@@ -47,12 +47,12 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 | 배분일 릴리스 (막 끝난 주기 N, 11/9면 1) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
 | 실행 요약에 「채택」이 없는 실험도 넣기 | 위 명령에 `--adopt eval/configs/<실험>.json` (여러 번 줄 수 있다) |
 | 릴리스 설정이 채택 실험 · 마지막 기록과 맞나 (키 없이, 2초) | `python3 eval/release.py --check` |
-| 그 판으로 채점 서버 띄우기 | `ENGINE_CONFIG=eval/configs/release.json .venv/bin/uvicorn engine.server:app --host 0.0.0.0 --port 8000` → `/health`의 `settings`가 릴리스 기록의 설정 지문과 같은지 본다 |
 
 - **들어가는 것**: 실행 요약(`eval/runs/*.json`)의 `conclusion`이 「채택」으로 시작하는 실험의 스위치다(그 주기까지). 합친 판에서 빼려면 그 실행의 `conclusion`을 바꾸고 다시 만든다. 같은 스위치를 다른 값으로 켠 실험이 둘이면 멈춘다(동규가 고른다). 탐색 모드 칸(`explore`, 탐색 실험의 `timeout_sec` 300)은 넣지 않는다. 릴리스는 늘 대회 조건(75초에 확인 불가, 90초 넘으면 0점)으로 잰다.
 - **따로 재는 까닭**: 실험끼리 서로 영향을 줄 수 있다. 예를 들어 후보를 넓히면 판정이 거절하는 문항도 바뀐다. 그래서 합친 판을 dev 전체로 두 번 따로 잰다.
 - **판정**: 계약 위반(네 칸 · 칸 자료형 · 확인 불가 꼴 · 인용이 색인 라벨이고 킷 채점식으로 읽히나 · 링크 · 시행일 꼴)이 0이고, 연기 시험(킷 예시 11 · 함정 3 · 빈 질문 · 아주 긴 질문 · 지시문 섞인 질문을 동시 10으로 보내 모두 HTTP 200 · 네 칸 · 90초 안, `/health` 설정 지문 같음)을 지나면 「통과」다. 지연은 1~3주기에 기록만 하고, 4~5주기부터 95%가 30초를 넘거나 가장 느린 것이 90초를 넘으면 막는다.
 - 통과한 릴리스는 PR 「릴리스 N주기」가 병합된 main 커밋에 태그 `rc-cN`을 붙인다(동규 승인 뒤). 11/17 동결 판단 날의 릴리스(`rc-c5`)가 동결 후보이고, 11/18에 동규가 그 판으로 holdout을 한 번 잰다(재현 규칙 10절).
+- 실험이 마무리되면 마지막으로 통과한 판(태그)을 채점 서버(#31)에 올린다. 서버는 `ENGINE_CONFIG=eval/configs/release.json`으로 그 판을 읽는다(레포 맨 위 폴더에서 띄운다. 설정 경로가 상대 경로라서). 올린 판이 맞는지는 `/health`의 `settings`가 [릴리스 기록](../docs/engine/releases.md)의 「설정 지문」과 같은지로 본다.
 - 릴리스 설정 · 기록 · `releases.md`는 손으로 고치지 않는다. 문서만 다시 쓰려면 `python3 eval/release.py --docs`.
 
 ## 흐름과 파일
