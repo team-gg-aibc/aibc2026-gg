@@ -1,0 +1,6 @@
+{
+  "name": "explore",
+  "issue": "",
+  "note": "탐색 모드의 바탕(1~3주기): 90초 조건 없이 문항당 300초까지, 시간은 단계별로 기록만. 실험 설정은 이 파일을 복사해 engine 칸에 자기 스위치를 더한다",
+  "engine": {"explore": true, "timeout_sec": 300}
+}

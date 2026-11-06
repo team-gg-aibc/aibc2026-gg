@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parent
@@ -32,6 +33,7 @@ DEFAULTS = {
     "answer_prompt": "v1",           # answer.PROMPTS의 판 이름
     "verify_prompt": "v1",           # verify.PROMPTS의 판 이름
     "timeout_sec": 75,               # 넘으면 확인 불가로 답한다 (대회 제한 90초)
+    "explore": False,                # 탐색 모드(1~3주기): 90초 넘어도 점수에서 빼지 않고 시간은 기록만. 상한은 timeout_sec(탐색 설정은 300)
     # ---- #22 출력 규격 강제 (동욱) ----
     # ---- #23 조각 다듬기 (건영) ----
     # ---- #24 후보 넓히기 (종희) ----
@@ -73,10 +75,9 @@ def _env_files():
         pass
 
 
-def api_key():
-    """환경 변수 → 레포 .env 순서로 찾는다. 값은 돌려주기만 하고 출력하지 않는다."""
-    if os.environ.get("UPSTAGE_API_KEY") is not None:   # 빈 값으로 두면 「키 없이」로 돈다
-        return os.environ["UPSTAGE_API_KEY"].strip()
+@lru_cache(maxsize=None)
+def _key_in_env_file():
+    """.env는 한 번만 읽는다(문항마다 git을 띄우지 않게. 하위 프로세스가 동시 계산과 겹치면 멈출 수 있다)."""
     for f in _env_files():
         if f.is_file():
             for line in f.read_text(encoding="utf-8").splitlines():
@@ -84,3 +85,10 @@ def api_key():
                 if sep and k.strip() == "UPSTAGE_API_KEY":
                     return v.strip().strip("'\"")
     return ""
+
+
+def api_key():
+    """환경 변수 → 레포 .env 순서로 찾는다. 값은 돌려주기만 하고 출력하지 않는다."""
+    if os.environ.get("UPSTAGE_API_KEY") is not None:   # 빈 값으로 두면 「키 없이」로 돈다
+        return os.environ["UPSTAGE_API_KEY"].strip()
+    return _key_in_env_file()

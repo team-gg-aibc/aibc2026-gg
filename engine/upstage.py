@@ -1,7 +1,7 @@
 """업스테이지 호출 한 곳 (Chat · Embedding · Document Parse). AGENTS.md 5절: 바깥 서비스 호출은 여기서만.
 
-Solar는 OpenAI SDK와 호환된다(base_url만 바꿈). 부를 때마다 `calls` 목록에 모델 · 토큰 · 걸린 시간을 남기고,
-점수 틀(eval/run.py)이 이 기록으로 비용을 낸다. 키 값은 기록하지 않는다.
+Solar는 OpenAI SDK와 호환된다(base_url만 바꿈). 부를 때마다 `calls` 목록에 모델 · 토큰 · 걸린 시간 · 보낸 메시지 · 모델 출력을
+남긴다. 점수 틀(eval/run.py)이 이 기록으로 비용을 내고, 궤적 화면(eval/trajectory.py)이 단계마다 보여 준다. 키 값은 기록하지 않는다.
 """
 import json
 import threading
@@ -54,7 +54,7 @@ def _retry(fn, tries=4):
             raise
 
 
-def _log(calls, kind, model, usage, t0):
+def _log(calls, kind, model, usage, t0, sent, output):
     if calls is None:
         return
     details = getattr(usage, "prompt_tokens_details", None)
@@ -62,7 +62,7 @@ def _log(calls, kind, model, usage, t0):
                   "in": getattr(usage, "prompt_tokens", 0) or 0,
                   "cached": getattr(details, "cached_tokens", 0) or 0,
                   "out": getattr(usage, "completion_tokens", 0) or 0,
-                  "sec": round(time.perf_counter() - t0, 3)})
+                  "sec": round(time.perf_counter() - t0, 3), "sent": sent, "output": output})
 
 
 def chat(messages, cfg, calls=None, response_format=None):
@@ -73,8 +73,9 @@ def chat(messages, cfg, calls=None, response_format=None):
         kw["reasoning_effort"] = cfg["reasoning_effort"]
     t0 = time.perf_counter()
     resp = _retry(lambda: client().chat.completions.create(**kw))
-    _log(calls, "chat", cfg["chat_model"], resp.usage, t0)
-    return resp.choices[0].message.content
+    content = resp.choices[0].message.content
+    _log(calls, "chat", cfg["chat_model"], resp.usage, t0, messages, content)
+    return content
 
 
 def embed(texts, model, calls=None):
@@ -83,7 +84,7 @@ def embed(texts, model, calls=None):
         batch = texts[i:i + 50]
         t0 = time.perf_counter()
         resp = _retry(lambda: client().embeddings.create(model=model, input=batch))
-        _log(calls, "embed", model, resp.usage, t0)
+        _log(calls, "embed", model, resp.usage, t0, batch, f"{len(resp.data)}개 × {len(resp.data[0].embedding)}차원")
         out.extend(d.embedding for d in resp.data)
     return out
 

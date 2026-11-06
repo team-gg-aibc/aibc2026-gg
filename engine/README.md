@@ -24,6 +24,18 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 
 파일을 직접(`python3 engine/server.py`) 돌리지 말고 `-m engine.…`으로 돌린다. 엔진 파일들이 패키지 안에서 서로를 부른다.
 
+## 실험 · 점수 · 리더보드
+
+| 하려는 것 | 명령 · 문서 |
+|---|---|
+| 내 컴퓨터가 팀과 같은 결과를 내나 (키 없이, 2초) | `python3 eval/run.py --check eval/runs/<키워드 dev 실행>.json` (파일 이름은 재현 규칙 1절) |
+| 실험 하나 재기 | 설정 파일 `eval/configs/<이슈>-<이름>.json`을 만들고 `python3 eval/run.py --config <설정 파일>` |
+| 리더보드 · 실험 기록 다시 만들기 | `python3 eval/board.py` → [리더보드](../docs/engine/leaderboard.md) · [실험 기록](../docs/engine/experiments.md) |
+| 탐색 모드(1~3주기: 90초 조건 없이, 문항당 300초까지) | 설정에 `"explore": true, "timeout_sec": 300` (바탕: `eval/configs/explore.json`) |
+| 문항마다 단계별 입력 · 프롬프트 · 모델 출력 · 시간 · 토큰 보기 | 끝까지 잰 실행이 `eval/results/<실행>.html`을 만든다. 문항 하나는 `python3 eval/trajectory.py <실행> <문항 id>` |
+| 병합 전 브랜치들의 결과까지 한 표로 (배분일) | `git fetch origin` 뒤 `python3 eval/board.py --from-branches 'origin/*'` (화면에만) |
+| 규칙(실험 하나 = 설정 파일 하나, 고정한 것 · 흔들리는 것, 기록 · 비교 · 색인 바꾸기 · 크레딧) | [재현 규칙](../docs/engine/reproducibility.md) |
+
 ## 흐름과 파일
 
 질문 받기 → 검색 → 근거 고르기 · 답 쓰기 → 판정 → 출력. 단계 하나 = 함수 하나이고(`pipeline.STAGES`), 경계는 LangGraph 노드와 같다. 새 단계는 `STAGES`에 끼운다.

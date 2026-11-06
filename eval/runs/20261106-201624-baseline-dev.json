@@ -1,0 +1,101 @@
+{
+ "run_id": "20261106-201624-baseline-dev",
+ "group": "20261106-201624-baseline-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-06T20:16:40+09:00",
+ "experiment": {
+  "name": "baseline",
+  "issue": "#21",
+  "note": "출발 판: 스타터 킷 그대로 + 검증을 solar-pro4 판정으로 (engine/config.py DEFAULTS 그대로)",
+  "cycle": 0,
+  "file": "eval/configs/baseline.json",
+  "file_sha": "f73fa66a9f35"
+ },
+ "conclusion": "출발 판 · 혼합 검색 기준(같은 날 82.2 · 82.9 · 82.8 · 82.8, 질문 임베딩이 실행마다 조금 다름)",
+ "args": {
+  "config": "eval/configs/baseline.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "retrieval",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false
+ },
+ "settings_hash": "698ee7f958d5",
+ "switches": {},
+ "env": {
+  "code_commit": "50fa76d",
+  "code_hash": "c0e1af2fbe29",
+  "eval_code_hash": "b713b57ad1fc",
+  "code_dirty": false,
+  "eval_commit": "5b3b1df",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 619,
+  "hit": {
+   "1": 51.2,
+   "3": 73.5,
+   "6": 82.8,
+   "10": 89.6,
+   "20": 94.8
+  },
+  "by_type": {
+   "단순": 86.2,
+   "조건": 83.9,
+   "결합": 72.7
+  },
+  "by_law": {
+   "animal": 85.8,
+   "bicycle": 78.4,
+   "common": 80.0,
+   "park": 78.3,
+   "parking": 81.1,
+   "smoking": 89.3,
+   "youth": 86.1
+  }
+ },
+ "cost_usd": 0.0007,
+ "tokens": {
+  "in": 33690,
+  "cached": 0,
+  "out": 0
+ },
+ "calls": 661,
+ "wall_sec": 16.2,
+ "hashes": {
+  "retrieval": "3a2c53457ae3",
+  "answers": null
+ }
+}
