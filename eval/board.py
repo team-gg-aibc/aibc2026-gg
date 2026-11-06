@@ -4,7 +4,7 @@
   python3 eval/board.py --from-branches 'origin/*'   원격 브랜치들(병합 전 실험 포함)의 실행 요약까지 모아 화면에만 보인다.
                                                      파일을 쓰지 않는다. 먼저 git fetch origin. 브랜치 칸이 붙는다
 두 문서는 손으로 고치지 않는다. PR끼리 충돌하면 main을 받은 뒤 이 명령을 다시 돌린다(같은 실행 파일이면 늘 같은 표).
-결론(채택 · 버림 · 보류)은 그 실행 파일의 "conclusion" 칸에 적고 다시 돌린다.
+결론(채택 · 버림 · 보류)은 그 실행 파일의 "conclusion" 칸에, 배운 점 세 줄은 "lesson" 칸에 적고 다시 돌린다.
 """
 import argparse
 import fnmatch
@@ -70,6 +70,7 @@ def groups(runs):
             "group": r0["group"], "branch": items[0][1], "name": r0["experiment"]["name"],
             "issue": r0["experiment"]["issue"] or "", "cycle": cycle_of(r0["created"]) if cycle is None else cycle,
             "conclusion": next((r["conclusion"] for r in rs if r["conclusion"]), ""), "full": full,
+            "lesson": next((r["lesson"] for r in rs if r.get("lesson")), []),
             "explore": bool(r0["settings"].get("explore")),
             "split": r0["args"]["split"], "sample": r0["args"]["sample"], "seed": r0["args"]["seed"],
             "table": (r0["args"]["split"], r0["args"]["sample"], r0["args"]["seed"], e["questions_hash"]),
@@ -137,7 +138,8 @@ def leaderboard(gs, n_runs):
            "**출발 판 대비** = 같은 표의 출발 판(baseline, 코드 지문이 같은 것이 있으면 그것, 없으면 가장 최근 것)과의 가중 차이. "
            "**흔들림** = 출발 판을 같은 설정으로 여러 번 돌린 가중 폭과 견준 것. 채택 기준(계획 5-2절)은 「폭의 2배 넘게 오름」. "
            "**(탐색)** = 90초 조건 없이 잰 실행(1~3주기). **궤적** = 문항마다 단계별 입력 · 프롬프트 · 모델 출력을 보는 화면으로, "
-           "그 실행을 돌린 컴퓨터에만 있다(`eval/results/`는 git에 안 올림).", "",
+           "그 실행을 돌린 컴퓨터에만 있다(`eval/results/`는 git에 안 올림). **비교** = 기준과 문항마다 견준 문서(`eval/compare.py`)로, "
+           "커밋돼 있어 GitHub에서 열린다.", "",
            DEFAULT, ""]
     full = [g for g in gs if g["full"] and g["split"] != "holdout"]
     if not full:
@@ -163,7 +165,7 @@ def leaderboard(gs, n_runs):
             out.append(f"| {i} | {cell(g)}{g['cycle']} | {name(g)} | {g['issue']} | **{num(m['weighted'])}**{spread} | {d} | {flag} | "
                        + " | ".join(num(m["by_type"].get(k)) for k in WEIGHTS)
                        + f" | {num(m['over_abstain'])} | {num(m['citations_per_answer'], digits=2)} | {num(m['latency_p95'], '초')} | "
-                       f"{cost} | {g['repeats']} | [보기](../../eval/results/{g['run_id']}.html) | {g['code']} · {g['eval']} | {g['date']} |")
+                       f"{cost} | {g['repeats']} | {links(g)} | {g['code']} · {g['eval']} | {g['date']} |")
         laws = sorted({k for g in rows for k in g["m"]["by_law"]}, key=lambda k: (list(LAWS).index(k) if k in LAWS else 99, k))
         out += ["", "조례별 근거 정확도(함정 뺌):", "",
                 "| 실험 | " + " | ".join(LAWS.get(k, k) for k in laws) + " |", "|---|" + "---|" * len(laws)]
@@ -208,11 +210,13 @@ def experiments(gs, n_runs):
            "- " + DEFAULT,
            "- 결론은 그 실행 파일(`eval/runs/<실행>.json`)의 `\"conclusion\"`에 「채택 · 버림 · 보류 — 한 줄 이유」로 적고 `python3 eval/board.py`를 다시 돌린다. 채택 · 버림은 동규가 정한다.",
            "- 「검색만」 줄의 단순 · 조건 · 결합은 근거 정확도가 아니라 검색 적중률(top-k)이다. 「(탐색)」은 90초 조건 없이 잰 실행이다.",
-           "- 주기는 설정 파일의 `cycle`, 없으면 실행한 날짜로 정한다(계획 0절 표)."]
+           "- 주기는 설정 파일의 `cycle`, 없으면 실행한 날짜로 정한다(계획 0절 표).",
+           "- 배운 점은 버림 · 보류여도 실행 요약의 `\"lesson\"`에 세 줄로 적는다: ① 무엇이 좋아지고 나빠졌나(종류 · 원인) ② 왜 그런 것 같나 "
+           "③ 다음에 해 볼 것. 버림 · 보류 실험의 배운 점은 맨 아래 「배운 점 모음」에 모인다. 배분일에는 그것부터 읽고 다음 가설을 고른다."]
     for cycle in sorted({g["cycle"] for g in gs}):
         out += ["", f"## {CYCLES.get(cycle, f'{cycle}주기')}", "",
-                ("| 브랜치 " if br else "") + "| 날짜 | 이슈 | main · 평가셋 커밋 | 켠 스위치 | 묶음(문항) | 단순 | 조건 | 결합 | 함정 | 가중 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 결론 |",
-                ("|---" if br else "") + "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                ("| 브랜치 " if br else "") + "| 날짜 | 이슈 | main · 평가셋 커밋 | 켠 스위치 | 묶음(문항) | 단순 | 조건 | 결합 | 함정 | 가중 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 결론 | 배운 점 |",
+                ("|---" if br else "") + "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for g in (g for g in gs if g["cycle"] == cycle):
             m = g["m"]
             sw = ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in g["switches"].items()) or "출발 판"
@@ -226,8 +230,26 @@ def experiments(gs, n_runs):
                 what += f" · 검색만({g['search']}) top-{k} {num(m['hit'].get(k))}"
                 cells = [num(m["by_type"].get(t)) for t in ("단순", "조건", "결합")] + ["—"] * 5
             out.append((f"| {g['branch'] or '지금 폴더'} " if br else "") + f"| {g['date']} | {g['issue']} | {g['code']} · {g['eval']} | {sw} | {what} | "
-                       + " | ".join(cells) + f" | {cost} | {g['conclusion']} |")
+                       + " | ".join(cells) + f" | {cost} | {g['conclusion']} | {' / '.join(g['lesson'])} |")
+    kept = [g for g in gs if g["conclusion"].startswith(("버림", "보류"))]
+    out += ["", "## 배운 점 모음 (버림 · 보류 실험)", "",
+            "버린 실험도 배운 것은 남긴다. 배분일에 이 절부터 읽고 다음 가설을 고른다(일하는 방식 4절)."]
+    for g in kept:
+        out += ["", f"### {name(g)} {g['issue']} · {g['cycle']}주기 · {label(g)}", "", f"- 결론: {g['conclusion']}"]
+        out += [f"- {x}" for x in g["lesson"]] or ["- 배운 점: 아직 없음(실행 요약의 `lesson`에 세 줄을 적는다)"]
+        if (DOCS / "compare" / f"{g['run_id']}.md").exists():
+            out.append(f"- 문항별 비교: [compare/{g['run_id']}.md](compare/{g['run_id']}.md)")
+    if not kept:
+        out += ["", "아직 없음."]
     return "\n".join(out) + "\n"
+
+
+def links(g):
+    """리더보드 칸: 궤적 화면(그 실행을 돌린 컴퓨터에만) · 비교 문서(커밋돼 있으면 GitHub에서 열림)."""
+    out = f"[보기](../../eval/results/{g['run_id']}.html)"
+    if (DOCS / "compare" / f"{g['run_id']}.md").exists():
+        out += f" · [비교](compare/{g['run_id']}.md)"
+    return out
 
 
 def main():
