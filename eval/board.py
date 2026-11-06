@@ -108,13 +108,22 @@ def mark(delta, band):
 
 
 def noise(gs, table):
-    """흔들림 폭: 같은 표(같은 문항)의 출발 판 반복 → 없으면 같은 묶음의 출발 판 반복(문항 수 표시)."""
-    reps = [g for g in gs if g["name"] == "baseline" and len(g["w"]) > 1]
-    same = [g for g in reps if g["table"] == table] or [g for g in reps if g["split"] == table[0]]
-    if not same:
-        return None, ""
-    g = same[-1]
-    return round(max(g["w"]) - min(g["w"]), 1), ("" if g["table"] == table else f" ({g['n']}문항 반복으로 잰 폭)")
+    """흔들림 폭: 같은 표(같은 문항)에서 가장 최근 출발 판과 엔진 코드가 같은 출발 판 실행을 모두 모은 가중의 최대 − 최소.
+    두 번이 안 되면 같은 묶음의 다른 표에서 같은 방법으로 잰 폭을 쓰고 그렇다고 적는다. 3번만 모으면 우연히 좁게 나올 수 있어서
+    반복 묶음 하나가 아니라 같은 조건의 실행을 다 모은다."""
+    def band(t):
+        bases = sorted((g for g in gs if g["name"] == "baseline" and g["table"] == t and g["w"]), key=lambda g: g["created"])
+        ws = [x for g in bases if g["code_hash"] == bases[-1]["code_hash"] for x in g["w"]] if bases else []
+        return (round(max(ws) - min(ws), 1), len(ws)) if len(ws) > 1 else (None, 0)
+    width, k = band(table)
+    if width is not None:
+        return width, f" (출발 판 {k}번)"
+    for t in sorted({g["table"] for g in gs if g["split"] == table[0] and g["table"] != table}, key=lambda t: t[1] or 0):
+        width, k = band(t)
+        if width is not None:
+            n = next(g["n"] for g in gs if g["table"] == t)
+            return width, f" ({n}문항으로 {k}번 잰 폭)"
+    return None, ""
 
 
 def leaderboard(gs, n_runs):
