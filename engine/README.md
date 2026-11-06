@@ -38,6 +38,23 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 | 기준과 문항마다 견주기 (버린 실험도) | `python3 eval/compare.py <실행>` → `docs/engine/compare/<실행>.md` |
 | 규칙(실험 하나 = 설정 파일 하나, 고정한 것 · 흔들리는 것, 기록 · 비교 · 색인 바꾸기 · 크레딧) | [재현 규칙](../docs/engine/reproducibility.md) |
 
+## 릴리스 만들기
+
+제출하는 것은 실험 하나가 아니라 **채택된 실험을 모두 켠 판**이다. 그 판의 설정이 릴리스 설정 `eval/configs/release.json`이고, 채점 서버는 이 파일을 읽는다(`ENGINE_CONFIG=eval/configs/release.json`). 배분일에 PM 쪽이 만들어 PR 「릴리스 N주기」로 넣는다. 기록: [릴리스](../docs/engine/releases.md).
+
+| 하려는 것 | 명령 |
+|---|---|
+| 배분일 릴리스 (막 끝난 주기 N, 11/9면 1) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
+| 실행 요약에 「채택」이 없는 실험도 넣기 | 위 명령에 `--adopt eval/configs/<실험>.json` (여러 번 줄 수 있다) |
+| 릴리스 설정이 채택 실험 · 마지막 기록과 맞나 (키 없이, 2초) | `python3 eval/release.py --check` |
+| 그 판으로 채점 서버 띄우기 | `ENGINE_CONFIG=eval/configs/release.json .venv/bin/uvicorn engine.server:app --host 0.0.0.0 --port 8000` → `/health`의 `settings`가 릴리스 기록의 설정 지문과 같은지 본다 |
+
+- **들어가는 것**: 실행 요약(`eval/runs/*.json`)의 `conclusion`이 「채택」으로 시작하는 실험의 스위치다(그 주기까지). 합친 판에서 빼려면 그 실행의 `conclusion`을 바꾸고 다시 만든다. 같은 스위치를 다른 값으로 켠 실험이 둘이면 멈춘다(동규가 고른다). 탐색 모드 칸(`explore`, 탐색 실험의 `timeout_sec` 300)은 넣지 않는다. 릴리스는 늘 대회 조건(75초에 확인 불가, 90초 넘으면 0점)으로 잰다.
+- **따로 재는 까닭**: 실험끼리 서로 영향을 줄 수 있다. 예를 들어 후보를 넓히면 판정이 거절하는 문항도 바뀐다. 그래서 합친 판을 dev 전체로 두 번 따로 잰다.
+- **판정**: 계약 위반(네 칸 · 칸 자료형 · 확인 불가 꼴 · 인용이 색인 라벨이고 킷 채점식으로 읽히나 · 링크 · 시행일 꼴)이 0이고, 연기 시험(킷 예시 11 · 함정 3 · 빈 질문 · 아주 긴 질문 · 지시문 섞인 질문을 동시 10으로 보내 모두 HTTP 200 · 네 칸 · 90초 안, `/health` 설정 지문 같음)을 지나면 「통과」다. 지연은 1~3주기에 기록만 하고, 4~5주기부터 95%가 30초를 넘거나 가장 느린 것이 90초를 넘으면 막는다.
+- 통과한 릴리스는 PR 「릴리스 N주기」가 병합된 main 커밋에 태그 `rc-cN`을 붙인다(동규 승인 뒤). 11/17 동결 판단 날의 릴리스(`rc-c5`)가 동결 후보이고, 11/18에 동규가 그 판으로 holdout을 한 번 잰다(재현 규칙 10절).
+- 릴리스 설정 · 기록 · `releases.md`는 손으로 고치지 않는다. 문서만 다시 쓰려면 `python3 eval/release.py --docs`.
+
 ## 흐름과 파일
 
 질문 받기 → 검색 → 근거 고르기 · 답 쓰기 → 판정 → 출력. 단계 하나 = 함수 하나이고(`pipeline.STAGES`), 경계는 LangGraph 노드와 같다. 새 단계는 `STAGES`에 끼운다.
