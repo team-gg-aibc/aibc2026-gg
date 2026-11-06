@@ -15,6 +15,7 @@ import hashlib
 import importlib.metadata
 import json
 import math
+import os
 import platform
 import re
 import subprocess
@@ -241,9 +242,8 @@ def git(*args):
         return ""
 
 
-def code_hash():
-    """엔진 코드 지문: 커밋 번호는 squash 병합 · rebase로 바뀌어도 코드 글자가 같으면 같다."""
-    files = sorted(ROOT.glob("engine/**/*.py")) + [ROOT / "eval/run.py", ROOT / "engine/requirements.txt"]
+def code_hash(files):
+    """코드 지문: 커밋 번호는 squash 병합 · rebase로 바뀌어도 파일 글자가 같으면 같다."""
     return config.digest({str(f.relative_to(ROOT)): hashlib.sha256(f.read_bytes()).hexdigest() for f in files})
 
 
@@ -279,7 +279,9 @@ def record(args, cfg, exp, qs, rows, mode, wall, run_id, group, rep):
                  "mode": mode, "url": args.url, "workers": args.workers},
         "settings": cfg, "settings_hash": config.digest(cfg),
         "switches": {k: v for k, v in cfg.items() if config.DEFAULTS.get(k) != v},
-        "env": {"code_commit": git("rev-parse", "--short=7", "HEAD"), "code_hash": code_hash(),
+        "env": {"code_commit": git("rev-parse", "--short=7", "HEAD"),
+                "code_hash": code_hash(sorted(ROOT.glob("engine/**/*.py")) + [ROOT / "engine/requirements.txt"]),
+                "eval_code_hash": code_hash([Path(__file__).resolve()]),
                 "code_dirty": bool(git("status", "--porcelain", "--", "engine", "eval/run.py", args.config)),
                 "eval_commit": git("log", "-1", "--format=%h", "--", "eval/questions_*.json", "eval/stress_*.json",
                                    "eval/kit_questions.json"),
@@ -311,7 +313,8 @@ def show(s):
               + f" · 과잉 포기 {m['over_abstain']}% · 인용 수 {m['citations_per_answer']}")
         print(f"  지연 95% {m['latency_p95']}초 · 형식 오류 {m['format_errors']} · 90초 넘음 {m['late']}"
               f" · 오류 {m['errors']} · 검색 적중률 {m['retrieval_hit']}%")
-        print(f"  틀린 원인: {m['causes']}")
+        if "causes" in m:                 # holdout은 틀린 원인을 남기지 않는다
+            print(f"  틀린 원인: {m['causes']}")
     print("  조례별: " + " · ".join(f"{k} {v}" for k, v in m["by_law"].items()))
     print(f"  비용 {'모름(서버 호출)' if s['cost_usd'] is None else '$' + str(s['cost_usd'])} · 호출 {s['calls']}번 · {s['wall_sec']}초")
 
@@ -372,6 +375,10 @@ def check(args):
     for k in ("config", "split", "sample", "seed", "url"):
         setattr(args, k, old["args"][k])
     args.mode, args.repeat = old["args"]["mode"], 1
+    if old["env"]["retrieval_used"] == ["keyword"]:
+        os.environ["UPSTAGE_API_KEY"] = ""      # 그때처럼 키워드 검색으로 잰다(키가 있어도 크레딧 0)
+    elif old["env"]["retrieval_used"] == ["hybrid"] and not upstage.has_key():
+        sys.exit("✗ 그때는 혼합 검색(키 필요)으로 잰 실행입니다. 레포 맨 위 .env에 키를 넣고 다시 돌리세요.")
     cfg, exp, mode, qs = prepare(args)
     t0 = time.perf_counter()
     rows = execute(qs, cfg, mode, args.url, args.workers, args.max_cost)
@@ -380,10 +387,11 @@ def check(args):
     new = record(args, cfg, exp, qs, rows, mode, time.perf_counter() - t0, "check", "check", 1)
     print(f"\n재현 점검: {old['run_id']}\n| 항목 | 그때 | 지금 | |\n|---|---|---|---|")
     pairs = [("설정 지문", old["settings_hash"], new["settings_hash"]), ("설정 파일", old["experiment"]["file_sha"], new["experiment"]["file_sha"])]
-    names = {"code_hash": "코드 지문", "code_commit": "코드 커밋 (참고: squash 병합 뒤엔 달라도 됨)", "code_dirty": "커밋 안 한 수정",
+    names = {"code_hash": "엔진 코드 지문", "eval_code_hash": "채점 코드 지문 (참고: eval/run.py)",
+             "code_commit": "코드 커밋 (참고: squash 병합 뒤엔 달라도 됨)", "code_dirty": "커밋 안 한 수정",
              "eval_commit": "평가셋 커밋 (참고)", "questions_hash": "문항 지문", "index": "색인 지문",
              "retrieval_used": "검색", "python": "파이썬", "packages": "패키지"}
-    pairs += [(names[k], old["env"][k], new["env"][k]) for k in names]
+    pairs += [(names[k], old["env"].get(k), new["env"].get(k)) for k in names]
     for name, a, b in pairs:
         print(f"| {name} | {a} | {b} | {'같음' if a == b else '다름'} |")
     m0, m1 = old["metrics"], new["metrics"]
@@ -474,6 +482,10 @@ def selftest():
     m = summarize(rows[:3] + [grade(trap_q, ok, tr(), 1, None, cfg)], "full", 6)
     assert m["weighted"] == round(900 / 11, 1) and m["causes"] == {TRAP_ANSWERED: 1}
     assert nearest_rank(list(range(1, 101)), 0.95) == 95
+    m.pop("causes")                     # holdout 요약(틀린 원인 없음)도 화면에 낼 수 있어야 한다
+    show({"run_id": "selftest", "args": {"split": "holdout", "mode": "full"}, "settings": cfg, "metrics": m,
+          "env": {"retrieval_used": ["hybrid"], "code_commit": "-", "code_dirty": False, "eval_commit": "-"},
+          "cost_usd": 0.0, "calls": 0, "wall_sec": 0.0})
 
     old = upstage._client, upstage.has_key
     upstage._client, upstage.has_key = _Fake(), lambda: True

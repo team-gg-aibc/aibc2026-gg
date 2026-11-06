@@ -96,7 +96,7 @@ def leaderboard(gs, n_runs):
     tables = sorted({g["table"] for g in full}, key=lambda t: (t[0] != "dev", t[1] or 0, t[0]))
     for t in tables:
         rows = sorted([g for g in full if g["table"] == t], key=lambda g: -(g["m"]["weighted"] or 0))
-        bases = [g for g in rows if g["name"] == "baseline"]
+        bases = sorted((g for g in rows if g["name"] == "baseline"), key=lambda g: g["created"])  # 오래된 것 → 최근 것
         band, band_note = noise(gs, t)
         out += [f"### {label(rows[0])} (문항 지문 `{t[3]}`)", "",
                 f"흔들림 폭: {num(band, '점')}{band_note}", "",
