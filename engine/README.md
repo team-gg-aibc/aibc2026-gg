@@ -65,7 +65,8 @@ PowerShell 기준이다.
 |---|---|
 | 한 문항 돌려 보기 (응답 + 판단 기록) | `.venv/bin/python -m engine.pipeline "경차 주차요금 할인돼요?"` |
 | 설정 파일로 한 문항 | `.venv/bin/python -m engine.pipeline "질문" eval/configs/baseline.json` |
-| 채점 API 서버 | `ENGINE_CONFIG=eval/configs/baseline.json .venv/bin/uvicorn engine.server:app --port 8000` |
+| 채점 API 서버 | `ENGINE_CONFIG=eval/configs/baseline.json .venv/bin/uvicorn engine.server:app --port 8000` (워커 하나. 문항마다 판단 기록 한 줄이 `logs/server-날짜.jsonl`에 남는다, git에 안 올림) |
+| 출력 규격 스스로 시험 (키 없이, 10초, CI에서도 돈다) | `.venv/bin/python -m engine.contract --selftest` |
 | 색인 다시 만들기 (조각 글을 바꿨을 때) | `.venv/bin/python -m engine.build_index` (키가 있어야 임베딩까지 만든다) |
 | 별표 다시 읽기 (거의 안 씀) | `.venv/bin/python -m engine.parse_annex` (키 필요, Document Parse 비용) |
 
@@ -125,7 +126,7 @@ PowerShell 기준이다.
 
 | 칸 | 뜻 |
 |---|---|
-| `reason` | 확인 불가를 낸 까닭: `점수 낮음`(검증 ①) · `found 거짓` · `근거 번호 없음` · `판정 거절`(검증 ②) · `오류`. 답했으면 `null` |
+| `reason` | 확인 불가를 낸 까닭: `점수 낮음`(검증 ①) · `found 거짓` · `근거 번호 없음` · `판정 거절`(검증 ②) · `오류` · `시간 초과`(마감 시각 = 받은 때 + `timeout_sec`가 지남, #22). 답했으면 `null` |
 | `error` | 오류 종류. 바깥 서비스 오류는 종류와 상태 번호만 남긴다(메시지에 키 일부가 섞일 수 있어서) |
 | `retrieval` · `candidates` | 실제로 쓴 검색(`hybrid` · `keyword`)과 후보 라벨 · 점수(혼합 · 키워드 · 의미) |
 | `evidence_ids` · `draft` · `verdict` | 모델이 고른 근거 번호, 판정 전 답, 판정 |

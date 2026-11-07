@@ -25,3 +25,6 @@ engine/data/annex_files/
 
 # 점수 틀: 문항별 결과(요약은 eval/runs/에 남기고 남길 것만 커밋)
 eval/results/
+
+# 채점 서버: 문항별 판단 기록(engine/server.py)
+logs/
