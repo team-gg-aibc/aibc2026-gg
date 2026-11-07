@@ -27,6 +27,8 @@ SPARE = "예비"
 SINCE = "2026-11-07T16:00:00Z"
 # 판정이 남지 않은 「가져감」과 PR에 아직 안 남긴 「회수」는 한 시간 안의 것만 처리한다(병합 전 · 실패한 실행의 일을 뒤늦게 되짚지 않게).
 FRESH = dt.timedelta(hours=1)
+# 「가져감」 댓글과 스스로 담당 지정을 잇달아(1분 안) 하면 한 번 가져가기로 본다(양식 「「가져감」 댓글 + 자기 담당」대로 한 경우).
+PAIR = dt.timedelta(minutes=1)
 KST = dt.timezone(dt.timedelta(hours=9))
 # 2일 주기 (첫날, 둘째 날 = 마감). docs/schedule.md 「엔진 실험 주기」 · GG비서 CYCLES와 같다.
 CYCLES = [((11, 7), (11, 8)), ((11, 9), (11, 10)), ((11, 11), (11, 12)), ((11, 13), (11, 14)), ((11, 15), (11, 16))]
@@ -87,7 +89,7 @@ def report_kinds(body):
 def replay(events, judge=None):
     """기록을 차례로 다시 놓아 (맞는 담당, 남길 안내, 한 번이라도 맞는 담당이었던 사람)을 낸다. 같은 기록이면 몇 번을 돌려도 같은 답이다.
     judge(who, at, key)는 판정이 아직 남지 않은 「가져감」을 판정해 (받나, 안내)를 낸다. 없으면 받는다(PR 검사에서 읽기만 할 때)."""
-    owners, spare, notes, ever = [], False, [], set()
+    owners, spare, notes, ever, refused = [], False, [], set(), {}
     marks = "\n".join(said(events))
     for e in events:
         kind, actor, at = e.get("event"), login(e.get("actor")), e.get("created_at", "")
@@ -125,14 +127,18 @@ def replay(events, judge=None):
                 notes.append(TAKEN.format(who=claimer, owners=mention(owners)))
             elif not spare:
                 notes.append(NOT_SPARE.format(who=claimer))
-            elif f"<!-- claims:no:{key} -->" not in marks:  # 앞서 거절한 「가져감」은 그대로 거절
-                took, note = True, None
-                if judge and f"<!-- claims:check:{key} -->" not in marks:
+            elif claimer in refused and refused[claimer][1] != kind and when(at) - when(refused[claimer][0]) <= PAIR:
+                pass  # 방금 끝 보고가 없어 거절한 가져가기의 짝(댓글 ↔ 스스로 지정)이라 같이 거절하고 안내는 한 번
+            else:
+                took, note = f"<!-- claims:no:{key} -->" not in marks, None  # 앞서 거절한 「가져감」은 그대로 거절
+                if took and judge and f"<!-- claims:check:{key} -->" not in marks:
                     took, note = judge(claimer, at, key)
                 if note:
                     notes.append(note)
                 if took:
                     owners = [claimer]
+                else:
+                    refused[claimer] = (at, kind)
         ever.update(owners)
     return owners, notes, ever
 
@@ -395,6 +401,15 @@ def selftest():
     for report in (says(B, "**[보고] 끝**", "2026-11-09T08:00:00Z"), says(A, "**[보고] 끝**", "2026-11-09T09:05:00Z")):
         api = run(Fake({1: [spare, says(A, "가져감")], 22: [report]}, {1: [], 22: [A]}, bodies=due), name="issue_comment")
         assert api.assignees[1] == [] and api.posts[0].startswith(NO_REPORT.format(who=A, n=22))
+    # 양식대로 「가져감」 댓글 + 스스로 담당 지정을 잇달아 했는데 끝 보고가 없으면: 둘 다 거절, 안내는 한 번
+    api = run(Fake({1: [spare, says(A, "가져감"), got(A, A, "2026-11-09T09:00:01Z")]}, {1: [A], 22: [A]}, bodies=due))
+    assert (api.assignees[1], len(api.posts), api.posts[0].count("claims:no:")) == ([], 1, 1) and len(run(api).posts) == 1
+    # 짝은 1분 안의 다른 종류만: 끝 보고를 올리고 다시 쓴 「가져감」(같은 종류) · 1분 넘어 한 스스로 지정은 새로 판정
+    for retry, report_at in ((says(A, "가져감", "2026-11-09T09:00:40Z"), "2026-11-09T09:00:20Z"),
+                             (got(A, A, "2026-11-09T09:02:00Z"), "2026-11-09T09:01:30Z")):
+        api = run(Fake({1: [spare, says(A, "가져감")]}, {1: [], 22: [A]}, bodies=due), name="issue_comment")
+        api.events[22], api.events[1] = [says(A, "**[보고] 끝**", report_at)], api.events[1] + [retry]
+        assert (run(api).assignees[1], len(api.posts)) == ([A], 1)
     api = claim([22], ["**[보고] 시작**", "**[보고] 세션 끝**"])  # 「세션 끝」은 끝 보고가 아니다
     assert api.assignees[1] == [] and len(api.posts) == 1 and api.posts[0].startswith(NO_REPORT.format(who=A, n=22))
     api.assignees[22] = [PM]  # 거절은 한 번 판정으로 남는다(그 뒤 A의 실험이 PM에게 넘어가도)
