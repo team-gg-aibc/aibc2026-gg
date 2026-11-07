@@ -16,6 +16,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  statuses: write  # 「회수」 때 그 이슈의 열린 PR 커밋에 실패 상태(claims · 회수)를 단다
 
 jobs:
   claims:
@@ -38,7 +39,7 @@ jobs:
       - name: 검사기 자체 시험
         run: python3 .github/scripts/claims.py --selftest
 
-      - name: 담당 맞추기 · PR 검사
+      - name: 담당 맞추기 · 끝 보고 확인 · 회수를 PR에 · PR 검사
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 .github/scripts/claims.py
