@@ -180,7 +180,7 @@ def main(api, name, event):
 
 
 def selftest():
-    A, B, C = "KIMDONGWOOK-KR1", "ParkjongE", "geonyeong325"
+    A, B, C = "member-a", "member-b", "member-c"
 
     def ev(kind, actor, at="2026-11-09T09:00:00Z", **x):
         return {"event": kind, "actor": {"login": actor}, "created_at": at, **x}
