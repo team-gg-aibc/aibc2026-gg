@@ -1,0 +1,14 @@
+{
+  "name": "24-top6-direct",
+  "issue": "#24",
+  "cycle": 1,
+  "note": "① 후보 6개를 점수 순 · 같은 조 묶어 보여 주고 v2 프롬프트로 고르기",
+  "engine": {
+    "explore": true,
+    "timeout_sec": 300,
+    "top_k": 6,
+    "answer_prompt": "v2",
+    "group_by_article": true,
+    "select_mode": "direct"
+  }
+}
