@@ -1,0 +1,1 @@
+{"name": "23-head", "issue": "#23", "cycle": 1, "note": "항이 없는 조 조각에 머리말", "engine": {"explore": true, "timeout_sec": 300, "use_embedding": false, "chunk_article_head": true}}

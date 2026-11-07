@@ -1,0 +1,1 @@
+{"name": "23-items", "issue": "#23", "cycle": 1, "note": "호 단위 조각 더하기(호 5개 이상)", "engine": {"explore": true, "timeout_sec": 300, "use_embedding": false, "chunk_item_split": true}}

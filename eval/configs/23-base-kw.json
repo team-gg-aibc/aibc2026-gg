@@ -1,0 +1,1 @@
+{"name": "23-base-kw", "issue": "#23", "cycle": 1, "note": "끈 판(출발 판 색인) 키워드 검색만", "engine": {"explore": true, "timeout_sec": 300, "use_embedding": false}}

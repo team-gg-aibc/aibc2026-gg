@@ -35,7 +35,11 @@ DEFAULTS = {
     "timeout_sec": 75,               # 넘으면 확인 불가로 답한다 (대회 제한 90초)
     "explore": False,                # 탐색 모드(1~3주기): 90초 넘어도 점수에서 빼지 않고 시간은 기록만. 상한은 timeout_sec(탐색 설정은 300)
     # ---- #22 출력 규격 강제 (동욱) ----
-    # ---- #23 조각 다듬기 (건영) ----
+    # ---- #23 조각 다듬기 (건영) ---- 켠 스위치마다 색인 이름에 「+이름」이 붙는다(index_unit). 모두 꺼야 출발 판 색인
+    "chunk_strip_tags": False,       # 개정 꼬리표를 떼어 조각의 tags 칸에 보관 + 본문이 「삭제」뿐인 항 조각 빼기
+    "chunk_article_head": False,     # 항이 없는 조 조각에도 「[조례 이름 제N조(제목)]」 머리말
+    "chunk_item_split": False,       # 호가 여럿인 항 · 조에 호 단위 조각을 더함(라벨은 항 그대로, 검색 결과에서 같은 라벨은 하나로)
+    "chunk_annex_rows": False,       # 별표 표를 행 단위 조각으로, 행마다 머리글 되풀이
     # ---- #24 후보 넓히기 (종희) ----
     # ---- #25 질문 분석 게이트 (동욱) ----
     # ---- #26 질문 다듬기 (건영) ----
@@ -56,6 +60,14 @@ def load(path=None):
             raise ValueError(f"{path}: config.py DEFAULTS에 없는 칸 {unknown} (오타인지, 스위치를 DEFAULTS에 더했는지 확인)")
         cfg.update(over)
     return cfg
+
+
+SWITCH_UNITS = {"chunk_strip_tags": "tags", "chunk_article_head": "head", "chunk_item_split": "items", "chunk_annex_rows": "rows"}
+
+
+def index_unit(cfg):
+    """설정이 읽을 색인 이름: chunk_unit에 켠 #23 스위치를 붙인다(전부 끄면 출발 판 `paragraph` 그대로)."""
+    return cfg["chunk_unit"] + "".join("+" + n for k, n in SWITCH_UNITS.items() if cfg.get(k))
 
 
 def digest(obj, n=12):

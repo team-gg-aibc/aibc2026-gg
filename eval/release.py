@@ -109,7 +109,7 @@ def dirty():
 
 # ---- ② API 연기 시험 · ④ 계약 점검 ----
 def labels_of(cfg):
-    return {c["label"] for c in json.loads((config.DATA / f"chunks_{cfg['chunk_unit']}.json").read_text(encoding="utf-8"))}
+    return {c["label"] for c in json.loads((config.DATA / f"chunks_{config.index_unit(cfg)}.json").read_text(encoding="utf-8"))}
 
 
 def violations(resp, labels):

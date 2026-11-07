@@ -70,13 +70,13 @@ def bm25(query, docs, df, avg, k1=1.2, b=0.75):
 
 def mode(cfg):
     """이번 실행에서 실제로 쓰는 검색: hybrid(의미 + 키워드) 또는 keyword."""
-    vecs = load(cfg["chunk_unit"])[1]
+    vecs = load(config.index_unit(cfg))[1]
     return "hybrid" if cfg["use_embedding"] and vecs is not None and upstage.has_key() else "keyword"
 
 
 def retrieve(question, cfg, calls=None, k=None):
     """상위 k개 조각(점수 높은 순). 점수가 같으면 조각 번호가 작은 쪽이 앞(어느 컴퓨터에서나 같은 순서)."""
-    chunks, vecs, stale, docs, df, avg = load(cfg["chunk_unit"])
+    chunks, vecs, stale, docs, df, avg = load(config.index_unit(cfg))
     kw = bm25(question, docs, df, avg)
     kw_norm = kw / kw.max() if kw.max() > 0 else kw
     if mode(cfg) == "hybrid":
@@ -88,6 +88,10 @@ def retrieve(question, cfg, calls=None, k=None):
         score = w * cos + (1 - w) * kw_norm
     else:
         cos, score = None, kw_norm
-    idx = np.argsort(-score, kind="stable")[:k or cfg["top_k"]]
+    idx = np.argsort(-score, kind="stable")
+    if cfg["chunk_item_split"] or cfg["chunk_annex_rows"]:  # 호 · 행 조각은 라벨이 같아서 가장 높은 하나만 남긴다
+        seen = set()
+        idx = [i for i in idx if not (chunks[i]["label"] in seen or seen.add(chunks[i]["label"]))]
+    idx = idx[:k or cfg["top_k"]]
     return [{**chunks[i], "score": float(score[i]), "kw": float(kw_norm[i]),
              "cos": float(cos[i]) if cos is not None else None} for i in idx]

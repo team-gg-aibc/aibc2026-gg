@@ -1,0 +1,1 @@
+{"name": "23-rows", "issue": "#23", "cycle": 1, "note": "별표 표 행 단위 조각 + 머리글 되풀이", "engine": {"explore": true, "timeout_sec": 300, "use_embedding": false, "chunk_annex_rows": true}}

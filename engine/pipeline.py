@@ -83,7 +83,7 @@ def answer(question, cfg=None):
           "switches": {k: v for k, v in cfg.items() if config.DEFAULTS.get(k) != v},
           "models": {"chat": cfg["chat_model"], "embed_query": cfg["embed_query"]},
           "prompts": {"answer": cfg["answer_prompt"], "verify": cfg["verify_prompt"]},
-          "index": _index(cfg["chunk_unit"])}
+          "index": _index(config.index_unit(cfg))}
     t0 = time.perf_counter()
     for name, fn in STAGES:
         t, n = time.perf_counter(), len(st["calls"])

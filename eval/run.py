@@ -299,7 +299,7 @@ def record(args, cfg, exp, qs, rows, mode, wall, run_id, group, rep):
                 "eval_commit": git("log", "-1", "--format=%h", "--", "eval/questions_*.json", "eval/stress_*.json",
                                    "eval/kit_questions.json"),
                 "questions_hash": config.digest([[q["id"], q["type"], q["question"], q["gold"]] for q in qs]),
-                "index": retrieve.fingerprint(cfg["chunk_unit"]), "retrieval_used": retrieval_used,
+                "index": retrieve.fingerprint(config.index_unit(cfg)), "retrieval_used": retrieval_used,
                 "key_present": upstage.has_key(), "server": server, "python": platform.python_version(),
                 "packages": {p: version(p) for p in ("numpy", "openai", "requests")},
                 "platform": platform.platform(terse=True)},

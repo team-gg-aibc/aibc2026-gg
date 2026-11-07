@@ -1,0 +1,1 @@
+{"name": "23-tags", "issue": "#23", "cycle": 1, "note": "꼬리표 떼기 + 삭제된 항 조각 빼기", "engine": {"explore": true, "timeout_sec": 300, "use_embedding": false, "chunk_strip_tags": true}}
