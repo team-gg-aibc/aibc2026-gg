@@ -1,0 +1,44 @@
+name: claims
+
+# 가져간 이슈는 PM이 「회수」하기 전까지 담당만 손댄다(docs/work-method.md 1절 「일찍 끝나면」 · 5절, 동규 11-08).
+# 무료 플랜 비공개 레포라 브랜치 보호 · 룰셋을 못 써서(API 403), 서버에서 담당을 되돌리고 PR 검사 claims로 알린다. 규칙은 .github/scripts/claims.py.
+# issues · issue_comment는 main에 병합된 이 파일로만 돈다. pull_request는 PR 쪽 파일로 돈다.
+# Actions 분을 아낀다(비공개 레포 무료 플랜 월 2,000분, job마다 1분 올림, 건너뛴 job은 0분): 이슈는 담당이 바뀔 때만, 댓글은 「가져감」 · 「회수」로 시작할 때만 돈다.
+on:
+  issues:
+    types: [assigned, unassigned]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, reopened, edited, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  claims:
+    name: claims
+    # PM(Lumiere001, claims.py의 PM과 같게)이 바꾼 담당은 그대로 두니 돌지 않는다. PR에 단 댓글도 돌지 않는다.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issues' && github.event.sender.login != 'Lumiere001') ||
+      (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
+      (startsWith(github.event.comment.body, '가져감') || startsWith(github.event.comment.body, '회수')))
+    runs-on: ubuntu-latest
+    # 같은 이슈 · PR의 이벤트는 하나씩 차례로 처리한다(거의 동시에 온 두 「가져감」도 기록을 다시 읽어 먼저 쓴 한 명만 남게).
+    # 기다리는 실행은 하나만 남고 그 사이 것은 취소되지만, 남은 실행이 기록 전체로 담당을 맞추고 빠진 안내도 단다.
+    concurrency:
+      group: claims-${{ github.event.issue.number || github.event.pull_request.number }}
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 검사기 자체 시험
+        run: python3 .github/scripts/claims.py --selftest
+
+      - name: 담당 맞추기 · PR 검사
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/claims.py
