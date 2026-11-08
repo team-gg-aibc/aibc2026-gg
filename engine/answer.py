@@ -86,12 +86,15 @@ def group_by_article(hits):
 
 
 def prefilter(question, hits, cfg, calls=None):
-    """방식 ②: 관련 있는 후보만 점수 순으로 prefilter_keep개까지. 하나도 안 고르면 원래 순서의 앞 prefilter_keep개."""
+    """방식 ②: 관련 있는 후보만 점수 순으로 prefilter_keep개까지.
+    하나도 안 고르면 prefilter_empty_abstain이 True일 때 빈 목록(→ 확인 불가), 아니면 원래 순서의 앞 prefilter_keep개."""
     raw = upstage.chat(
         [{"role": "system", "content": PREFILTER_PROMPT},
          {"role": "user", "content": f"[후보]\n{context(hits)}\n\n[질문]\n{question}"}],
         cfg, calls, response_format=PREFILTER_SCHEMA)
     ids = sorted({i for i in json.loads(raw).get("relevant_ids", []) if 1 <= i <= len(hits)})
+    if not ids and cfg["prefilter_empty_abstain"]:
+        return []
     keep = [hits[i - 1] for i in ids] or list(hits)
     return keep[:cfg["prefilter_keep"]]
 
@@ -137,6 +140,8 @@ def select_and_write(question, hits, cfg, calls=None):
     판단 기록의 후보(candidates)와 번호가 맞게 되돌린다. 모델이 낸 번호는 보여 준 목록 범위 안의 것만 쓴다.
     """
     view = shown(question, hits, cfg, calls)
+    if not view:   # ② 추리기가 관련 후보 없음이라고 했다(prefilter_empty_abstain) → 답을 쓰지 않고 확인 불가
+        return {"found": False, "answer": "", "evidence_ids": [], "used": []}
     raw = upstage.chat(
         [{"role": "system", "content": PROMPTS[cfg["answer_prompt"]]},
          {"role": "user", "content": f"[근거]\n{context(view)}\n\n[질문]\n{question}"}],
