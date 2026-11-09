@@ -329,7 +329,7 @@ def render(recs):
         out += ["", f"## {r['tag']} · {r['cycle']}주기 ({r['created'][:10]})", "",
                 f"- **판정: {verdict(r)}**",
                 "- 들어간 실험: " + ("; ".join(f"{link(e)} ({e['cycle']}주기, {switches(e['switches'])})" for e in r["experiments"])
-                                  or "없음. 출발 판(`engine/config.py` DEFAULTS) 그대로다"),
+                                  or "없음. 출발 판(그때의 `engine/config.py` DEFAULTS, 지금은 `eval/configs/start.json`) 그대로다"),
                 f"- 설정: `{r['config']}` · 설정 지문 `{r['settings_hash']}` · 출발 판과 다른 칸: {switches(r['engine'])}",
                 f"- 점수({r['label']} 두 번, 실행 {' · '.join(f'`{x}`' for x in r['runs'])}): 가중 "
                 f"{' · '.join(board.num(w) for w in r['weighted'])} → 평균 **{board.num(r['mean'])}** · "

@@ -13,14 +13,14 @@ python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt
 - 내 컴퓨터가 팀과 같은 결과를 내는지 먼저 본다(키 없이, 크레딧 0, 2초):
 
 ```bash
-python3 eval/run.py --check eval/runs/20261106-201622-baseline-dev.json
+python3 eval/run.py --check eval/runs/20261110-021505-start-dev.json
 ```
 
-「✅ 같은 결과」가 나오면 된다. 「다름」이면 표에서 「다름」인 항목부터 맞춘다(7절).
+「✅ 같은 결과」가 나오면 된다. 「다름」이면 표에서 「다름」인 항목부터 맞춘다(7절). 이 기준 실행은 출발 판을 고정한 `eval/configs/start.json`으로 잰 것이다(11-06 기준 실행 `20261106-201622-baseline-dev`와 문항마다 같은 후보, 11/10부터 이것을 쓴다).
 
 ## 2. 실험 하나 = 설정 파일 하나
 
-`eval/configs/<이슈 번호>-<짧은 이름>.json`을 만든다. `engine` 칸에는 출발 판(`engine/config.py`의 `DEFAULTS`)에서 **바꿀 값만** 쓴다.
+`eval/configs/<이슈 번호>-<짧은 이름>.json`을 만든다. `engine` 칸에는 끈 판(`engine/config.py`의 `DEFAULTS`, 지금 main의 판)에서 **바꿀 값만** 쓴다.
 
 ```json
 {"name": "24-top20", "issue": "#24", "cycle": 1, "note": "후보 20개에서 고르기", "engine": {"explore": true, "timeout_sec": 300, "top_k": 20}}
@@ -30,9 +30,10 @@ python3 eval/run.py --check eval/runs/20261106-201622-baseline-dev.json
 - **탐색 모드(1~3주기)**: `"explore": true, "timeout_sec": 300`을 켠다(바탕 설정 `eval/configs/explore.json`을 복사해 쓰면 된다). 90초를 넘어도 점수에서 빼지 않고 시간은 단계별로 기록만 한다. 문항당 300초가 넘으면 확인 불가로 친다. 리더보드에는 실험 이름 뒤에 「(탐색)」이 붙는다. 수렴 주기(4~5)부터는 두 칸을 빼서 대회 조건(75초에 확인 불가, 90초 넘으면 0점)으로 잰다.
 
 - 실험을 바꾸는 숫자 · 스위치 · 프롬프트 판은 모두 설정 파일에 둔다. 코드에 직접 박은 값은 결과 파일에 남지 않아 나중에 무엇을 바꿨는지 알 수 없다.
-- 새 스위치는 `engine/config.py` DEFAULTS의 자기 이슈 절(`# ---- #이슈 …`)에 **출발 판과 같은 동작**을 기본값으로 더하고, 설정 파일에서 켠다. 설정 파일에 DEFAULTS에 없는 칸이 있으면 실행이 멈춘다(오타로 조용히 출발 판이 도는 일을 막는다).
+- 새 스위치는 `engine/config.py` DEFAULTS의 자기 이슈 절(`# ---- #이슈 …`)에 **지금 동작 그대로(끈 상태)**를 기본값으로 더하고, 설정 파일에서 켠다. 설정 파일에 DEFAULTS에 없는 칸이 있으면 실행이 멈춘다(오타로 조용히 끈 판이 도는 일을 막는다).
 - 프롬프트는 고쳐 쓰지 않고 새 판을 더한다(`engine/answer.py`의 `PROMPTS["v2"]` 등). 설정에서 `"answer_prompt": "v2"`로 고른다. 예시 문항(few-shot)은 평가셋에서 가져오지 않는다(점수가 부풀려진다).
-- 출발 판의 설정 파일은 `eval/configs/baseline.json`이다. 「끈 판」은 이것으로 잰다.
+- 「끈 판」의 설정 파일은 `eval/configs/baseline.json`이다. DEFAULTS 그대로라 지금 main의 판이다. 배분일에 채택한 실험의 스위치를 DEFAULTS에 켜면 다음 주기의 끈 판이 그 판이 된다(1주기 #22 · #24, 11/10).
+- 출발 판(0주기, rc-c0과 같은 동작)은 `eval/configs/start.json`이 고정해 둔다. **DEFAULTS를 바꾸는 PR은 바꾼 칸의 예전 값을 `start.json`에 더한다.** 그래야 1절 재현 점검이 늘 같은 판을 다시 잰다.
 
 ## 3. 재는 순서
 
@@ -61,7 +62,7 @@ python3 eval/run.py --check eval/runs/20261106-201622-baseline-dev.json
 |---|---|
 | 코드: 커밋, 엔진 코드 지문(`engine/`의 파이썬 파일과 `requirements.txt` 글자의 해시, squash 병합 뒤에도 같음), 채점 코드 지문(`eval/run.py`), 커밋 안 한 수정이 있었나(`engine/` · `eval/run.py` · 설정 파일) | `env.code_commit` · `env.code_hash` · `env.eval_code_hash` · `env.code_dirty` |
 | 평가셋: 마지막으로 바뀐 커밋, 실제로 잰 문항의 지문(id · 유형 · 질문 · 정답 조항) | `env.eval_commit` · `env.questions_hash` |
-| 설정 전체(모델 이름 · 숫자 · 스위치 · 프롬프트 판), 설정 지문, 출발 판과 다른 칸, 설정 파일 지문 | `settings` · `settings_hash` · `switches` · `experiment` |
+| 설정 전체(모델 이름 · 숫자 · 스위치 · 프롬프트 판), 설정 지문, 끈 판(DEFAULTS)과 다른 칸, 설정 파일 지문 | `settings` · `settings_hash` · `switches` · `experiment` |
 | 색인 지문(조각 · 임베딩 파일 해시), 실제로 쓴 검색(hybrid · keyword), 키가 있었나 | `env.index` · `env.retrieval_used` · `env.key_present` |
 | 파이썬 · 패키지 판 · 운영체제 | `env.python` · `env.packages` · `env.platform` |
 | 날짜(KST) · 걸린 시간 · 호출 수 · 토큰 · 비용 | `created` · `wall_sec` · `calls` · `tokens` · `cost_usd` |
