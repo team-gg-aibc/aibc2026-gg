@@ -86,7 +86,8 @@ def selftest():
 
     from . import config, server, upstage
 
-    cfg = dict(config.load(), exit_check=True, max_citations=4)
+    # 가짜 업스테이지는 답 쓰기 한 번(근거 번호 고르기)만 흉내 낸다. DEFAULTS에 채택 실험이 켜져도 그 길로 시험한다(#24 먼저 추리기는 끔).
+    cfg = dict(config.load(), exit_check=True, max_citations=4, select_mode="direct")
     labels = list(sources(cfg["chunk_unit"]))
     a, b, c, d, e = labels[:5]
     url, date = sources(cfg["chunk_unit"])[a]

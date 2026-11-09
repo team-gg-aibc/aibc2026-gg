@@ -1,0 +1,134 @@
+{
+ "run_id": "20261109-173257-23-final-dev-r2",
+ "group": "20261109-173257-23-final-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-09T19:31:05+09:00",
+ "experiment": {
+  "name": "23-final",
+  "issue": "#23",
+  "note": "꼬리표 · 머리말 · 호 · 별표 행 네 스위치 모두(혼합 검색)",
+  "cycle": 1,
+  "file": "eval/configs/23-final.json",
+  "file_sha": "adeee655f10a"
+ },
+ "conclusion": "보류 — 검색은 나아졌지만(dev 혼합 적중률 82.8→84.3%, 정답이 후보에 없음 112→100) 가중 점수는 흔들림 안(두 번 평균 69.2→68.8)이고 함정 95.2→94.0, 과잉 포기 25.9→28.2%로 채택 기준(함정 −1점 이내, 과잉 포기 +1점 이내)에 못 미친다",
+ "lesson": [
+  "좋아짐: 정답이 후보에 없음 −12(결합 +2.7). 나빠짐: 단순 −3.2, 후보에 있는데 잘못 고름 +6, 함정에 답함 +3(두 번째 판 기준)",
+  "후보가 좋아져도 점수가 안 오른 것은 병목이 판정이 맞는 답을 거절하는 단계(100문항 안팎)라서로 보인다. 호 조각이 늘어 비슷한 조항이 함정에도 걸렸을 수 있다(확인 못 함)",
+  "스위치별로 끝까지 재서 함정 악화가 어느 것 탓인지 가르기(호 조각 추정), 판정 단계(#55)가 풀린 뒤 같은 색인으로 다시 재기, #26 · #28은 이 색인 위에서 잴지 PM이 정하기"
+ ],
+ "args": {
+  "config": "eval/configs/23-final.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 2
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_strip_tags": true,
+  "chunk_article_head": true,
+  "chunk_item_split": true,
+  "chunk_annex_rows": true
+ },
+ "settings_hash": "996824a235bc",
+ "switches": {
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_strip_tags": true,
+  "chunk_article_head": true,
+  "chunk_item_split": true,
+  "chunk_annex_rows": true
+ },
+ "env": {
+  "code_commit": "34073f2",
+  "code_hash": "019003ad5da2",
+  "eval_code_hash": "8b8d24c88de7",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:5f9ff5aa5d1a vectors:e20db3c921de",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.10",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-11"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 68.6,
+  "by_type": {
+   "단순": 69.8,
+   "조건": 69.2,
+   "결합": 52.1,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 74.6,
+   "bicycle": 68.5,
+   "common": 40.0,
+   "park": 53.3,
+   "parking": 59.0,
+   "smoking": 76.5,
+   "youth": 72.5
+  },
+  "over_abstain": 27.3,
+  "citations_per_answer": 1.6,
+  "retrieval_hit": 84.3,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.774,
+  "latency_p95": 5.053,
+  "latency_max": 10.466,
+  "causes": {
+   "판정이 맞는 답을 거절": 102,
+   "정답이 후보에 없음": 100,
+   "답이 있는데 확인 불가 (found 거짓)": 15,
+   "후보에 있는데 잘못 고름": 13,
+   "함정에 답함": 4,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2
+  }
+ },
+ "cost_usd": 0.2896,
+ "tokens": {
+  "in": 801992,
+  "cached": 59840,
+  "out": 60655
+ },
+ "calls": 1901,
+ "wall_sec": 1000.6,
+ "hashes": {
+  "retrieval": "bbdcab7d5c5a",
+  "answers": "0e0bbf46da30"
+ }
+}

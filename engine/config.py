@@ -1,6 +1,7 @@
 """엔진 설정 한곳. 실험 하나 = 설정 파일 하나(`eval/configs/<이름>.json`).
 
-- DEFAULTS가 출발 판이다(스타터 킷 그대로 + 없어진 groundedness-check 대신 solar-pro4 판정).
+- DEFAULTS가 지금 main의 판이다: 출발 판(스타터 킷 그대로 + 없어진 groundedness-check 대신 solar-pro4 판정) 위에
+  배분일마다 채택한 실험의 스위치를 켠다(1주기 #22 · #24, 11/10). 끈 판(`eval/configs/baseline.json`)은 DEFAULTS 그대로다.
   설정 파일은 바꿀 값만 `engine` 칸에 적는다. 모르는 칸이 있으면 멈춘다(오타로 실험이 조용히 출발 판이 되지 않게).
 - 이슈마다 아래 자기 절(주석)에만 줄을 더한다. 새 스위치의 기본값은 「출발 판과 같은 동작」으로 둔다.
 - 프롬프트는 고쳐 쓰지 않고 새 판 이름을 더한다(`answer.PROMPTS`, `verify.PROMPTS`). 설정에는 판 이름만 쓴다.
@@ -25,28 +26,28 @@ DEFAULTS = {
     "temperature": 0.0,
     "reasoning_effort": None,        # solar-pro4: None이면 추론 끔, "low" 이상이면 켬
     "chunk_unit": "paragraph",       # 색인 단위 (engine/data/chunks_<단위>.json)
-    "top_k": 6,                      # 검색 후보 수
+    "top_k": 20,                     # 검색 후보 수 (출발 판 6 → 1주기 채택 #24)
     "hybrid_cos_weight": 0.7,        # 혼합 점수 = 이 값 × 의미 점수 + (1 − 이 값) × 키워드 점수
     "use_embedding": True,           # False면 키워드 검색만 (키가 없어도 키워드만 돈다)
     "use_verify": True,              # 검증 ① 점수 문턱 · ② solar-pro4 판정
     "min_score": 0.25,               # 1위 후보의 의미 점수가 이보다 낮으면 확인 불가
-    "answer_prompt": "v1",           # answer.PROMPTS의 판 이름
+    "answer_prompt": "v2",           # answer.PROMPTS의 판 이름 (출발 판 v1 → 1주기 채택 #24)
     "verify_prompt": "v1",           # verify.PROMPTS의 판 이름
     "timeout_sec": 75,               # 넘으면 확인 불가로 답한다 (대회 제한 90초)
     "explore": False,                # 탐색 모드(1~3주기): 90초 넘어도 점수에서 빼지 않고 시간은 기록만. 상한은 timeout_sec(탐색 설정은 300)
     # ---- #22 출력 규격 강제 (동욱) ----
-    "exit_check": False,             # 마지막 출구 검사: 어중간한 답 맞추기 · 색인 라벨만 · 겹침 빼기 · 링크 · 시행일은 첫 인용의 원문에서
-    "max_citations": None,           # 인용 개수 상한(exit_check가 켜졌을 때). None = 상한 없음(출발 판)
-    "retry_budget": False,           # 429 · 5xx · 시간 초과 · 연결 오류만, 간격을 늘리며 마감 안에서 재시도(SDK 자체 재시도 끔). False = 킷 그대로
-    "max_concurrent_calls": None,    # 업스테이지 동시 호출 수 상한(프로세스 전체). None = 제한 없음
+    "exit_check": True,              # (1주기 채택, 출발 판 False) 마지막 출구 검사: 어중간한 답 맞추기 · 색인 라벨만 · 겹침 빼기 · 링크 · 시행일은 첫 인용의 원문에서
+    "max_citations": 4,              # 인용 개수 상한(exit_check가 켜졌을 때). None = 상한 없음(출발 판) → 1주기 채택 4
+    "retry_budget": True,            # (1주기 채택, 출발 판 False) 429 · 5xx · 시간 초과 · 연결 오류만, 간격을 늘리며 마감 안에서 재시도(SDK 자체 재시도 끔). False = 킷 그대로
+    "max_concurrent_calls": 6,       # 업스테이지 동시 호출 수 상한(프로세스 전체). None = 제한 없음(출발 판) → 1주기 채택 6
     "on_deadline": "unknown",        # 마감이 지났을 때: "unknown" = 확인 불가(킷), "draft" = 판정 전 답이 있으면 그것
     # ---- #23 조각 다듬기 (건영) ----
     # ---- #24 후보 넓히기 (종희) ----  후보 수 자체는 위 top_k(실험 10 · 15 · 20)
-    "select_mode": "direct",         # "direct" = ① 후보를 그대로 주고 고르기 / "prefilter" = ② Solar 한 번으로 먼저 추린 뒤 답 쓰기
+    "select_mode": "prefilter",      # (1주기 채택, 출발 판 "direct") "direct" = ① 후보를 그대로 주고 고르기 / "prefilter" = ② Solar 한 번으로 먼저 추린 뒤 답 쓰기
     "prefilter_keep": 8,             # ②에서 추린 뒤 답 쓰기에 넘길 최대 후보 수(점수 순)
-    "prefilter_empty_abstain": False,  # ②에서 관련 후보가 하나도 없으면 True = 확인 불가로 끝냄 / False = 점수 순 앞 prefilter_keep개로 답 쓰기
+    "prefilter_empty_abstain": True,  # (1주기 채택, 출발 판 False) ②에서 관련 후보가 하나도 없으면 True = 확인 불가로 끝냄 / False = 점수 순 앞 prefilter_keep개로 답 쓰기
     "max_per_article": 0,            # 같은 조(제○조)의 항을 후보에 몇 개까지 둘지. 0 = 제한 없음(출발 판)
-    "group_by_article": False,       # True면 같은 조의 항을 한 덩어리로 묶어 보여 준다(덩어리 순서는 그 조의 가장 높은 점수 순)
+    "group_by_article": True,        # (1주기 채택, 출발 판 False) True면 같은 조의 항을 한 덩어리로 묶어 보여 준다(덩어리 순서는 그 조의 가장 높은 점수 순)
     # ---- #25 질문 분석 게이트 (동욱) ----
     # ---- #26 질문 다듬기 (건영) ----
     # ---- #27 조례 통째로 읽기 (종희) ----

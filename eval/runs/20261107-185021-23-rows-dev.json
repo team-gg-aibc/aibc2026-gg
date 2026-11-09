@@ -1,0 +1,111 @@
+{
+ "run_id": "20261107-185021-23-rows-dev",
+ "group": "20261107-185021-23-rows-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-07T18:50:25+09:00",
+ "experiment": {
+  "name": "23-rows",
+  "issue": "#23",
+  "note": "별표 표 행 단위 조각 + 머리글 되풀이",
+  "cycle": 1,
+  "file": "eval/configs/23-rows.json",
+  "file_sha": "6f3441d59289"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/23-rows.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "retrieval",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": false,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_strip_tags": false,
+  "chunk_article_head": false,
+  "chunk_item_split": false,
+  "chunk_annex_rows": true
+ },
+ "settings_hash": "4ee3fd111852",
+ "switches": {
+  "use_embedding": false,
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_annex_rows": true
+ },
+ "env": {
+  "code_commit": "cbe1d41",
+  "code_hash": "019003ad5da2",
+  "eval_code_hash": "8b8d24c88de7",
+  "code_dirty": true,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a4549d51781e vectors:없음",
+  "retrieval_used": [
+   "keyword"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.10",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-11"
+ },
+ "metrics": {
+  "n": 619,
+  "hit": {
+   "1": 41.1,
+   "3": 58.3,
+   "6": 70.5,
+   "10": 78.7,
+   "20": 87.0
+  },
+  "by_type": {
+   "단순": 73.2,
+   "조건": 72.0,
+   "결합": 61.2
+  },
+  "by_law": {
+   "animal": 71.2,
+   "bicycle": 68.2,
+   "common": 30.0,
+   "park": 65.9,
+   "parking": 73.0,
+   "smoking": 75.0,
+   "youth": 72.3
+  }
+ },
+ "cost_usd": 0.0,
+ "tokens": {
+  "in": 0,
+  "cached": 0,
+  "out": 0
+ },
+ "calls": 0,
+ "wall_sec": 3.6,
+ "hashes": {
+  "retrieval": "273050b386eb",
+  "answers": null
+ }
+}
