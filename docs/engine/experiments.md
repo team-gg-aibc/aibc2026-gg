@@ -1,6 +1,6 @@
 # 실험 기록
 
-> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 55개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
+> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 56개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
 
 - 실험마다 켠 판과 끈 판을 **같은 main 커밋 · 같은 문항**으로 같은 날 잰다(계획 5-2절). 「켠 스위치」는 출발 판(`engine/config.py` DEFAULTS)과 다른 설정이다.
 - **재는 법 기본값**: 채택 판단은 **dev 전체**로 하고, 켠 판 · 끈 판을 **각각 두 번 이상** 잰다(`python3 eval/run.py --config <설정> --split dev --repeat 2`). 100문항 표본은 빠른 확인용으로만 쓴다(흔들림이 2.5~4.9점이라 채택 판단에 쓰지 않는다). dev 전체 한 판은 약 10분, 기록 비용 약 $0.38이다. 실제 콘솔 차감은 그 6할쯤이라 한 판 약 $0.2다(11-06 기준).
@@ -24,6 +24,7 @@
 | 2026-11-07 | #21 | 5c70805 · 17f8cc2 | 출발 판 | baseline · dev 전체 · 661문항 · 2회 평균 | 70.1 | 69.1 | 46.8 | 90.5 | 67.2 | 27.1 | 1.54 | 4.5초 | $0.72 |  |  |
 | 2026-11-07 |  | e1f01ef · 17f8cc2 | 출발 판 | release-c0 · dev 전체 · 661문항 · 2회 평균 | 71.2 | 67.5 | 45.1 | 92.9 | 67.0 | 28.4 | 1.51 | 5.7초 | $0.67 | 릴리스 rc-c0 — ✅ 통과(docs/engine/releases.md) |  |
 | 2026-11-07 | #21 | fc36232 · 17f8cc2 | 출발 판 | baseline · dev 100문항 표본(씨앗 0) · 100문항 | 63.2 | 56.4 | 47.1 | 100.0 | 63.6 | 39.4 | 1.49 | 5.8초 | $0.07 |  |  |
+| 2026-11-10 | #21 | d39ab29 · 17f8cc2 | top_k=6, answer_prompt="v1", exit_check=false, max_citations=null, retry_budget=false, max_concurrent_calls=null, select_mode="direct", prefilter_empty_abstain=false, group_by_article=false | start · dev 전체 · 619문항 · 검색만(keyword) top-6 70.0 | 72.0 | 71.6 | 62.3 | — | — | — | — | — | $0.00 | 출발 판 고정(start.json) · 키 없이 키워드 검색 기준(재현 점검용, 11/10부터. DEFAULTS가 채택 판으로 바뀌어 11-06 기준 대신 씀) |  |
 
 ## 1주기 · 탐색 (11/7~11/8)
 
