@@ -38,7 +38,8 @@ HOLD = "claims · 회수"  # 「회수」 때 PR 커밋에 다는 실패 상태.
 
 TAKEN = "@{who} 이 일은 {owners} 님이 맡고 있어요. PM이 「회수」하기 전에는 가져갈 수 없어요."
 NOT_SPARE = "@{who} PM이 배정하는 이슈예요. 「예비」 라벨이 붙고 담당이 없는 이슈만 「가져감」으로 가져갈 수 있어요."
-NO_REPORT = "@{who} 맡은 실험 #{n}의 끝 보고를 먼저 올려 주세요. 끝 보고를 올린 사람만 예비를 가져가요(올린 뒤 「가져감」을 다시 써요)."
+NO_REPORT = ("@{who} {what} #{n}의 끝 보고를 먼저 올려 주세요. "
+             "예비는 끝 보고를 올린 사람이 한 번에 하나씩 가져가요(올린 뒤 「가져감」을 다시 써요).")
 NEED_PM = "@{who} 님을 담당으로 지정했어요. {issues}의 마감이나 끝 보고를 읽지 못해 PM 확인 필요예요 @" + PM + "."
 PM_ONLY = "@{who} 담당은 PM만 바꿀 수 있어서 되돌렸어요. 바꿔야 하면 이 이슈에 까닭을 쓰고 PM에게 알려 주세요."
 GIVE_BACK = "@{who} 담당을 스스로 빼면 되돌려요. 반납은 이 이슈에 까닭을 쓰고 PM에게 알려 주세요(PM이 「회수」하면 비워져요)."
@@ -144,8 +145,9 @@ def replay(events, judge=None):
 
 
 def end_report(api, now, n):
-    """이슈 n의 「가져감」 판정(1절 「일찍 끝나면」): 이번 주기에 맡은 실험(열림 · 예비 아님 · 마감이 이번 주기)마다
-    그 사람의 끝 보고가 있어야 받는다. 마감이나 보고를 못 읽으면 막지 않고 받은 뒤 PM 확인을 부른다.
+    """이슈 n의 「가져감」 판정(1절 「일찍 끝나면」): 이번 주기에 맡은 실험(열림 · 예비 아님 · 마감이 이번 주기)과
+    이미 가져간 다른 예비(예비는 한 사람이 하나씩, 동규 11-10)마다 그 사람의 끝 보고가 있어야 받는다.
+    마감이나 보고를 못 읽으면 막지 않고 받은 뒤 PM 확인을 부른다.
     거절 · PM 확인은 댓글 표시로 남아 다시 판정하지 않는다."""
     def judge(who, at, key):
         if who == PM or now - when(at) > FRESH:
@@ -155,7 +157,7 @@ def end_report(api, now, n):
         except urllib.error.URLError:
             missing, unclear = None, ["맡은 이슈 목록"]
         if missing:
-            return False, NO_REPORT.format(who=who, n=missing) + f" <!-- claims:no:{key} -->"
+            return False, NO_REPORT.format(who=who, what=missing[1], n=missing[0]) + f" <!-- claims:no:{key} -->"
         if unclear:
             return True, NEED_PM.format(who=who, issues=" · ".join(unclear)) + f" <!-- claims:check:{key} -->"
         return True, None
@@ -163,19 +165,22 @@ def end_report(api, now, n):
 
 
 def report_gaps(api, who, at, n):
-    """그 사람의 이번 주기 실험(가져가려는 이슈 n은 빼고) 가운데 끝 보고가 없는 첫 이슈 번호와, 마감을 못 읽은 이슈들(#번호)."""
+    """그 사람이 담당인 열린 이슈(가져가려는 n은 빼고) 가운데 「가져감」보다 먼저 끝 보고가 있어야 하는데 없는 첫 것
+    (번호, 「맡은 실험」 · 「가져간 예비」)과, 마감을 못 읽은 이슈들(#번호).
+    대상은 이번 주기에 마감인 실험과, 마감과 상관없이 이미 가져간 예비다."""
     day = when(at).astimezone(KST).date()
     cycle, unclear = cycle_of(day), []
     for it in api("GET", f"/issues?assignee={who}&state=open&per_page=100"):
-        if it["number"] == n or "pull_request" in it or SPARE in [lb["name"] for lb in it.get("labels") or []]:
+        if it["number"] == n or "pull_request" in it:
             continue
-        due = issue_due(it.get("body"), day.year)
-        if due is None:
+        spare = SPARE in [lb["name"] for lb in it.get("labels") or []]
+        due = None if spare else issue_due(it.get("body"), day.year)
+        if not spare and due is None:
             unclear.append(f"#{it['number']}")
-        elif cycle and cycle[0] <= due <= cycle[1] and not any(
+        elif (spare or (cycle and cycle[0] <= due <= cycle[1])) and not any(
                 e.get("event") == "commented" and login(e.get("actor")) == who and e.get("created_at", "") <= at
                 and "끝" in report_kinds(e.get("body")) for e in timeline(api, it["number"])):
-            return it["number"], unclear
+            return (it["number"], "가져간 예비" if spare else "맡은 실험"), unclear
     return None, unclear
 
 
@@ -371,6 +376,9 @@ def selftest():
     def taken(who, owner):
         return TAKEN.format(who=who, owners="@" + owner)
 
+    def no_report(who, n, what="맡은 실험"):
+        return NO_REPORT.format(who=who, what=what, n=n)
+
     # 가져가기: 성공 · 거절(담당 있음) · 거절(예비 아님) · 스스로 담당 지정 · 이미 자기 담당
     assert issue([spare, says(A, "가져감 — #22 끝 보고 올림")], []) == ([A], [])
     assert issue([spare, got(PM, A), says(B, "가져감")], [A]) == ([A], [taken(B, A)])
@@ -387,12 +395,12 @@ def selftest():
     assert (run(api).assignees[1], api.posts) == ([A], [taken(B, A)])
 
     # 끝 보고(1절 「일찍 끝나면」): 이번 주기에 맡은 실험(예비 아님 · 마감 11/9 ~ 11/10)마다 끝 보고가 있어야 가져간다
-    due = {22: "- 마감: 11/10(화) 24:00", 25: "- 마감: 11/10(화) 24:00", 31: "- 마감: 11/19(목) 24:00 (중간: 11/13(금) 18:00 빈 서버)",
+    due = {22: "- 마감: 11/10(화) 24:00", 25: "- 마감: 11/13(금) 18:00", 31: "- 마감: 11/19(목) 24:00 (중간: 11/13(금) 18:00 빈 서버)",
            40: "마감 줄이 없는 본문"}
 
-    def claim(mine, reports=(), who=A, at="2026-11-09T09:00:00Z", down=False):
-        """who가 예비 이슈 1에 「가져감」. mine = who가 맡은 다른 이슈, reports = who가 이슈 22에 단 보고(8시)."""
-        return run(Fake({1: [spare, says(who, "가져감", at)], 22: [says(who, r, "2026-11-09T08:00:00Z") for r in reports]},
+    def claim(mine, reports=(), who=A, at="2026-11-09T09:00:00Z", down=False, on=22):
+        """who가 예비 이슈 1에 「가져감」. mine = who가 맡은 다른 이슈, reports = who가 이슈 on(기본 22)에 단 보고(8시)."""
+        return run(Fake({1: [spare, says(who, "가져감", at)], on: [says(who, r, "2026-11-09T08:00:00Z") for r in reports]},
                         {1: [], **{k: [who] for k in mine}}, bodies=due, spares={25}, down=down), name="issue_comment")
 
     api = claim([22], ["**[보고] 시작**", "**[보고] 끝 · 세션 끝**"])
@@ -400,7 +408,7 @@ def selftest():
     # 남이 단 끝 보고 · 「가져감」 뒤에 올린 끝 보고는 세지 않는다
     for report in (says(B, "**[보고] 끝**", "2026-11-09T08:00:00Z"), says(A, "**[보고] 끝**", "2026-11-09T09:05:00Z")):
         api = run(Fake({1: [spare, says(A, "가져감")], 22: [report]}, {1: [], 22: [A]}, bodies=due), name="issue_comment")
-        assert api.assignees[1] == [] and api.posts[0].startswith(NO_REPORT.format(who=A, n=22))
+        assert api.assignees[1] == [] and api.posts[0].startswith(no_report(A, 22))
     # 양식대로 「가져감」 댓글 + 스스로 담당 지정을 잇달아 했는데 끝 보고가 없으면: 둘 다 거절, 안내는 한 번
     api = run(Fake({1: [spare, says(A, "가져감"), got(A, A, "2026-11-09T09:00:01Z")]}, {1: [A], 22: [A]}, bodies=due))
     assert (api.assignees[1], len(api.posts), api.posts[0].count("claims:no:")) == ([], 1, 1) and len(run(api).posts) == 1
@@ -411,7 +419,7 @@ def selftest():
         api.events[22], api.events[1] = [says(A, "**[보고] 끝**", report_at)], api.events[1] + [retry]
         assert (run(api).assignees[1], len(api.posts)) == ([A], 1)
     api = claim([22], ["**[보고] 시작**", "**[보고] 세션 끝**"])  # 「세션 끝」은 끝 보고가 아니다
-    assert api.assignees[1] == [] and len(api.posts) == 1 and api.posts[0].startswith(NO_REPORT.format(who=A, n=22))
+    assert api.assignees[1] == [] and len(api.posts) == 1 and api.posts[0].startswith(no_report(A, 22))
     api.assignees[22] = [PM]  # 거절은 한 번 판정으로 남는다(그 뒤 A의 실험이 PM에게 넘어가도)
     assert (run(api, name="issue_comment").assignees[1], len(api.posts)) == ([], 1)
     api.assignees[22] = [A]
@@ -419,7 +427,11 @@ def selftest():
     api.events[1].append(says(A, "가져감 — 끝 보고 올림", "2026-11-09T09:06:00Z"))
     assert (run(api, name="issue_comment").assignees[1], len(api.posts)) == ([A], 1)  # 끝 보고를 올리고 다시 쓰면 그때 판정
     assert (claim([31]).assignees[1], claim([31]).posts) == ([A], [])  # 마감이 먼 일(서버)만 있으면 막지 않는다
-    assert (claim([25]).assignees[1], claim([25]).posts) == ([A], [])  # 앞서 가져간 예비는 「맡은 실험」이 아니다
+    # 예비는 한 사람이 하나씩(동규 11-10): 이미 가져간 예비 #25(마감이 멀어도)의 끝 보고 전에는 다음 예비를 못 가져간다
+    api = claim([25])
+    assert api.assignees[1] == [] and api.posts[0].startswith(no_report(A, 25, "가져간 예비"))
+    api = claim([25], ["**[보고] 끝**"], on=25)
+    assert (api.assignees[1], api.posts) == ([A], [])
     for api, issues in ((claim([40]), "#40"), (claim([22], down=True), "맡은 이슈 목록")):  # 애매하면 지정하고 PM 확인
         assert api.assignees[1] == [A] and len(api.posts) == 1 and api.posts[0].startswith(NEED_PM.format(who=A, issues=issues))
         api.bodies[40], api.down = "- 마감: 11/10(화) 24:00", False  # 나중에 읽혀도 판정은 그대로(끝 보고가 없어도 빼지 않는다)
