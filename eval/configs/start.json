@@ -1,0 +1,17 @@
+{
+  "name": "start",
+  "issue": "#21",
+  "cycle": 0,
+  "note": "출발 판 고정: 스타터 킷 그대로 + solar-pro4 판정(rc-c0과 같은 동작). DEFAULTS는 배분일마다 채택 실험을 켜 바뀌므로, 바뀐 칸의 출발 판 값을 여기에 적어 둔다. 재현 점검 기준 실행이 이 파일로 잰다",
+  "engine": {
+    "top_k": 6,
+    "answer_prompt": "v1",
+    "exit_check": false,
+    "max_citations": null,
+    "retry_budget": false,
+    "max_concurrent_calls": null,
+    "select_mode": "direct",
+    "prefilter_empty_abstain": false,
+    "group_by_article": false
+  }
+}
