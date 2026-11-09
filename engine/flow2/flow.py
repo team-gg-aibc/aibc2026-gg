@@ -73,12 +73,28 @@ def _nq(s):
     return _DROP.sub("", _TAGS.sub("", (s or "").translate(_SAME)))
 
 
+# 호 · 목 · 항 머리(「 2. 」 「 다. 」 「 ③」) 앞에서도 조각을 나눈다: 모델이 머리 문장과 떨어진 호를 「…」 없이 이어 옮긴다
+# (본 측정 11-10: 「…다음 각 호와 같다. 2. 「국토의 …」」 꼴로 맞는 인용이 버려졌다). 조각마다 그 조항 글에 있어야 하는 것은 같다.
+_ITEM_START = re.compile(r"(?:^|\s)(?=(?:\d{1,2}|[가-하])\.\s|[①-⑳])")
+
+
 def quote_in(quote, text):
-    """quote가 text에 글자 그대로 있나(위 차이 무시). 「…」로 줄였으면 조각(2글자 이상)마다 있어야 한다. 두 글자 미만은 근거가 아니다."""
+    """quote가 text에 글자 그대로 있나(위 차이 무시). 「…」로 줄였거나 호를 건너뛰어 이어 옮겼으면 조각(2글자 이상)마다 있어야 한다."""
     t = _nq(text)
-    parts = [_ITEM.sub("", _nq(p)) for p in _ELLIPSIS.split(quote or "")]
+    parts = [_ITEM.sub("", _nq(q)) for p in _ELLIPSIS.split(quote or "") for q in _ITEM_START.split(p)]
     parts = [p for p in parts if len(p) >= 2]
     return bool(parts) and all(p in t for p in parts)
+
+
+def by_quote(label, quote, chunks, body):
+    """조 이름만 적고(「제5조(제목)」) 한 항의 구절을 옮긴 경우: 그 조의 항 가운데 구절이 글자 그대로 있는 첫 항(원문 글자로만 고른다).
+    본 측정 11-10에서 두 번째 실행이 이 꼴로 14문항을 「목록에 없는 조항」으로 잃었다."""
+    k = _norm(label)
+    for i, c in enumerate(chunks, 1):
+        for key in (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", "")))):
+            if k and key.startswith(k) and key[len(k):len(k) + 1] == "제" and quote_in(quote, body[c["label"]]):
+                return [i]
+    return []
 
 
 def view(laws, unit):
@@ -150,7 +166,7 @@ def gate(st, cfg):
         body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
     kept, ids, dropped = [], [], []
     for ev in out.get("evidence") or []:
-        found = label_ids([ev.get("label", "")], v)
+        found = label_ids([ev.get("label", "")], v) or by_quote(ev.get("label", ""), ev.get("quote", ""), v, body)
         if not found:
             dropped.append({"label": ev.get("label", ""), "why": "목록에 없는 조항"})
             continue
@@ -211,6 +227,15 @@ def selftest():
     src = "④ 시장은 보상을 제공할 수 있다. <신설 2026.5.18>\n1. 차체 결함으로 이용이 불가능한 경우\n2. 그 밖의 경우"
     assert quote_in("시장은 보상을 제공할 수 있다. 1. 차체 결함으로 이용이 불가능한 경우", src)      # 개정 꼬리표를 빼고 옮김
     assert quote_in("시장은 보상을 ... 그 밖의 경우", src) and not quote_in("시장은 보상을 ... 지어낸 말", src)   # 「…」 조각마다
+    assert quote_in("시장은 보상을 제공할 수 있다. 2. 그 밖의 경우", src)          # 1호를 건너뛰고 이어 옮김
+    assert not quote_in("시장은 보상을 제공할 수 있다. 2. 지어낸 경우", src)
+    assert quote_in("감면한다. <개정 2025.9.29> 3. 셋째", "감면한다. <개정 2025.9.29>\n1. 첫째\n3. 셋째")   # 날짜 점에서는 안 나눔
+    body = {"서울특별시 동물보호 조례 제5조 제1항": "① 위원회를 둔다.", "서울특별시 동물보호 조례 제5조 제2항": "② 위원은 15명으로 한다.",
+            "서울특별시 동물보호 조례 제5조의2": "위원은 15명으로 한다."}
+    v5 = [{"label": k, "law": "서울특별시 동물보호 조례", "text": t} for k, t in body.items()]
+    assert by_quote("서울특별시 동물보호 조례 제5조(동물복지위원회의 설치ㆍ운영)", "② 위원은 15명으로", v5, body) == [2]
+    assert by_quote("[제5조(위원회)]", "위원은 15명으로", v5, body) == [2]               # 「제5조의2」로 새지 않음
+    assert by_quote("서울특별시 동물보호 조례 제5조", "지어낸 말", v5, body) == []
     v = [{"label": "서울특별시 도시공원 조례 제7조 제3항", "law": "서울특별시 도시공원 조례"},
          {"label": "서울특별시 도시공원 조례 제7조의2", "law": "서울특별시 도시공원 조례"}]
     assert label_ids(["제7조 제3항", "서울특별시 도시공원 조례 제7조의2", "제9조"], v) == [1, 2]
