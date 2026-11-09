@@ -1,6 +1,6 @@
 {
   "name": "17-judge-rewrite",
-  "issue": "",
+  "issue": "#70",
   "cycle": 2,
   "note": "가설 17 ③(동규 PM 실험): ①의 판정에 걸린 답을 확인 불가로 끝내지 않고 인용 조항 글만으로 한 번 다시 써서 다시 판정한다",
   "engine": {"verify_prompt": "v3-question", "judge_rewrite": true}

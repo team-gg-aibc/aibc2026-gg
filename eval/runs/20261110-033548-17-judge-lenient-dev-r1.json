@@ -1,0 +1,136 @@
+{
+ "run_id": "20261110-033548-17-judge-lenient-dev-r1",
+ "group": "20261110-033548-17-judge-lenient-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T03:43:01+09:00",
+ "experiment": {
+  "name": "17-judge-lenient",
+  "issue": "#70",
+  "note": "가설 17 ②(동규 PM 실험): 1주기 #55의 너그러운 판정(v2-lenient)을 rc-c1 위에서 다시 잰다. 근거와 어긋나거나 근거에 없는 주장만 거절",
+  "cycle": 2,
+  "file": "eval/configs/17-judge-lenient.json",
+  "file_sha": "069bf06bb0b8"
+ },
+ "conclusion": "버림 의견 — 가중 +2.95(81.0 · 81.2)로 기준을 넘지만 함정 91.7 → 85.7에 T015가 두 번 다 무너졌고, 같은 칸(verify_prompt)을 쓰는 ①(v3-question)이 가중 · 함정 · 과잉 포기 모두 앞선다",
+ "lesson": [
+  "좋아짐 61 · 65, 나빠짐 30 · 41(r1 · r2 대 끈 판): 판정이 맞는 답을 거절 77 · 82 → 45 · 46, 과잉 포기 18.25 → 12.28%. 함정 91.7 → 85.7(T015 두 번 다 무너짐, T007 · T021 · T025 · T053 나빠짐), v1이 통과시킨 맞는 답을 새로 버린 것 12 · 20",
+  "질문을 보지 않는 판정은 함정 신호를 못 본다: 판정까지 간 함정 답 8 · 6개 가운데 2 · 0개만 막았다. 답 글 확인만 풀려 함정 답이 늘었다",
+  "같은 칸의 ①(v3-question)이 모든 지표에서 앞서 v2-lenient는 더 재지 않는다"
+ ],
+ "args": {
+  "config": "eval/configs/17-judge-lenient.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v2-lenient",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "judge_rewrite": false
+ },
+ "settings_hash": "4156a591487c",
+ "switches": {
+  "verify_prompt": "v2-lenient"
+ },
+ "env": {
+  "code_commit": "8f6b574",
+  "code_hash": "e3ccc0648387",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 81.0,
+  "by_type": {
+   "단순": 87.4,
+   "조건": 84.9,
+   "결합": 67.6,
+   "함정": 85.7
+  },
+  "trap": 85.7,
+  "by_law": {
+   "animal": 82.6,
+   "bicycle": 85.5,
+   "common": 80.0,
+   "park": 83.3,
+   "parking": 75.4,
+   "smoking": 82.7,
+   "youth": 90.3
+  },
+  "over_abstain": 12.4,
+  "citations_per_answer": 1.48,
+  "retrieval_hit": 94.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.447,
+  "latency_p95": 4.294,
+  "latency_max": 10.613,
+  "causes": {
+   "판정이 맞는 답을 거절": 45,
+   "정답이 후보에 없음": 38,
+   "후보에 있는데 잘못 고름": 27,
+   "답이 있는데 확인 불가 (found 거짓)": 20,
+   "함정에 답함": 6,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 1
+  }
+ },
+ "cost_usd": 0.6598,
+ "tokens": {
+  "in": 3221830,
+  "cached": 1569984,
+  "out": 66265
+ },
+ "calls": 2539,
+ "wall_sec": 432.2,
+ "hashes": {
+  "retrieval": "7ff81af61a81",
+  "answers": "69d9d7da2585"
+ }
+}
