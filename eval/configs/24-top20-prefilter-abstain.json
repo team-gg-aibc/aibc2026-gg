@@ -1,0 +1,15 @@
+{
+  "name": "24-top20-prefilter-abstain",
+  "issue": "#24",
+  "cycle": 1,
+  "note": "② 후보 20개에서 Solar로 관련 있는 것을 8개까지 추리고, 하나도 없으면 확인 불가(함정에 답하지 않게) → v2 프롬프트로 답 쓰기",
+  "engine": {
+    "explore": true,
+    "timeout_sec": 300,
+    "top_k": 20,
+    "answer_prompt": "v2",
+    "group_by_article": true,
+    "select_mode": "prefilter",
+    "prefilter_empty_abstain": true
+  }
+}

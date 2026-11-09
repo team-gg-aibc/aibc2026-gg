@@ -1,0 +1,122 @@
+{
+ "run_id": "20261110-021505-start-dev",
+ "group": "20261110-021505-start-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-10T02:15:06+09:00",
+ "experiment": {
+  "name": "start",
+  "issue": "#21",
+  "note": "출발 판 고정: 스타터 킷 그대로 + solar-pro4 판정(rc-c0과 같은 동작). DEFAULTS는 배분일마다 채택 실험을 켜 바뀌므로, 바뀐 칸의 출발 판 값을 여기에 적어 둔다. 재현 점검 기준 실행이 이 파일로 잰다",
+  "cycle": 0,
+  "file": "eval/configs/start.json",
+  "file_sha": "524d4542297b"
+ },
+ "conclusion": "출발 판 고정(start.json) · 키 없이 키워드 검색 기준(재현 점검용, 11/10부터. DEFAULTS가 채택 판으로 바뀌어 11-06 기준 대신 씀)",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/start.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "retrieval",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": false,
+  "max_citations": null,
+  "retry_budget": false,
+  "max_concurrent_calls": null,
+  "on_deadline": "unknown",
+  "select_mode": "direct",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": false,
+  "max_per_article": 0,
+  "group_by_article": false
+ },
+ "settings_hash": "f47a6a1e50e9",
+ "switches": {
+  "top_k": 6,
+  "answer_prompt": "v1",
+  "exit_check": false,
+  "max_citations": null,
+  "retry_budget": false,
+  "max_concurrent_calls": null,
+  "select_mode": "direct",
+  "prefilter_empty_abstain": false,
+  "group_by_article": false
+ },
+ "env": {
+  "code_commit": "d39ab29",
+  "code_hash": "e8b93c30614e",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "keyword"
+  ],
+  "key_present": false,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 619,
+  "hit": {
+   "1": 41.7,
+   "3": 58.2,
+   "6": 70.0,
+   "10": 78.2,
+   "20": 86.8
+  },
+  "by_type": {
+   "단순": 72.0,
+   "조건": 71.6,
+   "결합": 62.3
+  },
+  "by_law": {
+   "animal": 71.2,
+   "bicycle": 67.0,
+   "common": 30.0,
+   "park": 64.6,
+   "parking": 72.6,
+   "smoking": 76.0,
+   "youth": 71.8
+  }
+ },
+ "cost_usd": 0.0,
+ "tokens": {
+  "in": 0,
+  "cached": 0,
+  "out": 0
+ },
+ "calls": 0,
+ "wall_sec": 1.2,
+ "hashes": {
+  "retrieval": "3d81ff38c558",
+  "answers": null
+ }
+}

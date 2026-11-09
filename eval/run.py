@@ -468,7 +468,7 @@ def selftest():
     assert {q["id"] for q in s0} != {q["id"] for q in sample(qs, 20, 1)}
     assert len(sample(qs, 7, 0)) == 7 and sample(qs, None, 0) == qs
 
-    cfg = config.load()
+    cfg = dict(config.load(), select_mode="direct")   # 가짜 업스테이지는 답 쓰기 한 번만 흉내 낸다(DEFAULTS의 #24 먼저 추리기는 끔)
     ok = {"answer": "네", "citation": [a], "source_url": "https://www.law.go.kr/x", "effective_date": "2026-10-01"}
     unk = contract.unknown()
     gold_q = {"id": "parking-C1", "type": "조건 판단", "question": "?", "gold": [[a]]}

@@ -1,0 +1,133 @@
+{
+ "run_id": "20261107-184558-22-contract-dev-r1",
+ "group": "20261107-184558-22-contract-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-07T18:53:18+09:00",
+ "experiment": {
+  "name": "22-contract",
+  "issue": "#22",
+  "note": "출력 규격 강제와 0점 방어: 마지막 출구 검사(인용 상한 4) · 마감 안 재시도 · 동시 호출 6. 대회 조건(75초)으로 잰다(탐색 모드 아님)",
+  "cycle": 1,
+  "file": "eval/configs/22-contract.json",
+  "file_sha": "981fa4efcc06"
+ },
+ "conclusion": "채택 — 0점 방어(형식 · 시간 · 이상한 요청)가 목적이고, dev 전체 두 번씩 켠 판 68.9 · 67.3 / 끈 판 68.1 · 65.4로 떨어지지 않음(흔들림 안). 형식 오류 · 90초 초과 · 오류 0",
+ "lesson": [
+  "좋아짐 · 나빠짐 거의 없음: 출구 검사가 바꾼 문항은 판마다 2~4개이고 모두 인용 상한 4(점수 깎인 것은 youth-M018 0.75→0.5 하나). 함정 95.2·92.9 대 85.7 차이는 출구 검사가 함정 문항을 하나도 안 바꿔 흔들림으로 본다",
+  "출발 판이 이미 색인 라벨만 인용하고 링크 · 시행일을 코드로 채워서, 출구 검사는 지금은 점수를 바꾸지 않는 안전망이다. 효과는 인용을 만드는 새 길(#24 · #27 · #28)이 붙을 때 생긴다",
+  "인용 상한 값은 운영진 답이 오면 정한다(4면 결합형에서 0.25 깎임 1건). on_deadline=\"draft\"는 dev에서 75초에 닿은 문항이 0이라 견줄 수 없었다 — 수렴 주기(4~5)에 시간을 줄일 때 다시 잰다"
+ ],
+ "args": {
+  "config": "eval/configs/22-contract.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown"
+ },
+ "settings_hash": "65d475714115",
+ "switches": {
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6
+ },
+ "env": {
+  "code_commit": "f2af472",
+  "code_hash": "cef1f737a423",
+  "eval_code_hash": "82f8c3f2afe7",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.11.15",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-10"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 68.9,
+  "by_type": {
+   "단순": 72.0,
+   "조건": 69.4,
+   "결합": 47.7,
+   "함정": 95.2
+  },
+  "trap": 95.2,
+  "by_law": {
+   "animal": 69.9,
+   "bicycle": 70.2,
+   "common": 30.0,
+   "park": 63.4,
+   "parking": 56.9,
+   "smoking": 75.2,
+   "youth": 72.5
+  },
+  "over_abstain": 25.8,
+  "citations_per_answer": 1.49,
+  "retrieval_hit": 82.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.484,
+  "latency_p95": 4.299,
+  "latency_max": 7.124,
+  "causes": {
+   "정답이 후보에 없음": 113,
+   "판정이 맞는 답을 거절": 99,
+   "후보에 있는데 잘못 고름": 12,
+   "답이 있는데 확인 불가 (found 거짓)": 8,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2,
+   "함정에 답함": 2
+  }
+ },
+ "cost_usd": 0.3968,
+ "tokens": {
+  "in": 1198583,
+  "cached": 114240,
+  "out": 61700
+ },
+ "calls": 1910,
+ "wall_sec": 439.9,
+ "hashes": {
+  "retrieval": "1fa37afeee5e",
+  "answers": "58663c271f15"
+ }
+}
