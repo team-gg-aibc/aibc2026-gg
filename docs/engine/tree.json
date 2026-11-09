@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-08 18:45",
+ "as_of": "2026-11-10 02:16",
  "example": false,
  "people": {
   "동규": "#2a78d6",
@@ -31,8 +31,159 @@
     "cycle": 1,
     "parent": "출발 판",
     "id": "h-2",
-    "status": "진행 중",
+    "status": "보류",
     "children": [
+     {
+      "id": "e-20261107-185000-23-base-kw-dev",
+      "kind": "experiment",
+      "title": "23-base-kw (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "70.0",
+      "delta": "+0.0",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-185005-23-tags-dev",
+      "kind": "experiment",
+      "title": "23-tags (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "71.0",
+      "delta": "+1.0",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true, chunk_strip_tags=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-185009-23-head-dev",
+      "kind": "experiment",
+      "title": "23-head (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "70.0",
+      "delta": "+0.0",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true, chunk_article_head=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-185014-23-items-dev",
+      "kind": "experiment",
+      "title": "23-items (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "71.1",
+      "delta": "+1.1",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true, chunk_item_split=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-185021-23-rows-dev",
+      "kind": "experiment",
+      "title": "23-rows (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "70.5",
+      "delta": "+0.5",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true, chunk_annex_rows=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-185027-23-all-dev",
+      "kind": "experiment",
+      "title": "23-all (탐색)",
+      "label": "dev 전체 · 619문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "진행 중",
+      "metric": "검색 적중률 top-6",
+      "score": "71.0",
+      "delta": "+1.0",
+      "flag": "검색만",
+      "conclusion": "",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "cbe1d41 ⚠수정",
+      "compare": null,
+      "switches": "use_embedding=false, timeout_sec=300, explore=true, chunk_strip_tags=true, chunk_article_head=true, chunk_item_split=true, chunk_annex_rows=true",
+      "children": []
+     },
+     {
+      "id": "e-20261109-173257-23-final-dev",
+      "kind": "experiment",
+      "title": "23-final (탐색)",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "건영",
+      "status": "보류",
+      "metric": "가중 점수",
+      "score": "68.8",
+      "delta": "+1.1",
+      "flag": "↑ 흔들림 밖",
+      "conclusion": "보류 — 검색은 나아졌지만(dev 혼합 적중률 82.8→84.3%, 정답이 후보에 없음 112→100) 가중 점수는 흔들림 안(두 번 평균 69.2→68.8)이고 함정 95.2→94.0, 과잉 포기 25.9→28.2%로 채택 기준(함정 −1점 이내, 과잉 포기 +1점 이내)에 못 미친다",
+      "lesson": [
+       "좋아짐: 정답이 후보에 없음 −12(결합 +2.7). 나빠짐: 단순 −3.2, 후보에 있는데 잘못 고름 +6, 함정에 답함 +3(두 번째 판 기준)",
+       "후보가 좋아져도 점수가 안 오른 것은 병목이 판정이 맞는 답을 거절하는 단계(100문항 안팎)라서로 보인다. 호 조각이 늘어 비슷한 조항이 함정에도 걸렸을 수 있다(확인 못 함)",
+       "스위치별로 끝까지 재서 함정 악화가 어느 것 탓인지 가르기(호 조각 추정), 판정 단계(#55)가 풀린 뒤 같은 색인으로 다시 재기, #26 · #28은 이 색인 위에서 잴지 PM이 정하기"
+      ],
+      "repeats": 2,
+      "date": "2026-11-09",
+      "code": "34073f2",
+      "compare": null,
+      "switches": "timeout_sec=300, explore=true, chunk_strip_tags=true, chunk_article_head=true, chunk_item_split=true, chunk_annex_rows=true",
+      "children": []
+     },
      {
       "num": "1",
       "kind": "hypothesis",
@@ -365,7 +516,7 @@
       "score": "78.3",
       "delta": "+10.6",
       "flag": "✅ 폭의 2배 넘게 오름",
-      "conclusion": "채택 의견 — 같은 커밋 끈 판(67.7) 대비 가중 +10.6(폭의 2배 넘게), 함정 85.7→90.5, 과잉 포기 26.1→17.5, 지연 95% 7.6초 안, 형식 오류 0",
+      "conclusion": "채택 — 같은 커밋 끈 판(67.7) 대비 가중 +10.6(폭의 2배 넘게), 함정 85.7→90.5, 과잉 포기 26.1→17.5, 지연 95% 7.6초 안, 형식 오류 0",
       "lesson": [
        "좋아짐 정답이 후보에 없음 110→약 35문항, 결합형 +17점 · 나빠짐 후보에 있는데 잘못 고름 소폭 증가",
        "후보 20개를 그대로 주면 모델이 헷갈리지만(①), 먼저 관련 있는 것만 추리면(②) 넓힌 후보를 점수로 바꾼다. 추리기가 빈 목록이면 확인 불가로 끝내야 함정을 지킨다",
@@ -393,7 +544,14 @@
       "children": [],
       "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/27",
       "issue_state": "OPEN",
-      "prs": []
+      "prs": [
+       {
+        "number": 63,
+        "state": "OPEN",
+        "title": "feat(engine): 조례 통째로 읽기 — 질문의 조례 원문 전체에서 근거 고르기(#27)",
+        "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/63"
+       }
+      ]
      },
      {
       "num": "8",
@@ -414,12 +572,12 @@
      }
     ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/24",
-    "issue_state": "OPEN",
+    "issue_state": "CLOSED",
     "prs": [
      {
       "number": 57,
-      "state": "OPEN",
-      "title": "feat(engine): 검색 후보를 넓혀 고르기 — 후보 수 · 먼저 추리기 · 조 단위 묶기 스위치(#24)",
+      "state": "MERGED",
+      "title": "feat(engine): 검색 후보 20개에서 먼저 추린 뒤 고르기 — 후보 수 · 추리기 · 조 단위 묶기 스위치(#24)",
       "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/57"
      }
     ]
@@ -435,14 +593,40 @@
     "cycle": 1,
     "parent": "출발 판",
     "id": "h-22",
-    "status": "진행 중",
-    "children": [],
+    "status": "채택",
+    "children": [
+     {
+      "id": "e-20261107-184558-22-contract-dev",
+      "kind": "experiment",
+      "title": "22-contract",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "동욱",
+      "status": "채택",
+      "metric": "가중 점수",
+      "score": "68.1",
+      "delta": "+1.3",
+      "flag": "↑ 흔들림 밖",
+      "conclusion": "채택 — 0점 방어(형식 · 시간 · 이상한 요청)가 목적이고, dev 전체 두 번씩 켠 판 68.9 · 67.3 / 끈 판 68.1 · 65.4로 떨어지지 않음(흔들림 안). 형식 오류 · 90초 초과 · 오류 0",
+      "lesson": [
+       "좋아짐 · 나빠짐 거의 없음: 출구 검사가 바꾼 문항은 판마다 2~4개이고 모두 인용 상한 4(점수 깎인 것은 youth-M018 0.75→0.5 하나). 함정 95.2·92.9 대 85.7 차이는 출구 검사가 함정 문항을 하나도 안 바꿔 흔들림으로 본다",
+       "출발 판이 이미 색인 라벨만 인용하고 링크 · 시행일을 코드로 채워서, 출구 검사는 지금은 점수를 바꾸지 않는 안전망이다. 효과는 인용을 만드는 새 길(#24 · #27 · #28)이 붙을 때 생긴다",
+       "인용 상한 값은 운영진 답이 오면 정한다(4면 결합형에서 0.25 깎임 1건). on_deadline=\"draft\"는 dev에서 75초에 닿은 문항이 0이라 견줄 수 없었다 — 수렴 주기(4~5)에 시간을 줄일 때 다시 잰다"
+      ],
+      "repeats": 2,
+      "date": "2026-11-07",
+      "code": "f2af472",
+      "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261107-184558-22-contract-dev-r1.md",
+      "switches": "exit_check=true, max_citations=4, retry_budget=true, max_concurrent_calls=6",
+      "children": []
+     }
+    ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/22",
-    "issue_state": "OPEN",
+    "issue_state": "CLOSED",
     "prs": [
      {
       "number": 58,
-      "state": "OPEN",
+      "state": "MERGED",
       "title": "feat: 출력 규격 강제와 0점 방어 — 마지막 출구 검사 · 마감 안 재시도 · 동시 호출 제한",
       "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/58"
      }

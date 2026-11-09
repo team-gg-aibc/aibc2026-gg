@@ -1,0 +1,126 @@
+{
+ "run_id": "20261109-165138-explore-dev-r2",
+ "group": "20261109-165138-explore-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-09T17:32:53+09:00",
+ "experiment": {
+  "name": "explore",
+  "issue": "",
+  "note": "탐색 모드의 바탕(1~3주기): 90초 조건 없이 문항당 300초까지, 시간은 단계별로 기록만. 실험 설정은 이 파일을 복사해 engine 칸에 자기 스위치를 더한다",
+  "cycle": 2,
+  "file": "eval/configs/explore.json",
+  "file_sha": "eec604361c1b"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/explore.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 2
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_strip_tags": false,
+  "chunk_article_head": false,
+  "chunk_item_split": false,
+  "chunk_annex_rows": false
+ },
+ "settings_hash": "4af779b86013",
+ "switches": {
+  "timeout_sec": 300,
+  "explore": true
+ },
+ "env": {
+  "code_commit": "34073f2",
+  "code_hash": "019003ad5da2",
+  "eval_code_hash": "8b8d24c88de7",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.10",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-11"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 69.9,
+  "by_type": {
+   "단순": 73.0,
+   "조건": 68.8,
+   "결합": 49.4,
+   "함정": 97.6
+  },
+  "trap": 97.6,
+  "by_law": {
+   "animal": 74.3,
+   "bicycle": 67.3,
+   "common": 50.0,
+   "park": 61.1,
+   "parking": 56.6,
+   "smoking": 78.7,
+   "youth": 72.0
+  },
+  "over_abstain": 25.5,
+  "citations_per_answer": 1.53,
+  "retrieval_hit": 82.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.274,
+  "latency_p95": 7.417,
+  "latency_max": 56.384,
+  "causes": {
+   "정답이 후보에 없음": 112,
+   "판정이 맞는 답을 거절": 100,
+   "답이 있는데 확인 불가 (found 거짓)": 9,
+   "후보에 있는데 잘못 고름": 7,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2,
+   "함정에 답함": 1
+  }
+ },
+ "cost_usd": 0.3593,
+ "tokens": {
+  "in": 1199096,
+  "cached": 272000,
+  "out": 61894
+ },
+ "calls": 1910,
+ "wall_sec": 1387.6,
+ "hashes": {
+  "retrieval": "6674a88f26a0",
+  "answers": "d5b1db474bda"
+ }
+}
