@@ -1,0 +1,1 @@
+{"name": "69-whole-item", "issue": "#69", "note": "#23 네 스위치 + 호 조각이 이기면 항 전체 글을 넘김(반쪽 항 막기), rc-c1 위", "engine": {"explore": true, "timeout_sec": 300, "chunk_strip_tags": true, "chunk_article_head": true, "chunk_item_split": true, "chunk_annex_rows": true, "chunk_whole_item": true}}
