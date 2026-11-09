@@ -11,7 +11,7 @@ import time
 from functools import lru_cache
 
 from . import answer as answer_step
-from . import config, contract, retrieve, verify
+from . import config, contract, retrieve, upstage, verify
 
 # 확인 불가를 낸 까닭 (판단 기록 reason)
 LOW_SCORE = "점수 낮음"          # 검증 ①: 1위 후보의 의미 점수가 문턱보다 낮음
@@ -19,6 +19,7 @@ NOT_FOUND = "found 거짓"         # 모델이 근거로 답할 수 없다고 �
 NO_EVIDENCE = "근거 번호 없음"   # 모델이 고른 번호가 없거나 후보 밖 · 자치구뿐
 REJECTED = "판정 거절"           # 검증 ②: 판정이 notGrounded
 ERROR = "오류"                   # 호출 실패 · JSON 깨짐 등
+TIMEOUT = "시간 초과"            # #22: 마감 시각(받은 때 + timeout_sec)이 지남
 
 
 def receive(st, cfg):
@@ -75,7 +76,9 @@ def _error(e):
     return f"{type(e).__name__}: {str(e)[:200]}"
 
 
-def answer(question, cfg=None):
+def answer(question, cfg=None, deadline=None, box=None):
+    """deadline: 마감 시각(time.monotonic() 초). 없으면 지금 + timeout_sec. 단계 사이와 업스테이지 호출이 이것을 본다(#22).
+    box: 서버가 넘기는 빈 dict. 여기에 진행 중인 상태(box["st"])를 둬서, 서버가 마감에 먼저 답할 때 판정 전 답 · 기록을 쓴다."""
     cfg = cfg or config.load()
     st = {"question": question, "reason": None, "error": None, "retrieval": None, "candidates": [],
           "evidence_ids": [], "draft": None, "verdict": None, "response": None, "steps": {}, "calls": [],
@@ -84,22 +87,42 @@ def answer(question, cfg=None):
           "models": {"chat": cfg["chat_model"], "embed_query": cfg["embed_query"]},
           "prompts": {"answer": cfg["answer_prompt"], "verify": cfg["verify_prompt"]},
           "index": _index(cfg["chunk_unit"])}
+    if box is not None:
+        box["st"] = st
     t0 = time.perf_counter()
-    for name, fn in STAGES:
-        t, n = time.perf_counter(), len(st["calls"])
-        try:
-            fn(st, cfg)
-        except Exception as e:  # noqa: BLE001  어떤 오류든 확인 불가로 끝내고 까닭을 남긴다
-            st["reason"], st["error"] = ERROR, _error(e)
-        st["steps"][name] = round(time.perf_counter() - t, 3)
-        for c in st["calls"][n:]:
-            c["stage"] = name
-        if st["reason"]:
-            break
+    deadline = deadline if deadline is not None else time.monotonic() + cfg["timeout_sec"]
+    with upstage.budget(cfg, deadline):
+        for name, fn in STAGES:
+            if time.monotonic() >= deadline:
+                st["reason"] = TIMEOUT
+                break
+            t, n = time.perf_counter(), len(st["calls"])
+            try:
+                fn(st, cfg)
+            except upstage.DeadlineExceeded:
+                st["reason"] = TIMEOUT
+            except Exception as e:  # noqa: BLE001  어떤 오류든 확인 불가로 끝내고 까닭을 남긴다
+                st["reason"], st["error"] = ERROR, _error(e)
+            st["steps"][name] = round(time.perf_counter() - t, 3)
+            for c in st["calls"][n:]:
+                c["stage"] = name
+            if st["reason"]:
+                break
     st["sec"] = round(time.perf_counter() - t0, 3)
-    resp = contract.unknown() if st["reason"] or not st["response"] else st["response"]
+    resp = final(st, cfg)
     trace = {k: v for k, v in st.items() if not k.startswith("_") and k != "response"}
     return resp, trace
+
+
+def final(st, cfg):
+    """나갈 응답. 마감이 지났고 on_deadline이 "draft"면 판정 전 답을 낸다. exit_check면 마지막 출구 검사를 건다(#22)."""
+    if st["reason"] == TIMEOUT and cfg["on_deadline"] == "draft" and st["draft"]:
+        resp = st["draft"]
+    elif st["reason"] or not st["response"]:
+        resp = contract.unknown()
+    else:
+        resp = st["response"]
+    return contract.finalize(resp, cfg) if cfg["exit_check"] else resp
 
 
 if __name__ == "__main__":   # 한 문항 돌려 보기: python3 -m engine.pipeline "질문" [설정 파일]

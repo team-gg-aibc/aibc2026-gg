@@ -3,9 +3,11 @@
 Solar는 OpenAI SDK와 호환된다(base_url만 바꿈). 부를 때마다 `calls` 목록에 모델 · 토큰 · 걸린 시간 · 보낸 메시지 · 모델 출력을
 남긴다. 점수 틀(eval/run.py)이 이 기록으로 비용을 내고, 궤적 화면(eval/trajectory.py)이 단계마다 보여 준다. 키 값은 기록하지 않는다.
 """
+import contextvars
 import json
 import threading
 import time
+from contextlib import contextmanager
 
 import requests
 
@@ -43,7 +45,7 @@ def client():
 
 
 def _retry(fn, tries=4):
-    """429(too_many_requests)는 잠시 기다렸다 다시 부른다(킷 그대로). 시간 예산 · 5xx는 #22 출력 규격 강제 몫."""
+    """429(too_many_requests)는 잠시 기다렸다 다시 부른다(킷 그대로). retry_budget을 켜면 아래 _call이 대신한다."""
     for i in range(tries):
         try:
             return fn()
@@ -52,6 +54,85 @@ def _retry(fn, tries=4):
                 time.sleep(2 ** i)
                 continue
             raise
+
+
+# ---- #22 시간 예산 · 재시도 · 동시 호출 제한 ----
+# 흐름(pipeline.answer)이 문항마다 budget(cfg, 마감 시각)을 걸어 두면, 그 안의 호출은 마감을 보고 재시도 · 대기를 멈춘다.
+# 마감 시각은 time.monotonic() 기준 초다. budget 밖(색인 만들기 등)에서 부르면 킷 그대로 돈다.
+RETRY_TRIES = 6         # retry_budget: 한 호출에 많아야 이만큼 (마감이 먼저 오면 그 전에 멈춘다)
+RETRY_CAP_SEC = 8.0     # 재시도 간격 상한 (0.5 · 1 · 2 · 4 · 8 …초)
+MIN_TRY_SEC = 1.0       # 마감까지 이보다 적게 남으면 새로 부르지 않는다
+_budget = contextvars.ContextVar("upstage_budget", default=None)
+_slots, _slots_lock = {}, threading.Lock()
+
+
+class DeadlineExceeded(Exception):
+    """마감 시각이 지나(또는 곧 지나) 더 부르지 않는다. 흐름은 이것을 「시간 초과」로 남긴다."""
+
+
+@contextmanager
+def budget(cfg, deadline):
+    """이 안의 업스테이지 호출에 설정(retry_budget · max_concurrent_calls)과 마감 시각(monotonic 초)을 건다."""
+    token = _budget.set((deadline, cfg))
+    try:
+        yield
+    finally:
+        _budget.reset(token)
+
+
+def retryable(e):
+    """다시 불러 볼 만한 오류: 429 · 5xx · 시간 초과 · 연결 오류. 그 밖의 4xx는 다시 불러도 같다."""
+    status = getattr(e, "status_code", None)
+    if isinstance(status, int):
+        return status == 429 or status >= 500
+    names = {c.__name__ for c in type(e).__mro__}
+    return bool(names & {"APITimeoutError", "APIConnectionError", "TimeoutError", "ConnectionError"})
+
+
+def _left(deadline):
+    return None if deadline is None else deadline - time.monotonic()
+
+
+def _in_slot(cfg, deadline, fn):
+    """동시 호출 상한(max_concurrent_calls)이 있으면 자리가 날 때까지(마감 전까지만) 기다린다."""
+    n = cfg.get("max_concurrent_calls")
+    if not n:
+        return fn()
+    with _slots_lock:
+        sem = _slots.setdefault(n, threading.BoundedSemaphore(n))
+    left = _left(deadline)
+    if not sem.acquire(timeout=None if left is None else max(0.0, left - MIN_TRY_SEC)):
+        raise DeadlineExceeded("동시 호출 자리를 마감 전에 얻지 못함")
+    try:
+        return fn()
+    finally:
+        sem.release()
+
+
+def _call(fn):
+    """업스테이지 호출 하나. fn(client) → 응답."""
+    deadline, cfg = _budget.get() or (None, {})
+    if not cfg.get("retry_budget"):
+        return _retry(lambda: _in_slot(cfg, deadline, lambda: fn(client())))
+    for i in range(RETRY_TRIES):
+        left = _left(deadline)
+        if left is not None and left < MIN_TRY_SEC:
+            raise DeadlineExceeded("마감이 가까워 부르지 않음")
+        opts = {"max_retries": 0} if left is None else {"max_retries": 0, "timeout": left}
+        c = client()
+        c = c.with_options(**opts) if hasattr(c, "with_options") else c
+        try:
+            return _in_slot(cfg, deadline, lambda: fn(c))
+        except DeadlineExceeded:
+            raise
+        except Exception as e:  # noqa: BLE001
+            if not retryable(e) or i == RETRY_TRIES - 1:
+                raise
+            wait = min(RETRY_CAP_SEC, 0.5 * 2 ** i)
+            left = _left(deadline)
+            if left is not None and left < wait + MIN_TRY_SEC:
+                raise DeadlineExceeded(f"재시도할 시간이 없음 ({type(e).__name__})") from e
+            time.sleep(wait)
 
 
 def _log(calls, kind, model, usage, t0, sent, output):
@@ -72,7 +153,7 @@ def chat(messages, cfg, calls=None, response_format=None):
     if cfg["reasoning_effort"]:
         kw["reasoning_effort"] = cfg["reasoning_effort"]
     t0 = time.perf_counter()
-    resp = _retry(lambda: client().chat.completions.create(**kw))
+    resp = _call(lambda c: c.chat.completions.create(**kw))
     content = resp.choices[0].message.content
     _log(calls, "chat", cfg["chat_model"], resp.usage, t0, messages, content)
     return content
@@ -83,7 +164,7 @@ def embed(texts, model, calls=None):
     for i in range(0, len(texts), 50):        # 한 번에 너무 많이 보내지 않는다
         batch = texts[i:i + 50]
         t0 = time.perf_counter()
-        resp = _retry(lambda: client().embeddings.create(model=model, input=batch))
+        resp = _call(lambda c, b=batch: c.embeddings.create(model=model, input=b))
         _log(calls, "embed", model, resp.usage, t0, batch, f"{len(resp.data)}개 × {len(resp.data[0].embedding)}차원")
         out.extend(d.embedding for d in resp.data)
     return out
