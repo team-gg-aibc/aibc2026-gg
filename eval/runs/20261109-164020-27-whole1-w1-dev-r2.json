@@ -1,0 +1,132 @@
+{
+ "run_id": "20261109-164020-27-whole1-w1-dev-r2",
+ "group": "20261109-164020-27-whole1-w1-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-09T16:57:07+09:00",
+ "experiment": {
+  "name": "27-whole1-w1",
+  "issue": "#27",
+  "note": "조례 통째로 + 고르기 프롬프트 w1(문장마다 근거 · 이웃 항 확인 · 계산 덧붙이지 않기)",
+  "cycle": 2,
+  "file": "eval/configs/27-whole1-w1.json",
+  "file_sha": "c2d8172549e4"
+ },
+ "conclusion": "보류 의견 — 같은 커밋 끈 판(67.8) 대비 가중 +5.0, 과잉 포기 +0.7(기준 안)이지만 함정 91.7→90.5(−1.2, 기준 −1 밖)",
+ "lesson": [
+  "좋아짐 판정이 맞는 답을 거절 150→126(조례 통째로 v1 대비), 과잉 포기 31.8→27.7 · 나빠짐 함정 소폭, JSON이 깨진 답 2건(확인 불가로 나감)",
+  "「문장마다 근거 · 이웃 항 확인 · 계산 덧붙이지 않기」를 적으니 번호 실수와 덧붙인 내용이 줄었다. 그래도 번호로 고르는 한 이웃 항 실수가 남는다",
+  "번호 대신 조항 이름으로 고르기(27-whole1-w1-label)"
+ ],
+ "args": {
+  "config": "eval/configs/27-whole1-w1.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "w1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true,
+  "whole_max_laws": 1,
+  "whole_cite": "id",
+  "whole_second_ratio": 0.9
+ },
+ "settings_hash": "28a2d0da960c",
+ "switches": {
+  "answer_prompt": "w1",
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true
+ },
+ "env": {
+  "code_commit": "bc61420",
+  "code_hash": "d8a29ba9c4a7",
+  "eval_code_hash": "a09821526cd3",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.14",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-26.6"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 72.5,
+  "by_type": {
+   "단순": 75.2,
+   "조건": 74.9,
+   "결합": 55.3,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 75.9,
+   "bicycle": 65.1,
+   "common": 0.0,
+   "park": 66.7,
+   "parking": 72.9,
+   "smoking": 81.3,
+   "youth": 72.3
+  },
+  "over_abstain": 27.8,
+  "citations_per_answer": 1.94,
+  "retrieval_hit": 82.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 2,
+  "latency_p50": 2.664,
+  "latency_p95": 5.17,
+  "latency_max": 16.985,
+  "causes": {
+   "판정이 맞는 답을 거절": 128,
+   "후보에 있는데 잘못 고름": 19,
+   "정답이 후보에 없음": 18,
+   "답이 있는데 확인 불가 (found 거짓)": 16,
+   "함정에 답함": 4,
+   "오류 · 형식": 2
+  }
+ },
+ "cost_usd": 0.834,
+ "tokens": {
+  "in": 9027171,
+  "cached": 8144768,
+  "out": 75045
+ },
+ "calls": 1924,
+ "wall_sec": 484.8,
+ "hashes": {
+  "retrieval": "151434f057e8",
+  "answers": "6daff3cf2898"
+ }
+}

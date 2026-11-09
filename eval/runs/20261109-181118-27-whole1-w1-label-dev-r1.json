@@ -1,0 +1,132 @@
+{
+ "run_id": "20261109-181118-27-whole1-w1-label-dev-r1",
+ "group": "20261109-181118-27-whole1-w1-label-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-09T18:20:55+09:00",
+ "experiment": {
+  "name": "27-whole1-w1-label",
+  "issue": "#27",
+  "note": "조례 통째로 + 프롬프트 w1 + 번호 대신 조항 이름으로 고르기(목록에 있는 이름만 받음)",
+  "cycle": 2,
+  "file": "eval/configs/27-whole1-w1-label.json",
+  "file_sha": "0f034acdc3f6"
+ },
+ "conclusion": "보류 의견(채택 후보) — 같은 커밋 끈 판(68.1) 대비 가중 +12.0(폭의 2배 넘게), 과잉 포기 27.3→18.6, 결합 48.0→72.2, 지연 95% 6.5초 안, 형식 오류 0이지만 함정 92.9→86.9(−6, 기준 −1 밖)",
+ "lesson": [
+  "좋아짐 정답이 후보에 없음 110→17, 판정이 맞는 답을 거절 110→88, 결합 +24 · 나빠짐 함정에 답함 3→5.5(자치구 · 다른 법 · 조례에 없는 구체 행위)",
+  "번호 대신 목록의 조항 이름을 적게 하자 이웃 항 실수가 사라졌다. 조례 전체를 보니 「비슷한 일반 조항」(도시공원 금지행위 제22조 · 제23조 등)이 늘 보여, 함정에도 그것을 끌어다 답한다",
+  "관할 · 다른 법 판별 게이트(#25)와 함께 켜서 함정 재기 · #24 추리기(②)와 견주거나 합치기 · JSON 깨짐은 #22 재시도로"
+ ],
+ "args": {
+  "config": "eval/configs/27-whole1-w1-label.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "w1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true,
+  "whole_max_laws": 1,
+  "whole_cite": "label",
+  "whole_second_ratio": 0.9
+ },
+ "settings_hash": "e218a3c4a5c3",
+ "switches": {
+  "answer_prompt": "w1",
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true,
+  "whole_cite": "label"
+ },
+ "env": {
+  "code_commit": "21c02b6",
+  "code_hash": "a8bd09721ebe",
+  "eval_code_hash": "a09821526cd3",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.14",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-26.6"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 79.0,
+  "by_type": {
+   "단순": 82.4,
+   "조건": 79.2,
+   "결합": 71.0,
+   "함정": 85.7
+  },
+  "trap": 85.7,
+  "by_law": {
+   "animal": 84.1,
+   "bicycle": 81.0,
+   "common": 20.0,
+   "park": 80.3,
+   "parking": 65.2,
+   "smoking": 81.6,
+   "youth": 89.9
+  },
+  "over_abstain": 19.9,
+  "citations_per_answer": 1.77,
+  "retrieval_hit": 82.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.448,
+  "latency_p95": 5.145,
+  "latency_max": 7.347,
+  "causes": {
+   "판정이 맞는 답을 거절": 95,
+   "정답이 후보에 없음": 17,
+   "답이 있는데 확인 불가 (found 거짓)": 14,
+   "후보에 있는데 잘못 고름": 11,
+   "함정에 답함": 6
+  }
+ },
+ "cost_usd": 0.8346,
+ "tokens": {
+  "in": 8979132,
+  "cached": 8127360,
+  "out": 84023
+ },
+ "calls": 1931,
+ "wall_sec": 577.4,
+ "hashes": {
+  "retrieval": "dcbb2254dc77",
+  "answers": "a58e64d2a143"
+ }
+}

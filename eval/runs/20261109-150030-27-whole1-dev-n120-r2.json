@@ -12,7 +12,7 @@
   "file": "eval/configs/27-whole1.json",
   "file_sha": "163a20f5ad5a"
  },
- "conclusion": "",
+ "conclusion": "빠른 확인(120문항) — 판단은 dev 전체 실행으로",
  "lesson": [],
  "args": {
   "config": "eval/configs/27-whole1.json",
