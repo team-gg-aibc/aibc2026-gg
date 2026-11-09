@@ -54,6 +54,9 @@ DEFAULTS = {
     # ---- #28 원칙 · 예외 묶음 (건영) ----
     # ---- #29 답 형식 (종희) ----
     # ---- #30 확인 불가 신호등 (동욱) ----
+    # ---- PM 별도 실험: 새 흐름 (동규, 설계는 공유 노트 「PM별도실험-설계-11-10」) ----
+    "flow": "kit",                   # "kit" = 지금 흐름(pipeline.STAGES) / "flow2" = engine/flow2(질문 분석 → 조례 확정 → 조례 통째로 읽기 → 구절 관문 → 질문 대조)
+    "flow2_ontology": True,          # flow2만: True = ③ · ⑥이 온톨로지(engine/flow2/ontology.json)를 씀, False = 단순 규칙(온톨로지 몫 재기)
 }
 
 
