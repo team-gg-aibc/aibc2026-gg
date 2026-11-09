@@ -35,8 +35,18 @@ DEFAULTS = {
     "timeout_sec": 75,               # 넘으면 확인 불가로 답한다 (대회 제한 90초)
     "explore": False,                # 탐색 모드(1~3주기): 90초 넘어도 점수에서 빼지 않고 시간은 기록만. 상한은 timeout_sec(탐색 설정은 300)
     # ---- #22 출력 규격 강제 (동욱) ----
+    "exit_check": False,             # 마지막 출구 검사: 어중간한 답 맞추기 · 색인 라벨만 · 겹침 빼기 · 링크 · 시행일은 첫 인용의 원문에서
+    "max_citations": None,           # 인용 개수 상한(exit_check가 켜졌을 때). None = 상한 없음(출발 판)
+    "retry_budget": False,           # 429 · 5xx · 시간 초과 · 연결 오류만, 간격을 늘리며 마감 안에서 재시도(SDK 자체 재시도 끔). False = 킷 그대로
+    "max_concurrent_calls": None,    # 업스테이지 동시 호출 수 상한(프로세스 전체). None = 제한 없음
+    "on_deadline": "unknown",        # 마감이 지났을 때: "unknown" = 확인 불가(킷), "draft" = 판정 전 답이 있으면 그것
     # ---- #23 조각 다듬기 (건영) ----
-    # ---- #24 후보 넓히기 (종희) ----
+    # ---- #24 후보 넓히기 (종희) ----  후보 수 자체는 위 top_k(실험 10 · 15 · 20)
+    "select_mode": "direct",         # "direct" = ① 후보를 그대로 주고 고르기 / "prefilter" = ② Solar 한 번으로 먼저 추린 뒤 답 쓰기
+    "prefilter_keep": 8,             # ②에서 추린 뒤 답 쓰기에 넘길 최대 후보 수(점수 순)
+    "prefilter_empty_abstain": False,  # ②에서 관련 후보가 하나도 없으면 True = 확인 불가로 끝냄 / False = 점수 순 앞 prefilter_keep개로 답 쓰기
+    "max_per_article": 0,            # 같은 조(제○조)의 항을 후보에 몇 개까지 둘지. 0 = 제한 없음(출발 판)
+    "group_by_article": False,       # True면 같은 조의 항을 한 덩어리로 묶어 보여 준다(덩어리 순서는 그 조의 가장 높은 점수 순)
     # ---- #25 질문 분석 게이트 (동욱) ----
     # ---- #26 질문 다듬기 (건영) ----
     # ---- #27 조례 통째로 읽기 (종희) ----
