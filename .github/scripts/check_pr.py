@@ -19,6 +19,12 @@ def sections(text: str) -> dict[str, str]:
     return {parts[i].strip(): parts[i + 1] for i in range(1, len(parts) - 1, 2)}
 
 
+def first_line(body: str) -> str:
+    """HTML 주석을 뺀 본문에서 처음 나오는 글 있는 줄. claims.py도 이 줄로 PR의 이슈를 찾는다."""
+    text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
+    return next((line.strip() for line in text.splitlines() if line.strip()), "")
+
+
 def check(title: str, body: str, changed: list[str]) -> list[str]:
     errors = []
     screen_pr = any(path.startswith("app/") for path in changed)
@@ -26,7 +32,7 @@ def check(title: str, body: str, changed: list[str]) -> list[str]:
     if not re.match(rf"^({TYPES})(\([^)]+\))?: \S", title or ""):
         errors.append(f"PR 제목은 「{TYPES.replace('|', ' · ')}」 중 하나로 시작해야 해요. 예: feat: 검색 결과에 근거 조항 붙이기")
     text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
-    first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    first = first_line(text)
     if not re.match(r"^((Closes|Refs) #\d+|티켓 없음 — \S)", first):
         errors.append("첫 줄은 「Closes #번호」, 「Refs #번호」, 「티켓 없음 — 이유」 중 하나여야 해요.")
     found = sections(text)
