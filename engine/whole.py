@@ -42,13 +42,22 @@ def expand(hits, cfg):
 
 
 def _norm(s):
-    return "".join(s.split())
+    return "".join(s.split()).strip("「」『』\"'“”‘’")
+
+
+def _match(k, keys):
+    """k가 keys 가운데 하나와 같거나, 그 키로 시작하고 바로 뒤가 숫자 · 「의」가 아닌 것(호 · 단서 · 별표 제목이 붙은 꼴).
+    여러 개면 가장 긴 키. 「제7조」가 「제7조의4」 · 「제71조」에 맞지 않게 한다."""
+    if k in keys:
+        return k
+    ok = [key for key in keys if k.startswith(key) and not (k[len(key)].isdigit() or k[len(key)] == "의")]
+    return max(ok, key=len) if ok else None
 
 
 def label_ids(labels, hits):
-    """모델이 적은 조항 이름 → 근거 번호(1부터). 목록의 라벨과 글자(띄어쓰기 무시)가 같거나, 조례 이름을 뺀
-    「제○조 제○항」이 정확히 같을 때만 받는다(끝 글자 견주기는 「제7조 제3항」이 「제17조 제3항」에도 맞아 쓰지 않는다).
-    조례 이름을 뺀 꼴이 같은 라벨이 둘 이상이면(두 조례를 넣었을 때) 버린다."""
+    """모델이 적은 조항 이름 → 근거 번호(1부터). 따옴표를 떼고 띄어쓰기를 무시한 뒤, 목록 라벨(조례 이름 포함)이나
+    조례 이름을 뗀 「제○조 제○항」과 견준다(_match). 조례 이름을 뗀 꼴이 같은 라벨이 둘 이상이면(두 조례를 넣었을 때) 버린다.
+    목록에 없는 이름은 버린다(조항을 지어낼 수 없다)."""
     full, short = {}, {}
     for i, h in enumerate(hits, 1):
         full[_norm(h["label"])] = i
@@ -56,9 +65,13 @@ def label_ids(labels, hits):
     ids = []
     for lab in labels:
         k = _norm(lab)
-        i = full.get(k)
-        if i is None and len(short.get(k, [])) == 1:
-            i = short[k][0]
+        if not k:
+            continue
+        key = _match(k, full)
+        i = full[key] if key else None
+        if i is None:
+            key = _match(k, short)
+            i = short[key][0] if key and len(short[key]) == 1 else None
         if i is not None and i not in ids:
             ids.append(i)
     return ids
