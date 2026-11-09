@@ -1,0 +1,7 @@
+{
+  "name": "17-judge-lenient",
+  "issue": "",
+  "cycle": 2,
+  "note": "가설 17 ②(동규 PM 실험): 1주기 #55의 너그러운 판정(v2-lenient)을 rc-c1 위에서 다시 잰다. 근거와 어긋나거나 근거에 없는 주장만 거절",
+  "engine": {"verify_prompt": "v2-lenient"}
+}

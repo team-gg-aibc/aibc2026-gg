@@ -1,0 +1,7 @@
+{
+  "name": "17-judge-question",
+  "issue": "",
+  "cycle": 2,
+  "note": "가설 17 ①(동규 PM 실험): 판정이 질문도 보고, 질문이 묻는 대상(조례 이름 · 지역 · 행위)이 인용 조항에 있는지만 본다(v3-question). 답 글의 맞고 틀림으로는 거절하지 않는다",
+  "engine": {"verify_prompt": "v3-question"}
+}
