@@ -28,10 +28,12 @@ jobs:
       (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
       (startsWith(github.event.comment.body, '가져감') || startsWith(github.event.comment.body, '회수')))
     runs-on: ubuntu-latest
-    # 같은 이슈 · PR의 이벤트는 하나씩 차례로 처리한다(거의 동시에 온 두 「가져감」도 기록을 다시 읽어 먼저 쓴 한 명만 남게).
+    # 같은 이슈의 이벤트는 하나씩 차례로 처리한다(거의 동시에 온 두 「가져감」도 기록을 다시 읽어 먼저 쓴 한 명만 남게).
     # 기다리는 실행은 하나만 남고 그 사이 것은 취소되지만, 남은 실행이 기록 전체로 담당을 맞추고 빠진 안내도 단다.
+    # PR 이벤트는 실행마다 따로 돈다(run_id): push한 사람은 그 이벤트에만 있어서 취소되면 다시 셀 수 없다.
+    # ponytail: 같은 PR에 이벤트가 몰리면 같은 안내가 두 번 달릴 수 있다. 잦아지면 PR 쪽도 기록으로 셈하게 바꾼다.
     concurrency:
-      group: claims-${{ github.event.issue.number || github.event.pull_request.number }}
+      group: claims-${{ github.event.issue.number || github.run_id }}
     steps:
       - name: 체크아웃
         uses: actions/checkout@v4

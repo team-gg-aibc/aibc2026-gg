@@ -268,14 +268,15 @@ def hold_prs(api, n, events, now):
 def pr_problems(api, event):
     """PR 검사: 첫 줄 이슈의 담당 · PM이 연 PR이고 담당 · PM의 push인가. 문제 문장 목록(비면 통과)."""
     pr, sender, action = event["pull_request"], login(event["sender"]), event["action"]
+    sha, events = pr["head"]["sha"], timeline(api, pr["number"])
+    # 남이 push한 커밋은 본문을 고쳐도(첫 줄을 「티켓 없음」으로 바꿔도) 빨갛게 남긴다
+    problems = [line for line in said(events) if f"claims:push:{sha}" in line]
     m = LINK.match(first_line(pr.get("body")))
-    if not m:
-        return []  # 「티켓 없음」처럼 이슈가 없는 PR
-    n, author, sha = int(m[2]), login(pr["user"]), pr["head"]["sha"]
-    owners, problems = assignees(api, n), []
-    if owners is None:
+    n, author = (int(m[2]), login(pr["user"])) if m else (None, None)  # 「티켓 없음」처럼 이슈가 없는 PR은 아래를 건너뛴다
+    owners = assignees(api, n) if n else []
+    if n and owners is None:
         problems.append(f"PR 첫 줄의 #{n} 이슈를 찾을 수 없어요. 이슈 번호를 확인해 주세요.")
-    else:
+    elif n:
         ok = owners + [PM]
         whose = f"{mention(owners)} 님이 맡은 일이라" if owners else "아직 담당이 없어서"
         # 새로 열거나 다시 여는 사람은 지금 담당 · PM이어야 한다. 이미 있던 PR은 원래 담당(한 번이라도 맞는 담당이었던 사람)이 연 것이면
@@ -288,8 +289,6 @@ def pr_problems(api, event):
         if action == "synchronize" and sender not in ok:
             problems.append(f"@{sender} #{n} 이슈는 {whose} 이 PR 브랜치에 push할 수 없어요(커밋 {sha[:7]}). "
                             f"담당이나 PM만 push해요. <!-- claims:push:{sha} -->")
-    events = timeline(api, pr["number"])
-    problems += [line for line in said(events) if f"claims:push:{sha}" in line]  # 남이 push한 커밋은 본문을 고쳐도 빨갛게 남긴다
     say(api, pr["number"], problems, events)
     return list(dict.fromkeys(problems))
 
@@ -494,6 +493,7 @@ def selftest():
     code, api = pr("Closes #7", A, sender=B, action="synchronize")
     assert code == 1 and len(api.posts) == 1 and "claims:push:" + "a1" * 20 in api.posts[0]
     assert pr("Closes #7", A, action="edited", api=api)[0] == 1 and len(api.posts) == 1
+    assert pr("티켓 없음 — 본문만 고침", A, action="edited", api=api)[0] == 1 and len(api.posts) == 1  # 첫 줄을 바꿔도 그대로
     assert pr("Closes #7", A, action="synchronize", sha="b2" * 20, api=api)[0] == 0
     # 이어받기(5절): 원래 담당 A가 연 PR에 PM이 push하면 통과, 그 뒤 A가 push하면 실패
     assert pr("Closes #8", A, sender=PM, action="synchronize")[0] == 0
