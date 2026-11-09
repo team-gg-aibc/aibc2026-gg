@@ -1,0 +1,128 @@
+{
+ "run_id": "20261110-063619-pm-flow2-para",
+ "group": "20261110-063619-pm-flow2-para",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-10T06:38:06+09:00",
+ "experiment": {
+  "name": "pm-flow2",
+  "issue": "",
+  "note": "PM 별도 실험: 새 흐름 flow2 — 질문 분석 → 조례 확정(코드) → 조례 통째로 읽고 조항 이름 + 구절 → 구절 관문(코드) → 질문 대조(가설 17 v3 바탕). 나머지는 rc-c1 기본값(#22 출구 검사 · 75초)",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2.json",
+  "file_sha": "887fb10eda0f"
+ },
+ "conclusion": "PM 별도 실험 일반화 — flow2 새 질문 묶음 50: 세 유형 평균 99.2(rc-c1 89.2 대비 +10.0), 과잉 포기 0%, 지연 95% 10.7초. 쉬운 묶음(한 항에서 쓴 질문 · 함정 없음)이라 천장이 낮다",
+ "lesson": [
+  "좋아짐 7(판정 거절 6 · 후보에 없음 1이 맞음으로) · 나빠짐 1(다른 조항 인용)"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2.json",
+  "split": "para",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true
+ },
+ "settings_hash": "344f5276f80a",
+ "switches": {
+  "flow": "flow2"
+ },
+ "env": {
+  "code_commit": "451c77c",
+  "code_hash": "f4117e0f7f34",
+  "eval_code_hash": "cc0e489b3437",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "4421dac68d6e",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.4",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 50,
+  "n_gold": 50,
+  "n_trap": 0,
+  "weighted": null,
+  "by_type": {
+   "단순": 100.0,
+   "조건": 100.0,
+   "결합": 97.5
+  },
+  "trap": null,
+  "by_law": {
+   "animal": 100.0,
+   "bicycle": 96.4,
+   "park": 100.0,
+   "parking": 100.0,
+   "smoking": 100.0,
+   "youth": 100.0
+  },
+  "over_abstain": 0.0,
+  "citations_per_answer": 1.42,
+  "retrieval_hit": 100.0,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 5.804,
+  "latency_p95": 10.691,
+  "latency_max": 13.016,
+  "causes": {
+   "후보에 있는데 잘못 고름": 1
+  }
+ },
+ "cost_usd": 0.0963,
+ "tokens": {
+  "in": 687611,
+  "cached": 563584,
+  "out": 21723
+ },
+ "calls": 200,
+ "wall_sec": 107.1,
+ "hashes": {
+  "retrieval": "1dbe7f318a94",
+  "answers": "0d9000a2638d"
+ }
+}
