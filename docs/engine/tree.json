@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-10 02:16",
+ "as_of": "2026-11-10 03:16",
  "example": false,
  "people": {
   "동규": "#2a78d6",
@@ -185,6 +185,23 @@
       "children": []
      },
      {
+      "num": "19",
+      "kind": "hypothesis",
+      "title": "조각 다듬기 rc-c1 위에서 다시 + 반쪽 항(#23 이어서)",
+      "what": "조각 다듬기 rc-c1 위에서 다시 + 반쪽 항(#23 이어서): #23을 rc-c1 위에서 다시 재고, 호 · 별표 행 조각이 이기면 그 항 전체 글을 답 쓰기에 넘긴다",
+      "expect": "검색 이득(정답이 후보에 없음 −12)을 점수로, found 거짓 +6 되찾기",
+      "issue": 69,
+      "owner": "건영",
+      "cycle": 2,
+      "parent": "가설 2",
+      "id": "h-19",
+      "status": "진행 중",
+      "children": [],
+      "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/69",
+      "issue_state": "OPEN",
+      "prs": []
+     },
+     {
       "num": "1",
       "kind": "hypothesis",
       "title": "질문 다듬기",
@@ -238,7 +255,7 @@
      }
     ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/23",
-    "issue_state": "OPEN",
+    "issue_state": "CLOSED",
     "prs": [
      {
       "number": 59,
@@ -536,11 +553,11 @@
       "what": "조례 통째로 읽기: 질문의 조례 원문 전체를 보고 근거 번호 고르기",
       "expect": "가장 불확실. 결합 · 조건 · 함정이 크게 오를 수도, 비용 · 지연으로 못 쓸 수도",
       "issue": 27,
-      "owner": null,
-      "cycle": null,
+      "owner": "종희",
+      "cycle": 2,
       "parent": "가설 3",
       "id": "h-4",
-      "status": "대기",
+      "status": "진행 중",
       "children": [],
       "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/27",
       "issue_state": "OPEN",
@@ -552,6 +569,23 @@
         "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/63"
        }
       ]
+     },
+     {
+      "num": "17",
+      "kind": "hypothesis",
+      "title": "판정에 질문 주기(동규 11-10)",
+      "what": "판정에 질문 주기(동규 11-10): 판정이 질문을 보고, 거절 사유를 「질문이 묻는 대상(조례 이름 · 지역 · 행위)이 인용 조항에 있나」로 좁힌다. 너그러운 판정(v2-lenient)을 rc-c1 위에서 다시 견주고, 좋으면 「거절되면 인용 조항 글만으로 한 번 다시 쓰기」",
+      "expect": "같은 주제 · 다른 관할 함정(T041 · T025 꼴)은 막으면서 「판정이 맞는 답을 거절」(rc-c1 86 · 82문항)을 줄이기",
+      "issue": 70,
+      "owner": "동규",
+      "cycle": 2,
+      "parent": "가설 3",
+      "id": "h-17",
+      "status": "진행 중",
+      "children": [],
+      "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/70",
+      "issue_state": "OPEN",
+      "prs": []
      },
      {
       "num": "8",
@@ -579,6 +613,65 @@
       "state": "MERGED",
       "title": "feat(engine): 검색 후보 20개에서 먼저 추린 뒤 고르기 — 후보 수 · 추리기 · 조 단위 묶기 스위치(#24)",
       "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/57"
+     }
+    ]
+   },
+   {
+    "num": "6",
+    "kind": "hypothesis",
+    "title": "질문 분석 게이트",
+    "what": "질문 분석 게이트: 지시문 떼기 · 관할(자치구 · 다른 시도 · 상위 법률) 판별",
+    "expect": "인젝션 30문항 지시 따름 0, 자치구 함정 10/10, 멀쩡한 질문 막음 0",
+    "issue": 25,
+    "owner": "동욱",
+    "cycle": 1,
+    "parent": "출발 판",
+    "id": "h-6",
+    "status": "버림",
+    "children": [
+     {
+      "num": "18",
+      "kind": "hypothesis",
+      "title": "관할 규칙 넓히기(#25 이어서)",
+      "what": "관할 규칙 넓히기(#25 이어서): 자치구 이름이 있는데 그 문장에 「서울」이 없으면 막고, 6종이 아닌 이름의 조례(「청년주거 기본 조례」 등)를 물으면 막는다",
+      "expect": "dev 자치구 함정 8/8(지금 3/8) · T041 · T042 막음, 막은 정상 질문 0",
+      "issue": 68,
+      "owner": "동욱",
+      "cycle": 2,
+      "parent": "가설 6",
+      "id": "h-18",
+      "status": "진행 중",
+      "children": [],
+      "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/68",
+      "issue_state": "OPEN",
+      "prs": []
+     },
+     {
+      "num": "9",
+      "kind": "candidate",
+      "title": "바깥 근거 대조",
+      "what": "바깥 근거 대조(동규 11-06): 6종 밖 법령(상위 법률 · 시행규칙 · 자치구 조례)을 국가법령정보 OPEN API로 받아 6종과 함께 찾는다. 근거가 6종 밖에 있다고 확실하면 확인 불가로 보낸다. 인용은 6종만 한다",
+      "expect": "함정 정답률 ↑ · 과잉 포기 ↓. 6종에 답이 있는데 바깥 근거 때문에 확인 불가로 보내는 오탐을 같이 잰다",
+      "issue": null,
+      "owner": null,
+      "cycle": null,
+      "parent": "가설 6",
+      "id": "c-9",
+      "status": "대기",
+      "children": [],
+      "issue_url": null,
+      "issue_state": null,
+      "prs": []
+     }
+    ],
+    "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/25",
+    "issue_state": "CLOSED",
+    "prs": [
+     {
+      "number": 60,
+      "state": "OPEN",
+      "title": "feat: 질문 분석 게이트 — 지시문 떼기 · 자치구 조례 · 규칙 질문 거르기 (#25)",
+      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/60"
      }
     ]
    },
@@ -629,48 +722,6 @@
       "state": "MERGED",
       "title": "feat: 출력 규격 강제와 0점 방어 — 마지막 출구 검사 · 마감 안 재시도 · 동시 호출 제한",
       "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/58"
-     }
-    ]
-   },
-   {
-    "num": "6",
-    "kind": "hypothesis",
-    "title": "질문 분석 게이트",
-    "what": "질문 분석 게이트: 지시문 떼기 · 관할(자치구 · 다른 시도 · 상위 법률) 판별",
-    "expect": "인젝션 30문항 지시 따름 0, 자치구 함정 10/10, 멀쩡한 질문 막음 0",
-    "issue": 25,
-    "owner": null,
-    "cycle": null,
-    "parent": "출발 판",
-    "id": "h-6",
-    "status": "대기",
-    "children": [
-     {
-      "num": "9",
-      "kind": "candidate",
-      "title": "바깥 근거 대조",
-      "what": "바깥 근거 대조(동규 11-06): 6종 밖 법령(상위 법률 · 시행규칙 · 자치구 조례)을 국가법령정보 OPEN API로 받아 6종과 함께 찾는다. 근거가 6종 밖에 있다고 확실하면 확인 불가로 보낸다. 인용은 6종만 한다",
-      "expect": "함정 정답률 ↑ · 과잉 포기 ↓. 6종에 답이 있는데 바깥 근거 때문에 확인 불가로 보내는 오탐을 같이 잰다",
-      "issue": null,
-      "owner": null,
-      "cycle": null,
-      "parent": "가설 6",
-      "id": "c-9",
-      "status": "대기",
-      "children": [],
-      "issue_url": null,
-      "issue_state": null,
-      "prs": []
-     }
-    ],
-    "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/25",
-    "issue_state": "OPEN",
-    "prs": [
-     {
-      "number": 60,
-      "state": "OPEN",
-      "title": "feat: 질문 분석 게이트 — 지시문 떼기 · 자치구 조례 · 규칙 질문 거르기 (#25)",
-      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/60"
      }
     ]
    },

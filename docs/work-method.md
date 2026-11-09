@@ -182,7 +182,7 @@ GG비서는 디스코드로 알려 주기만 한다(원본은 이슈다). 새로
 
 - 끈 판은 그 주기의 릴리스 판(2주기는 rc-c1 = main `4908473`, 태그 `rc-c1`)이다. 그 커밋 뒤의 main을 실험 브랜치에 합친 다음, 켠 판과 같은 날 · 같은 커밋에서 dev 전체를 두 번씩 잰다. 끈 판의 설정 지문(실행 요약의 `settings_hash`)이 그 릴리스 판의 지문과 같은지 재기 전에 확인한다. rc-c1은 `c7fa2a072a92`(`eval/configs/baseline.json`), 탐색 모드 끈 판(`eval/configs/explore.json`)은 `3dfd793c9f0f`다. 키 없이 미리 보려면 `python3 -c "from engine import config; print(config.digest(config.load('eval/configs/baseline.json')))"`. 켠 판을 탐색 모드(`explore` · `timeout_sec` 300)로 재면 끈 판도 `eval/configs/explore.json`으로 같은 모드에서 잰다.
 - 비교 문서를 r1끼리 · r2끼리 두 개 만들어 둘 다 커밋한다: `python3 eval/compare.py <켠 판>-r1 --base <끈 판>-r1`, r2도 같게.
-- 끝 보고의 결과 표 밑에 네 줄을 더한다. ① 끈 판에서 두 번 다 맞던 함정이 켠 판에서 두 번 다 틀린 수와 문항 id ② 오류 · 시간 초과로 끝난 함정(켠 판 · 끈 판 따로). 지금 채점은 엔진이 「확인 불가」로 끝낸 이런 문항을 맞음으로 센다 ③ 정답이 애매한 함정 T017 · T021(평가셋 「사람 확인」 표시) · T043(다른 회사 모델도 답함)의 결과 ④ 과잉 포기에서 오류 · 시간 초과로 확인 불가가 된 정답 문항을 뺀 값(나누는 수 619는 그대로).
+- 끝 보고의 결과 표 밑에 네 줄을 더한다. ① 끈 판에서 두 번 다 맞던 함정이 켠 판에서 두 번 다 틀린 수와 문항 id ② 오류 · 시간 초과로 끝난 함정(켠 판 · 끈 판 따로). 지금 채점은 엔진이 「확인 불가」로 끝낸 이런 문항을 맞음으로 센다 ③ 정답이 애매한 함정 T017 · T021(평가셋 「사람 확인」 표시) · T043(다른 회사 모델도 답함)의 결과 ④ 과잉 포기에서 오류 · 시간 초과로 확인 불가가 된 정답 문항을 포기 수와 나누는 수에서 모두 뺀 값(동규 11-10).
 - 네 줄은 아래 명령 한 번으로 나온다(키 없이, 그 실행을 돌린 컴퓨터에서. 윈도우 Git Bash에서도 같고, `python3`이 없으면 `python`).
 
 ```bash
@@ -199,7 +199,8 @@ for name, runs in (("켠 판", (on1, on2)), ("끈 판", (off1, off2))):
     print(name, "3. T017 · T021 · T043 점수 (r1, r2):", [[r[f"common-{t}"]["score"] for t in ("T017", "T021", "T043")] for r in runs])
     for k, r in enumerate(runs, 1):
         gold = [x for x in r.values() if x["gold"]]
-        print(name, f"r{k} 4. 과잉 포기 {100 * sum(x['unknown'] for x in gold) / len(gold):.1f}% → 오류 · 시간 초과 뺀 값 {100 * sum(x['unknown'] and not bad(x) for x in gold) / len(gold):.1f}%")
+        kept = [x for x in gold if not bad(x)]
+        print(name, f"r{k} 4. 과잉 포기 {100 * sum(x['unknown'] for x in gold) / len(gold):.1f}% → 오류 · 시간 초과 {len(gold) - len(kept)}문항을 빼면 {100 * sum(x['unknown'] for x in kept) / len(kept):.1f}%")
 EOF
 ```
 
