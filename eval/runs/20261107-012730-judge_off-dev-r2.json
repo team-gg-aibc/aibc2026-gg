@@ -1,0 +1,125 @@
+{
+ "run_id": "20261107-012730-judge_off-dev-r2",
+ "group": "20261107-012730-judge_off-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-07T01:42:30+09:00",
+ "experiment": {
+  "name": "judge_off",
+  "issue": "#55",
+  "note": "PM 실험(동규 11-07, 이슈는 올린 뒤 채움): 검증 ② 판정을 건너뛴다(① 점수 문턱은 그대로). 판정이 버리는 맞는 답과 판정이 막는 함정을 함께 보는 상한선",
+  "cycle": 1,
+  "file": "eval/configs/pm-judge-off.json",
+  "file_sha": "c8a8fa5c53fe"
+ },
+ "conclusion": "버림 — 가중 +11.8(67.2 → 78.9)로 크게 오르지만 함정 −9.5(90.5 → 81.0)로 기준(−1점)을 넘는다. 판정이 점수를 지키는 곳이 함정뿐임을 확인한 상한선",
+ "lesson": [
+  "좋아짐 116 · 나빠짐 12(r1 대 출발 판 r1): 판정이 맞는 답을 거절 112 → 0, 과잉 포기 27.6 → 6.8%. 나빠짐은 함정에 답함 +4~5와 버려지던 틀린 답이 나간 잘못 고름 +15",
+  "판정은 정답 있는 문항에서는 점수를 깎기만 한다(채점은 인용만 보고, 틀린 인용은 버려도 0점). 지키는 곳은 함정 실행당 3~5문항뿐. 버린 맞는 답의 3분의 2는 답 쪽 문제(답 글 틀림 36 · 인용 안 한 조각 내용 24 · 추측 8, 실행당)",
+  "함정 막기를 판정에서 떼어 질문 쪽 신호(#25 게이트 · #30의 「질문 대상이 근거에 있나」)로 옮기고, 판정에 걸린 답은 확인 불가 대신 답 글만 다시 쓰기"
+ ],
+ "args": {
+  "config": "eval/configs/pm-judge-off.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "judge_off": true
+ },
+ "settings_hash": "25901c6161c0",
+ "switches": {
+  "judge_off": true
+ },
+ "env": {
+  "code_commit": "5c70805",
+  "code_hash": "a63ccb7659e8",
+  "eval_code_hash": "ac989cd5d33d",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 78.6,
+  "by_type": {
+   "단순": 84.0,
+   "조건": 82.5,
+   "결합": 69.3,
+   "함정": 78.6
+  },
+  "trap": 78.6,
+  "by_law": {
+   "animal": 84.0,
+   "bicycle": 77.6,
+   "common": 70.0,
+   "park": 75.8,
+   "parking": 79.4,
+   "smoking": 86.9,
+   "youth": 83.2
+  },
+  "over_abstain": 6.1,
+  "citations_per_answer": 1.57,
+  "retrieval_hit": 83.0,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.222,
+  "latency_p95": 5.152,
+  "latency_max": 9.364,
+  "causes": {
+   "정답이 후보에 없음": 137,
+   "후보에 있는데 잘못 고름": 15,
+   "답이 있는데 확인 불가 (found 거짓)": 9,
+   "함정에 답함": 9,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2
+  }
+ },
+ "cost_usd": 0.2515,
+ "tokens": {
+  "in": 885917,
+  "cached": 295936,
+  "out": 55141
+ },
+ "calls": 1322,
+ "wall_sec": 427.4,
+ "hashes": {
+  "retrieval": "791d34d7bbf2",
+  "answers": "af1dd7066290"
+ }
+}
