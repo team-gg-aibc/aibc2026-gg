@@ -52,9 +52,7 @@ def judge(st, cfg):
     if not cfg["use_verify"]:
         return
     sel = st["_sel"]
-    st["verdict"], text = verify.judge(answer_step.context(sel["used"]), sel["answer"], cfg, st["calls"], st["question"])
-    if text != sel["answer"]:    # 가설 17 ③: 인용 조항 글만으로 다시 쓴 답이 다시 판정을 통과했다
-        st["draft"] = contract.build(text, sel["used"])
+    st["verdict"] = verify.judge(answer_step.context(sel["used"]), sel["answer"], cfg, st["calls"], st["question"])
     if st["verdict"] == "notGrounded":
         st["reason"] = REJECTED
 
