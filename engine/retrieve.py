@@ -93,5 +93,13 @@ def retrieve(question, cfg, calls=None, k=None):
         seen = set()
         idx = [i for i in idx if not (chunks[i]["label"] in seen or seen.add(chunks[i]["label"]))]
     idx = idx[:k or cfg["top_k"]]
-    return [{**chunks[i], "score": float(score[i]), "kw": float(kw_norm[i]),
-             "cos": float(cos[i]) if cos is not None else None} for i in idx]
+    out = [{**chunks[i], "score": float(score[i]), "kw": float(kw_norm[i]),
+            "cos": float(cos[i]) if cos is not None else None} for i in idx]
+    if cfg["chunk_whole_item"]:  # 같은 라벨 가운데 번호가 가장 작은 조각이 항 전체 글(호 조각은 그 뒤에 붙는다). 별표는 해당 없음
+        first = {}
+        for c in chunks:
+            first.setdefault(c["label"], c)
+        for r in out:
+            if "annex_source" not in r:
+                r["text"] = first[r["label"]]["text"]
+    return out

@@ -46,6 +46,7 @@ DEFAULTS = {
     "chunk_article_head": False,     # 항이 없는 조 조각에도 「[조례 이름 제N조(제목)]」 머리말
     "chunk_item_split": False,       # 호가 여럿인 항 · 조에 호 단위 조각을 더함(라벨은 항 그대로, 검색 결과에서 같은 라벨은 하나로)
     "chunk_annex_rows": False,       # 별표 표를 행 단위 조각으로, 행마다 머리글 되풀이
+    "chunk_whole_item": False,       # 호 조각이 검색에서 이기면 답 쓰기에 그 항 전체 글을 넘긴다(반쪽 항 막기, 색인은 그대로). 별표 행은 그대로
     # ---- #24 후보 넓히기 (종희) ----  후보 수 자체는 위 top_k(실험 10 · 15 · 20)
     "select_mode": "prefilter",      # (1주기 채택, 출발 판 "direct") "direct" = ① 후보를 그대로 주고 고르기 / "prefilter" = ② Solar 한 번으로 먼저 추린 뒤 답 쓰기
     "prefilter_keep": 8,             # ②에서 추린 뒤 답 쓰기에 넘길 최대 후보 수(점수 순)
