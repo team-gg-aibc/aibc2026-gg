@@ -1,0 +1,139 @@
+{
+ "run_id": "20261110-063940-23-final-dev-r2",
+ "group": "20261110-063940-23-final-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-10T06:58:01+09:00",
+ "experiment": {
+  "name": "23-final",
+  "issue": "#23",
+  "note": "꼬리표 · 머리말 · 호 · 별표 행 네 스위치 모두(혼합 검색)",
+  "cycle": 2,
+  "file": "eval/configs/23-final.json",
+  "file_sha": "4a2cf9f35589"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/23-final.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "chunk_strip_tags": true,
+  "chunk_article_head": true,
+  "chunk_item_split": true,
+  "chunk_annex_rows": true,
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true
+ },
+ "settings_hash": "38af52159b9f",
+ "switches": {
+  "timeout_sec": 300,
+  "explore": true,
+  "chunk_strip_tags": true,
+  "chunk_article_head": true,
+  "chunk_item_split": true,
+  "chunk_annex_rows": true
+ },
+ "env": {
+  "code_commit": "04f17ca",
+  "code_hash": "f796d709dc54",
+  "eval_code_hash": "dd2f9632631f",
+  "code_dirty": true,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:5f9ff5aa5d1a vectors:e20db3c921de",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.13.7",
+  "packages": {
+   "numpy": "2.5.4",
+   "openai": "3.46.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-11"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 77.4,
+  "by_type": {
+   "단순": 83.8,
+   "조건": 77.5,
+   "결합": 62.1,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 83.1,
+   "bicycle": 88.1,
+   "common": 20.0,
+   "park": 67.9,
+   "parking": 69.0,
+   "smoking": 80.6,
+   "youth": 81.4
+  },
+  "over_abstain": 18.3,
+  "citations_per_answer": 1.53,
+  "retrieval_hit": 95.1,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.448,
+  "latency_p95": 3.812,
+  "latency_max": 12.98,
+  "causes": {
+   "판정이 맞는 답을 거절": 74,
+   "정답이 후보에 없음": 33,
+   "답이 있는데 확인 불가 (found 거짓)": 28,
+   "후보에 있는데 잘못 고름": 27,
+   "함정에 답함": 4
+  }
+ },
+ "cost_usd": 0.5761,
+ "tokens": {
+  "in": 2001704,
+  "cached": 388416,
+  "out": 65189
+ },
+ "calls": 2522,
+ "wall_sec": 548.1,
+ "hashes": {
+  "retrieval": "890fdbb589df",
+  "answers": "f468838163b0"
+ }
+}
