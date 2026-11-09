@@ -1,0 +1,126 @@
+{
+ "run_id": "20261109-150827-27-whole1-dev-r2",
+ "group": "20261109-150827-27-whole1-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-09T15:26:13+09:00",
+ "experiment": {
+  "name": "27-whole1",
+  "issue": "#27",
+  "note": "검색 후보 대신 후보 점수 합 1위 조례의 원문 전체를 근거 목록으로",
+  "cycle": 2,
+  "file": "eval/configs/27-whole1.json",
+  "file_sha": "163a20f5ad5a"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/27-whole1.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true,
+  "whole_max_laws": 1,
+  "whole_second_ratio": 0.9
+ },
+ "settings_hash": "2410a4f312ff",
+ "switches": {
+  "timeout_sec": 300,
+  "explore": true,
+  "whole_ordinance": true
+ },
+ "env": {
+  "code_commit": "205c3c2",
+  "code_hash": "491e0e79b82c",
+  "eval_code_hash": "a09821526cd3",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.14",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-26.6"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 69.5,
+  "by_type": {
+   "단순": 70.0,
+   "조건": 68.2,
+   "결합": 56.3,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 67.6,
+   "bicycle": 61.6,
+   "common": 10.0,
+   "park": 72.7,
+   "parking": 62.8,
+   "smoking": 69.4,
+   "youth": 71.3
+  },
+  "over_abstain": 32.1,
+  "citations_per_answer": 1.83,
+  "retrieval_hit": 82.9,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.171,
+  "latency_p95": 5.617,
+  "latency_max": 8.583,
+  "causes": {
+   "판정이 맞는 답을 거절": 149,
+   "후보에 있는데 잘못 고름": 29,
+   "정답이 후보에 없음": 19,
+   "답이 있는데 확인 불가 (found 거짓)": 13,
+   "함정에 답함": 4,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 1
+  }
+ },
+ "cost_usd": 0.7886,
+ "tokens": {
+  "in": 8919296,
+  "cached": 8146944,
+  "out": 64594
+ },
+ "calls": 1930,
+ "wall_sec": 563.5,
+ "hashes": {
+  "retrieval": "24149a41806a",
+  "answers": "a59860a8e4c9"
+ }
+}
