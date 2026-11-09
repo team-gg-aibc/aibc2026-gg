@@ -6,7 +6,7 @@
 import json
 import re
 
-from . import upstage
+from . import upstage, whole
 
 DISTRICT = re.compile(r"서울특별시\s*\S+구\s")      # 「OO구」 자치구 조례 인용 막기
 
@@ -47,6 +47,8 @@ def context(hits):
 
 def select_and_write(question, hits, cfg, calls=None):
     """돌려주는 것: found · answer · evidence_ids(모델이 고른 번호) · used(번호에 맞는 조각, 자치구 라벨 뺌)."""
+    if cfg["whole_ordinance"]:   # #27: 검색 후보 대신 조례 원문 전체
+        hits = whole.expand(hits, cfg)
     raw = upstage.chat(
         [{"role": "system", "content": PROMPTS[cfg["answer_prompt"]]},
          {"role": "user", "content": f"[근거]\n{context(hits)}\n\n[질문]\n{question}"}],
