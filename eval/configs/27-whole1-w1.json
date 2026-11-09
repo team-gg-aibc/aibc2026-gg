@@ -1,0 +1,1 @@
+{"name": "27-whole1-w1", "issue": "#27", "cycle": 2, "note": "조례 통째로 + 고르기 프롬프트 w1(문장마다 근거 · 이웃 항 확인 · 계산 덧붙이지 않기)", "engine": {"explore": true, "timeout_sec": 300, "whole_ordinance": true, "answer_prompt": "w1"}}

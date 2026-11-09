@@ -39,3 +39,26 @@ def expand(hits, cfg):
                 out.append({**c, "score": h["score"] if h else None, "kw": h["kw"] if h else None,
                             "cos": h["cos"] if h else None})
     return out
+
+
+def _norm(s):
+    return "".join(s.split())
+
+
+def label_ids(labels, hits):
+    """모델이 적은 조항 이름 → 근거 번호(1부터). 목록의 라벨과 글자(띄어쓰기 무시)가 같거나, 조례 이름을 뺀
+    「제○조 제○항」이 정확히 같을 때만 받는다(끝 글자 견주기는 「제7조 제3항」이 「제17조 제3항」에도 맞아 쓰지 않는다).
+    조례 이름을 뺀 꼴이 같은 라벨이 둘 이상이면(두 조례를 넣었을 때) 버린다."""
+    full, short = {}, {}
+    for i, h in enumerate(hits, 1):
+        full[_norm(h["label"])] = i
+        short.setdefault(_norm(h["label"].removeprefix(h.get("law", ""))), []).append(i)
+    ids = []
+    for lab in labels:
+        k = _norm(lab)
+        i = full.get(k)
+        if i is None and len(short.get(k, [])) == 1:
+            i = short[k][0]
+        if i is not None and i not in ids:
+            ids.append(i)
+    return ids

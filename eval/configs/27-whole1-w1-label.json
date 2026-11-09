@@ -1,0 +1,1 @@
+{"name": "27-whole1-w1-label", "issue": "#27", "cycle": 2, "note": "조례 통째로 + 프롬프트 w1 + 번호 대신 조항 이름으로 고르기(목록에 있는 이름만 받음)", "engine": {"explore": true, "timeout_sec": 300, "whole_ordinance": true, "answer_prompt": "w1", "whole_cite": "label"}}
