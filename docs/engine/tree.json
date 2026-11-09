@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-06 23:24",
+ "as_of": "2026-11-08 18:45",
  "example": false,
  "people": {
   "동규": "#2a78d6",
@@ -88,7 +88,14 @@
     ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/23",
     "issue_state": "OPEN",
-    "prs": []
+    "prs": [
+     {
+      "number": 59,
+      "state": "OPEN",
+      "title": "feat(engine): 조각 다듬기 스위치 — 꼬리표 · 머리말 · 호 · 별표 행(#23)",
+      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/59"
+     }
+    ]
    },
    {
     "num": "3",
@@ -101,8 +108,276 @@
     "cycle": 1,
     "parent": "출발 판",
     "id": "h-3",
-    "status": "진행 중",
+    "status": "채택",
     "children": [
+     {
+      "id": "e-20261107-182114-24-top6-direct-dev-n100",
+      "kind": "experiment",
+      "title": "24-top6-direct (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "69.5",
+      "delta": "+5.9",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182228-24-top10-direct-dev-n100",
+      "kind": "experiment",
+      "title": "24-top10-direct (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "66.2",
+      "delta": "+2.6",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=10, answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182329-24-top15-direct-dev-n100",
+      "kind": "experiment",
+      "title": "24-top15-direct (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "66.1",
+      "delta": "+2.5",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=15, answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182432-24-top20-direct-dev-n100",
+      "kind": "experiment",
+      "title": "24-top20-direct (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "70.5",
+      "delta": "+6.9",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=20, answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182548-24-top6-prefilter-dev-n100",
+      "kind": "experiment",
+      "title": "24-top6-prefilter (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "65.2",
+      "delta": "+1.6",
+      "flag": "↑ 흔들림 밖",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182745-24-top10-prefilter-dev-n100",
+      "kind": "experiment",
+      "title": "24-top10-prefilter (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "68.8",
+      "delta": "+5.2",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=10, answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-182941-24-top15-prefilter-dev-n100",
+      "kind": "experiment",
+      "title": "24-top15-prefilter (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "71.6",
+      "delta": "+8.0",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=15, answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261107-183135-24-top20-prefilter-dev-n100",
+      "kind": "experiment",
+      "title": "24-top20-prefilter (탐색)",
+      "label": "dev 100문항 표본(씨앗 0) · 100문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "진행 중",
+      "metric": "가중 점수",
+      "score": "74.5",
+      "delta": "+10.9",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "참고 — 100문항 빠른 확인(후보 수 × 방식 고르기용). 채택 판단은 dev 전체로",
+      "lesson": [],
+      "repeats": 1,
+      "date": "2026-11-07",
+      "code": "fc36232",
+      "compare": null,
+      "switches": "top_k=20, answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261108-170751-24-top20-prefilter-dev",
+      "kind": "experiment",
+      "title": "24-top20-prefilter (탐색)",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "버림",
+      "metric": "가중 점수",
+      "score": "75.8",
+      "delta": "+8.8",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "버림 — 가중 +8.8이지만 함정 90.5→79.8(추리기가 빈 목록이어도 앞 8개로 답을 써 함정에 답함). abstain 판으로 대신",
+      "lesson": [
+       "좋아짐 근거 정확도 · 결합형, 나빠짐 함정 −10.7(함정에 답함 4→8.5)",
+       "추리기가 「관련 없음」이라 한 함정에도 점수 순 앞 8개를 넘겨 답을 썼다",
+       "빈 목록이면 확인 불가(prefilter_empty_abstain)"
+      ],
+      "repeats": 2,
+      "date": "2026-11-08",
+      "code": "fc36232",
+      "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261108-170751-24-top20-prefilter-dev-r1.md",
+      "switches": "top_k=20, answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261108-172654-24-top20-direct-dev",
+      "kind": "experiment",
+      "title": "24-top20-direct (탐색)",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "버림",
+      "metric": "가중 점수",
+      "score": "70.7",
+      "delta": "+3.8",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "버림 — 가중 +3.8이지만 두 번 폭 5.2점으로 흔들리고 함정 −9.5, 판정 거절 104→138",
+      "lesson": [
+       "좋아짐 정답이 후보에 없음 110→34, 나빠짐 판정이 맞는 답을 거절 +34 · 함정에 답함 +4",
+       "후보 20개를 한꺼번에 주면 근거를 더 많이 붙여(인용 1.77) 판정이 거절하고, 함정에서도 비슷한 조항을 고른다",
+       "먼저 추리기(②)로 바꾼다"
+      ],
+      "repeats": 2,
+      "date": "2026-11-08",
+      "code": "fc36232",
+      "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261108-172654-24-top20-direct-dev-r1.md",
+      "switches": "top_k=20, answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261108-175019-24-top6-direct-dev",
+      "kind": "experiment",
+      "title": "24-top6-direct (탐색)",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "버림",
+      "metric": "가중 점수",
+      "score": "67.5",
+      "delta": "+0.5",
+      "flag": "흔들림 안",
+      "conclusion": "버림 — 대조군(후보 6 + v2 프롬프트 + 조 묶기): 가중 +0.5로 흔들림 안. 점수가 오른 것은 프롬프트가 아니라 후보 넓히기 덕",
+      "lesson": [
+       "바뀐 것 없음(흔들림 안)",
+       "100문항에서 보인 +5.9는 표본 흔들림이었다",
+       "프롬프트 효과를 볼 때도 dev 전체로 잰다"
+      ],
+      "repeats": 2,
+      "date": "2026-11-08",
+      "code": "fc36232",
+      "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261108-175019-24-top6-direct-dev-r1.md",
+      "switches": "answer_prompt=\"v2\", timeout_sec=300, explore=true, group_by_article=true",
+      "children": []
+     },
+     {
+      "id": "e-20261108-180643-24-top20-prefilter-abstain-dev",
+      "kind": "experiment",
+      "title": "24-top20-prefilter-abstain (탐색)",
+      "label": "dev 전체 · 661문항",
+      "cycle": 1,
+      "owner": "종희",
+      "status": "채택",
+      "metric": "가중 점수",
+      "score": "78.3",
+      "delta": "+10.6",
+      "flag": "✅ 폭의 2배 넘게 오름",
+      "conclusion": "채택 의견 — 같은 커밋 끈 판(67.7) 대비 가중 +10.6(폭의 2배 넘게), 함정 85.7→90.5, 과잉 포기 26.1→17.5, 지연 95% 7.6초 안, 형식 오류 0",
+      "lesson": [
+       "좋아짐 정답이 후보에 없음 110→약 35문항, 결합형 +17점 · 나빠짐 후보에 있는데 잘못 고름 소폭 증가",
+       "후보 20개를 그대로 주면 모델이 헷갈리지만(①), 먼저 관련 있는 것만 추리면(②) 넓힌 후보를 점수로 바꾼다. 추리기가 빈 목록이면 확인 불가로 끝내야 함정을 지킨다",
+       "같은 조 개수 제한(max_per_article)은 아직 안 잼 · 판정이 맞는 답을 거절(약 80문항)은 #56과 함께 보기"
+      ],
+      "repeats": 2,
+      "date": "2026-11-08",
+      "code": "7bbf736",
+      "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261108-180643-24-top20-prefilter-abstain-dev-r1.md",
+      "switches": "top_k=20, answer_prompt=\"v2\", timeout_sec=300, explore=true, select_mode=\"prefilter\", prefilter_empty_abstain=true, group_by_article=true",
+      "children": []
+     },
      {
       "num": "4",
       "kind": "hypothesis",
@@ -140,7 +415,14 @@
     ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/24",
     "issue_state": "OPEN",
-    "prs": []
+    "prs": [
+     {
+      "number": 57,
+      "state": "OPEN",
+      "title": "feat(engine): 검색 후보를 넓혀 고르기 — 후보 수 · 먼저 추리기 · 조 단위 묶기 스위치(#24)",
+      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/57"
+     }
+    ]
    },
    {
     "num": "#22",
@@ -157,7 +439,14 @@
     "children": [],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/22",
     "issue_state": "OPEN",
-    "prs": []
+    "prs": [
+     {
+      "number": 58,
+      "state": "OPEN",
+      "title": "feat: 출력 규격 강제와 0점 방어 — 마지막 출구 검사 · 마감 안 재시도 · 동시 호출 제한",
+      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/58"
+     }
+    ]
    },
    {
     "num": "6",
@@ -192,7 +481,14 @@
     ],
     "issue_url": "https://github.com/team-gg-aibc/aibc2026-gg/issues/25",
     "issue_state": "OPEN",
-    "prs": []
+    "prs": [
+     {
+      "number": 60,
+      "state": "OPEN",
+      "title": "feat: 질문 분석 게이트 — 지시문 떼기 · 자치구 조례 · 규칙 질문 거르기 (#25)",
+      "url": "https://github.com/team-gg-aibc/aibc2026-gg/pull/60"
+     }
+    ]
    },
    {
     "num": "7",
@@ -323,17 +619,17 @@
    }
   ],
   "metric": "가중 점수",
-  "score": "68.1",
+  "score": "67.7",
   "label": "dev 전체 · 661문항",
-  "band": "1.1",
-  "date": "2026-11-06",
+  "band": "0.8",
+  "date": "2026-11-08",
   "by_type": {
-   "단순": "72.7",
-   "조건": "69.5",
-   "결합": "47.8",
-   "함정": "89.7"
+   "단순": "72.6",
+   "조건": "70.9",
+   "결합": "47.6",
+   "함정": "85.7"
   },
-  "compare": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/compare/20261106-203151-baseline-dev-r1.md",
+  "compare": null,
   "links": {
    "리더보드": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/leaderboard.md",
    "실험 기록": "https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/experiments.md",
