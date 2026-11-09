@@ -1,0 +1,7 @@
+{
+  "name": "22-contract",
+  "issue": "#22",
+  "cycle": 1,
+  "note": "출력 규격 강제와 0점 방어: 마지막 출구 검사(인용 상한 4) · 마감 안 재시도 · 동시 호출 6. 대회 조건(75초)으로 잰다(탐색 모드 아님)",
+  "engine": {"exit_check": true, "max_citations": 4, "retry_budget": true, "max_concurrent_calls": 6}
+}
