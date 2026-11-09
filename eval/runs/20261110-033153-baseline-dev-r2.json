@@ -1,0 +1,130 @@
+{
+ "run_id": "20261110-033153-baseline-dev-r2",
+ "group": "20261110-033153-baseline-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-10T03:51:46+09:00",
+ "experiment": {
+  "name": "baseline",
+  "issue": "#21",
+  "note": "끈 판: engine/config.py DEFAULTS 그대로(스타터 킷 + solar-pro4 판정 위에 채택한 실험을 켠 지금 main의 판, 1주기 #22 · #24 채택 11/10)",
+  "cycle": 2,
+  "file": "eval/configs/baseline.json",
+  "file_sha": "8f412e2e6f53"
+ },
+ "conclusion": "PM 별도 실험 비교 기준 — rc-c1(DEFAULTS) 같은 날 · 같은 커밋 6388f50 두 번: 가중 78.4 · 79.4(평균 78.9), 함정 88.1 · 90.5, 과잉 포기 16.2%",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/baseline.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "kit",
+  "flow2_ontology": true
+ },
+ "settings_hash": "cd00fb7b9634",
+ "switches": {},
+ "env": {
+  "code_commit": "6388f50",
+  "code_hash": "d98441d21f66",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.4",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 79.4,
+  "by_type": {
+   "단순": 82.2,
+   "조건": 81.4,
+   "결합": 67.2,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 82.7,
+   "bicycle": 84.9,
+   "common": 80.0,
+   "park": 74.2,
+   "parking": 70.7,
+   "smoking": 83.3,
+   "youth": 83.4
+  },
+  "over_abstain": 16.2,
+  "citations_per_answer": 1.53,
+  "retrieval_hit": 94.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.607,
+  "latency_p95": 5.179,
+  "latency_max": 18.155,
+  "causes": {
+   "판정이 맞는 답을 거절": 64,
+   "정답이 후보에 없음": 37,
+   "후보에 있는데 잘못 고름": 28,
+   "답이 있는데 확인 불가 (found 거짓)": 23,
+   "함정에 답함": 4
+  }
+ },
+ "cost_usd": 0.5951,
+ "tokens": {
+  "in": 3111942,
+  "cached": 1702720,
+  "out": 66353
+ },
+ "calls": 2532,
+ "wall_sec": 635.9,
+ "hashes": {
+  "retrieval": "d4be7ed4501d",
+  "answers": "3619c5e09b0b"
+ }
+}

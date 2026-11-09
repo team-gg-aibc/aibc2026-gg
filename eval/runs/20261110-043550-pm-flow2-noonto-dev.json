@@ -1,0 +1,140 @@
+{
+ "run_id": "20261110-043550-pm-flow2-noonto-dev",
+ "group": "20261110-043550-pm-flow2-noonto-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-10T04:55:41+09:00",
+ "experiment": {
+  "name": "pm-flow2-noonto",
+  "issue": "",
+  "note": "PM 별도 실험: 새 흐름 flow2에서 온톨로지만 끔 — ③은 단순 규칙(정식 이름 글자 같음 · 분석이 자치구/다른 시도면 막음), ⑥은 인용 법령 목록 없이. 온톨로지 몫 재기용",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2-noonto.json",
+  "file_sha": "54671e2526e2"
+ },
+ "conclusion": "온톨로지 몫 재기(한 번) — 가중 81.4(켬 두 번 평균 88.3 대비 −6.9), 함정 97.6, 과잉 포기 18.9%. 끔 = ③ 단순 규칙(정식 이름 글자 같음 · 분석이 자치구/다른 시도면 막음) · ⑥ 인용 법령 목록 없음",
+ "lesson": [
+  "끔에서 ③이 정답 있는 문항 59개를 막음(관할 밖 53 · 6종 밖 조례 6), 켬은 0. 함정은 끔이 2문항 더 막음(자치구 조례 8/8 vs 7/8)",
+  "온톨로지 몫은 대부분 ③의 위임 · 별칭 · 서울 시설 예외에서 나옴"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2-noonto.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": false
+ },
+ "settings_hash": "0f5526a86f5b",
+ "switches": {
+  "flow": "flow2",
+  "flow2_ontology": false
+ },
+ "env": {
+  "code_commit": "6388f50",
+  "code_hash": "d98441d21f66",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.4",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 81.4,
+  "by_type": {
+   "단순": 84.8,
+   "조건": 74.1,
+   "결합": 74.4,
+   "함정": 97.6
+  },
+  "trap": 97.6,
+  "by_law": {
+   "animal": 67.6,
+   "bicycle": 83.0,
+   "common": 60.0,
+   "park": 73.2,
+   "parking": 84.6,
+   "smoking": 84.7,
+   "youth": 83.7
+  },
+  "over_abstain": 18.9,
+  "citations_per_answer": 1.64,
+  "retrieval_hit": 99.2,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 5.565,
+  "latency_p95": 8.618,
+  "latency_max": 13.257,
+  "causes": {
+   "답이 있는데 확인 불가 (관할 밖)": 51,
+   "후보에 있는데 잘못 고름": 30,
+   "판정이 맞는 답을 거절": 22,
+   "답이 있는데 확인 불가 (구절 불일치)": 19,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 14,
+   "답이 있는데 확인 불가 (6종 밖 조례)": 6,
+   "정답이 후보에 없음": 3,
+   "함정에 답함": 1,
+   "답이 있는데 확인 불가 (found 거짓)": 1
+  }
+ },
+ "cost_usd": 1.1741,
+ "tokens": {
+  "in": 8761465,
+  "cached": 7304832,
+  "out": 256907
+ },
+ "calls": 2434,
+ "wall_sec": 1191.6,
+ "hashes": {
+  "retrieval": "68b8f8cffced",
+  "answers": "e8c450453f76"
+ }
+}

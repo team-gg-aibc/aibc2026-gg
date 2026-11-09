@@ -1,0 +1,139 @@
+{
+ "run_id": "20261110-035147-pm-flow2-dev-r1",
+ "group": "20261110-035147-pm-flow2-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T04:13:53+09:00",
+ "experiment": {
+  "name": "pm-flow2",
+  "issue": "",
+  "note": "PM 별도 실험: 새 흐름 flow2 — 질문 분석 → 조례 확정(코드) → 조례 통째로 읽고 조항 이름 + 구절 → 구절 관문(코드) → 질문 대조(가설 17 v3 바탕). 나머지는 rc-c1 기본값(#22 출구 검사 · 75초)",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2.json",
+  "file_sha": "887fb10eda0f"
+ },
+ "conclusion": "채택 후보(PM 별도 실험 flow2, 2주기) — 가중 90.5 · 86.1(평균 88.3, 같은 날 rc-c1 78.9 대비 +9.4), 함정 95.2 · 95.2(+6.0), 과잉 포기 7.3 · 12.8%(rc-c1 16.2%), 형식 오류 0, 지연 95% 9.2초, 문항당 $0.0020(rc-c1의 2.1배). rc-c1이 두 번 다 맞힌 함정 35개 중 두 번 다 틀린 것 0. 동규 확인 전(답 글 표본 20개 · #63 병합 여부)",
+ "lesson": [
+  "좋아짐: 판정이 맞는 답을 거절 71 · 64 → 15 · 22, 정답이 후보에 없음 34 · 37 → 1 · 1(조례 통째로 읽기), 결합 64.9 → 83.4(두 번 평균)",
+  "나빠짐: 지연 95% 3.9~5.2초 → 9.2초, 비용 2.1배, 흔들림 1.0 → 4.4점",
+  "흔들림 까닭: ⑤ 관문이 조 이름만 적은 인용(「제5조(제목)」)과 호를 이어 옮긴 구절을 버림(두 번째 실행 근거 번호 없음 24 · 구절 불일치 25). 다음 커밋에서 고침 — 같은 기록을 다시 매기면(⑥ 통과 가정, 보수적) 93.3 · 91.6",
+  "⑥ 규칙: 지금(판정만)과 대상 구절 요구는 거의 같고, ⑥을 빼면 가중 +0.6~1.3 · 함정 −4.7이라 유지"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true
+ },
+ "settings_hash": "344f5276f80a",
+ "switches": {
+  "flow": "flow2"
+ },
+ "env": {
+  "code_commit": "6388f50",
+  "code_hash": "d98441d21f66",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.4",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 90.5,
+  "by_type": {
+   "단순": 91.6,
+   "조건": 91.0,
+   "결합": 85.6,
+   "함정": 95.2
+  },
+  "trap": 95.2,
+  "by_law": {
+   "animal": 88.9,
+   "bicycle": 95.2,
+   "common": 60.0,
+   "park": 92.2,
+   "parking": 89.8,
+   "smoking": 89.8,
+   "youth": 88.1
+  },
+  "over_abstain": 7.3,
+  "citations_per_answer": 1.62,
+  "retrieval_hit": 99.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 5.794,
+  "latency_p95": 9.205,
+  "latency_max": 24.391,
+  "causes": {
+   "후보에 있는데 잘못 고름": 32,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 15,
+   "판정이 맞는 답을 거절": 15,
+   "답이 있는데 확인 불가 (구절 불일치)": 12,
+   "함정에 답함": 2,
+   "정답이 후보에 없음": 1,
+   "답이 있는데 확인 불가 (found 거짓)": 1
+  }
+ },
+ "cost_usd": 1.3859,
+ "tokens": {
+  "in": 9868588,
+  "cached": 7936960,
+  "out": 282998
+ },
+ "calls": 2568,
+ "wall_sec": 1325.8,
+ "hashes": {
+  "retrieval": "6aab664872fa",
+  "answers": "3e1d316567ed"
+ }
+}
