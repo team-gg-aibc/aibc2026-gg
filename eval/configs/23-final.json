@@ -1,0 +1,1 @@
+{"name": "23-final", "issue": "#23", "cycle": 1, "note": "꼬리표 · 머리말 · 호 · 별표 행 네 스위치 모두(혼합 검색)", "engine": {"explore": true, "timeout_sec": 300, "chunk_strip_tags": true, "chunk_article_head": true, "chunk_item_split": true, "chunk_annex_rows": true}}
