@@ -1,6 +1,6 @@
 # engine — 서울특별시 조례 6종 질의응답 엔진
 
-스타터 킷(커밋 `8866d0e`: 받은 그대로 + 없어진 groundedness-check 대신 solar-pro4 판정)을 옮겨 단계별 파일로 나눈 판이다. 동작은 킷과 같다. 이 판이 모든 실험의 **출발 판**이고, 실험은 `eval/configs/`의 설정 파일로 스위치를 켜서 잰다(규칙은 `docs/engine/reproducibility.md`).
+스타터 킷(커밋 `8866d0e`: 받은 그대로 + 없어진 groundedness-check 대신 solar-pro4 판정)을 옮겨 단계별 파일로 나눈 판이다. 이 판이 **출발 판**(0주기, 동작은 킷과 같다. `eval/configs/start.json`이 고정)이다. 배분일마다 채택한 실험의 스위치를 기본값(`engine/config.py` DEFAULTS)으로 켜서, 다음 주기 실험은 그 판(끈 판)에서 `eval/configs/`의 설정 파일로 스위치를 켜서 잰다(규칙은 `docs/engine/reproducibility.md`).
 
 ## 설치 (처음 한 번)
 
@@ -22,7 +22,7 @@ python3 -m venv .venv
 처음 받은 컴퓨터에서 위에서부터 차례로 돌린다. 맥 기준이고, 윈도우는 아래 「윈도우에서 다른 것」 표대로 바꾼다.
 
 ```bash
-.venv/bin/python eval/run.py --check eval/runs/20261106-201622-baseline-dev.json
+.venv/bin/python eval/run.py --check eval/runs/20261110-021505-start-dev.json
 .venv/bin/python -m engine.pipeline "경차 주차요금 할인돼요?"
 .venv/bin/python eval/run.py --config eval/configs/baseline.json --split dev --sample 20 --repeat 2
 .venv/bin/python eval/compare.py <두 번째 실행 이름> --base <첫 번째 실행 이름>
@@ -65,7 +65,8 @@ PowerShell 기준이다.
 |---|---|
 | 한 문항 돌려 보기 (응답 + 판단 기록) | `.venv/bin/python -m engine.pipeline "경차 주차요금 할인돼요?"` |
 | 설정 파일로 한 문항 | `.venv/bin/python -m engine.pipeline "질문" eval/configs/baseline.json` |
-| 채점 API 서버 | `ENGINE_CONFIG=eval/configs/baseline.json .venv/bin/uvicorn engine.server:app --port 8000` |
+| 채점 API 서버 | `ENGINE_CONFIG=eval/configs/baseline.json .venv/bin/uvicorn engine.server:app --port 8000` (워커 하나. 문항마다 판단 기록 한 줄이 `logs/server-날짜.jsonl`에 남는다, git에 안 올림) |
+| 출력 규격 스스로 시험 (키 없이, 10초, CI에서도 돈다) | `.venv/bin/python -m engine.contract --selftest` |
 | 색인 다시 만들기 (조각 글을 바꿨을 때) | `.venv/bin/python -m engine.build_index` (키가 있어야 임베딩까지 만든다) |
 | 별표 다시 읽기 (거의 안 씀) | `.venv/bin/python -m engine.parse_annex` (키 필요, Document Parse 비용) |
 
@@ -75,7 +76,7 @@ PowerShell 기준이다.
 
 | 하려는 것 | 명령 · 문서 |
 |---|---|
-| 내 컴퓨터가 팀과 같은 결과를 내나 (키 없이, 2초) | `python3 eval/run.py --check eval/runs/20261106-201622-baseline-dev.json` (재현 규칙 1절) |
+| 내 컴퓨터가 팀과 같은 결과를 내나 (키 없이, 2초) | `python3 eval/run.py --check eval/runs/20261110-021505-start-dev.json` (재현 규칙 1절) |
 | 실험 하나 재기 | 설정 파일 `eval/configs/<이슈>-<이름>.json`을 만들고 `python3 eval/run.py --config <설정 파일>` |
 | 리더보드 · 실험 기록 다시 만들기 | `python3 eval/board.py` → [리더보드](../docs/engine/leaderboard.md) · [실험 기록](../docs/engine/experiments.md) |
 | 탐색 모드(1~3주기: 90초 조건 없이, 문항당 300초까지) | 설정에 `"explore": true, "timeout_sec": 300` (바탕: `eval/configs/explore.json`) |
@@ -91,7 +92,7 @@ PowerShell 기준이다.
 
 | 하려는 것 | 명령 |
 |---|---|
-| 배분일 릴리스 (막 끝난 주기 N, 11/9면 1) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
+| 배분일 릴리스 (막 끝난 주기 N, 11/11이면 2) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
 | 실행 요약에 「채택」이 없는 실험도 넣기 | 위 명령에 `--adopt eval/configs/<실험>.json` (여러 번 줄 수 있다) |
 | 릴리스 설정이 채택 실험 · 마지막 기록과 맞나 (키 없이, 2초) | `python3 eval/release.py --check` |
 
@@ -108,7 +109,7 @@ PowerShell 기준이다.
 
 | 파일 | 하는 일 | 주로 고치는 사람 |
 |---|---|---|
-| `config.py` | 스위치 · 설정(DEFAULTS = 출발 판), 설정 파일 읽기, 키 찾기. 이슈마다 자기 절(`# ---- #이슈 …`)에만 줄을 더한다 | 모두 (자기 절만) |
+| `config.py` | 스위치 · 설정(DEFAULTS = 지금 main의 판: 출발 판 + 채택한 실험), 설정 파일 읽기, 키 찾기. 이슈마다 자기 절(`# ---- #이슈 …`)에만 줄을 더한다 | 모두 (자기 절만) |
 | `upstage.py` | 업스테이지 호출 한 곳, 429 재시도, 토큰 · 비용 기록(`PRICES`) | 동욱 (#22) |
 | `retrieve.py` | 임베딩 + 키워드(BM25) 혼합 검색, 색인 지문 | 건영 (#23 · #26 · #28) |
 | `answer.py` | 근거 고르기 · 답 쓰기(Solar 한 번), 프롬프트 판(`PROMPTS`). 계획 문서의 `select.py`다. `select`는 파이썬 표준 모듈 이름이라 겹치지 않게 했다 | 종희 (#24 · #27 · #29) |
@@ -125,7 +126,7 @@ PowerShell 기준이다.
 
 | 칸 | 뜻 |
 |---|---|
-| `reason` | 확인 불가를 낸 까닭: `점수 낮음`(검증 ①) · `found 거짓` · `근거 번호 없음` · `판정 거절`(검증 ②) · `오류`. 답했으면 `null` |
+| `reason` | 확인 불가를 낸 까닭: `점수 낮음`(검증 ①) · `found 거짓` · `근거 번호 없음` · `판정 거절`(검증 ②) · `오류` · `시간 초과`(마감 시각 = 받은 때 + `timeout_sec`가 지남, #22). 답했으면 `null` |
 | `error` | 오류 종류. 바깥 서비스 오류는 종류와 상태 번호만 남긴다(메시지에 키 일부가 섞일 수 있어서) |
 | `retrieval` · `candidates` | 실제로 쓴 검색(`hybrid` · `keyword`)과 후보 라벨 · 점수(혼합 · 키워드 · 의미) |
 | `evidence_ids` · `draft` · `verdict` | 모델이 고른 근거 번호, 판정 전 답, 판정 |

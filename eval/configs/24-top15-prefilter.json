@@ -1,0 +1,14 @@
+{
+  "name": "24-top15-prefilter",
+  "issue": "#24",
+  "cycle": 1,
+  "note": "② 후보 15개에서 Solar로 관련 있는 것을 8개까지 추린 뒤 v2 프롬프트로 답 쓰기",
+  "engine": {
+    "explore": true,
+    "timeout_sec": 300,
+    "top_k": 15,
+    "answer_prompt": "v2",
+    "group_by_article": true,
+    "select_mode": "prefilter"
+  }
+}
