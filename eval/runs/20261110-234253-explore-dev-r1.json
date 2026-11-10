@@ -1,0 +1,131 @@
+{
+  "run_id": "20261110-234253-explore-dev-r1",
+  "group": "20261110-234253-explore-dev",
+  "repeat": 1,
+  "repeats": 2,
+  "created": "2026-11-10T23:50:32+09:00",
+  "experiment": {
+    "name": "explore",
+    "issue": "",
+    "note": "탐색 모드의 바탕(1~3주기): 90초 조건 없이 문항당 300초까지, 시간은 단계별로 기록만. 실험 설정은 이 파일을 복사해 engine 칸에 자기 스위치를 더한다",
+    "cycle": 2,
+    "file": "eval/configs/explore.json",
+    "file_sha": "eec604361c1b"
+  },
+  "conclusion": "#71 끈 판 — 탐색 모드(explore.json, 지문 3dfd793c9f0f), 켠 판과 같은 날 · 같은 커밋 766116c",
+  "lesson": [],
+  "args": {
+    "config": "eval/configs/explore.json",
+    "split": "dev",
+    "sample": null,
+    "seed": 0,
+    "mode": "full",
+    "url": null,
+    "workers": 4
+  },
+  "settings": {
+    "chat_model": "solar-pro4",
+    "embed_passage": "solar-embedding-2-passage",
+    "embed_query": "solar-embedding-2-query",
+    "temperature": 0.0,
+    "reasoning_effort": null,
+    "chunk_unit": "paragraph",
+    "top_k": 20,
+    "hybrid_cos_weight": 0.7,
+    "use_embedding": true,
+    "use_verify": true,
+    "min_score": 0.25,
+    "answer_prompt": "v2",
+    "verify_prompt": "v1",
+    "timeout_sec": 300,
+    "explore": true,
+    "exit_check": true,
+    "max_citations": 4,
+    "retry_budget": true,
+    "max_concurrent_calls": 6,
+    "on_deadline": "unknown",
+    "select_mode": "prefilter",
+    "prefilter_keep": 8,
+    "prefilter_empty_abstain": true,
+    "max_per_article": 0,
+    "group_by_article": true
+  },
+  "settings_hash": "3dfd793c9f0f",
+  "switches": {
+    "timeout_sec": 300,
+    "explore": true
+  },
+  "env": {
+    "code_commit": "766116c",
+    "code_hash": "42f8177e7c8c",
+    "eval_code_hash": "2cb442d13c87",
+    "code_dirty": false,
+    "eval_commit": "17f8cc2",
+    "questions_hash": "8cf67c797eaa",
+    "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+    "retrieval_used": [
+      "hybrid"
+    ],
+    "key_present": true,
+    "server": null,
+    "python": "3.11.15",
+    "packages": {
+      "numpy": "2.2.6",
+      "openai": "3.39.0",
+      "requests": "2.34.2"
+    },
+    "platform": "Windows-10"
+  },
+  "metrics": {
+    "n": 661,
+    "n_gold": 619,
+    "n_trap": 42,
+    "weighted": 77.0,
+    "by_type": {
+      "단순": 85.0,
+      "조건": 78.0,
+      "결합": 63.7,
+      "함정": 83.3
+    },
+    "trap": 83.3,
+    "by_law": {
+      "animal": 79.8,
+      "bicycle": 81.5,
+      "common": 80.0,
+      "park": 77.3,
+      "parking": 69.9,
+      "smoking": 83.8,
+      "youth": 82.9
+    },
+    "over_abstain": 17.0,
+    "citations_per_answer": 1.51,
+    "retrieval_hit": 94.8,
+    "format_errors": 0,
+    "late": 0,
+    "over_90s": 0,
+    "timeouts": 0,
+    "errors": 0,
+    "latency_p50": 2.725,
+    "latency_p95": 4.038,
+    "latency_max": 8.226,
+    "causes": {
+      "판정이 맞는 답을 거절": 79,
+      "정답이 후보에 없음": 36,
+      "후보에 있는데 잘못 고름": 27,
+      "답이 있는데 확인 불가 (found 거짓)": 16,
+      "함정에 답함": 7
+    }
+  },
+  "cost_usd": 0.9386,
+  "tokens": {
+    "in": 3136163,
+    "cached": 304640,
+    "out": 66899
+  },
+  "calls": 2545,
+  "wall_sec": 458.9,
+  "hashes": {
+    "retrieval": "5c481a2aa481",
+    "answers": "c194f6e191d9"
+  }
+}
