@@ -1,0 +1,143 @@
+{
+ "run_id": "20261110-203619-27-whole2-prefilter-dev-r1",
+ "group": "20261110-203619-27-whole2-prefilter-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T20:45:38+09:00",
+ "experiment": {
+  "name": "27-whole2-prefilter",
+  "issue": "#27",
+  "note": "rc-c1 위: #24 추리기 → 빈 목록이면 확인 불가, 아니면 추린 후보로 고른 조례를 통째로 읽고 조항 이름으로 고르기(프롬프트 w1)",
+  "cycle": 2,
+  "file": "eval/configs/27-whole2-prefilter.json",
+  "file_sha": "a6374a1f31e3"
+ },
+ "conclusion": "채택 의견(함정 한 문항은 PM 판단) — 같은 커밋 끈 판 rc-c1(76.5) 대비 가중 +3.6(80.1, 폭의 2배 넘게), 과잉 포기(오류 뺀 값) 19.3→18.6, 형식 오류 0, 지연 95% 4.7초. 두 번 다 맞던 함정이 두 번 다 틀린 것은 정답이 애매한 T043 하나",
+ "lesson": [
+  "좋아짐 정답이 후보에 없음 36→10, 후보에 있는데 잘못 고름 27→18, 결합 62.9→70.3 · 나빠짐 함정 88.1→88.1(같음)이지만 T043(남산공원 개발)을 두 번 다 답함, JSON 깨짐 판마다 1건",
+  "통째로 읽기 앞에 #24 추리기를 붙이니 1주기(출발 판 위)의 함정 −6이 사라졌다. 추리기가 비슷한 일반 조항(도시공원 제22조 · 제23조)을 관련 있다고 보면 여전히 답한다(T016 · T043)",
+  "판정이 맞는 답을 거절(약 98)은 #70과 함께 · 같은 주제 다른 관할(T025 · T041)은 #68 게이트와 함께 · 추리기가 본 후보로 조례를 고르는 대신 Solar 분류 한 번 견주기"
+ ],
+ "args": {
+  "config": "eval/configs/27-whole2-prefilter.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "w1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "whole_ordinance": true,
+  "whole_max_laws": 1,
+  "whole_cite": "label",
+  "whole_second_ratio": 0.9,
+  "whole_prefilter": true
+ },
+ "settings_hash": "0fba099344c0",
+ "switches": {
+  "answer_prompt": "w1",
+  "whole_ordinance": true,
+  "whole_cite": "label",
+  "whole_prefilter": true
+ },
+ "env": {
+  "code_commit": "2e46a61",
+  "code_hash": "8df7457d0ee4",
+  "eval_code_hash": "09f33fb3c985",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.14",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-26.6"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 80.6,
+  "by_type": {
+   "단순": 86.0,
+   "조건": 77.3,
+   "결합": 72.0,
+   "함정": 90.5
+  },
+  "trap": 90.5,
+  "by_law": {
+   "animal": 83.6,
+   "bicycle": 86.6,
+   "common": 20.0,
+   "park": 74.7,
+   "parking": 66.3,
+   "smoking": 89.5,
+   "youth": 90.8
+  },
+  "over_abstain": 18.9,
+  "citations_per_answer": 1.79,
+  "retrieval_hit": 94.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 1,
+  "latency_p50": 3.403,
+  "latency_p95": 4.656,
+  "latency_max": 8.409,
+  "causes": {
+   "판정이 맞는 답을 거절": 99,
+   "후보에 있는데 잘못 고름": 18,
+   "정답이 후보에 없음": 10,
+   "답이 있는데 확인 불가 (found 거짓)": 4,
+   "함정에 답함": 4,
+   "오류 · 형식": 1
+  }
+ },
+ "cost_usd": 1.5557,
+ "tokens": {
+  "in": 10587471,
+  "cached": 7165568,
+  "out": 90505
+ },
+ "calls": 2551,
+ "wall_sec": 558.1,
+ "hashes": {
+  "retrieval": "f02ce214f918",
+  "answers": "4ef224dcb801"
+ }
+}
