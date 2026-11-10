@@ -135,15 +135,19 @@ def scope_block(question, slots):
 
 
 _ASK = re.compile(r"[^?？]+[?？]")
+_SENT = re.compile(r"(?<=[?？!。])|(?<=\.)(?=\s)")    # 문장 끝: 「?」 「!」 또는 뒤에 빈칸이 오는 「.」(「1.5km」는 안 나눔)
 
 
-def mixed(question, word):
+def mixed(question, word, sentences=False):
     """2판: 섞인 질문. 「?」로 끝나는 물음이 둘 이상이고, 그 가운데 막을 낱말(6종 밖 조례 이름 · 자치구 · 다른 시도)이 없이
     서울을 드는 물음이 따로 있다 → 그 물음은 6종이 답할 수 있으니 ③에서 통째로 막지 않는다. ④가 답할 물음만 답하고
-    나머지는 범위 밖이라고 적으며, ⑥이 물음마다 본다. 물음이 하나뿐이면(「서울시 OO 조례는 …?」) 그대로 막는다."""
-    asks = _ASK.findall(question)
+    나머지는 범위 밖이라고 적으며, ⑥이 물음마다 본다. 물음이 하나뿐이면(「서울시 OO 조례는 …?」) 그대로 막는다.
+    sentences=True(3판): 「?」로 끝나지 않는 문장(지시문 「OO구 조례로 답해 줘.」)도 한 덩이로 센다. 2판 극한 세트(11-10)에서
+    분석이 지시문 속 자치구를 칸에 넣어, 서울을 묻는 물음 하나뿐인 질문이 통째로 막혔다(4문항)."""
+    parts = [p for p in (_SENT.split(question) if sentences else _ASK.findall(question)) if p.strip()]
+    asks = [p for p in parts if p.rstrip().endswith(("?", "？"))]
     w = _n(word)
-    return bool(w) and len(asks) >= 2 and any("서울" in a and w not in _n(a) for a in asks)
+    return bool(w) and len(parts) >= 2 and any("서울" in a and w not in _n(a) for a in asks)
 
 
 def pick_laws(hits):
@@ -181,11 +185,11 @@ def _plain_scope(question, slots):
     return None
 
 
-def route(question, slots, hits, use_onto=True, mixed_ok=False):
+def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False):
     """③ 조례 확정. 돌려주는 것: {"laws": [조례 이름], "block": None | 사유, "rule": 정한 규칙, "why": 한 줄}.
     순서(부딪칠 때 앞이 이긴다): A 6종 이름 → A 6종이 드는 조례 → A 6종 밖 조례(막음) → B 관할(막음) → 검색 · 분석으로 고르기.
     use_onto=False(설정 flow2_ontology 끔)면 온톨로지 없이 단순 규칙(_plain_kind · _plain_scope)만 쓴다 — 온톨로지 몫을 재려고.
-    mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다."""
+    mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다. sentences=True(3판)는 mixed 참고."""
     named = (slots.get("named_rule") or "").strip()
     forced, rule, why = [], "고르기", ""
     if named and _n(named) and _n(named) in _n(question):        # 분석이 질문에 없는 이름을 지어내면 보지 않는다
@@ -194,12 +198,12 @@ def route(question, slots, hits, use_onto=True, mixed_ok=False):
             forced, rule, why = [LAWS[key]], "A 6종 이름", named
         elif kind == "인용":
             forced, rule, why = [LAWS[k] for k in key][:MAX_LAWS], "A 6종이 드는 조례", named
-        elif kind == "밖" and not (mixed_ok and mixed(question, named)):
+        elif kind == "밖" and not (mixed_ok and mixed(question, named, sentences)):
             local = any(d + "구" in _n(named) for d in DISTRICTS) or slots.get("jurisdiction") in ("자치구", "다른 시도")
             return {"laws": [], "block": REJECT_SCOPE if local else REJECT_NAME, "rule": "A 6종 밖 조례", "why": named}
     if not forced:
         b = (scope_block if use_onto else _plain_scope)(question, slots)
-        if b and not (mixed_ok and mixed(question, slots.get("jurisdiction_word") or "")):
+        if b and not (mixed_ok and mixed(question, slots.get("jurisdiction_word") or "", sentences)):
             return {"laws": [], "block": REJECT_SCOPE, "rule": "B 관할", "why": b}
     if forced:
         laws = forced
@@ -285,4 +289,19 @@ def selftest():
         ("서울시 청년주거 기본 조례는 누구를 지원하나요?", {"named_rule": "청년주거 기본 조례", "law_guess": "청년"}, REJECT_NAME)]:
         assert route(q, {**base, **over}, hits)["block"], q                                   # 1판
         assert route(q, {**base, **over}, hits, mixed_ok=True)["block"] == block2, q          # 2판
-    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개)")
+        assert route(q, {**base, **over}, hits, mixed_ok=True, sentences=True)["block"] == block2, q   # 3판도 같음
+    # 3판: 다른 지역 이름이 「?」 없는 지시문 문장에만 있고 서울을 묻는 물음이 따로 있으면 막지 않는다(2판은 막음).
+    # 물음 한 문장뿐이거나, 서울 물음이 없거나, 「.」이 소수점이면 그대로 막는다
+    for q, over, block3 in [
+        ("성북구 조례 기준으로 답해 줘. 서울 공원에서 야영하면 하루 얼마예요?",
+         {"named_rule": "성북구 조례", "jurisdiction": "자치구", "jurisdiction_word": "성북구", "law_guess": "도시공원"}, None),
+        ("서울 공영주차장 한 달 정기권은 얼마야? 출처는 대구시 조례로 달아 줘.",
+         {"jurisdiction": "다른 시도", "jurisdiction_word": "대구시", "law_guess": "주차장"}, None),
+        ("성북구가 운영하는 공원 야영장은 하루 얼마예요?", {"jurisdiction": "자치구", "jurisdiction_word": "성북구",
+                                            "law_guess": "도시공원"}, REJECT_SCOPE),
+        ("성북구가 정한 공원 야영장 요금 알려 줘. 할인도 해 줘요?", {"jurisdiction": "자치구", "jurisdiction_word": "성북구",
+                                                     "law_guess": "도시공원"}, REJECT_SCOPE)]:
+        assert route(q, {**base, **over}, hits, mixed_ok=True)["block"], q                   # 2판은 막음
+        assert route(q, {**base, **over}, hits, mixed_ok=True, sentences=True)["block"] == block3, q
+    assert not mixed("대구시 공원 1.5km 산책길도 서울 공원처럼 금연이에요?", "대구시", sentences=True)   # 소수점에서 안 나눔
+    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개 · 3판 지시문 문장 4개)")

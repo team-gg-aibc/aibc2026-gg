@@ -71,6 +71,9 @@ _TAGS = re.compile(r"<[^<>]{0,60}>|\[[^\[\]]{0,120}\]")
 _DROP = re.compile(r"[\s\"'“”‘’「」『』|,○◦●■□※]")
 _ELLIPSIS = re.compile(r"\.{3,}|…|⋯|‥")
 _ITEM = re.compile(r"^(?:\d+\.|[가-하]\.|[①-⑳]|제\d+항)")   # 「제N항」: 모델이 항 머리 「②」를 「제2항」으로 바꿔 옮긴다(11-10 2판 시험)
+# 3판: 짧은 괄호 글(「(이하 "시장"이라 한다)」 · 「(月齡)」)은 양쪽에서 지우고 본다. 모델이 빼고 옮겨 맞는 구절이 버려졌다
+# (2판 전체 측정 11-10: dev 한 실행에서 버린 구절 40개 중 14개, 정답 조항을 잃은 문항 5~6개. 옛 규칙으로 통과하던 구절은 그대로 통과 777/777)
+_PAREN = re.compile(r"\([^()]{0,40}\)")
 
 
 def _nq(s):
@@ -82,8 +85,11 @@ def _nq(s):
 _ITEM_START = re.compile(r"(?:^|\s)(?=(?:\d{1,2}|[가-하])\.\s|[①-⑳])")
 
 
-def quote_in(quote, text):
-    """quote가 text에 글자 그대로 있나(위 차이 무시). 「…」로 줄였거나 호를 건너뛰어 이어 옮겼으면 조각(2글자 이상)마다 있어야 한다."""
+def quote_in(quote, text, paren=False):
+    """quote가 text에 글자 그대로 있나(위 차이 무시). 「…」로 줄였거나 호를 건너뛰어 이어 옮겼으면 조각(2글자 이상)마다 있어야 한다.
+    paren=True(3판)면 짧은 괄호 글을 양쪽에서 지우고 본다."""
+    if paren:
+        quote, text = _PAREN.sub("", quote or ""), _PAREN.sub("", text or "")
     t = _nq(text)
     parts = [_ITEM.sub("", _nq(q)) for p in _ELLIPSIS.split(quote or "") for q in _ITEM_START.split(p)]
     parts = [p for p in parts if len(p) >= 2]
@@ -112,6 +118,15 @@ def missing_numbers(question, chunks):
     """질문이 든 조 · 별표 번호 가운데 고른 조례 원문(조각 이름)에 없는 것. 예: 그 조례가 제35조까지인데 「제52조」."""
     have = {_cite_key(m) for c in chunks for m in _CITE.finditer(c["label"].removeprefix(c.get("law", "")))}
     return list(dict.fromkeys(m.group(0) for m in _CITE.finditer(question) if _cite_key(m) not in have))
+
+
+_ARTNO = re.compile(r"(?:제\s*)?\d+\s*조(?:\s*의\s*\d+)?(?:\s*(?:제\s*)?\d+\s*항)?(?:\s*(?:제\s*)?\d+\s*호)?|별표\s*\d+")
+
+
+def mask_numbers(question):
+    """3판 ⑥: 질문 속 조 · 항 · 호 · 별표 번호를 가린다. ⑥은 [근거]가 묻는 대상을 정하는지만 보는데, 2판 극한 세트(11-10)에서
+    틀린 조 번호나 지시문 속 조 번호를 「이름을 든 조례와 다르다」(1)로 보고 맞는 답을 거절했다(4문항). 번호 대조는 ④ · 코드 몫이다."""
+    return _ARTNO.sub("(조 번호)", question)
 
 
 def facts(st, cfg):
@@ -164,7 +179,7 @@ def analyze(st, cfg):
 def route(st, cfg):
     """③ 조례 확정(코드만, 호출 0). 규칙과 근거 조항은 lawmap.py."""
     r = lawmap.route(st["question"], _f2(st).get("slots") or {}, st["_hits"], use_onto=cfg["flow2_ontology"],
-                     mixed_ok=cfg["flow2_version"] >= 2)
+                     mixed_ok=cfg["flow2_version"] >= 2, sentences=cfg["flow2_version"] >= 3)
     _f2(st)["route"] = r
     _f2(st)["ontology"] = lawmap.ontology.VERSION if cfg["flow2_ontology"] else "끔"
     if r["block"]:
@@ -190,6 +205,8 @@ def read(st, cfg):
     out = json.loads(raw)
     st["_read"] = out
     _f2(st)["read"] = {k: out.get(k) for k in ("found", "conclusion", "evidence")}
+    if "check" in out:                       # 3판(r4): 결론 앞에 쓴 조건 대조
+        _f2(st)["read"]["check"] = out["check"]
     if not out.get("found"):
         st["reason"] = pipeline.NOT_FOUND
 
@@ -201,15 +218,19 @@ def gate(st, cfg):
     for c in v:
         body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
     kept, ids, dropped = [], [], []
+    v3 = cfg["flow2_version"] >= 3
     for ev in out.get("evidence") or []:
-        found = label_ids([ev.get("label", "")], v) or by_quote(ev.get("label", ""), ev.get("quote", ""), v, body)
+        lab = ev.get("label", "")
+        if v3:   # 3판: 모델이 근거 줄 머리 「[조항]」까지 옮겨 적는다(2판 dev 두 번째 실행에서 13문항이 「목록에 없는 조항」, 11-10)
+            lab = lab.replace("[조항]", "").strip()
+        found = label_ids([lab], v) or by_quote(lab, ev.get("quote", ""), v, body)
         if not found:
             dropped.append({"label": ev.get("label", ""), "why": "목록에 없는 조항"})
             continue
         c = v[found[0] - 1]
         if answer_step.DISTRICT.search(c["label"]):
             dropped.append({"label": c["label"], "why": "자치구"})
-        elif not quote_in(ev.get("quote", ""), body[c["label"]]):
+        elif not quote_in(ev.get("quote", ""), body[c["label"]], paren=v3):
             dropped.append({"label": c["label"], "why": "구절이 원문에 없음", "quote": ev.get("quote", "")})
         elif c["label"] not in {k["label"] for k in kept}:
             kept.append(c)
@@ -234,8 +255,11 @@ def check(st, cfg):
     who = (f"\n묻는 일을 하는 사람: {s.get('actor') or '없음'}\n알고 싶은 것: {s.get('asks') or '없음'}"   # 2판: c4의 4(행위 주체)
            if cfg["flow2_version"] >= 2 else "")
     fx = _f2(st).get("facts") or []
+    question = st["question"]
+    if cfg["flow2_version"] >= 3:            # 3판: 조 번호를 가리고(mask_numbers), 「없는 번호」 사실은 ⑥에 넘기지 않는다(④에는 넘김)
+        question, fx = mask_numbers(question), fx[:1]
     who += ("\n\n[조례 확정]\n" + "\n".join(fx)) if fx else ""
-    user = (f"[질문]\n{st['question']}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
+    user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used)}\n\n[답변]\n{st['draft']['answer']}")
     _, system, schema = prompts.SETS[cfg["flow2_version"]]["check"]
     out = json.loads(upstage.chat([{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -290,6 +314,12 @@ def selftest():
          {"label": "서울특별시 도시공원 조례 제7조의2", "law": "서울특별시 도시공원 조례"}]
     assert label_ids(["제7조 제3항", "서울특별시 도시공원 조례 제7조의2", "제9조"], v) == [1, 2]
     assert label_ids(["[서울특별시 도시공원 조례 제7조(공원의 관리) 제3항]"], v) == [1]   # 대괄호 · 조 제목 괄호
+    # 3판: 괄호 글을 빼고 옮긴 구절(옛 규칙은 버림) · 지어낸 말은 그대로 버림 · 조 번호 가리기
+    par = '① 서울특별시장(이하 "시장"이라 한다)은 월령(月齡) 3개월 이상인 개의 명단을 매년 정리하여야 한다.'
+    assert quote_in("서울특별시장은 월령 3개월 이상인 개의 명단을", par, paren=True) and not quote_in("서울특별시장은 월령 3개월", par)
+    assert quote_in('서울특별시장(이하 "시장"이라 한다)은', par, paren=True) and not quote_in("서울특별시장은 지어낸 명단", par, paren=True)
+    assert mask_numbers("주차장 조례 제12조의3 제2항이랑 별표 4, 그리고 7조 1항 3호는요? 1.5km는 그대로") == \
+        "주차장 조례 (조 번호)이랑 (조 번호), 그리고 (조 번호)는요? 1.5km는 그대로"
 
     law = "서울특별시 주차장 설치 및 관리 조례"
     chunks = [c for c in retrieve.load("paragraph")[0] if c["law"] == law]
@@ -356,6 +386,21 @@ def selftest():
         assert r["citation"] == [target["label"]] and t["verdict"] == "grounded", t["reason"]   # 물음 하나라도 grounded면 통과
         plan["target_check"] = dict(plan["target_check"], asks=[{"ask": "경차 할인", "verdict": "notGrounded"}])
         assert pipeline.answer(mix, cfg2)[1]["reason"] == pipeline.REJECTED                    # 모든 물음이 notGrounded면 거절
+        # 3판: 프롬프트 판 · 근거 이름의 「[조항]」 표시(2판은 버림) · ⑥은 조 번호를 가린 질문과 별칭 사실만 · ④는 없는 번호 사실까지
+        cfg3 = dict(cfg, flow2_version=3)
+        plan.update(question_slots=dict(slots, named_rule="주차장 조례", actor="시민"),
+                    law_answer_quotes={"found": True, "check": "질문은 경차, 조문도 경형자동차 → 맞음", "conclusion": "네",
+                                       "answer": "네, 감면됩니다.", "evidence": [{"label": "[조항] " + target["label"], "quote": quote}]},
+                    target_check={"reason": "", "targets": [{"asked": "경차", "quote": quote}],
+                                  "asks": [{"ask": "경차 할인", "verdict": "grounded"}]})
+        q99 = "주차장 조례 제99조에 경차 할인이 있다던데 맞아요?"
+        r, t = pipeline.answer(q99, cfg3)
+        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r4", "check": "c4"}, t["reason"]
+        assert t["flow2"]["read"]["check"].startswith("질문은 경차")
+        assert "「제99조」는 이 조례 원문에 없는 번호다" in seen["law_answer_quotes"][-1]["content"]
+        assert "(조 번호)" in seen["target_check"][-1]["content"] and "제99조" not in seen["target_check"][-1]["content"]
+        assert "「주차장 조례」는 서울특별시 주차장 설치 및 관리 조례다" in seen["target_check"][-1]["content"]
+        assert pipeline.answer(q99, cfg2)[1]["reason"] == pipeline.NO_EVIDENCE                 # 2판은 「[조항]」 이름을 버림
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit"
     finally:
