@@ -4,7 +4,7 @@
 - ④ 읽기(r1): #27 「w1」 판(종희, PR #63)을 바탕으로 결론 · 근거 구절 칸을 더했다. #63 병합 뒤에는 공통 부분을 그 판에서 가져온다.
 - ⑥ 대조(c1): 가설 17 「v3-question」(PM 실험, 브랜치 donggyu/judge-question 커밋 0ac580e)을 그대로 옮기고,
   질문 분석의 대상마다 근거 구절을 글자 그대로 받는 칸(targets)을 더했다. 구절은 코드가 원문과 글자로 대조한다.
-- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5)은 맨 아래. 설정 flow2_version이 고른다(SETS).
+- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7)은 맨 아래. 설정 flow2_version이 고른다(SETS).
 """
 
 LAW_KEYS = ["주차장", "동물보호", "자전거", "도시공원", "청년", "금연", "없음"]
@@ -296,6 +296,15 @@ CHECK6 = CHECK4.replace(
 assert CHECK6.count("\n") == CHECK4.count("\n") + 2 and all(k in CHECK6 for k in (
     "물음에 섞지도 않는다", "「아니요」라고 해도 3이다", "삭제되었다고 답한 것은 5가 아니다", "바로 그 혜택", "삭제되었다고 답한 경우"))
 
+# ---- 5판 (설정 flow2_version 5, 11-10 저녁): 시간 초과 · 오류 0과 답변 시간 ----
+# 프롬프트는 3판 그대로(a2 · r4)이고 ⑥만 c7이다. 4판 c6은 쓰지 않는다(본 세트에서 3판과 같고 안 본 세트에서 낮았다, 문서 10절).
+# c7: c4에서 targets 칸과 그 설명 두 줄을 뺐다. targets는 판정에 쓰지 않고 기록만 하던 칸인데 ⑥ 출력 토큰의 38%였다
+# (3판 dev · 극한 네 실행: 호출 시간 ≈ 1.3초 + 출력 토큰당 15ms). 칸 순서가 reason → asks → targets라 물음마다의 verdict는 targets보다 먼저 나온다.
+CHECK7_V = "c7"
+CHECK7 = CHECK4.split("\ntargets에는 [질문 분석]의 대상마다")[0] + "\n" + CHECK4.split("\n")[-1]
+assert "targets" not in CHECK7 and CHECK7.endswith("1에 들지 않는다.") and CHECK7.count("\n") == CHECK4.count("\n") - 2
+CHECK7_SCHEMA = _schema("target_check", {k: v for k, v in CHECK3_SCHEMA["json_schema"]["schema"]["properties"].items() if k != "targets"})
+
 # 판 번호(설정 flow2_version) → 단계마다 (판 이름, 프롬프트, JSON 칸)
 SETS = {
     1: {"analyze": (ANALYZE_V, ANALYZE, ANALYZE_SCHEMA), "read": (READ_V, READ, READ_SCHEMA), "check": (CHECK_V, CHECK, CHECK_SCHEMA)},
@@ -305,4 +314,6 @@ SETS = {
         "check": (CHECK4_V, CHECK4, CHECK3_SCHEMA)},
     4: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ4_V, READ4, READ4_SCHEMA),
         "check": (CHECK6_V, CHECK6, CHECK3_SCHEMA)},
+    5: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ4_V, READ4, READ4_SCHEMA),
+        "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
 }

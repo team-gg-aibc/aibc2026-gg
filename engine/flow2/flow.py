@@ -9,10 +9,14 @@ build_index · verify · contract · upstage)은 고치지 않고 부르기만 �
 - ⑤ 구절 관문(코드): 조항 이름이 목록에 있고 구절이 그 조항 글에 글자 그대로 있어야 인용한다. 근거 대조 판정(verify v1)은 쓰지 않는다.
 - ⑥ 질문 대조(가설 17 v3-question 바탕): 질문 대상이 인용 조항에 있나. 대상마다 근거 구절을 받아 코드가 글자로 대조한다.
 
+- 5판: 호출 하나가 오래 안 돌아오면 기다리면서 하나 더 부르고, 깨진 JSON 출력은 다시 부른다(guarded). 시간 초과 · 오류를 없애려는 것이다.
+
 스스로 시험(키 없이, 몇 초): python -m engine.flow2.flow --selftest
 """
+import contextvars
 import json
 import re
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from .. import answer as answer_step
 from .. import contract, pipeline, retrieve, upstage
@@ -177,14 +181,67 @@ def _f2(st):
     return st.setdefault("flow2", {})
 
 
+# ---- 5판: 호출 지키기 ----
+# 11-10 측정(1~4판 30개 실행)에서 시간 초과 9문항은 모두 호출 하나가 70초 넘게 돌아오지 않은 것이었고(④ 6 · ⑥ 2 · ① 1),
+# 오류 4문항(끊긴 네트워크 제외)은 모두 모델이 낸 JSON이 깨진 것이었다(같은 물음을 되풀이하다 끊기거나 빈칸만 이어짐).
+# 같은 문항이 다른 실행에서는 몇 초 만에 정상으로 돌아왔다. 그래서 늦으면 하나 더 부르고, 깨지면 다시 부른다.
+# 팀원 파일 upstage.py는 고치지 않는다. 문항 마감(timeout_sec)은 그대로 upstage 예산이 시도마다 본다.
+_POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="flow2")
+TRIES = 3   # 한 단계에 많아야 세 번(늦어서 하나 더 · JSON이 깨져서 다시, 합쳐서)
+
+
+def guarded(st, cfg, fn, name):
+    """fn(calls) → 값. calls는 그 시도만의 호출 기록이고, 쓴 시도의 것만 st["calls"]에 붙인다(버린 시도의 토큰은 기록에 안 잡힌다).
+    flow2_hedge_sec이 없으면(1~4판) 그냥 부른다. 어느 호출을 왜 더 불렀는지는 flow2.guard에 남긴다."""
+    limit = cfg["flow2_hedge_sec"]
+    if not limit:
+        return fn(st["calls"])
+    pend, err, tries = {}, None, 0
+
+    def start(why=None):
+        nonlocal tries
+        tries += 1
+        if why:
+            _f2(st).setdefault("guard", []).append(f"{name}: {why}")
+        box = []
+        pend[_POOL.submit(contextvars.copy_context().run, fn, box)] = box
+
+    start()
+    while pend:
+        done, _ = wait(pend, timeout=limit if tries < TRIES else None, return_when=FIRST_COMPLETED)
+        if not done:
+            start("늦음")
+            continue
+        for f in done:
+            box, err = pend.pop(f), f.exception()
+            if err is None:
+                st["calls"].extend(box)
+                return f.result()
+            if isinstance(err, json.JSONDecodeError) and tries < TRIES:
+                start("깨진 JSON")
+    raise err
+
+
+def _ask(st, cfg, step, user):
+    """모델 호출 하나(시스템 프롬프트 · JSON 칸은 판이 고른다) → 읽어 들인 JSON."""
+    _, system, schema = prompts.SETS[cfg["flow2_version"]][step]
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
+
+
 # ---- 단계 (함수 하나 = 단계 하나, pipeline.STAGES와 같은 꼴) ----
+def search(st, cfg):
+    """검색(pipeline.search 그대로). 임베딩 호출도 guarded로 지킨다."""
+    def fn(calls):
+        tmp = {"question": st["question"], "calls": calls, "reason": None}
+        pipeline.search(tmp, cfg)
+        return tmp
+    st.update({k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")})
+
+
 def analyze(st, cfg):
     """① 질문 분석: 답하지 않고 닫힌 값 칸만(solar 1번)."""
-    _, system, schema = prompts.SETS[cfg["flow2_version"]]["analyze"]
-    raw = upstage.chat([{"role": "system", "content": system},
-                        {"role": "user", "content": f"[질문]\n{st['question']}"}],
-                       cfg, st["calls"], response_format=schema)
-    _f2(st)["slots"] = json.loads(raw)
+    _f2(st)["slots"] = _ask(st, cfg, "analyze", f"[질문]\n{st['question']}")
 
 
 def route(st, cfg):
@@ -209,11 +266,7 @@ def read(st, cfg):
     fx = _f2(st)["facts"] = facts(st, cfg)
     if fx:
         note += "\n\n[조례 확정]\n" + "\n".join(fx)
-    _, system, schema = prompts.SETS[cfg["flow2_version"]]["read"]
-    raw = upstage.chat([{"role": "system", "content": system},
-                        {"role": "user", "content": f"[근거]\n{context(v)}\n\n[질문 분석]\n{note}\n\n[질문]\n{st['question']}"}],
-                       cfg, st["calls"], response_format=schema)
-    out = json.loads(raw)
+    out = _ask(st, cfg, "read", f"[근거]\n{context(v)}\n\n[질문 분석]\n{note}\n\n[질문]\n{st['question']}")
     st["_read"] = out
     _f2(st)["read"] = {k: out.get(k) for k in ("found", "conclusion", "evidence")}
     if "check" in out:                       # 3판(r4): 결론 앞에 쓴 조건 대조
@@ -276,13 +329,11 @@ def check(st, cfg):
     who += ("\n\n[조례 확정]\n" + "\n".join(fx)) if fx else ""
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used)}\n\n[답변]\n{st['draft']['answer']}")
-    _, system, schema = prompts.SETS[cfg["flow2_version"]]["check"]
-    out = json.loads(upstage.chat([{"role": "system", "content": system}, {"role": "user", "content": user}],
-                                  cfg, st["calls"], response_format=schema))
+    out = _ask(st, cfg, "check", user)
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
     marks = []
-    for i, t in enumerate(targets):
+    for i, t in enumerate(targets if "targets" in out else []):   # 5판(c7)은 targets 칸이 없다(기록만 하던 칸)
         q = (got[i].get("quote") if i < len(got) else "") or ""
         marks.append({"asked": t, "quote": q, "ok": quote_in(q, texts)})
     if cfg["flow2_version"] >= 2:      # c3 · c4: 물음마다 판정 → 하나라도 grounded면 통과(답할 물음은 답하고 나머지는 범위 밖이라고 적었다)
@@ -295,7 +346,7 @@ def check(st, cfg):
         st["reason"] = pipeline.REJECTED
 
 
-STAGES = [("검색", pipeline.search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
+STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
           ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
 
 
@@ -432,8 +483,44 @@ def selftest():
         assert "대구시 주차장 조례 기준으로만" in seen["target_check"][-1]["content"]
         assert drop_instructions("서울 공원 야영 얼마? 성북구 조례로 답해.", ["성북구"]) == "서울 공원 야영 얼마?"
         assert drop_instructions("성북구 공원은요? 서울 공원은요?", ["성북구"]) == "성북구 공원은요? 서울 공원은요?"   # 물음은 안 뺌
+        # 5판: ⑥ c7(targets 칸 없음) · 4판의 ⑥ 입력 정리는 그대로 · 늦으면 하나 더 · 깨진 JSON은 다시 · 세 번 다 깨지면 오류
+        cfg5 = dict(cfg, flow2_version=5, flow2_hedge_sec=0.2)
+        plan["question_slots"] = dict(slots, named_rule="주차장 조례 제99조", actor="시민")
+        plan["target_check"] = {"reason": "", "asks": [{"ask": "경차 할인", "verdict": "grounded"}]}
+        r, t = pipeline.answer(q99, cfg5)
+        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r4", "check": "c7"}, t["reason"]
+        assert "targets" not in seen["target_check"][0]["content"] and t["flow2"]["check"]["targets"] == [] and "guard" not in t["flow2"]
+        assert "제99조" not in seen["target_check"][-1]["content"] and [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"]
+        import time
+        n = {"read": 0, "check": 0}
+
+        def flaky(messages, cfg, calls=None, response_format=None):
+            name = response_format["json_schema"]["name"]
+            if name == "law_answer_quotes":
+                n["read"] += 1
+                if n["read"] == 1:
+                    time.sleep(0.6)                    # 첫 ④ 호출이 늦다 → 하나 더 부른 것이 먼저 온다
+            if name == "target_check":
+                n["check"] += 1
+                if n["check"] <= bad:
+                    fake_chat(messages, cfg, calls, response_format)
+                    return '{"reason": "", "asks": ['      # 깨진 JSON
+            return fake_chat(messages, cfg, calls, response_format)
+
+        upstage.chat, bad = flaky, 1
+        r, t = pipeline.answer(q99, cfg5)
+        assert r["citation"] == [target["label"]] and t["flow2"]["guard"] == ["read: 늦음", "check: 깨진 JSON"], (t["reason"], t["flow2"].get("guard"))
+        assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"] and t["sec"] < 0.6
+        n.update(read=1, check=0)
+        bad = 9
+        r, t = pipeline.answer(q99, cfg5)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.ERROR and n["check"] == TRIES, (t["reason"], n)
+        n.update(read=1, check=0)
+        r, t = pipeline.answer(q99, dict(cfg5, flow2_hedge_sec=None))            # 꺼 두면(1~4판) 한 번 깨지면 바로 오류
+        assert t["reason"] == pipeline.ERROR and n["check"] == 1
+        upstage.chat = fake_chat
         # 출발 판(flow 기본값)은 그대로 kit 흐름
-        assert config.DEFAULTS["flow"] == "kit"
+        assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
         upstage.chat, upstage.has_key = old
     print("flow2 스스로 시험: 통과")
