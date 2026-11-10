@@ -24,6 +24,7 @@
 | `fetch_source.py` | 원문을 법제처에서 다시 받는 스크립트 (`LAW_OC=<인증키> python3 eval/fetch_source.py`) |
 | `demo_hangang.json` | 한강 시연 질문 15개(태그 `시연`). 형식은 극한 세트와 같고 채점 점수에 넣지 않는다 |
 | `para_pm.json` | 새 질문 묶음 50문항(태그 `말 바꿈`, `--split para`). 평가 문항을 보지 않은 에이전트가 조례 원문만 보고 쓴 바꿔 말한 질문으로, dev로 고친 엔진이 처음 보는 질문에서도 오르는지(일반화) 본다. 만든 법은 `docs/engine/pm-flow2.md` |
+| `mix_pm.json` | 섞임 · 전제 확인 묶음 38문항(`--split mix`). 섞인 질문 10 · 없는 조 번호 10 · 틀린 전제 10 · 함정 8(없는 조 번호 4 · 행위 주체 4). 극한 세트에서 떨어진 갈래를 고친 flow2 2판이 처음 보는 같은 꼴 질문에서도 맞는지 본다. 같은 방식(평가 문항을 보지 않은 에이전트 · 원문만)으로 만들었고 만든 법은 `docs/engine/pm-flow2.md` |
 | `check.py` | 자동 점검 (`python3 eval/check.py`, 함정 검색기 훑기는 `--traps`) |
 | `review_sheets.py` | 사람마다 검수 엑셀 만들기 (`python3 eval/review_sheets.py <출력 폴더>`) |
 | `verify/astra.py` | 다른 회사 모델로 정답 없이 다시 풀고 비교 (`plan` → `solve` → `compare`) |

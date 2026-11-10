@@ -84,9 +84,10 @@ def score_citation(preds, gold):
 
 # ---- 문항 고르기 ----
 def load(split):
-    """회색지대(정답 꼴 미정)는 뺀다. kit = 스타터 킷 예시 11문항. para = 조례 원문에서 새로 쓴 바꿔 말한 질문(PM 별도 실험 일반화 확인, eval/para_*.json)."""
+    """회색지대(정답 꼴 미정)는 뺀다. kit = 스타터 킷 예시 11문항. para = 조례 원문에서 새로 쓴 바꿔 말한 질문(PM 별도 실험 일반화 확인, eval/para_*.json).
+    mix = 조례 원문에서 새로 쓴 섞인 질문 · 없는 조 번호 · 틀린 전제 · 행위 주체 함정(PM 별도 실험 flow2 2판 확인, eval/mix_*.json)."""
     pattern = {"dev": "questions_*.json", "holdout": "questions_*.json", "stress": "stress_*.json",
-               "kit": "kit_questions.json", "para": "para_*.json"}[split]
+               "kit": "kit_questions.json", "para": "para_*.json", "mix": "mix_*.json"}[split]
     qs = [q for f in sorted(EVAL.glob(pattern)) for q in json.loads(f.read_text(encoding="utf-8"))]
     return [q for q in qs if "[회색지대]" not in q.get("note", "")
             and (split not in ("dev", "holdout") or q.get("split") == split)]
@@ -531,7 +532,7 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser(description="점수 재는 틀 (eval/run.py 맨 위 설명 참고)")
     ap.add_argument("--config", default=BASELINE, help="실험 설정 파일 (기본: 출발 판)")
-    ap.add_argument("--split", default="dev", choices=["dev", "holdout", "stress", "kit", "para"])
+    ap.add_argument("--split", default="dev", choices=["dev", "holdout", "stress", "kit", "para", "mix"])
     ap.add_argument("--sample", type=int, help="유형 비율대로 뽑을 문항 수 (기본: 전부)")
     ap.add_argument("--seed", type=int, default=0, help="표본 뽑기 씨앗")
     ap.add_argument("--repeat", type=int, default=1, help="같은 설정 반복 횟수 (흔들림 폭)")

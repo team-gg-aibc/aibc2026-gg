@@ -94,7 +94,7 @@ def answer(question, cfg=None, deadline=None, box=None):
     stages = STAGES
     if cfg["flow"] == "flow2":   # PM 별도 실험: 같은 고리(마감 · 오류 · 기록 · 출구 검사)로 engine/flow2의 단계를 돈다
         from .flow2 import flow as flow2
-        stages, st["prompts"] = flow2.STAGES, flow2.PROMPT_VERSIONS
+        stages, st["prompts"] = flow2.STAGES, flow2.prompt_versions(cfg)
     with upstage.budget(cfg, deadline):
         for name, fn in stages:
             if time.monotonic() >= deadline:

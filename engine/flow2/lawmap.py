@@ -134,6 +134,18 @@ def scope_block(question, slots):
     return None                                       # 자치구인데 그 구가 정한 표시가 없음 → ⑥에 맡긴다
 
 
+_ASK = re.compile(r"[^?？]+[?？]")
+
+
+def mixed(question, word):
+    """2판: 섞인 질문. 「?」로 끝나는 물음이 둘 이상이고, 그 가운데 막을 낱말(6종 밖 조례 이름 · 자치구 · 다른 시도)이 없이
+    서울을 드는 물음이 따로 있다 → 그 물음은 6종이 답할 수 있으니 ③에서 통째로 막지 않는다. ④가 답할 물음만 답하고
+    나머지는 범위 밖이라고 적으며, ⑥이 물음마다 본다. 물음이 하나뿐이면(「서울시 OO 조례는 …?」) 그대로 막는다."""
+    asks = _ASK.findall(question)
+    w = _n(word)
+    return bool(w) and len(asks) >= 2 and any("서울" in a and w not in _n(a) for a in asks)
+
+
 def pick_laws(hits):
     """검색 후보 점수를 조례별로 더해 큰 순서. 2위 합이 1위의 SECOND_RATIO배 이상이면 함께.
     #27 engine/whole.py pick_laws(종희, PR #63)에서 옮김 — #63 병합 뒤 import로 바꾼다."""
@@ -169,10 +181,11 @@ def _plain_scope(question, slots):
     return None
 
 
-def route(question, slots, hits, use_onto=True):
+def route(question, slots, hits, use_onto=True, mixed_ok=False):
     """③ 조례 확정. 돌려주는 것: {"laws": [조례 이름], "block": None | 사유, "rule": 정한 규칙, "why": 한 줄}.
     순서(부딪칠 때 앞이 이긴다): A 6종 이름 → A 6종이 드는 조례 → A 6종 밖 조례(막음) → B 관할(막음) → 검색 · 분석으로 고르기.
-    use_onto=False(설정 flow2_ontology 끔)면 온톨로지 없이 단순 규칙(_plain_kind · _plain_scope)만 쓴다 — 온톨로지 몫을 재려고."""
+    use_onto=False(설정 flow2_ontology 끔)면 온톨로지 없이 단순 규칙(_plain_kind · _plain_scope)만 쓴다 — 온톨로지 몫을 재려고.
+    mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다."""
     named = (slots.get("named_rule") or "").strip()
     forced, rule, why = [], "고르기", ""
     if named and _n(named) and _n(named) in _n(question):        # 분석이 질문에 없는 이름을 지어내면 보지 않는다
@@ -181,12 +194,12 @@ def route(question, slots, hits, use_onto=True):
             forced, rule, why = [LAWS[key]], "A 6종 이름", named
         elif kind == "인용":
             forced, rule, why = [LAWS[k] for k in key][:MAX_LAWS], "A 6종이 드는 조례", named
-        elif kind == "밖":
+        elif kind == "밖" and not (mixed_ok and mixed(question, named)):
             local = any(d + "구" in _n(named) for d in DISTRICTS) or slots.get("jurisdiction") in ("자치구", "다른 시도")
             return {"laws": [], "block": REJECT_SCOPE if local else REJECT_NAME, "rule": "A 6종 밖 조례", "why": named}
     if not forced:
         b = (scope_block if use_onto else _plain_scope)(question, slots)
-        if b:
+        if b and not (mixed_ok and mixed(question, slots.get("jurisdiction_word") or "")):
             return {"laws": [], "block": REJECT_SCOPE, "rule": "B 관할", "why": b}
     if forced:
         laws = forced
@@ -261,4 +274,15 @@ def selftest():
         assert route(q, {**base, **over}, hits)["block"] is None and route(q, {**base, **over}, hits, use_onto=False)["block"], q
     assert route("서울특별시 도시공원 조례 제20조는?", {**base, "named_rule": "서울특별시 도시공원 조례"}, hits,
                  use_onto=False)["laws"] == [LAWS["도시공원"]]
-    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개)")
+    # 2판 섞인 질문: 서울 물음이 따로 있으면 막지 않고(1판은 막음), 물음이 하나뿐이거나 뒷물음에 서울이 없으면 그대로 막는다
+    for q, over, block2 in [
+        ("서울시 자전거 주차장 하루 주차권은 얼마예요? 인천시 자전거 조례에도 그런 주차권이 있어요?",
+         {"named_rule": "인천시 자전거 조례", "jurisdiction": "다른 시도", "jurisdiction_word": "인천시", "law_guess": "자전거"}, None),
+        ("강서구가 지정한 금연구역에서 담배 피우면 과태료가 얼마예요? 서울 공원 금연구역이면 얼마예요?",
+         {"jurisdiction": "자치구", "jurisdiction_word": "강서구", "law_guess": "금연"}, None),
+        ("인천시 자전거 조례에 주차장 요금이 있나요? 있으면 하루에 얼마예요?",
+         {"named_rule": "인천시 자전거 조례", "jurisdiction": "다른 시도", "jurisdiction_word": "인천시"}, REJECT_SCOPE),
+        ("서울시 청년주거 기본 조례는 누구를 지원하나요?", {"named_rule": "청년주거 기본 조례", "law_guess": "청년"}, REJECT_NAME)]:
+        assert route(q, {**base, **over}, hits)["block"], q                                   # 1판
+        assert route(q, {**base, **over}, hits, mixed_ok=True)["block"] == block2, q          # 2판
+    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개)")
