@@ -188,9 +188,18 @@ def _f2(st):
 # 11-10 측정(1~4판 30개 실행)에서 시간 초과 9문항은 모두 호출 하나가 70초 넘게 돌아오지 않은 것이었고(④ 6 · ⑥ 2 · ① 1),
 # 오류 4문항(끊긴 네트워크 제외)은 모두 모델이 낸 JSON이 깨진 것이었다(같은 물음을 되풀이하다 끊기거나 빈칸만 이어짐).
 # 같은 문항이 다른 실행에서는 몇 초 만에 정상으로 돌아왔다. 그래서 늦으면 하나 더 부르고, 깨지면 다시 부른다.
+# 연결 오류: 4판 dev 두 번째 실행(15:50쯤 네트워크가 끊김)에서 102문항이 검색 단계의 APIConnectionError로 끝났다. upstage.py는
+# 15.5초 동안 여섯 번 부르고 그만둔다(마감 75초까지 59초가 남는데도). 그래서 마감까지 20초 넘게 남았으면 한 바퀴 더 부른다.
 # 팀원 파일 upstage.py는 고치지 않는다. 문항 마감(timeout_sec)은 그대로 upstage 예산이 시도마다 본다.
 _POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="flow2")
 TRIES = 3   # 한 단계에 많아야 세 번(늦어서 하나 더 · JSON이 깨져서 다시, 합쳐서)
+RETRY_LEFT_SEC = 20   # 연결 오류 · 5xx · 429로 끝난 호출은 문항 마감까지 이보다 많이 남았을 때만 다시 부른다
+
+
+def _left():
+    """문항 마감까지 남은 초(pipeline.answer가 건 upstage 예산). 마감이 없으면 None."""
+    b = upstage._budget.get()
+    return None if not b or b[0] is None else b[0] - time.monotonic()
 
 
 def guarded(st, cfg, fn, name):
@@ -222,6 +231,8 @@ def guarded(st, cfg, fn, name):
                 return f.result()
             if isinstance(err, json.JSONDecodeError) and tries < TRIES:
                 start("깨진 JSON")
+            elif upstage.retryable(err) and not pend and (_left() or 0) > RETRY_LEFT_SEC:
+                start("연결 오류")
     raise err
 
 
@@ -246,9 +257,8 @@ def _read_user(question, v, fx=()):
 
 def _wait(fut):
     """미리 부른 호출을 문항 마감 전까지만 기다린다."""
-    b = upstage._budget.get()
     try:
-        return fut.result(timeout=None if not b or b[0] is None else b[0] - time.monotonic())
+        return fut.result(timeout=_left())
     except FutureTimeout:
         raise upstage.DeadlineExceeded("미리 읽기가 마감 전에 안 끝남") from None
 
@@ -558,6 +568,21 @@ def selftest():
         n.update(read=1, check=0)
         r, t = pipeline.answer(q99, dict(cfg5, flow2_hedge_sec=None))            # 꺼 두면(1~4판) 한 번 깨지면 바로 오류
         assert t["reason"] == pipeline.ERROR and n["check"] == 1
+        APIConnectionError = type("APIConnectionError", (Exception,), {})      # upstage.retryable은 오류 이름으로 가린다
+
+        def down(messages, cfg, calls=None, response_format=None):
+            n["down"] += 1
+            if n["down"] <= fails:
+                raise APIConnectionError("끊김")
+            return fake_chat(messages, cfg, calls, response_format)
+
+        upstage.chat, fails = down, 2                # 연결 오류 두 번 뒤 살아남: 마감까지 20초 넘게 남았으니 다시 불러 답한다
+        n["down"] = 0
+        r, t = pipeline.answer(q99, cfg5)
+        assert r["citation"] == [target["label"]] and t["flow2"]["guard"] == ["analyze: 연결 오류", "analyze: 연결 오류"], t["flow2"].get("guard")
+        n["down"], fails = 0, 99                     # 마감까지 20초가 안 남았으면 다시 부르지 않고 확인 불가(오류)로 끝낸다
+        r, t = pipeline.answer(q99, dict(cfg5, timeout_sec=15))
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.ERROR and n["down"] == 1 and t["error"].startswith("APIConnectionError"), (t["reason"], n)
         upstage.chat = fake_chat
         # 6판: ④를 미리 부른다. ③이 검색만으로 정하면 그 답을 쓰고(질문 분석 줄 없음, r6), 질문이 6종 이름을 들면 버리고 사실과 함께 다시 읽는다
         cfg6 = dict(cfg, flow2_version=6, flow2_hedge_sec=0.2)
