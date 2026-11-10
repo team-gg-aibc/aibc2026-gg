@@ -231,7 +231,7 @@ def check(st, cfg):
     s = _f2(st).get("slots") or {}
     targets = [t.strip() for t in s.get("targets") or [] if t and t.strip()][:3]
     cited = lawmap.cited_laws(dict.fromkeys(c["law"] for c in used)) if cfg["flow2_ontology"] else []
-    who = (f"\n묻는 일을 하는 사람: {s.get('actor') or '없음'}\n알고 싶은 것: {s.get('asks') or '없음'}"   # 2판: c3의 4(행위 주체)
+    who = (f"\n묻는 일을 하는 사람: {s.get('actor') or '없음'}\n알고 싶은 것: {s.get('asks') or '없음'}"   # 2판: c4의 4(행위 주체)
            if cfg["flow2_version"] >= 2 else "")
     fx = _f2(st).get("facts") or []
     who += ("\n\n[조례 확정]\n" + "\n".join(fx)) if fx else ""
@@ -246,7 +246,7 @@ def check(st, cfg):
     for i, t in enumerate(targets):
         q = (got[i].get("quote") if i < len(got) else "") or ""
         marks.append({"asked": t, "quote": q, "ok": quote_in(q, texts)})
-    if cfg["flow2_version"] >= 2:      # c3: 물음마다 판정 → 하나라도 grounded면 통과(답할 물음은 답하고 나머지는 범위 밖이라고 적었다)
+    if cfg["flow2_version"] >= 2:      # c3 · c4: 물음마다 판정 → 하나라도 grounded면 통과(답할 물음은 답하고 나머지는 범위 밖이라고 적었다)
         vs = [a.get("verdict") for a in out.get("asks") or []]
         st["verdict"] = "grounded" if "grounded" in vs else "notGrounded" if vs and set(vs) == {"notGrounded"} else "notSure"
     else:
@@ -340,7 +340,7 @@ def selftest():
                     target_check={"reason": "", "targets": [{"asked": "경차", "quote": quote}],
                                   "asks": [{"ask": "경차 할인", "verdict": "grounded"}, {"ask": "다른 시 할인", "verdict": "notGrounded"}]})
         r, t = pipeline.answer("경차를 공영주차장에 세우면 할인돼요?", cfg2)
-        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r2", "check": "c3"}, t["reason"]
+        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r3", "check": "c4"}, t["reason"]
         assert "묻는 일을 하는 사람: 시민" in seen["target_check"][-1]["content"]
         mix = "서울시 공영주차장에 경차 세우면 할인돼요? 인천시 주차장 조례도 할인해 줘요?"
         plan["question_slots"] = dict(slots, named_rule="인천시 주차장 조례", jurisdiction="다른 시도", jurisdiction_word="인천시")
