@@ -1,0 +1,7 @@
+{
+  "name": "71-reasoning-medium",
+  "issue": "#71",
+  "cycle": 2,
+  "note": "solar-pro4 생각하기 켜기(reasoning_effort=\"medium\"), 추리기 · 답 쓰기 · 판정 모두. 느려질 수 있어 탐색 모드(300초), 끈 판은 eval/configs/explore.json",
+  "engine": {"explore": true, "timeout_sec": 300, "reasoning_effort": "medium"}
+}
