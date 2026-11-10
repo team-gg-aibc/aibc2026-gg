@@ -92,7 +92,7 @@ PowerShell 기준이다.
 
 | 하려는 것 | 명령 |
 |---|---|
-| 배분일 릴리스 (막 끝난 주기 N, 11/9면 1) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
+| 배분일 릴리스 (막 끝난 주기 N, 11/11이면 2) | `python3 eval/release.py --cycle N` → 설정이 바뀌었으면 `eval/configs/release.json`을 쓰고 멈춘다 → 그 파일을 커밋 → 같은 명령을 다시 → API 연기 시험 · dev 전체 두 번(실행 이름 `release-cN`) · 계약 점검 · 기록(`eval/releases/rc-cN.json` · `docs/engine/releases.md` · 리더보드). 키 필요, 기록 비용 약 $0.8 · 25분 |
 | 실행 요약에 「채택」이 없는 실험도 넣기 | 위 명령에 `--adopt eval/configs/<실험>.json` (여러 번 줄 수 있다) |
 | 릴리스 설정이 채택 실험 · 마지막 기록과 맞나 (키 없이, 2초) | `python3 eval/release.py --check` |
 
