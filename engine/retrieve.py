@@ -12,7 +12,7 @@ from collections import Counter
 
 import numpy as np
 
-from . import config, upstage
+from . import config, rewrite, upstage
 
 _cache = {}
 _lock = threading.Lock()
@@ -77,7 +77,8 @@ def mode(cfg):
 def retrieve(question, cfg, calls=None, k=None):
     """상위 k개 조각(점수 높은 순). 점수가 같으면 조각 번호가 작은 쪽이 앞(어느 컴퓨터에서나 같은 순서)."""
     chunks, vecs, stale, docs, df, avg = load(cfg["chunk_unit"])
-    kw = bm25(question, docs, df, avg)
+    kw_query = rewrite.expand(question)[0] if cfg["term_dict"] else question   # #26: 원래 질문 + 조례 용어
+    kw = bm25(kw_query, docs, df, avg)
     kw_norm = kw / kw.max() if kw.max() > 0 else kw
     if mode(cfg) == "hybrid":
         if stale:

@@ -1,0 +1,7 @@
+{
+  "name": "26-term-dict",
+  "issue": "#26",
+  "cycle": 2,
+  "note": "용어 사전: 시민 말을 조례 용어로 바꾼 낱말을 키워드 검색어에 더함(engine/rewrite.py, 호출 0). 의미 검색은 원래 질문 그대로. 끈 판은 rc-c1(baseline.json)",
+  "engine": {"term_dict": true}
+}
