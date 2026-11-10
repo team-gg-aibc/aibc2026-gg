@@ -4,7 +4,7 @@
 - ④ 읽기(r1): #27 「w1」 판(종희, PR #63)을 바탕으로 결론 · 근거 구절 칸을 더했다. #63 병합 뒤에는 공통 부분을 그 판에서 가져온다.
 - ⑥ 대조(c1): 가설 17 「v3-question」(PM 실험, 브랜치 donggyu/judge-question 커밋 0ac580e)을 그대로 옮기고,
   질문 분석의 대상마다 근거 구절을 글자 그대로 받는 칸(targets)을 더했다. 구절은 코드가 원문과 글자로 대조한다.
-- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7)은 맨 아래. 설정 flow2_version이 고른다(SETS).
+- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7) · 6판(a2 · r6 · c7)은 맨 아래. 설정 flow2_version이 고른다(SETS).
 """
 
 LAW_KEYS = ["주차장", "동물보호", "자전거", "도시공원", "청년", "금연", "없음"]
@@ -305,6 +305,12 @@ CHECK7 = CHECK4.split("\ntargets에는 [질문 분석]의 대상마다")[0] + "\
 assert "targets" not in CHECK7 and CHECK7.endswith("1에 들지 않는다.") and CHECK7.count("\n") == CHECK4.count("\n") - 2
 CHECK7_SCHEMA = _schema("target_check", {k: v for k, v in CHECK3_SCHEMA["json_schema"]["schema"]["properties"].items() if k != "targets"})
 
+# ---- 6판 (설정 flow2_version 6, 11-10 저녁): ④를 ①과 함께 부르기 ----
+# r6: r4에서 「[질문 분석]은 …참고다」 줄만 뺐다. 6판 ④는 질문 분석 줄을 받지 않는다(①을 기다리지 않고 읽기 시작한다, flow.py 「미리 읽기」).
+READ6_V = "r6"
+READ6 = READ4.replace("[질문 분석]은 질문이 무엇을 묻는지 정리한 참고다.\n", "")
+assert "[질문 분석]" not in READ6 and READ6.count("\n") == READ4.count("\n") - 1
+
 # 판 번호(설정 flow2_version) → 단계마다 (판 이름, 프롬프트, JSON 칸)
 SETS = {
     1: {"analyze": (ANALYZE_V, ANALYZE, ANALYZE_SCHEMA), "read": (READ_V, READ, READ_SCHEMA), "check": (CHECK_V, CHECK, CHECK_SCHEMA)},
@@ -315,5 +321,7 @@ SETS = {
     4: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ4_V, READ4, READ4_SCHEMA),
         "check": (CHECK6_V, CHECK6, CHECK3_SCHEMA)},
     5: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ4_V, READ4, READ4_SCHEMA),
+        "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
+    6: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ6_V, READ6, READ4_SCHEMA),
         "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
 }

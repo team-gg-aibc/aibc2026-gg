@@ -10,13 +10,16 @@ build_index · verify · contract · upstage)은 고치지 않고 부르기만 �
 - ⑥ 질문 대조(가설 17 v3-question 바탕): 질문 대상이 인용 조항에 있나. 대상마다 근거 구절을 받아 코드가 글자로 대조한다.
 
 - 5판: 호출 하나가 오래 안 돌아오면 기다리면서 하나 더 부르고, 깨진 JSON 출력은 다시 부른다(guarded). 시간 초과 · 오류를 없애려는 것이다.
+- 6판: 검색이 끝나면 ①을 기다리지 않고 ④를 미리 부른다(검색 점수만으로 고른 조례). ③이 같은 조례로 정하면 그 답을 쓰고, 다르면 버리고 다시 읽는다.
 
 스스로 시험(키 없이, 몇 초): python -m engine.flow2.flow --selftest
 """
 import contextvars
 import json
 import re
+import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import TimeoutError as FutureTimeout
 
 from .. import answer as answer_step
 from .. import contract, pipeline, retrieve, upstage
@@ -229,14 +232,40 @@ def _ask(st, cfg, step, user):
     return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
 
 
+# ---- 6판: ④ 미리 읽기 ----
+# 3판 dev · 극한 네 실행에서 ③이 검색 점수만으로 조례를 정한 문항(규칙 「고르기」)이 dev 92% · 극한 75%였다. 이때 ④는 ①의 결과가
+# 없어도 같은 조례를 읽는다. 그래서 ①과 ④를 함께 부르고, ③이 다른 조례를 정했거나(분석이 조례를 더함 · 질문이 6종 이름을 듦) 막으면
+# 미리 읽은 답은 버린다. 미리 읽기와 다시 읽기가 같은 글을 받도록 6판 ④에는 질문 분석 줄(대상 · 알고 싶은 것 · 유형)을 넣지 않는다(r6).
+_SPEC = ThreadPoolExecutor(max_workers=8, thread_name_prefix="flow2-spec")   # 안에서 guarded가 _POOL을 쓰므로 풀을 나눈다
+
+
+def _read_user(question, v, fx=()):
+    """6판 ④에 보내는 글: 원문 · (③이 확인한 사실) · 질문."""
+    return f"[근거]\n{context(v)}\n\n" + ("[조례 확정]\n" + "\n".join(fx) + "\n\n" if fx else "") + f"[질문]\n{question}"
+
+
+def _wait(fut):
+    """미리 부른 호출을 문항 마감 전까지만 기다린다."""
+    b = upstage._budget.get()
+    try:
+        return fut.result(timeout=None if not b or b[0] is None else b[0] - time.monotonic())
+    except FutureTimeout:
+        raise upstage.DeadlineExceeded("미리 읽기가 마감 전에 안 끝남") from None
+
+
 # ---- 단계 (함수 하나 = 단계 하나, pipeline.STAGES와 같은 꼴) ----
 def search(st, cfg):
-    """검색(pipeline.search 그대로). 임베딩 호출도 guarded로 지킨다."""
+    """검색(pipeline.search 그대로). 임베딩 호출도 guarded로 지킨다. 6판은 끝나자마자 ④를 미리 부른다."""
     def fn(calls):
         tmp = {"question": st["question"], "calls": calls, "reason": None}
         pipeline.search(tmp, cfg)
         return tmp
     st.update({k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")})
+    laws = lawmap.pick_laws(st["_hits"]) if cfg["flow2_version"] >= 6 and not st["reason"] else []
+    if laws:
+        box = {"calls": []}
+        user = _read_user(st["question"], view(laws, cfg["chunk_unit"]))
+        st["_spec"] = (laws, box, _SPEC.submit(contextvars.copy_context().run, _ask, box, cfg, "read", user))
 
 
 def analyze(st, cfg):
@@ -266,7 +295,18 @@ def read(st, cfg):
     fx = _f2(st)["facts"] = facts(st, cfg)
     if fx:
         note += "\n\n[조례 확정]\n" + "\n".join(fx)
-    out = _ask(st, cfg, "read", f"[근거]\n{context(v)}\n\n[질문 분석]\n{note}\n\n[질문]\n{st['question']}")
+    laws, box, fut = st.pop("_spec", None) or (None, None, None)
+    if fut and laws == _f2(st)["route"]["laws"] and not fx:      # 6판: 미리 읽은 것이 ③이 정한 조례와 같다 → 그 답을 쓴다
+        out = _wait(fut)
+        st["calls"].extend(box["calls"])
+        if box.get("flow2"):
+            _f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
+        _f2(st)["spec"] = "씀"
+    elif cfg["flow2_version"] >= 6:
+        _f2(st)["spec"] = "버림"
+        out = _ask(st, cfg, "read", _read_user(st["question"], v, fx))
+    else:
+        out = _ask(st, cfg, "read", f"[근거]\n{context(v)}\n\n[질문 분석]\n{note}\n\n[질문]\n{st['question']}")
     st["_read"] = out
     _f2(st)["read"] = {k: out.get(k) for k in ("found", "conclusion", "evidence")}
     if "check" in out:                       # 3판(r4): 결론 앞에 쓴 조건 대조
@@ -519,6 +559,21 @@ def selftest():
         r, t = pipeline.answer(q99, dict(cfg5, flow2_hedge_sec=None))            # 꺼 두면(1~4판) 한 번 깨지면 바로 오류
         assert t["reason"] == pipeline.ERROR and n["check"] == 1
         upstage.chat = fake_chat
+        # 6판: ④를 미리 부른다. ③이 검색만으로 정하면 그 답을 쓰고(질문 분석 줄 없음, r6), 질문이 6종 이름을 들면 버리고 사실과 함께 다시 읽는다
+        cfg6 = dict(cfg, flow2_version=6, flow2_hedge_sec=0.2)
+        plan["question_slots"] = dict(slots, actor="시민")
+        r, t = pipeline.answer("경차를 공영주차장에 세우면 할인돼요?", cfg6)
+        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r6", "check": "c7"}, t["reason"]
+        assert t["flow2"]["spec"] == "씀" and t["flow2"]["route"]["rule"] == "고르기", t["flow2"]["route"]
+        assert "[질문 분석]" not in seen["law_answer_quotes"][-1]["content"] and "[질문 분석]" not in seen["law_answer_quotes"][0]["content"]
+        assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"]
+        plan["question_slots"] = dict(slots, named_rule="주차장 조례 제99조", actor="시민")
+        r, t = pipeline.answer(q99, cfg6)
+        assert r["citation"] == [target["label"]] and t["flow2"]["spec"] == "버림" and t["flow2"]["route"]["rule"] == "A 6종 이름"
+        assert "[조례 확정]" in seen["law_answer_quotes"][-1]["content"] and "「제99조」는 이 조례 원문에 없는 번호다" in seen["law_answer_quotes"][-1]["content"]
+        plan["question_slots"] = dict(slots, named_rule="청년주거 기본 조례", law_guess="청년")            # ③이 막으면 미리 읽은 답은 안 쓴다
+        r, t = pipeline.answer("서울시 청년주거 기본 조례는 누구를 지원해요?", cfg6)
+        assert r == contract.UNKNOWN and t["reason"] == lawmap.REJECT_NAME and "spec" not in t["flow2"]
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
