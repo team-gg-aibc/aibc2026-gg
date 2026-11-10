@@ -628,7 +628,7 @@ def selftest():
                                        "evidence": [{"label": ban["label"], "quote": "법 제49조제1항 및 제2항 각 호의 행위" + DELEG_MARK + "를 하여서는"}]},
                     target_check={"reason": "", "asks": [{"ask": "금지 행위", "verdict": "grounded"}], "done": True})
         r, t = pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg7)
-        assert r["citation"] == [ban["label"]] and t["prompts"] == {"analyze": "a2", "read": "r6", "check": "c8"}, (t["reason"], t["flow2"].get("gate"))
+        assert r["citation"] == [ban["label"]] and t["prompts"] == {"analyze": "a2", "read": "r7", "check": "c8"}, (t["reason"], t["flow2"].get("gate"))
         assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
         pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
         assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]

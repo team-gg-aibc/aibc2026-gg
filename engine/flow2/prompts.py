@@ -4,7 +4,7 @@
 - ④ 읽기(r1): #27 「w1」 판(종희, PR #63)을 바탕으로 결론 · 근거 구절 칸을 더했다. #63 병합 뒤에는 공통 부분을 그 판에서 가져온다.
 - ⑥ 대조(c1): 가설 17 「v3-question」(PM 실험, 브랜치 donggyu/judge-question 커밋 0ac580e)을 그대로 옮기고,
   질문 분석의 대상마다 근거 구절을 글자 그대로 받는 칸(targets)을 더했다. 구절은 코드가 원문과 글자로 대조한다.
-- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7) · 6판(a2 · r6 · c7) · 7판(a2 · r6 · c8)은 맨 아래. 설정 flow2_version이 고른다(SETS).
+- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7) · 6판(a2 · r6 · c7) · 7판(a2 · r7 · c8)은 맨 아래. 설정 flow2_version이 고른다(SETS).
 """
 
 LAW_KEYS = ["주차장", "동물보호", "자전거", "도시공원", "청년", "금연", "없음"]
@@ -314,7 +314,17 @@ assert "[질문 분석]" not in READ6 and READ6.count("\n") == READ4.count("\n")
 # ---- 7판 (설정 flow2_version 7, 11-10 밤) ----
 # c8: c7 끝에 닫는 칸 done을 더했다. 5 · 6판 전체 측정(11-10 저녁, ⑥ 호출 3,162번)에서 c7은 JSON이 70번 깨졌다(2.2%, c4는 1만 5천 번에 4번).
 # targets를 빼니 asks 배열이 마지막 칸이 돼, 모델이 같은 물음을 되풀이해 적다 끊겼다. 다시 불러 오류는 0이었지만 그 문항은 ⑥을 두 번 불렀다.
-# 물음마다의 verdict는 done보다 먼저 나온다. ④는 6판 r6 그대로다(위임 구절 표시는 코드가 근거 글에 붙인다, flow.DELEG).
+# 물음마다의 verdict는 done보다 먼저 나온다.
+# r7: r6에 위임 구절 표시(코드가 근거 글에 붙인다, flow.DELEG)를 설명하는 한 줄을 더했다. 표시만 붙인 첫 시도(r6 그대로)는 작은 묶음에서
+# 「도시공원에서 금지되는 행위」를 묻는 함정에 모델이 아는 지식으로 답을 채웠다(같은 문항 6번 중 5번 found 참). 설명을 더하면 맹견 견종 함정은
+# ④에서 3번 다 found 거짓이 됐다. 금지 행위 함정은 그래도 6번 중 2번 샌다(11-10 밤, 위임 구절 문항 37번 시험).
+READ7_V = "r7"
+_NO_DIRECT = "- 질문이 묻는 대상(행위 · 시설 · 장소 · 자격)을 직접 정한 조항이 [근거]에 하나도 없으면 found를 false로 하고 evidence를 비운다. 비슷한 주제의 다른 조항으로 답을 만들지 않는다.\n"
+READ7 = READ6.replace(_NO_DIRECT, _NO_DIRECT + (
+    "- 「(※ 그 내용은 이 자료에 없다)」 표시가 붙은 구절은 조례가 내용을 다른 법령에 넘긴 곳이다. 넘겨진 내용(무엇이 금지되는지 · 금액이 얼마인지 · "
+    "어떤 종류가 해당하는지)은 [근거]에 없다. 알고 있는 지식으로 채우지 않는다. 질문이 그 넘겨진 내용을 물으면 found를 false로 한다. 조례가 직접 적은 것"
+    "(어느 법령 · 별표를 따르는지, 누가 부과하는지, 줄이거나 늘릴 수 있는지, 예외로 허용되는 것)을 물으면 그 조문으로 답한다.\n"))
+assert READ7.count("\n") == READ6.count("\n") + 1 and "이 자료에 없다" in READ7
 CHECK8_V = "c8"
 CHECK8 = CHECK7 + "\ndone에는 asks를 다 적은 뒤 true를 넣는다."
 CHECK8_SCHEMA = _schema("target_check", {**CHECK7_SCHEMA["json_schema"]["schema"]["properties"], "done": {"type": "boolean"}})
@@ -332,6 +342,6 @@ SETS = {
         "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
     6: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ6_V, READ6, READ4_SCHEMA),
         "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
-    7: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ6_V, READ6, READ4_SCHEMA),
+    7: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ7_V, READ7, READ4_SCHEMA),
         "check": (CHECK8_V, CHECK8, CHECK8_SCHEMA)},
 }
