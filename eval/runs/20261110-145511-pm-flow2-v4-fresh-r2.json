@@ -1,0 +1,137 @@
+{
+ "run_id": "20261110-145511-pm-flow2-v4-fresh-r2",
+ "group": "20261110-145511-pm-flow2-v4-fresh",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-10T15:03:01+09:00",
+ "experiment": {
+  "name": "pm-flow2-v4",
+  "issue": "",
+  "note": "PM 별도 실험 flow2 4판: 3판 측정(c34e28b)의 ⑥ 거절에서 고침. ⑥ c6 — 근거가 묻는 바로 그 혜택 · 감면 · 의무 · 금지 · 요금을 정하고 물음의 경우만 조건 · 범위 · 대상 목록 밖이라 「아니요」라고 답한 것과 「삭제」 호 답은 grounded, 묻는 혜택 자체가 없고 다른 제도만 있으면 3, 지시문을 물음에 섞지 않음(앞선 시도 c5는 함정이 샘). 코드 — ⑥ 별칭 사실 줄의 조 번호 가리기, ③이 지시문 문장 예외로 통과시킨 질문은 그 지시문 문장을 ⑥ 질문에서 뺌. 나머지는 pm-flow2-v3와 같다",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2-v4.json",
+  "file_sha": "3e4311594fc3"
+ },
+ "conclusion": "4판 안 본 세트 70(두 번): 가중 94.0 · 94.0으로 3판(95.5 · 96.7)보다 낮다. 조건 82.5 · 87.5(3판 92.5 · 92.5), 함정 93.3 · 93.3, 과잉 포기 5.5%(3판 1.8%).",
+ "lesson": [
+  "좋아짐: 노린 문항(조건 · 범위 밖 「아니요」, 「삭제」 호)은 일부 되살림. 나빠짐: 안 본 세트 조건 문항 · 과잉 포기",
+  "⑥ 판정은 실행마다 다른 문항을 거절해서, 규칙 글을 고치면 거절이 자리만 옮긴다. 규칙 3에 더한 「아니요라도 3」 문장이 조건 문항을 더 엄하게 만든 것으로 보인다",
+  "채택 안 함(후보는 3판). 다음: ④에서 물음마다 found(5판 초안), 호출 상한 · ⑥ 출력 줄이기(6판 초안) — docs/engine/pm-flow2.md 11절"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2-v4.json",
+  "split": "fresh",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 4
+ },
+ "settings_hash": "0fd8276bae4a",
+ "switches": {
+  "flow": "flow2",
+  "flow2_version": 4
+ },
+ "env": {
+  "code_commit": "5268700",
+  "code_hash": "4a44d71c0c67",
+  "eval_code_hash": "d9014e927480",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "c1ada8229759",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "1.26.3",
+   "openai": "2.37.0",
+   "requests": "2.32.3"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 70,
+  "n_gold": 55,
+  "n_trap": 15,
+  "weighted": 94.0,
+  "by_type": {
+   "단순": 95.0,
+   "조건": 87.5,
+   "결합": 100.0,
+   "함정": 93.3
+  },
+  "trap": 93.3,
+  "by_law": {
+   "animal": 90.0,
+   "bicycle": 100.0,
+   "park": 100.0,
+   "parking": 88.9,
+   "smoking": 88.9,
+   "youth": 94.4
+  },
+  "over_abstain": 5.5,
+  "citations_per_answer": 1.53,
+  "retrieval_hit": 100.0,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 1,
+  "errors": 0,
+  "latency_p50": 12.991,
+  "latency_p95": 19.593,
+  "latency_max": 75,
+  "causes": {
+   "시간 초과": 1,
+   "후보에 있는데 잘못 고름": 1,
+   "판정이 맞는 답을 거절": 1,
+   "답이 있는데 확인 불가 (구절 불일치)": 1,
+   "함정에 답함": 1
+  }
+ },
+ "cost_usd": 0.1339,
+ "tokens": {
+  "in": 940753,
+  "cached": 781184,
+  "out": 33554
+ },
+ "calls": 264,
+ "wall_sec": 242.2,
+ "hashes": {
+  "retrieval": "c78f32d5502e",
+  "answers": "5b4bdbda7f58"
+ }
+}
