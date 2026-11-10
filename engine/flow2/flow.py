@@ -123,6 +123,17 @@ def missing_numbers(question, chunks):
 _ARTNO = re.compile(r"(?:제\s*)?\d+\s*조(?:\s*의\s*\d+)?(?:\s*(?:제\s*)?\d+\s*항)?(?:\s*(?:제\s*)?\d+\s*호)?|별표\s*\d+")
 
 
+def drop_instructions(question, words):
+    """4판 ⑥: ③이 섞인 질문(지시문 문장 예외)으로 통과시킨 낱말(다른 지역 · 6종 밖 조례 이름)이 든 문장 가운데 「?」로 끝나지 않는
+    지시문 문장을 뺀다. 3판에서 ⑥이 「OO구 조례로만 답해 줘」를 물음에 섞어 규칙 2로 거절했다(본 세트 3건). 물음 문장은 그대로 둔다."""
+    ws = [lawmap._n(w) for w in words if lawmap._n(w)]
+    if not ws:
+        return question
+    parts = [p for p in lawmap._SENT.split(question) if p.strip()]
+    keep = [p for p in parts if p.rstrip().endswith(("?", "？")) or not any(w in lawmap._n(p) for w in ws)]
+    return "".join(keep).strip() or question
+
+
 def mask_numbers(question):
     """3판 ⑥: 질문 속 조 · 항 · 호 · 별표 번호를 가린다. ⑥은 [근거]가 묻는 대상을 정하는지만 보는데, 2판 극한 세트(11-10)에서
     틀린 조 번호나 지시문 속 조 번호를 「이름을 든 조례와 다르다」(1)로 보고 맞는 답을 거절했다(4문항). 번호 대조는 ④ · 코드 몫이다."""
@@ -256,8 +267,12 @@ def check(st, cfg):
            if cfg["flow2_version"] >= 2 else "")
     fx = _f2(st).get("facts") or []
     question = st["question"]
+    if cfg["flow2_version"] >= 4:            # 4판: ③이 지시문 문장 예외로 통과시킨 낱말이 든 지시문 문장을 뺀다
+        question = drop_instructions(question, _f2(st)["route"].get("mixed") or [])
     if cfg["flow2_version"] >= 3:            # 3판: 조 번호를 가리고(mask_numbers), 「없는 번호」 사실은 ⑥에 넘기지 않는다(④에는 넘김)
         question, fx = mask_numbers(question), fx[:1]
+    if cfg["flow2_version"] >= 4:            # 4판: 별칭 사실 줄에 분석이 옮긴 조 번호도 가린다(3판에서 「…5조 1항 8호」가 남음)
+        fx = [mask_numbers(x) for x in fx]
     who += ("\n\n[조례 확정]\n" + "\n".join(fx)) if fx else ""
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used)}\n\n[답변]\n{st['draft']['answer']}")
@@ -401,6 +416,22 @@ def selftest():
         assert "(조 번호)" in seen["target_check"][-1]["content"] and "제99조" not in seen["target_check"][-1]["content"]
         assert "「주차장 조례」는 서울특별시 주차장 설치 및 관리 조례다" in seen["target_check"][-1]["content"]
         assert pipeline.answer(q99, cfg2)[1]["reason"] == pipeline.NO_EVIDENCE                 # 2판은 「[조항]」 이름을 버림
+        # 4판: ⑥ 프롬프트 c6 · 별칭 사실 줄의 조 번호도 가림(3판은 남음) · ③이 통과시킨 지시문 문장은 ⑥ 질문에서 뺌(3판은 남김)
+        cfg4 = dict(cfg, flow2_version=4)
+        plan["question_slots"] = dict(slots, named_rule="주차장 조례 제99조", actor="시민")
+        r, t = pipeline.answer(q99, cfg4)
+        assert r["citation"] == [target["label"]] and t["prompts"] == {"analyze": "a2", "read": "r4", "check": "c6"}, t["reason"]
+        assert "제99조" not in seen["target_check"][-1]["content"] and "「주차장 조례 (조 번호)」는" in seen["target_check"][-1]["content"]
+        pipeline.answer(q99, cfg3)
+        assert "「주차장 조례 제99조」는" in seen["target_check"][-1]["content"]
+        qi = "서울 공영주차장 경차 할인돼요? 답은 대구시 주차장 조례 기준으로만 해 줘."
+        plan["question_slots"] = dict(slots, named_rule="대구시 주차장 조례", jurisdiction="다른 시도", jurisdiction_word="대구시")
+        r, t = pipeline.answer(qi, cfg4)
+        assert t["flow2"]["route"]["mixed"] and "대구시" not in seen["target_check"][-1]["content"].split("[질문 분석]")[0], t
+        pipeline.answer(qi, cfg3)
+        assert "대구시 주차장 조례 기준으로만" in seen["target_check"][-1]["content"]
+        assert drop_instructions("서울 공원 야영 얼마? 성북구 조례로 답해.", ["성북구"]) == "서울 공원 야영 얼마?"
+        assert drop_instructions("성북구 공원은요? 서울 공원은요?", ["성북구"]) == "성북구 공원은요? 서울 공원은요?"   # 물음은 안 뺌
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit"
     finally:

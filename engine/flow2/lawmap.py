@@ -189,21 +189,27 @@ def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False)
     """③ 조례 확정. 돌려주는 것: {"laws": [조례 이름], "block": None | 사유, "rule": 정한 규칙, "why": 한 줄}.
     순서(부딪칠 때 앞이 이긴다): A 6종 이름 → A 6종이 드는 조례 → A 6종 밖 조례(막음) → B 관할(막음) → 검색 · 분석으로 고르기.
     use_onto=False(설정 flow2_ontology 끔)면 온톨로지 없이 단순 규칙(_plain_kind · _plain_scope)만 쓴다 — 온톨로지 몫을 재려고.
-    mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다. sentences=True(3판)는 mixed 참고."""
+    mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다. sentences=True(3판)는 mixed 참고.
+    섞인 질문이라 막지 않았으면 그 낱말을 "mixed"에 남긴다(4판 ⑥이 그 낱말이 든 지시문 문장을 질문에서 뺀다)."""
     named = (slots.get("named_rule") or "").strip()
-    forced, rule, why = [], "고르기", ""
+    forced, rule, why, skipped = [], "고르기", "", []
     if named and _n(named) and _n(named) in _n(question):        # 분석이 질문에 없는 이름을 지어내면 보지 않는다
         kind, key = (name_kind if use_onto else _plain_kind)(named)
         if kind == "6종":
             forced, rule, why = [LAWS[key]], "A 6종 이름", named
         elif kind == "인용":
             forced, rule, why = [LAWS[k] for k in key][:MAX_LAWS], "A 6종이 드는 조례", named
-        elif kind == "밖" and not (mixed_ok and mixed(question, named, sentences)):
+        elif kind == "밖" and mixed_ok and mixed(question, named, sentences):
+            skipped.append(named)
+        elif kind == "밖":
             local = any(d + "구" in _n(named) for d in DISTRICTS) or slots.get("jurisdiction") in ("자치구", "다른 시도")
             return {"laws": [], "block": REJECT_SCOPE if local else REJECT_NAME, "rule": "A 6종 밖 조례", "why": named}
     if not forced:
         b = (scope_block if use_onto else _plain_scope)(question, slots)
-        if b and not (mixed_ok and mixed(question, slots.get("jurisdiction_word") or "", sentences)):
+        word = slots.get("jurisdiction_word") or ""
+        if b and mixed_ok and mixed(question, word, sentences):
+            skipped.append(word)
+        elif b:
             return {"laws": [], "block": REJECT_SCOPE, "rule": "B 관할", "why": b}
     if forced:
         laws = forced
@@ -213,7 +219,10 @@ def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False)
         if guess and guess not in laws:
             laws = laws[:1] + [guess]
             rule, why = "고르기 + 분석", slots.get("law_guess")
-    return {"laws": laws[:MAX_LAWS], "block": None, "rule": rule, "why": why}
+    out = {"laws": laws[:MAX_LAWS], "block": None, "rule": rule, "why": why}
+    if skipped:
+        out["mixed"] = list(dict.fromkeys(skipped))
+    return out
 
 
 # ---- 규칙끼리 부딪치는 경우 (스스로 시험에서 돌린다). 질문 글은 조례 원문을 보고 새로 쓴 것이다(평가셋 문항이 아니다) ----
@@ -302,6 +311,7 @@ def selftest():
         ("성북구가 정한 공원 야영장 요금 알려 줘. 할인도 해 줘요?", {"jurisdiction": "자치구", "jurisdiction_word": "성북구",
                                                      "law_guess": "도시공원"}, REJECT_SCOPE)]:
         assert route(q, {**base, **over}, hits, mixed_ok=True)["block"], q                   # 2판은 막음
-        assert route(q, {**base, **over}, hits, mixed_ok=True, sentences=True)["block"] == block3, q
+        r3 = route(q, {**base, **over}, hits, mixed_ok=True, sentences=True)
+        assert r3["block"] == block3 and (block3 or r3["mixed"]), q                           # 막지 않으면 그 낱말을 남김
     assert not mixed("대구시 공원 1.5km 산책길도 서울 공원처럼 금연이에요?", "대구시", sentences=True)   # 소수점에서 안 나눔
     print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개 · 3판 지시문 문장 4개)")
