@@ -1,0 +1,1 @@
+{"name": "27-whole2-prefilter", "issue": "#27", "cycle": 2, "note": "rc-c1 위: #24 추리기 → 빈 목록이면 확인 불가, 아니면 추린 후보로 고른 조례를 통째로 읽고 조항 이름으로 고르기(프롬프트 w1)", "engine": {"whole_ordinance": true, "whole_prefilter": true, "whole_cite": "label", "answer_prompt": "w1"}}

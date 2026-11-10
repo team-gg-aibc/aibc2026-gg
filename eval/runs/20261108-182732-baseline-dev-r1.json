@@ -1,0 +1,124 @@
+{
+ "run_id": "20261108-182732-baseline-dev-r1",
+ "group": "20261108-182732-baseline-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-08T18:34:46+09:00",
+ "experiment": {
+  "name": "baseline",
+  "issue": "#21",
+  "note": "출발 판: 스타터 킷 그대로 + 검증을 solar-pro4 판정으로 (engine/config.py DEFAULTS 그대로)",
+  "cycle": 1,
+  "file": "eval/configs/baseline.json",
+  "file_sha": "f73fa66a9f35"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/baseline.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "select_mode": "direct",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": false,
+  "max_per_article": 0,
+  "group_by_article": false
+ },
+ "settings_hash": "74b59dfa036f",
+ "switches": {},
+ "env": {
+  "code_commit": "7bbf736",
+  "code_hash": "1a1e34e115ba",
+  "eval_code_hash": "a09821526cd3",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.12.14",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-26.6"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 67.3,
+  "by_type": {
+   "단순": 69.8,
+   "조건": 70.0,
+   "결합": 49.9,
+   "함정": 85.7
+  },
+  "trap": 85.7,
+  "by_law": {
+   "animal": 75.2,
+   "bicycle": 70.2,
+   "common": 20.0,
+   "park": 57.1,
+   "parking": 55.4,
+   "smoking": 78.2,
+   "youth": 71.3
+  },
+  "over_abstain": 27.0,
+  "citations_per_answer": 1.51,
+  "retrieval_hit": 82.8,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 2.329,
+  "latency_p95": 4.686,
+  "latency_max": 21.926,
+  "causes": {
+   "정답이 후보에 없음": 112,
+   "판정이 맞는 답을 거절": 106,
+   "답이 있는데 확인 불가 (found 거짓)": 9,
+   "후보에 있는데 잘못 고름": 6,
+   "함정에 답함": 6,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 1
+  }
+ },
+ "cost_usd": 0.4165,
+ "tokens": {
+  "in": 1202120,
+  "cached": 34816,
+  "out": 61399
+ },
+ "calls": 1914,
+ "wall_sec": 433.5,
+ "hashes": {
+  "retrieval": "392ae27523f3",
+  "answers": "ea5ca959dc49"
+ }
+}
