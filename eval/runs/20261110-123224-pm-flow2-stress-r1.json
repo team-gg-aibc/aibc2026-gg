@@ -1,0 +1,136 @@
+{
+ "run_id": "20261110-123224-pm-flow2-stress-r1",
+ "group": "20261110-123224-pm-flow2-stress",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T12:46:12+09:00",
+ "experiment": {
+  "name": "pm-flow2",
+  "issue": "",
+  "note": "PM 별도 실험: 새 흐름 flow2 — 질문 분석 → 조례 확정(코드) → 조례 통째로 읽고 조항 이름 + 구절 → 구절 관문(코드) → 질문 대조(가설 17 v3 바탕). 나머지는 rc-c1 기본값(#22 출구 검사 · 75초)",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2.json",
+  "file_sha": "887fb10eda0f"
+ },
+ "conclusion": "1판 극한(두 번): 가중 82.7 · 84.8. 고정 실패 38(확인 불가 22 — 관할 밖 지시문 · 틀린 전제 · 섞인 질문).",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/pm-flow2.json",
+  "split": "stress",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 1
+ },
+ "settings_hash": "990e3a820891",
+ "switches": {
+  "flow": "flow2"
+ },
+ "env": {
+  "code_commit": "263aae3",
+  "code_hash": "5b4c0d80dbdd",
+  "eval_code_hash": "3fa383059d91",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "f6a18b9a22bd",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "1.26.3",
+   "openai": "2.37.0",
+   "requests": "2.32.3"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 283,
+  "n_gold": 230,
+  "n_trap": 53,
+  "weighted": 82.7,
+  "by_type": {
+   "단순": 67.5,
+   "조건": 85.0,
+   "결합": 85.2,
+   "함정": 98.1
+  },
+  "trap": 98.1,
+  "by_law": {
+   "animal": 87.6,
+   "bicycle": 85.6,
+   "common": 62.5,
+   "park": 74.3,
+   "parking": 79.6,
+   "smoking": 80.2,
+   "youth": 88.3
+  },
+  "over_abstain": 19.6,
+  "citations_per_answer": 1.61,
+  "retrieval_hit": 99.1,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 8.66,
+  "latency_p95": 15.92,
+  "latency_max": 20.52,
+  "causes": {
+   "판정이 맞는 답을 거절": 16,
+   "답이 있는데 확인 불가 (found 거짓)": 14,
+   "후보에 있는데 잘못 고름": 10,
+   "답이 있는데 확인 불가 (구절 불일치)": 7,
+   "답이 있는데 확인 불가 (관할 밖)": 4,
+   "정답이 후보에 없음": 2,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2,
+   "함정에 답함": 1
+  }
+ },
+ "cost_usd": 0.5869,
+ "tokens": {
+  "in": 3829143,
+  "cached": 2913664,
+  "out": 118662
+ },
+ "calls": 1037,
+ "wall_sec": 827.2,
+ "hashes": {
+  "retrieval": "03d17faf0994",
+  "answers": "a7a2df098834"
+ }
+}

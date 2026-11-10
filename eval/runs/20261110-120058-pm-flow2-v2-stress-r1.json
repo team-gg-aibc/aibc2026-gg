@@ -1,0 +1,142 @@
+{
+ "run_id": "20261110-120058-pm-flow2-v2-stress-r1",
+ "group": "20261110-120058-pm-flow2-v2-stress",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T12:17:52+09:00",
+ "experiment": {
+  "name": "pm-flow2-v2",
+  "issue": "",
+  "note": "PM 별도 실험 flow2 2판: 섞인 질문은 답할 물음만 답하고 나머지는 범위 밖이라고 적기 · 틀린 조 번호 · 숫자는 맞는 조항으로 바로잡기(r3 · c4, ⑥은 물음마다 판정) · ③ 섞인 질문은 막지 않음 · 행위 주체(시민 / 행정) 칸과 ⑥ 규칙 4(a2 · c4). 나머지는 pm-flow2와 같다",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2-v2.json",
+  "file_sha": "e9674568498a"
+ },
+ "conclusion": "2판 극한(두 번): 가중 86.0 · 85.7(1판보다 +2.1). 고정 실패 25(확인 불가 13 — 「OO구 조례로만 답해」 지시문 4 · 질문 속 지시문을 따름 2).",
+ "lesson": [
+  "좋아짐: 섞인 질문 · 틀린 전제 · 함정(dev). 나빠짐: 두 실행 사이 흔들림(dev 2.9점)",
+  "흔들림은 모델이 근거 이름을 「[조항] …」으로 적는 날 ⑤가 목록에 없는 조항으로 버려서. ⑥ 거절의 상당수는 ④가 「네」를 먼저 정하고 조건을 따져 반대로 끝난 모순 답",
+  "3판: ⑤ 이름 · 괄호 글 대조 고침, ④ 조건 대조 칸을 결론 앞에, ③ 지시문 문장의 다른 지역은 막지 않기, ⑥ 조 번호 가리기"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2-v2.json",
+  "split": "stress",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 2
+ },
+ "settings_hash": "3f66a5df42cf",
+ "switches": {
+  "flow": "flow2",
+  "flow2_version": 2
+ },
+ "env": {
+  "code_commit": "263aae3",
+  "code_hash": "5b4c0d80dbdd",
+  "eval_code_hash": "3fa383059d91",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "f6a18b9a22bd",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "1.26.3",
+   "openai": "2.37.0",
+   "requests": "2.32.3"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 283,
+  "n_gold": 230,
+  "n_trap": 53,
+  "weighted": 86.0,
+  "by_type": {
+   "단순": 85.0,
+   "조건": 84.0,
+   "결합": 84.6,
+   "함정": 92.5
+  },
+  "trap": 92.5,
+  "by_law": {
+   "animal": 79.8,
+   "bicycle": 88.3,
+   "common": 85.0,
+   "park": 80.0,
+   "parking": 88.0,
+   "smoking": 91.4,
+   "youth": 80.0
+  },
+  "over_abstain": 13.9,
+  "citations_per_answer": 1.57,
+  "retrieval_hit": 99.1,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 1,
+  "errors": 0,
+  "latency_p50": 10.243,
+  "latency_p95": 18.842,
+  "latency_max": 75,
+  "causes": {
+   "후보에 있는데 잘못 고름": 11,
+   "판정이 맞는 답을 거절": 10,
+   "답이 있는데 확인 불가 (found 거짓)": 7,
+   "답이 있는데 확인 불가 (구절 불일치)": 5,
+   "함정에 답함": 4,
+   "답이 있는데 확인 불가 (관할 밖)": 4,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 3,
+   "정답이 후보에 없음": 2,
+   "시간 초과": 1
+  }
+ },
+ "cost_usd": 0.5733,
+ "tokens": {
+  "in": 3971706,
+  "cached": 3196544,
+  "out": 128288
+ },
+ "calls": 1048,
+ "wall_sec": 1014.5,
+ "hashes": {
+  "retrieval": "2d2685f71bb7",
+  "answers": "3d10b568719c"
+ }
+}
