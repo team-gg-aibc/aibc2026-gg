@@ -1,0 +1,131 @@
+{
+ "run_id": "20261110-101337-pm-flow2-v2-para",
+ "group": "20261110-101337-pm-flow2-v2-para",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-10T10:16:35+09:00",
+ "experiment": {
+  "name": "pm-flow2-v2",
+  "issue": "",
+  "note": "PM 별도 실험 flow2 2판: 섞인 질문은 답할 물음만 답하고 나머지는 범위 밖이라고 적기 · 틀린 조 번호 · 숫자는 맞는 조항으로 바로잡기(r3 · c4, ⑥은 물음마다 판정) · ③ 섞인 질문은 막지 않음 · 행위 주체(시민 / 행정) 칸과 ⑥ 규칙 4(a2 · c4). 나머지는 pm-flow2와 같다",
+  "cycle": 2,
+  "file": "eval/configs/pm-flow2-v2.json",
+  "file_sha": "e9674568498a"
+ },
+ "conclusion": "flow2 2판 새 질문 묶음 50: 세 유형 평균 98.3(1판 99.2), 과잉 포기 2%. 1문항(bicycle-P003 자전거 전용도로 · 차도)이 판정 거절",
+ "lesson": [
+  "답 있는 처음 보는 질문에서 2판은 1판과 1문항 차이 — 규칙 4 · 5가 맞는 답을 크게 버리지는 않는다(1/50)",
+  "bicycle-P003은 시민의 「노력하여야」를 규칙 4의 행정 노력으로 읽은 것으로 보인다 — 규칙 4 낱말을 고칠 후보"
+ ],
+ "args": {
+  "config": "eval/configs/pm-flow2-v2.json",
+  "split": "para",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 3
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 2
+ },
+ "settings_hash": "3f66a5df42cf",
+ "switches": {
+  "flow": "flow2",
+  "flow2_version": 2
+ },
+ "env": {
+  "code_commit": "48cfd95",
+  "code_hash": "5b4c0d80dbdd",
+  "eval_code_hash": "3fa383059d91",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "4421dac68d6e",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "1.26.3",
+   "openai": "2.37.0",
+   "requests": "2.32.3"
+  },
+  "platform": "macOS-27.2"
+ },
+ "metrics": {
+  "n": 50,
+  "n_gold": 50,
+  "n_trap": 0,
+  "weighted": null,
+  "by_type": {
+   "단순": 100.0,
+   "조건": 95.0,
+   "결합": 100.0
+  },
+  "trap": null,
+  "by_law": {
+   "animal": 100.0,
+   "bicycle": 85.7,
+   "park": 100.0,
+   "parking": 100.0,
+   "smoking": 100.0,
+   "youth": 100.0
+  },
+  "over_abstain": 2.0,
+  "citations_per_answer": 1.43,
+  "retrieval_hit": 100.0,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 9.78,
+  "latency_p95": 14.854,
+  "latency_max": 18.806,
+  "causes": {
+   "판정이 맞는 답을 거절": 1
+  }
+ },
+ "cost_usd": 0.1005,
+ "tokens": {
+  "in": 718524,
+  "cached": 587520,
+  "out": 22307
+ },
+ "calls": 200,
+ "wall_sec": 177.2,
+ "hashes": {
+  "retrieval": "1dbe7f318a94",
+  "answers": "6ebbb1ce5689"
+ }
+}
