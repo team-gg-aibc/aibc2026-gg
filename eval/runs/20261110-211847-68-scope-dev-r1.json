@@ -1,0 +1,137 @@
+{
+ "run_id": "20261110-211847-68-scope-dev-r1",
+ "group": "20261110-211847-68-scope-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T21:31:29+09:00",
+ "experiment": {
+  "name": "68-scope",
+  "issue": "#68",
+  "note": "관할 규칙 넓히기: 게이트(gate on)에 규칙 ① 자치구 이름 + 그 문장에 「서울」 없음, 규칙 ② 6종 밖 이름 붙은 조례를 더한 판. question_fence · v1-guard는 끔(이번에 안 잼). 끈 판은 rc-c1(baseline.json)",
+  "cycle": 2,
+  "file": "eval/configs/68-scope.json",
+  "file_sha": "4779f9148834"
+ },
+ "conclusion": "채택 의견 — 막은 정상 문항 dev · 극한 0, dev 함정 T023~T030 · T041 · T042(+T037)를 회차와 상관없이 막음. 두 번 다 무너진 함정 T015 하나는 게이트가 손대지 않은 문항(흔들림), 과잉 포기 · 형식 오류 줄 지킴 (#68, PM 판단 대기)",
+ "lesson": [
+  "좋아짐: dev 관할 밖 함정 11개를 검색 전에 확인 불가로 고정(끈 판은 T041 두 번 · T025 한 번 틀림), 극한 인젝션 30 점수합 16 → 22~23.5(지시문 떼기)",
+  "나빠짐 없음으로 보임: T015(「공원에서 드론」)는 게이트가 바꾸지 않은 질문이라 켠 판도 끈 판과 같은 길인데 판정이 두 번 통과시킴 — 판정 흔들림",
+  "다음: 다른 시도 · 「○○법」은 꼴이 정상 질문과 같아 코드로 못 막음 → 6종 밖 원문 대조(후보 9), T015 같은 '조례에 안 적힌 행위' 함정은 판정 쪽에서"
+ ],
+ "args": {
+  "config": "eval/configs/68-scope.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "gate": "on",
+  "question_fence": false
+ },
+ "settings_hash": "92313da047ee",
+ "switches": {
+  "gate": "on"
+ },
+ "env": {
+  "code_commit": "6999915",
+  "code_hash": "52069e5a6d00",
+  "eval_code_hash": "2cb442d13c87",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.11.15",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-10"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 79.2,
+  "by_type": {
+   "단순": 81.2,
+   "조건": 77.6,
+   "결합": 69.6,
+   "함정": 92.9
+  },
+  "trap": 92.9,
+  "by_law": {
+   "animal": 83.0,
+   "bicycle": 79.3,
+   "common": 40.0,
+   "park": 75.0,
+   "parking": 68.4,
+   "smoking": 86.2,
+   "youth": 81.9
+  },
+  "over_abstain": 18.3,
+  "citations_per_answer": 1.5,
+  "retrieval_hit": 94.9,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 12,
+  "latency_p50": 3.479,
+  "latency_p95": 15.845,
+  "latency_max": 20.353,
+  "causes": {
+   "판정이 맞는 답을 거절": 71,
+   "정답이 후보에 없음": 38,
+   "후보에 있는데 잘못 고름": 22,
+   "답이 있는데 확인 불가 (found 거짓)": 20,
+   "오류 · 형식": 11,
+   "함정에 답함": 3
+  }
+ },
+ "cost_usd": 0.6179,
+ "tokens": {
+  "in": 3012116,
+  "cached": 1476416,
+  "out": 64770
+ },
+ "calls": 2460,
+ "wall_sec": 762.8,
+ "hashes": {
+  "retrieval": "be9e5f673ca3",
+  "answers": "4e41f042494c"
+ }
+}
