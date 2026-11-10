@@ -11,6 +11,7 @@ build_index · verify · contract · upstage)은 고치지 않고 부르기만 �
 
 - 5판: 호출 하나가 오래 안 돌아오면 기다리면서 하나 더 부르고, 깨진 JSON 출력은 다시 부른다(guarded). 시간 초과 · 오류를 없애려는 것이다.
 - 6판: 검색이 끝나면 ①을 기다리지 않고 ④를 미리 부른다(검색 점수만으로 고른 조례). ③이 같은 조례로 정하면 그 답을 쓰고, 다르면 버리고 다시 읽는다.
+- 7판: 원문이 내용을 상위 법령으로 넘기기만 하는 구절 뒤에 「이 자료에 없다」 표시를 붙여 ④ · ⑥에 보여 준다(DELEG). ⑥ 출력 끝에 닫는 칸(c8).
 
 스스로 시험(키 없이, 몇 초): python -m engine.flow2.flow --selftest
 """
@@ -176,8 +177,21 @@ def view(laws, unit):
     return sorted(out, key=lambda c: laws.index(c["law"]))
 
 
-def context(chunks):
-    return "\n\n".join(f"[조항] {c['label']}\n{c['text']}" for c in chunks)
+# 7판: 내용을 상위 법령으로 넘기기만 하는 구절(「법 제○조 각 호의 행위」 · 「법 제○조 각 목에 해당하는」 · 「영 별표 ○와 같다」).
+# 6종 원문에 네 곳이다(동물보호 조례 제2조 맹견 정의 · 도시공원 조례 제22조 제1항 금지행위 · 제23조 제1항 과태료 기준 · 제24조 자문 사항).
+# 넘겨진 내용(무엇이 금지인지 · 얼마인지 · 어떤 종류인지)은 6종 원문에 없는데, 1~6판은 이 조문을 근거로 「법 제49조 각 호의 행위가
+# 금지됩니다」 같은 답을 만들어 함정이 샜다(1~4판 16개 실행에서 common-T018 5번 · animal-X031 5번 · common-T043 4번 · park-X034 3번).
+# 모델에게 규칙 글로 시키는 것(11-10 작은 묶음 r7 bc)은 듣지 않았고, 「없다」는 표시를 자료 안에 붙이면 지어내지 않았다.
+# 원문 글자에서만 찾는다. 조문이 내용을 스스로 적은 인용(「영 제23조 별표 1의 제10호 …를 위하여 설치하는 가설건축물」)에는 붙이지 않는다.
+DELEG = re.compile(r"(?:법|영|시행령|시행규칙)\s*제\d+조(?:의\d+)?(?:제\d+항)?(?:제\d+호)?(?:\s*(?:및|ㆍ|·)\s*제\d+항)?\s*"
+                   r"(?:각\s*호의\s*(?:행위|사항)|각\s*목에\s*해당하는|별표\s*\d+\s*와\s*같다)")
+DELEG_MARK = "(※ 그 내용은 이 자료에 없다)"
+
+
+def context(chunks, mark=False):
+    """모델에게 보여 줄 근거 글. mark=True(7판)면 위임 구절 뒤에 DELEG_MARK를 붙인다(구절 대조 ⑤는 표시 없는 원문으로 한다)."""
+    return "\n\n".join(f"[조항] {c['label']}\n" + (DELEG.sub(lambda m: m.group(0) + DELEG_MARK, c["text"]) if mark else c["text"])
+                       for c in chunks)
 
 
 def _f2(st):
@@ -250,9 +264,10 @@ def _ask(st, cfg, step, user):
 _SPEC = ThreadPoolExecutor(max_workers=8, thread_name_prefix="flow2-spec")   # 안에서 guarded가 _POOL을 쓰므로 풀을 나눈다
 
 
-def _read_user(question, v, fx=()):
+def _read_user(question, v, cfg, fx=()):
     """6판 ④에 보내는 글: 원문 · (③이 확인한 사실) · 질문."""
-    return f"[근거]\n{context(v)}\n\n" + ("[조례 확정]\n" + "\n".join(fx) + "\n\n" if fx else "") + f"[질문]\n{question}"
+    return (f"[근거]\n{context(v, cfg['flow2_version'] >= 7)}\n\n" + ("[조례 확정]\n" + "\n".join(fx) + "\n\n" if fx else "")
+            + f"[질문]\n{question}")
 
 
 def _wait(fut):
@@ -274,7 +289,7 @@ def search(st, cfg):
     laws = lawmap.pick_laws(st["_hits"]) if cfg["flow2_version"] >= 6 and not st["reason"] else []
     if laws:
         box = {"calls": []}
-        user = _read_user(st["question"], view(laws, cfg["chunk_unit"]))
+        user = _read_user(st["question"], view(laws, cfg["chunk_unit"]), cfg)
         st["_spec"] = (laws, box, _SPEC.submit(contextvars.copy_context().run, _ask, box, cfg, "read", user))
 
 
@@ -314,7 +329,7 @@ def read(st, cfg):
         _f2(st)["spec"] = "씀"
     elif cfg["flow2_version"] >= 6:
         _f2(st)["spec"] = "버림"
-        out = _ask(st, cfg, "read", _read_user(st["question"], v, fx))
+        out = _ask(st, cfg, "read", _read_user(st["question"], v, cfg, fx))
     else:
         out = _ask(st, cfg, "read", f"[근거]\n{context(v)}\n\n[질문 분석]\n{note}\n\n[질문]\n{st['question']}")
     st["_read"] = out
@@ -334,6 +349,8 @@ def gate(st, cfg):
     kept, ids, dropped = [], [], []
     v3 = cfg["flow2_version"] >= 3
     for ev in out.get("evidence") or []:
+        if cfg["flow2_version"] >= 7:   # 7판: 모델이 위임 표시까지 옮겨 적었으면 떼고 대조한다
+            ev = dict(ev, quote=ev.get("quote", "").replace(DELEG_MARK, ""))
         lab = ev.get("label", "")
         if v3:   # 3판: 모델이 근거 줄 머리 「[조항]」까지 옮겨 적는다(2판 dev 두 번째 실행에서 13문항이 「목록에 없는 조항」, 11-10)
             lab = lab.replace("[조항]", "").strip()
@@ -378,7 +395,8 @@ def check(st, cfg):
         fx = [mask_numbers(x) for x in fx]
     who += ("\n\n[조례 확정]\n" + "\n".join(fx)) if fx else ""
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
-            f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used)}\n\n[답변]\n{st['draft']['answer']}")
+            f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used, cfg['flow2_version'] >= 7)}\n\n"
+            f"[답변]\n{st['draft']['answer']}")
     out = _ask(st, cfg, "check", user)
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
@@ -599,6 +617,21 @@ def selftest():
         plan["question_slots"] = dict(slots, named_rule="청년주거 기본 조례", law_guess="청년")            # ③이 막으면 미리 읽은 답은 안 쓴다
         r, t = pipeline.answer("서울시 청년주거 기본 조례는 누구를 지원해요?", cfg6)
         assert r == contract.UNKNOWN and t["reason"] == lawmap.REJECT_NAME and "spec" not in t["flow2"]
+        # 7판: 위임 구절 표시. 6종 원문에 네 곳뿐이고, ④ · ⑥에 보내는 글에만 붙는다(6판에는 없음). 표시까지 옮긴 구절도 ⑤를 지난다
+        marked = [c["label"].removeprefix("서울특별시 ") for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"])]
+        assert marked == ["동물보호 조례 제2조", "도시공원 조례 제22조 제1항", "도시공원 조례 제23조 제1항", "도시공원 조례 제24조"], marked
+        ban = next(c for c in retrieve.load("paragraph")[0] if c["label"].endswith("도시공원 조례 제22조 제1항"))
+        assert "각 호의 행위" + DELEG_MARK in context([ban], True) and DELEG_MARK not in context([ban])
+        cfg7 = dict(cfg, flow2_version=7, flow2_hedge_sec=0.2)
+        plan.update(question_slots=dict(slots, law_guess="도시공원", actor="시민"),
+                    law_answer_quotes={"found": True, "check": "", "conclusion": "정보", "answer": "법이 정한 행위가 금지됩니다.",
+                                       "evidence": [{"label": ban["label"], "quote": "법 제49조제1항 및 제2항 각 호의 행위" + DELEG_MARK + "를 하여서는"}]},
+                    target_check={"reason": "", "asks": [{"ask": "금지 행위", "verdict": "grounded"}], "done": True})
+        r, t = pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg7)
+        assert r["citation"] == [ban["label"]] and t["prompts"] == {"analyze": "a2", "read": "r6", "check": "c8"}, (t["reason"], t["flow2"].get("gate"))
+        assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
+        pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
+        assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:

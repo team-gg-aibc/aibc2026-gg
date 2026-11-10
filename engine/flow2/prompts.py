@@ -4,7 +4,7 @@
 - ④ 읽기(r1): #27 「w1」 판(종희, PR #63)을 바탕으로 결론 · 근거 구절 칸을 더했다. #63 병합 뒤에는 공통 부분을 그 판에서 가져온다.
 - ⑥ 대조(c1): 가설 17 「v3-question」(PM 실험, 브랜치 donggyu/judge-question 커밋 0ac580e)을 그대로 옮기고,
   질문 분석의 대상마다 근거 구절을 글자 그대로 받는 칸(targets)을 더했다. 구절은 코드가 원문과 글자로 대조한다.
-- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7) · 6판(a2 · r6 · c7)은 맨 아래. 설정 flow2_version이 고른다(SETS).
+- 2판(a2 · r3 · c4, 앞선 시도 r2 · c3) · 3판(a2 · r4 · c4) · 4판(a2 · r4 · c6, 앞선 시도 c5) · 5판(a2 · r4 · c7) · 6판(a2 · r6 · c7) · 7판(a2 · r6 · c8)은 맨 아래. 설정 flow2_version이 고른다(SETS).
 """
 
 LAW_KEYS = ["주차장", "동물보호", "자전거", "도시공원", "청년", "금연", "없음"]
@@ -311,6 +311,14 @@ READ6_V = "r6"
 READ6 = READ4.replace("[질문 분석]은 질문이 무엇을 묻는지 정리한 참고다.\n", "")
 assert "[질문 분석]" not in READ6 and READ6.count("\n") == READ4.count("\n") - 1
 
+# ---- 7판 (설정 flow2_version 7, 11-10 밤) ----
+# c8: c7 끝에 닫는 칸 done을 더했다. 5 · 6판 전체 측정(11-10 저녁, ⑥ 호출 3,162번)에서 c7은 JSON이 70번 깨졌다(2.2%, c4는 1만 5천 번에 4번).
+# targets를 빼니 asks 배열이 마지막 칸이 돼, 모델이 같은 물음을 되풀이해 적다 끊겼다. 다시 불러 오류는 0이었지만 그 문항은 ⑥을 두 번 불렀다.
+# 물음마다의 verdict는 done보다 먼저 나온다. ④는 6판 r6 그대로다(위임 구절 표시는 코드가 근거 글에 붙인다, flow.DELEG).
+CHECK8_V = "c8"
+CHECK8 = CHECK7 + "\ndone에는 asks를 다 적은 뒤 true를 넣는다."
+CHECK8_SCHEMA = _schema("target_check", {**CHECK7_SCHEMA["json_schema"]["schema"]["properties"], "done": {"type": "boolean"}})
+
 # 판 번호(설정 flow2_version) → 단계마다 (판 이름, 프롬프트, JSON 칸)
 SETS = {
     1: {"analyze": (ANALYZE_V, ANALYZE, ANALYZE_SCHEMA), "read": (READ_V, READ, READ_SCHEMA), "check": (CHECK_V, CHECK, CHECK_SCHEMA)},
@@ -324,4 +332,6 @@ SETS = {
         "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
     6: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ6_V, READ6, READ4_SCHEMA),
         "check": (CHECK7_V, CHECK7, CHECK7_SCHEMA)},
+    7: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ6_V, READ6, READ4_SCHEMA),
+        "check": (CHECK8_V, CHECK8, CHECK8_SCHEMA)},
 }
