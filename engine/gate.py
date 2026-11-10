@@ -67,7 +67,6 @@ SIX = ("주차장설치및관리조례", "주차장조례",                     
 _GENERIC = set("서울 서울시 서울특별시 특별시 시 구 군 도 관련 다른 그 이 저 건 거 걸 게 해당 새 이번 지금 현행 자치 각 어느 어떤 무슨 그런 이런 모든 여러 기존 지방".split())
 # 조사 · 어미로 끝나면 이름이 아니다(「서비스를 조례에서는」 「저도 조례」)
 _PARTICLE_END = re.compile(r"(?:을|를|은|는|이|가|도|에|에서|로|으로|의|와|과|랑|만|게|고|면|요|다|지|며|서|께|한테|처럼|보다)$")
-_ORD = re.compile(r"([가-힣]+)\s?조례")
 
 OUT = "관할 밖"   # 판단 기록 reason
 
@@ -106,28 +105,42 @@ def _sentence_scope(sentence):
     return None
 
 
+# 「조례」 앞 이름(띄어쓰기 지움)이 이 꼴이면 6종을 줄여 부른 것이다(PR #60 리뷰 2차: 「서울시 주차 조례」 「금연구역 조례」 「자전거 이용 조례」).
+# 핵심어 뒤에 다른 말이 붙은 이름(「청년주거 기본」 「청년일자리 기본」 「공원 맨발걷기 길 지원」)은 6종이 아니다.
+_SIX_NAME = re.compile(r"(?:주차(?:장)?(?:설치및관리)?|자전거(?:이용)?(?:활성화)?(?:에관한)?|공공자전거|따릉이"
+                       r"|동물(?:보호)?|(?:도시)?공원|금연(?:구역|환경)?|(?:간접)?흡연(?:피해방지)?|금연환경조성및간접흡연피해방지"
+                       r"|청년(?:기본)?)")
+
+
+def _name_before(text):
+    """「조례」 앞에 붙은 이름(낱말 4개까지, 띄어쓰기 지움). 일반어(서울시 · 관련 …)나 조사로 끝나는 낱말에서 멈춘다."""
+    words = []
+    for w in reversed(re.split(r"\s+", text.rstrip())[-4:]):
+        if not re.fullmatch(r"[가-힣]+", w) or w in _GENERIC or _PARTICLE_END.search(w) or w.endswith("조례"):
+            break
+        words.insert(0, w)
+    return "".join(words)
+
+
 def named_ordinances(question):
-    """「조례」 바로 앞에 조사 없이 붙은 이름들(「청년주거 기본 조례」 → 「기본 조례」의 「기본」). 이름 없는 「조례」는 뺀다."""
+    """「조례」 바로 앞에 조사 없이 붙은 이름들(「서울시 청년주거 기본 조례」 → 「청년주거기본」). 이름 없는 「조례」는 뺀다."""
     out = []
-    for m in _ORD.finditer(question):
-        word = m.group(1)
-        if word.endswith("조례"):
-            continue
-        if word in _GENERIC or _PARTICLE_END.search(word):
-            continue
-        out.append(m.group(0))
+    for m in re.finditer(r"조례", question):
+        name = _name_before(question[:m.start()])
+        if name:
+            out.append(name)
     return out
 
 
 def _ordinance_scope(question):
-    """#68 규칙 ②: 이름 붙은 조례가 있는데 질문 어디에도 6종 이름(별칭 포함)이 없으면 그 까닭."""
+    """#68 규칙 ②: 이름 붙은 조례가 있는데 그 이름이 모두 6종 꼴이 아니고, 질문 어디에도 6종 이름(별칭 포함)이 없으면 그 까닭."""
     names = named_ordinances(question)
-    if not names:
+    if not names or any(_SIX_NAME.fullmatch(n) for n in names):
         return None
     flat = re.sub(r"\s+", "", question)
     if any(a in flat for a in SIX):
         return None
-    return f"6종 밖 조례 ({names[0]})"
+    return f"6종 밖 조례 ({names[0]} 조례)"
 
 
 def scope(question):
@@ -201,7 +214,10 @@ def _selftest():
               "서울시 조례에서 말하는 청년은 몇 살부터예요?", "조례에서 말하는 임시보호는 뭐예요?",
               "주차 가능 대수를 바로바로 보여 주는 서비스를 조례에서는 뭐라고 하나요?",
               "서울시 공원 조례로 공원에서 술 마시면 안 돼요?", "서울 금연 조례로 버스정류소도 금연구역이에요?",
-              "서울특별시 금연환경 조성 및 간접흡연 피해방지조례에서 금연구역은 어디예요?"):
+              "서울특별시 금연환경 조성 및 간접흡연 피해방지조례에서 금연구역은 어디예요?",
+              # PR #60 리뷰 2차: 6종을 줄여 부른 꼴
+              "서울시 주차 조례로 경차 할인돼요?", "서울 금연구역 조례에서 버스정류소는 금연구역이에요?",
+              "서울시 자전거 이용 조례로 따릉이 할인돼요?", "서울 간접흡연 조례로 아파트 베란다 흡연도 막아요?"):
         assert not check(t, "on")["block"], t
     assert _sentence_scope("집중구역 조례가 있나요?") is None   # 「중구」가 낱말 속에 묻힌 꼴은 자치구가 아니다
     # 「조례 말고 ○○법 기준으로도 …인가요?」는 지시가 아니라 질문이다
