@@ -1,0 +1,135 @@
+{
+ "run_id": "20261110-215633-26-term-dict-dev-r1",
+ "group": "20261110-215633-26-term-dict-dev",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-10T22:04:55+09:00",
+ "experiment": {
+  "name": "26-term-dict",
+  "issue": "#26",
+  "note": "용어 사전: 시민 말을 조례 용어로 바꾼 낱말을 키워드 검색어에 더함(engine/rewrite.py, 호출 0). 의미 검색은 원래 질문 그대로. 끈 판은 rc-c1(baseline.json)",
+  "cycle": 2,
+  "file": "eval/configs/26-term-dict.json",
+  "file_sha": "d1678642495b"
+ },
+ "conclusion": "채택 의견 — dev 가중 81.3 vs 78.35(+2.95, 기준 2.2 넘음), 혼합 적중률 94.8 → 98.7, 과잉 포기 16.4 vs 17.5%, 형식 오류 0. 두 번 다 무너진 함정 T050 하나는 사전(강아지 → 반려동물) 탓 (#26, PM 판단 대기)",
+ "lesson": [
+  "좋아짐: 키워드 적중률 top-6 69.5 → 84.2 · top-20 86.3 → 97.1, 혼합 94.8 → 98.7, 가중 +2.95. 나빠짐: 함정 T050(강아지 + 식당)을 반려동물 출입 조항으로 끌어옴",
+  "왜: 시민 말(따릉이 · 길가 · 담배 단속하는 분)과 조례 용어(공공자전거 · 노상주차장 · 금연지도원)의 글자가 겹치지 않아 BM25가 못 찾았다. 다만 사전은 dev에서 놓친 문항을 보고 만들어 dev에 맞춰진 몫이 있다",
+  "다음: 넓은 항목(강아지 → 반려동물)은 다른 낱말과 같이 나올 때만 더하기, holdout · 극한 세트로 과적합 확인, Solar 다시 쓰기(미룬 일)"
+ ],
+ "args": {
+  "config": "eval/configs/26-term-dict.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "term_dict": true
+ },
+ "settings_hash": "364fb7b2e5c5",
+ "switches": {
+  "term_dict": true
+ },
+ "env": {
+  "code_commit": "408a9a0",
+  "code_hash": "9a42886f4d54",
+  "eval_code_hash": "2cb442d13c87",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "8cf67c797eaa",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.11.15",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-10"
+ },
+ "metrics": {
+  "n": 661,
+  "n_gold": 619,
+  "n_trap": 42,
+  "weighted": 81.8,
+  "by_type": {
+   "단순": 88.0,
+   "조건": 82.7,
+   "결합": 67.2,
+   "함정": 92.9
+  },
+  "trap": 92.9,
+  "by_law": {
+   "animal": 83.5,
+   "bicycle": 88.6,
+   "common": 40.0,
+   "park": 77.5,
+   "parking": 73.9,
+   "smoking": 93.0,
+   "youth": 86.6
+  },
+  "over_abstain": 16.2,
+  "citations_per_answer": 1.59,
+  "retrieval_hit": 98.7,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.023,
+  "latency_p95": 4.566,
+  "latency_max": 12.575,
+  "causes": {
+   "판정이 맞는 답을 거절": 84,
+   "후보에 있는데 잘못 고름": 18,
+   "답이 있는데 확인 불가 (found 거짓)": 14,
+   "정답이 후보에 없음": 6,
+   "함정에 답함": 3
+  }
+ },
+ "cost_usd": 0.8179,
+ "tokens": {
+  "in": 3064345,
+  "cached": 722432,
+  "out": 67833
+ },
+ "calls": 2557,
+ "wall_sec": 501.2,
+ "hashes": {
+  "retrieval": "95f29a0ce9d4",
+  "answers": "fdf9949f34f0"
+ }
+}

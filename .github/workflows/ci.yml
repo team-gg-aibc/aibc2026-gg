@@ -56,6 +56,10 @@ jobs:
           UPSTAGE_API_KEY: ""
         run: python -m engine.contract --selftest
 
+      # #26 용어 사전: 출처가 모두 dev 문항인지(holdout 금지) · 더하는 용어가 조례 원문에 있는지. 키 없이 1초.
+      - name: 용어 사전 스스로 시험
+        run: python -m engine.rewrite --selftest
+
   pr-check:
     name: pr-check
     if: github.event_name == 'pull_request'
