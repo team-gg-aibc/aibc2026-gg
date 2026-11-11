@@ -56,6 +56,10 @@ jobs:
           UPSTAGE_API_KEY: ""
         run: python -m engine.contract --selftest
 
+      # #82 곳 표(engine/flow2/places.json): 칸이 다 있고 곳 낱말이 원문 증거 구절에 있는지. 키 없이 돈다.
+      - name: 곳 표 점검
+        run: python -m engine.flow2.places --check
+
   pr-check:
     name: pr-check
     if: github.event_name == 'pull_request'
