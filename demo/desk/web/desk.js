@@ -413,10 +413,15 @@ function agencyBlock(q, d, word, compact) {
     ${!compact && a.why ? `<details class="why"><summary>${esc(C['처리 기관 근거 보기'])}</summary><p>${esc(a.why)}</p>${a.links.map((o) => `<div><a href="${esc(o['주소'])}" target="_blank" rel="noopener">${esc(o['주소'].replace(/^https?:\/\//, '').slice(0, 64))}</a></div>`).join('')}</details>` : ''}
     ${compact ? '' : `<p class="note">${esc(C['처리 기관 뜻'])}</p>`}`;
 }
+// 지난번에 승인한 답: 같은 조항을 인용한 승인 답 가운데, 문의 글도 비슷하면(글자 겹침) 펼쳐 보이고 글이 다르면 접힌 한 줄로(시연 흐름 손질 3)
+// ponytail: 두 글자 겹침(Dice) 0.5 고정 — 같은 글 0.88, 조항만 같은 다른 문의는 47건 안에서 0.29 이하(11-12 잼). 어긋나면 엔진이 비슷한 지난 답을 찾게 하는 것이 길
+const dice = (a, b) => { const A = grams(a), B = grams(b); let n = 0; for (const x of A) if (B.has(x)) n++; return (2 * n) / ((A.size + B.size) || 1); };
 function pastFor(q) {
   const labels = new Set(q.card.citations.map((c) => c.label));
-  return S.inquiries.filter((x) => x.id !== q.id && x.approved && x.approved.reply === 'draft' && ((x.card || {}).citations || []).some((c) => labels.has(c.label)))
-    .sort((a, b) => b.approved.at.localeCompare(a.approved.at))[0];
+  const all = S.inquiries.filter((x) => x.id !== q.id && x.approved && x.approved.reply === 'draft' && ((x.card || {}).citations || []).some((c) => labels.has(c.label)))
+    .sort((a, b) => b.approved.at.localeCompare(a.approved.at));
+  const near = all.filter((x) => dice(q.text, x.text) >= 0.5);
+  return all.length ? { item: near[0] || all[0], similar: near.length > 0, n: all.length } : null;
 }
 function draftBlock(q, compact) {
   const C = W('답변 초안').kv, P = W('문장과 구절'), done = !!q.approved;
@@ -484,9 +489,13 @@ function bodyOf(q, o = {}) {   // o.compact(나란히 보기의 한 칸) · o.cm
     const dr = draftBlock(q, o.compact);
     h += dr.html + citesBlock(q, d, word, o.compact, dr.on) + agencyBlock(q, d, word, o.compact);
     if (!o.compact) {
-      const past = !q.approved && pastFor(q), PA = W('지난번에 승인한 답');
-      if (past) h += `<div class="past"><div class="t">${esc(fill(PA.kv['머리'], { 번호: past.no, 조항: `${shortLaw(past.card.citations[0].law)} ${past.card.citations[0].article}` }))}</div>
-        <div class="a">${esc(past.approved.text)}</div><button type="button" class="outline" data-act="past" data-id="${past.id}">${esc(PA.btn()[0])}</button><p class="note">${esc(PA.smalls[0] || '')}</p></div>`;
+      const found = !q.approved && pastFor(q), PA = W('지난번에 승인한 답');
+      if (found) {
+        const past = found.item, inner = `<div class="t">${esc(fill(PA.kv['머리'], { 번호: past.no, 조항: `${shortLaw(past.card.citations[0].law)} ${past.card.citations[0].article}` }))}</div>
+          <div class="a">${esc(past.approved.text)}</div><button type="button" class="outline" data-act="past" data-id="${past.id}">${esc(PA.btn()[0])}</button><p class="note">${esc(PA.smalls[0] || '')}</p>`;
+        h += found.similar ? `<div class="past">${inner}</div>`
+          : `<details class="past folded"><summary>${esc(fill(PA.kv['접힌 줄'], { n: found.n }))}</summary>${inner}</details>`;
+      }
     }
   }
   if (prev && !o.compact && (d.cite || d.dept || d.agency)) h = `<p class="note">${esc(W('위치 바로잡기').kv['바뀜 설명'])}</p>` + h;

@@ -132,6 +132,8 @@ details.why a { color: var(--accent); word-break: break-all; }
 .gap .lead2 { color: var(--ink); font-weight: 600; }
 .past { margin-top: 12px; padding: 9px 11px; border: 1px dashed var(--ok); border-radius: 8px; }
 .past .t { color: var(--ink); font-size: 12px; font-weight: 800; }
+.past.folded { border-color: var(--line); } .past.folded > summary { cursor: pointer; color: var(--sub); font-size: 12px; font-weight: 600; }
+.past.folded[open] > summary { margin-bottom: 6px; }
 .past .a { margin: 4px 0 6px; color: var(--text); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .status { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
 .c-status { padding: 8px 14px 10px; border-top: 1px solid var(--line); background: var(--panel-solid); box-shadow: 0 -8px 14px -12px rgba(0, 0, 0, .35); }
