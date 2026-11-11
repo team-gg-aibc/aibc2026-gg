@@ -100,6 +100,18 @@ def load(split):
     return qs
 
 
+PRIVATE = ("holdout", "fresh")      # 보고 고치지 않는 묶음. 문항별 기록을 팀이 받는 곳(릴리스 · 비교 문서 · 실패 모음)에 두지 않는다
+
+
+def private(summary):
+    """실행 요약이 PRIVATE 묶음의 것이면 그 묶음 이름, 아니면 None. 요약의 split 칸과 실행 이름(…-<묶음>[-n수][-r번]) 둘 다 본다."""
+    split = (summary.get("args") or {}).get("split")
+    if split in PRIVATE:
+        return split
+    m = re.search(rf"-({'|'.join(PRIVATE)})(?:-n\d+)?(?:-r\d+)?$", summary.get("run_id") or "")
+    return m.group(1) if m else None
+
+
 def sample(qs, n, seed):
     """유형 비율대로, 문항 id의 해시 순서로 n개. 같은 n · seed면 어느 컴퓨터에서나 같은 문항."""
     if not n or n >= len(qs):
@@ -361,7 +373,9 @@ def run(args):
     cfg, exp, mode, qs = prepare(args)
     if args.split == "holdout":
         print("· holdout: 큰 이정표에서만 잽니다(계획 5-1절). 문항별 결과는 남기지 않습니다.")
-    stamp = datetime.now(KST).strftime("%Y%m%d-%H%M%S")
+    if args.split == "fresh":
+        print("· fresh: 문항별 결과는 이 컴퓨터의 eval/results/에만 둡니다. share · compare · failures는 이 실행을 거부합니다(decisions 11-11).")
+    stamp =datetime.now(KST).strftime("%Y%m%d-%H%M%S")
     group = "-".join([stamp, re.sub(r"[^\w.-]+", "-", exp["name"]), args.split] + ([f"n{args.sample}"] if args.sample else []))
     out = []
     for rep in range(1, args.repeat + 1):
@@ -485,6 +499,9 @@ def selftest():
         assert "--split para" in str(e)
     finally:
         EVAL = keep
+    assert private({"args": {"split": "fresh"}}) == "fresh" and private({"args": {"split": "holdout"}}) == "holdout"
+    assert private({"args": {"split": "dev"}, "run_id": "20261111-090000-x-fresh-r2"}) == "fresh"       # 요약의 split 칸이 달라도 실행 이름으로
+    assert private({"args": {"split": "dev"}, "run_id": "20261111-090000-83-fresh-start-dev-r1"}) is None and private({}) is None
 
     cfg = dict(config.load(), select_mode="direct")   # 가짜 업스테이지는 답 쓰기 한 번만 흉내 낸다(DEFAULTS의 #24 먼저 추리기는 끔)
     ok = {"answer": "네", "citation": [a], "source_url": "https://www.law.go.kr/x", "effective_date": "2026-10-01"}

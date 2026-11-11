@@ -4,7 +4,8 @@
   python3 eval/failures.py --cycle 2 1            여러 주기를 함께(예: 2주기 실험 + 1주기 릴리스 rc-c1)
   python3 eval/failures.py --files <x.jsonl.gz> …  받지 않고 가진 파일로
   python3 eval/failures.py --selftest             키 · 네트워크 없이
-올리는 법은 eval/share.py. 받으려면 gh(GitHub CLI) 로그인이 필요하다. holdout은 올리지 않으니 여기에도 없다.
+올리는 법은 eval/share.py. 받으려면 gh(GitHub CLI) 로그인이 필요하다. holdout · 처음 보는 문항(fresh) 실행은 올리지 않으니 여기에도 없고,
+받은 것에 섞여 있어도 모으지 않는다.
 
 - 실패 = 점수가 1이 아닌 문항(부분 점수 포함). 원인은 점수 틀(run.py)이 채점할 때 붙인 것을 큰 갈래로 모은다(compare.py와 같은 규칙).
 - 단계: 정답이 후보에 없음 → 검색, 후보에 있는데 잘못 고름 → 고르기 · 답 쓰기, 확인 불가 · 오류 · 시간 초과로 끝남 → 흐름이 멈춘 단계,
@@ -28,7 +29,7 @@ from pathlib import Path
 import share
 from board import LAWS
 from compare import bucket
-from run import BROKEN, CAUSES, KST, MISPICK, NOT_IN, RESULTS, TRAP_ANSWERED, TYPES, match
+from run import BROKEN, CAUSES, KST, MISPICK, NOT_IN, RESULTS, TRAP_ANSWERED, TYPES, match, private
 
 OUT = RESULTS / "failures"
 STAGE = {NOT_IN: "검색", MISPICK: "고르기 · 답 쓰기"}
@@ -181,8 +182,11 @@ def main():
     if not (args.cycle or args.files):
         ap.error("--cycle이나 --files를 주세요")
     runs = [share.load(f) for f in args.files] if args.files else [x for c in args.cycle for x in download(c)]
-    hold = share.holdout_ids()      # share.py가 이미 거부하지만, 손으로 올린 파일이 섞여도 holdout은 보지 않는다
-    runs = [(s, [r for r in rows if r["id"] not in hold]) for s, rows in runs if s["args"]["split"] != "holdout"]
+    hold = share.holdout_ids()      # share.py가 이미 거부하지만, 손으로 올린 파일이 섞여도 holdout · 처음 보는 문항(fresh)은 보지 않는다
+    skipped = [s["run_id"] for s, _ in runs if private(s)]
+    if skipped:
+        print(f"· 모으지 않은 실행 {len(skipped)}개(holdout · fresh, 보고 고치지 않는 묶음)")
+    runs = [(s, [r for r in rows if r["id"] not in hold]) for s, rows in runs if not private(s)]
     if not runs:
         sys.exit("✗ 모을 실행이 없습니다.")
     tag = "-".join(f"c{c}" for c in args.cycle) if args.cycle else "files"
