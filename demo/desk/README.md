@@ -80,7 +80,7 @@ DESK_ENGINE=saved python3 demo/desk/server.py
 | `web/desk.html` · `desk.js` · `desk.css` | 담당자 화면 |
 | `web/citizen.html` | 시민 화면 |
 | `web/common.js` | 두 화면이 같이 쓰는 작은 도구(문구 꺼내기 · 서울 안 판정 · 가까운 장소) |
-| `web/data/agencies.json` | 소관 부서 · 처리 기관 자료(조례 6종 × 문의 갈래 37). 원본: 소관 · 처리 기관 조사(2026-11-11, `_orch-tools/reports/소관-처리-기관/`의 `도구/build.py`로 만듦) |
+| `web/data/agencies.json` | 소관 부서 · 처리 기관 자료(조례 6종 × 문의 갈래 37). 원본: 소관 · 처리 기관 조사(2026-11-11, `_orch-tools/reports/소관-처리-기관/agencies.json`을 그대로 복사, 19:54 판) |
 | `web/data/seoul.geojson` | 서울특별시 경계(지도에서 서울 밖을 가리고, 움직일 범위와 서울 안 판정에 씀). OpenStreetMap relation 2297418, Overpass API 2026-11-11 받음, 0.0004° 단순화 |
 
 ## 스스로 시험
@@ -98,13 +98,14 @@ python3 demo/desk/server.py --selftest
 - 공개 문의 요지: 서울시설공단 주차 「시민의 소리」, 서울시 응답소 「공개 민원사례」, 기관 자주 묻는 질문(이름 · 연락처 · 번호 없음)
 - 서울 경계: © OpenStreetMap contributors(ODbL)
 - 한강공원 조례 · 소관 부서: 국가법령정보센터 「서울특별시 한강공원 보전 및 이용에 관한 기본 조례」 화면(https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171805)
-- 소관 부서 · 처리 기관(`web/data/agencies.json`): 국가법령정보센터 조례 · 「서울특별시 행정기구 설치 조례 시행규칙」(2026-09-11 시행), 서울시 · 서울시설공단 · 따릉이 · 미래한강본부 · 자치구 누리집의 공식 안내, 공개 답변 사례(2026-11-11 받음). 자료에 적힌 출처 주소 37곳:
-  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171833
+- 소관 부서 · 처리 기관(`web/data/agencies.json`): 국가법령정보센터 조례 · 「서울특별시 행정기구 설치 조례 시행규칙」(2026-09-11 시행), 서울시 · 서울시설공단 · 따릉이 · 미래한강본부 · 자치구 누리집의 공식 안내, 공개 답변 사례(2026-11-11 받음). 자료에 적힌 출처 주소 35곳:
   - https://www.law.go.kr/LSW/ordinInfoR.do
   - https://www.sisul.or.kr/open_content/main/introduce/found.jsp
   - https://www.sisul.or.kr/open_content/parking/
   - https://news.seoul.go.kr/traffic/archives/514606
   - https://www.sisul.or.kr/open_content/parking/parkingRefund/parkingRefundList.do?pgno=1063
+  - https://www.law.go.kr/LSW/lsInfoR.do
+  - https://www.sisul.or.kr/open_content/main/introduce/organization.jsp
   - https://news.seoul.go.kr/traffic/archives/26877
   - https://www.gwangjin.go.kr/portal/main/contents.do?menuNo=200622
   - https://news.seoul.go.kr/traffic/archives/1853
@@ -113,24 +114,21 @@ python3 demo/desk/server.py --selftest
   - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2147709
   - https://junggu.seoul.kr/content.do?cmsid=14424
   - https://news.seoul.go.kr/env/archives/563805
-  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171767
   - https://www.bikeseoul.com/app/use/moveUseMenuClauseInfo.do
   - https://www.bikeseoul.com/app/use/moveUseMenuInsurance.do
   - https://news.seoul.go.kr/traffic/archives/507121
   - https://news.seoul.go.kr/traffic/archives/512347
   - https://hangang.seoul.go.kr/www/contents/759.do?mid=509
   - https://news.seoul.go.kr/traffic/archives/507954
-  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171803
   - https://mediahub.seoul.go.kr/archives/977687
   - https://news.seoul.go.kr/welfare/archives/243465
   - https://mediahub.seoul.go.kr/archives/1024246
   - https://www.mapo.go.kr/site/health/content/health04030303
-  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171829
+  - https://www.law.go.kr/LSW/flDownload.do?flSeq=144612525
   - https://news.seoul.go.kr/env/archives/category/animal-protection-news_c1/animal-welfare_c1/animal-registration
   - https://news.seoul.go.kr/env/archives/category/animal-protection-news_c1/animal-welfare_c1/animal-rescue
   - https://news.seoul.go.kr/env/archives/216413
   - https://news.seoul.go.kr/env/archives/559051
-  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2054497
   - https://mediahub.seoul.go.kr/archives/2014727
   - https://news.seoul.go.kr/gov/archives/574771
   - https://news.seoul.go.kr/traffic/archives/518138
