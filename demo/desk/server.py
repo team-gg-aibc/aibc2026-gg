@@ -197,9 +197,11 @@ def engine_status():
         try:
             urllib.request.urlopen(ENGINE_BASE + "/health", timeout=3).read()
             engine["reachable"] = True
-        except Exception:  # noqa: BLE001  채점 서버엔 /health가 없을 수 있다: 그때는 마지막 호출 결과를 따른다
+        except urllib.error.HTTPError:  # 답은 했다(채점 서버엔 /health가 없을 수 있다): 마지막 호출 결과를 따른다
             if engine["reachable"] is None:
                 engine["reachable"] = False
+        except Exception:  # noqa: BLE001  연결 자체가 안 된다: 켜져 있던 엔진이 꺼진 때도 「연결되지 않음」으로 바꾼다
+            engine["reachable"] = False
     if not engine["reachable"]:
         return "down"
     return "notrace" if engine["trace"] is False else "live"
@@ -247,11 +249,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def body(self):
-        n = int(self.headers.get("Content-Length") or 0)
+        """요청 본문 → dict. 길이 머리말이 이상하거나 JSON이 깨졌거나 dict가 아니면 빈 dict(서버가 죽지 않고 400 · 409로 답한다)."""
         try:
-            return json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
+            n = int(self.headers.get("Content-Length") or 0)
+            d = json.loads(self.rfile.read(n).decode("utf-8")) if n > 0 else {}
         except ValueError:
             return {}
+        return d if isinstance(d, dict) else {}
 
     def end_headers(self):
         if not self.path.startswith("/api/"):
@@ -263,8 +267,9 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/text":
             return self.send_json(text_bundle())
         if p == "/api/state":
+            status = engine_status()      # 엔진이 살아 있는지 보는 호출(길면 3초)은 잠금 밖에서: 그동안 다른 요청이 멈추지 않게
             with lock:
-                return self.send_json({"inquiries": state["inquiries"], "places": places, "engine": engine_status(),
+                return self.send_json({"inquiries": state["inquiries"], "places": places, "engine": status,
                                        "engine_url": ENGINE_BASE, "replaying": bool(state.get("replaying")),
                                        "replay_left": len(replay["replay"]) - state["replay_next"], "core": replay["core"],
                                        "text_version": text_bundle()["version"]})
@@ -281,7 +286,7 @@ class Handler(SimpleHTTPRequestHandler):
             text = str(b.get("text") or "").strip()
             if not text:
                 return self.send_json({"error": "빈 문의"}, 400)
-            place = b.get("place") if b.get("place") in places else None
+            place = b.get("place") if isinstance(b.get("place"), str) and b.get("place") in places else None
             q = add_inquiry(text[:1000], "citizen", place)
             return self.send_json({"id": q["id"], "no": q["no"]})
         if p == "/api/replay":

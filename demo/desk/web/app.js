@@ -12,6 +12,9 @@ const store = { get: (k) => { try { return localStorage.getItem(k); } catch { re
 let T = null, textVersion = null, S = null, view = 0, chip = 0, openId = null, map = null, mapOk = false;
 const markers = {};
 const ui = { dirty: {}, citizen: store.get('desk.citizen'), lastKind: {} };
+const drawn = { list: '', card: '' };   // 마지막으로 그린 값. 값이 같으면 다시 그리지 않는다(누름 · 고른 글 · 글쇠 초점이 1.2초마다 사라지지 않게)
+const WIDE = () => innerWidth >= 1200;   // style.css의 좁은 화면 기준(1199px 이하)과 같아야 한다
+const setDlg = (text, yes) => { $('dlg-text').textContent = text; $('dlg-yes').textContent = yes; };   // 확인 창은 하나를 같이 쓰므로 열 때마다 글을 놓는다
 
 // ---- 글자 꺼내기 (읽는 규칙: docs/content/A-01_답변화면.md 맨 위)
 const doc = (k) => T[{ A: 'A-01_답변화면', C: 'C-01_답변초안카드', U: 'U-02_시민문의' }[k]];
@@ -62,12 +65,11 @@ function placeText() {
   $('u-place').value = keep;
   const ub = its('U', '문의 쓰기', '버튼');
   $('u-send').textContent = ub[0].text; $('u-example').textContent = ub[1] ? ub[1].text : '';
-  $('u-privacy').textContent = W.smalls[0] || ''; $('u-demo').textContent = W.smalls[1] || '';
+  $('u-privacy').textContent = W.smalls[0] || ''; $('u-demo').textContent = U.smalls[0] || '';
   $('u-sent-h').textContent = sec('U', '보낸 문의').name; $('u-sent-lead').textContent = sec('U', '보낸 문의').lead;
   $('u-answer-h').textContent = sec('U', '받은 답').name; $('u-answer-lead').textContent = sec('U', '받은 답').lead;
   $('u-answer-note').textContent = sec('U', '받은 답').smalls[0] || ''; $('u-new').textContent = its('U', '받은 답', '버튼')[0].text;
-  const st = sit('C');
-  $('dlg-text').textContent = st['승인 확인']; $('dlg-yes').textContent = st['승인 확인 · 보내기']; $('dlg-no').textContent = st['승인 확인 · 그만두기'];
+  $('dlg-no').textContent = sit('C')['승인 확인 · 그만두기'];
 }
 const placeIdOf = (name) => (S && Object.values(S.places).find((p) => p.name === name) || {}).id || '';
 
@@ -97,6 +99,7 @@ function renderList() {
   if (!S.inquiries.length) msg = A['들어온 문의 없음'];
   else if (!list.length) msg = view === 1 ? A['「승인 전」으로 거른 결과 없음'] : view === 2 ? A['「승인 완료」로 거른 결과 없음'] : A['고른 소관 부서의 문의 없음'];
   else if (S.replaying) msg = A['시연 문의를 들여오는 중'];
+  else if (S.replay_left === 0) msg = A['시연 문의를 다 들여옴'];   // 막힌 「시연 문의 들여오기」 버튼의 까닭
   $('list-msg').textContent = msg;
   $('btn-replay').disabled = S.replaying || S.replay_left === 0;
   $('rows').innerHTML = list.map((q) => {
@@ -120,6 +123,7 @@ function initMap() {
   try {
     map = new maplibregl.Map({ container: 'map', style: STYLE_URL, ...HOME, maxPitch: 60, attributionControl: false });
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    map.jumpTo({ padding: mapPad() });   // 처음 모습도 칸에 가리지 않는 곳을 가운데로(안 그러면 지도 점이 시민 화면 · 목록 밑에 숨는다)
     map.on('load', () => {
       for (const l of map.getStyle().layers) {   // 지도 이름표는 한글 이름 먼저(없으면 원래 이름)
         if (l.type === 'symbol' && map.getLayoutProperty(l.id, 'text-field')) map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
@@ -151,12 +155,16 @@ function renderMarkers() {
   }
   for (const id of Object.keys(markers)) if (!seen.has(id)) { markers[id].remove(); delete markers[id]; }
 }
+// 지도에서 칸(시민 화면 · 목록 · 열린 카드)에 가리지 않는 곳. 화면 너비의 비율이 아니라 칸의 실제 끝을 잰다
+function mapPad() {
+  if (!WIDE()) return { top: 20, bottom: 20, left: 20, right: 20 };
+  const c = $('card');
+  return { left: $('inbox').getBoundingClientRect().right + 8, right: c.hidden ? 16 : innerWidth - c.getBoundingClientRect().left + 8, top: 40, bottom: 40 };
+}
 function flyTo(q) {
   const p = q && q.place && S.places[q.place];
   if (!mapOk || !p) return;
-  const wide = innerWidth > 1100;
-  map.flyTo({ center: [p.lon, p.lat], zoom: 15.6, pitch: 58, bearing: -20, duration: 2200,
-              padding: wide ? { left: innerWidth * 0.46, right: innerWidth * 0.3, top: 40, bottom: 40 } : { top: 20, bottom: 20, left: 20, right: 20 } });
+  map.flyTo({ center: [p.lon, p.lat], zoom: 15.6, pitch: 58, bearing: -20, duration: 2200, padding: mapPad() });
 }
 
 // ---- 답변 초안 카드
@@ -164,8 +172,9 @@ function openCard(id) {
   openId = id;
   const q = S.inquiries.find((x) => x.id === id);
   renderCard(true); renderList(); renderMarkers(); flyTo(q);
+  if (!WIDE()) $('card').scrollIntoView({ behavior: 'smooth', block: 'start' });   // 안 그러면 줄을 눌러도 바뀐 것이 안 보인다
 }
-function closeCard() { openId = null; $('card').hidden = true; renderList(); renderMarkers(); }
+function closeCard() { openId = null; $('card').hidden = true; drawn.card = 'null'; renderList(); renderMarkers(); if (mapOk) map.easeTo({ padding: mapPad(), duration: 600 }); }
 
 function placeLine(q) {
   const pairs = sec('A', '지도').items.map((i) => split2(i.text)), notes = Object.fromEntries(pairs);
@@ -178,10 +187,10 @@ function placeLine(q) {
 function renderCard(fresh) {
   const q = S.inquiries.find((x) => x.id === openId);
   const box = $('card');
-  if (!q) { box.hidden = true; return; }
+  if (!q) { box.hidden = true; drawn.card = 'null'; return; }
   const ta = $('c-draft');
   if (!fresh && ta && document.activeElement === ta && ui.lastKind[q.id] === kindOf(q)) return;   // 고쳐 쓰는 중에는 다시 그리지 않는다
-  ui.lastKind[q.id] = kindOf(q);
+  ui.lastKind[q.id] = kindOf(q); drawn.card = JSON.stringify(q);
   const C = doc('C'), st = sit('C'), k = kindOf(q), [kb, ks] = kindLabel(k), rowsQ = kv('C', '문의');
   const qLabels = tbl('C', '문의').map((r) => r[0]);
   let h = `<header class="c-head"><p class="c-no">${q.no}</p><div><h2>${esc(C.title)}</h2>
@@ -197,8 +206,9 @@ function renderCard(fresh) {
     h += `<section class="making" aria-busy="true"><p class="lead">${esc(st['초안을 만드는 중'])}</p><div class="sk"></div><div class="sk"></div><div class="sk short"></div></section>`;
   } else if (k === 'out' || k === 'notfound' || k === 'failed') {
     const name = { out: '6종 밖', notfound: '조항을 찾지 못함', failed: '불러오지 못함' }[k], b = sec('C', name);
-    h += `<section class="gap k-${k}"><p class="lead">${esc(b.lead)}</p>${b.smalls.map((s) => `<p class="note">${esc(s)}</p>`).join('')}
-      ${k === 'failed' ? `<button type="button" class="outline" id="c-retry">${esc(its('C', name, '버튼')[0].text)}</button>` : ''}</section>`;
+    const noSaved = k === 'failed' && q.engine && q.engine.how === 'saved';   // 엔진을 부르지 않는 방식인데 받아 둔 답이 없는 문의: 「연결이 끊겼다」고 말하지 않는다
+    h += `<section class="gap k-${k}"><p class="lead">${esc(noSaved ? st['미리 받은 답이 없음'] : b.lead)}</p>${(noSaved ? [] : b.smalls).map((s) => `<p class="note">${esc(s)}</p>`).join('')}
+      ${k === 'failed' && S.engine !== 'saved' ? `<button type="button" class="outline" id="c-retry">${esc(its('C', name, '버튼')[0].text)}</button>` : ''}</section>`;
   } else {
     h += draftSections(q);
   }
@@ -272,6 +282,7 @@ function askApprove(q) {
   if (!ta.value.trim()) { err.textContent = sit('C')['답변 초안이 비어 있음']; err.hidden = false; back(); ta.focus(); return; }
   err.hidden = true;
   const dlg = $('dlg');
+  setDlg(sit('C')['승인 확인'], sit('C')['승인 확인 · 보내기']);
   $('dlg-no').onclick = () => { dlg.close(); back(); };
   dlg.oncancel = () => back();
   $('dlg-yes').onclick = async () => {
@@ -332,14 +343,17 @@ async function refresh() {
         const prev = T;
         T = t.text;
         try { placeText(); renderList(); } catch (e) { T = prev; err = err || String(e.message || e); if (T) placeText(); }
+        drawn.list = drawn.card = '';   // 글자가 바뀌었으니 목록 · 카드를 다시 그린다
       }
       $('a-text-err').hidden = !err || !T; if (err && T) { $('a-text-err').textContent = sit('A')['화면 문구 파일을 읽지 못함']; console.warn('content:', err); }
     }
     $('rows').setAttribute('aria-busy', 'false');
-    renderList(); renderMarkers(); renderCard(false);
+    const listKey = JSON.stringify([S.inquiries, S.engine, S.replaying, S.replay_left]);
+    if (listKey !== drawn.list) { drawn.list = listKey; renderList(); renderMarkers(); }
+    if (JSON.stringify(S.inquiries.find((q) => q.id === openId) || null) !== drawn.card) renderCard(false);
     if (ui.citizen && !S.inquiries.some((q) => q.id === ui.citizen)) { ui.citizen = null; store.set('desk.citizen', null); }
   } catch {
-    if (T) { $('list-msg').textContent = sit('A')['불러오지 못함']; }
+    if (T) { $('list-msg').textContent = sit('A')['불러오지 못함']; drawn.list = ''; }   // 다시 이어지면 목록 안내를 새로 그린다
   }
 }
 
@@ -349,12 +363,11 @@ function bind() {
   $('rows').addEventListener('click', (e) => { const b = e.target.closest('button.row'); if (b) openCard(b.dataset.id); });
   $('btn-replay').onclick = async () => { await api('/api/replay', {}).catch(() => {}); refresh(); };
   $('btn-reset').onclick = () => {
-    const dlg = $('dlg'), st = sit('C');
-    $('dlg-text').textContent = sit('A')['처음 상태로 되돌리기 확인'];
-    $('dlg-yes').textContent = its('A', '들어온 문의', '버튼')[1].text;
+    const dlg = $('dlg');
+    setDlg(sit('A')['처음 상태로 되돌리기 확인'], its('A', '들어온 문의', '버튼')[1].text);
     $('dlg-no').onclick = () => dlg.close(); dlg.oncancel = null;
     $('dlg-yes').onclick = async () => { await api('/api/reset', {}).catch(() => {}); dlg.close(); closeCard(); ui.citizen = null; store.set('desk.citizen', null); ui.dirty = {};
-      $('dlg-text').textContent = st['승인 확인']; $('dlg-yes').textContent = st['승인 확인 · 보내기']; refresh(); renderCitizen(); };
+      refresh(); renderCitizen(); };
     dlg.showModal();
   };
   $('u-send').onclick = sendCitizen;
