@@ -11,6 +11,17 @@
 </head>
 <body>
 <!-- 화면 글자는 모두 /api/text(= docs/content/의 A-01_답변화면 · C-01_답변초안카드 · U-02_시민문의)에서 채운다. 이 파일에는 자리만 있다 -->
+<!-- 맨 위 띠: 화면 이름 · 초안 자동 작성 상태 · 칸 접고 펴기(늘 같은 자리, 글자 버튼) -->
+<header class="topbar">
+  <h1 id="a-title"></h1>
+  <p class="engine" id="a-engine" role="status"></p>
+  <div class="toggles" role="group" id="toggles">
+    <button type="button" id="tg-phone" data-panel="phone" aria-controls="phone" aria-expanded="true"></button>
+    <button type="button" id="tg-list" data-panel="list" aria-controls="inbox" aria-expanded="true"></button>
+    <button type="button" id="tg-card" data-panel="card" aria-controls="card" aria-expanded="false" disabled></button>
+  </div>
+</header>
+
 <nav class="tabs" aria-label="화면 고르기">
   <button type="button" data-tab="citizen" aria-pressed="false" id="tab-citizen"></button>
   <button type="button" data-tab="staff" aria-pressed="true" id="tab-staff"></button>
@@ -25,15 +36,20 @@
   <section class="phone" id="phone" aria-labelledby="u-title">
     <div class="screen">
       <header class="u-head"><h2 id="u-title"></h2><p id="u-lead"></p><p class="note demo" id="u-demo"></p></header>
-      <section id="u-write">
-        <h3 id="u-write-h"></h3>
-        <label class="field"><span id="u-text-l"></span>
-          <textarea id="u-text" rows="5" maxlength="1000"></textarea></label>
-        <label class="field"><span id="u-place-l"></span><select id="u-place"></select></label>
-        <p class="note warn" id="u-privacy"></p>
+      <div id="u-write">
+        <section class="u-box"><h3 id="u-who-h"></h3><dl class="kv" id="u-who"></dl><p class="note ok-note" id="u-who-note"></p></section>
+        <fieldset class="u-box"><legend id="u-notify-h"></legend><div class="checks" id="u-notify"></div></fieldset>
+        <section class="u-box"><h3 id="u-body-h"></h3>
+          <label class="field"><span id="u-place-l"></span><select id="u-place"></select></label>
+          <label class="field"><span><span id="u-title-l"></span> <b class="req" aria-hidden="true">*</b></span><input id="u-title-in" type="text" maxlength="30" required><small class="count" id="u-title-n" aria-live="off"></small></label>
+          <label class="field"><span><span id="u-text-l"></span> <b class="req" aria-hidden="true">*</b></span><textarea id="u-text" rows="6" maxlength="3000" required></textarea><small class="count" id="u-text-n" aria-live="off"></small></label>
+          <p class="note" id="u-limit"></p><p class="note warn" id="u-privacy"></p>
+        </section>
+        <fieldset class="u-box"><legend id="u-public-h"></legend><p class="note" id="u-public-q"></p><div class="checks" id="u-public"></div></fieldset>
+        <fieldset class="u-box"><legend id="u-agree-h"></legend><label class="check"><input type="checkbox" id="u-agree" aria-describedby="u-agree-note"> <span id="u-agree-l"></span> <b class="req" aria-hidden="true">*</b></label><p class="note" id="u-agree-note"></p></fieldset>
         <p class="err" id="u-err" role="alert" hidden></p>
-        <div class="u-btns"><button type="button" class="primary" id="u-send"></button><button type="button" class="ghost" id="u-example"></button></div>
-      </section>
+        <div class="u-btns"><button type="button" class="primary" id="u-send" aria-describedby="u-why"></button><p class="note" id="u-why"></p><button type="button" class="ghost" id="u-example"></button></div>
+      </div>
       <section id="u-sent" hidden>
         <h3 id="u-sent-h"></h3><p class="lead" id="u-sent-lead"></p>
         <dl class="kv" id="u-sent-kv"></dl>
@@ -50,27 +66,29 @@
 
   <!-- 담당자 답변 화면 (A-01) -->
   <section class="panel inbox" id="inbox" aria-labelledby="a-title">
-    <header>
-      <h1 id="a-title"></h1>
+    <header class="full-only">
       <p class="lead" id="a-lead"></p>
       <ul class="basis" id="a-basis"></ul>
-      <p class="engine" id="a-engine" role="status"></p>
       <p class="err" id="a-text-err" role="alert" hidden></p>
     </header>
     <h2 id="list-h"></h2>
+    <div class="full-only">
     <p class="sub" id="list-lead"></p>
     <div class="seg" role="group" id="views"></div>
     <div class="chips" role="group" id="chips"></div>
     <div class="row-btns"><button type="button" class="outline" id="btn-replay"></button><button type="button" class="ghost" id="btn-reset"></button></div>
     <p class="note" id="list-note"></p>
+    </div>
     <p class="msg" id="list-msg" role="status"></p>
     <ol class="rows" id="rows" aria-busy="false"></ol>
-    <ul class="map-notes" id="map-notes"></ul>
+    <ul class="map-notes full-only" id="map-notes"></ul>
   </section>
 
   <!-- 답변 초안 카드 (C-01) -->
   <article class="panel card" id="card" hidden aria-live="off"></article>
 </main>
+
+<p class="credit" id="credit"></p>
 
 <dialog id="dlg" aria-labelledby="dlg-text">
   <p id="dlg-text"></p>

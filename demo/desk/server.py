@@ -5,7 +5,7 @@
   DESK_ENGINE_URL   엔진 주소. 기본 http://127.0.0.1:8000 (demo/desk/engine_trace.py). 채점 서버 주소(/ask까지 적어도 됨)로 바꿔도 돈다
   DESK_ENGINE       live = 시민 화면에서 보낸 문의는 그때 엔진을 부른다(기본) · saved = 엔진을 부르지 않고 미리 받은 답만 쓴다
   DESK_PORT · DESK_REPLAY_SEC(재생 간격, 기본 2.5초) · DESK_STATE(저장 파일, 기본 demo/desk/runtime/state.json)
-미리 받은 답 만들기:       python3 demo/desk/server.py --save   (같은 통로로 엔진을 불러 data/saved.json에 저장)
+미리 받은 답 만들기:       python3 demo/desk/server.py --save   (같은 통로로 엔진을 불러 data/saved.json에 저장. 없는 글만 받는다, 모두 다시 받으려면 --all)
 스스로 시험:               python3 demo/desk/server.py --selftest   (엔진 · 인터넷 없이)
 
 - 시연 문의(재생)는 늘 미리 받은 답으로 뜬다. 시민 화면에서 보낸 문의만 그때 엔진을 부른다(PRD 3판 3절 추천안).
@@ -163,11 +163,11 @@ def run_engine(qid):
         save_state()
 
 
-def add_inquiry(text, source, place, set_id=None):
+def add_inquiry(text, source, place, set_id=None, form=None):
     with lock:
         no = max([x["no"] for x in state["inquiries"]], default=0) + 1
         q = {"id": f"q{no}-{int(time.time() * 1000) % 100000}", "no": no, "text": text, "source": source, "place": place,
-             "set_id": set_id, "received": now(), "kind": "making", "card": None, "draft": None, "approved": None, "engine": None}
+             "set_id": set_id, "form": form or {}, "received": now(), "kind": "making", "card": None, "draft": None, "approved": None, "engine": None}
         state["inquiries"].append(q)
         save_state()
     threading.Thread(target=run_engine, args=(q["id"],), daemon=True).start()
@@ -226,7 +226,7 @@ def text_bundle():
 
 def citizen_view(q):
     a = q.get("approved")
-    return {"no": q["no"], "text": q["text"], "received": q["received"],
+    return {"no": q["no"], "text": q["text"], "title": (q.get("form") or {}).get("title", ""), "received": q["received"],
             "answer": a["text"] if a else None, "approved_at": a["at"] if a else None,
             "citations": [{"label": c["label"], "effective": c["effective"]} for c in (q["card"] or {}).get("citations", [])] if a else []}
 
@@ -286,7 +286,12 @@ class Handler(SimpleHTTPRequestHandler):
             if not text:
                 return self.send_json({"error": "빈 문의"}, 400)
             place = b.get("place") if isinstance(b.get("place"), str) and b.get("place") in places else None
-            q = add_inquiry(text[:1000], "citizen", place)
+            if b.get("agree") is False:                       # 실제 신청 화면처럼 개인정보 수집 · 이용 동의가 있어야 받는다
+                return self.send_json({"error": "동의 필요"}, 400)
+            form = {"title": str(b.get("title") or "").strip()[:30], "region": str(b.get("region") or "").strip()[:20],
+                    "public": b.get("public") is True,
+                    "notify": [str(x)[:10] for x in b.get("notify")][:3] if isinstance(b.get("notify"), list) else []}
+            q = add_inquiry(text[:3000], "citizen", place, form=form)
             return self.send_json({"id": q["id"], "no": q["no"]})
         if p == "/api/replay":
             with lock:
@@ -333,8 +338,12 @@ class Handler(SimpleHTTPRequestHandler):
 
 def save_answers():
     """시연 문의(재생 + 첫 장면)를 같은 통로(call_engine)로 엔진에 넣어 data/saved.json에 저장한다."""
-    out = dict(saved)
-    for item in [replay["core"], *replay["replay"]]:
+    items = [replay["core"], *replay["replay"]]
+    want = {it["text"] for it in items}
+    out = {t: r for t, r in saved.items() if t in want}   # 시연 세트에서 빠진 글의 답은 버리고, 이미 받은 답은 그대로 둔다
+    for item in items:
+        if item["text"] in out and "--all" not in sys.argv:
+            continue
         res = call_engine(item["text"])
         if res["error"]:
             print("못 받음:", item["set_id"], res["error"])
