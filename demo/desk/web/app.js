@@ -67,6 +67,8 @@ function placeText() {
   $('u-send').textContent = ub[0].text; $('u-example').textContent = ub[1] ? ub[1].text : '';
   $('u-privacy').textContent = W.smalls[0] || ''; $('u-demo').textContent = U.smalls[0] || '';
   $('u-sent-h').textContent = sec('U', '보낸 문의').name; $('u-sent-lead').textContent = sec('U', '보낸 문의').lead;
+  const again = its('U', '보낸 문의', '버튼')[0];
+  $('u-again').textContent = again ? again.text : ''; $('u-again').hidden = !again;
   $('u-answer-h').textContent = sec('U', '받은 답').name; $('u-answer-lead').textContent = sec('U', '받은 답').lead;
   $('u-answer-note').textContent = sec('U', '받은 답').smalls[0] || ''; $('u-new').textContent = its('U', '받은 답', '버튼')[0].text;
   $('dlg-no').textContent = sit('C')['승인 확인 · 그만두기'];
@@ -372,7 +374,7 @@ function bind() {
   };
   $('u-send').onclick = sendCitizen;
   $('u-example').onclick = () => { $('u-text').value = S.core.text; $('u-place').value = S.core.place || ''; $('u-err').hidden = true; };
-  $('u-new').onclick = () => { ui.citizen = null; store.set('desk.citizen', null); renderCitizen(); };
+  $('u-new').onclick = $('u-again').onclick = () => { ui.citizen = null; store.set('desk.citizen', null); renderCitizen(); };
   document.querySelector('.tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     document.body.dataset.tab = b.dataset.tab;

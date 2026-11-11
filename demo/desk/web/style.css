@@ -69,7 +69,7 @@ h1, h2, h3 { color: var(--ink); line-height: 1.3; }
 .field textarea, .field select { width: 100%; padding: 10px; border: 1.5px solid #b9c1cc; border-radius: 10px; background: #fff; font-weight: 400; font-size: var(--s-body); }
 .u-btns { display: grid; gap: 8px; margin-top: 12px; }
 .phone .arrived { padding: 8px 10px; border-radius: 10px; background: var(--ok-bg); color: var(--ok); font-weight: 700; }
-.phone #u-new { margin-top: 12px; width: 100%; }
+.phone #u-new, .phone #u-again { margin-top: 12px; width: 100%; }
 .phone .kv { grid-template-columns: 1fr; gap: 2px; }
 .phone .kv dd { margin-bottom: 8px; }
 .phone .kv dd.answer { color: var(--ink); }
