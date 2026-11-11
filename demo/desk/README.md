@@ -63,6 +63,7 @@ DESK_ENGINE_URL=https://<채점 서버 주소>/ask python3 demo/desk/server.py
 | `data/saved.json` | 미리 받은 엔진 답(새 흐름 7판, 11-11). 다시 받기: 엔진을 띄운 뒤 `python3 demo/desk/server.py --save`(없는 글만 받는다, 모두 다시 받으려면 `--all`) |
 | `data/places.json` | 지도 점 자리(대략 위치). 급지 · 공원 구분 자료는 아직 없다 |
 | `web/` | 화면(MapLibre GL JS 5.6.0 + OpenFreeMap, 키 없음) |
+| `web/data/agencies.json` | 소관 부서 · 처리 기관 자료(조례 6종 × 문의 갈래 37, 「조항→갈래」, 「장소별 처리 기관」). 카드는 엔진이 인용한 첫 조 · 항으로 갈래를 찾고, 공원 · 주차장은 `data/places.json`의 「처리 장소」로 처리 기관을 한 번 더 좁힌다. 자치구가 처리하는 갈래는 「자치구가 처리」로만 보인다. 원본: 소관 · 처리 기관 조사(2026-11-11, `_orch-tools/reports/소관-처리-기관/`의 `도구/build.py`로 만듦) |
 | `web/data/seoul.geojson` | 서울특별시 경계(지도에서 서울 밖을 가리고 움직일 범위를 묶는 데 씀). OpenStreetMap relation 2297418, Overpass API 2026-11-11 받음, 0.0004° 단순화 |
 
 ## 스스로 시험
@@ -79,5 +80,43 @@ python3 demo/desk/server.py --selftest
 - 가상 문의: NVIDIA Nemotron-Personas-Korea(CC BY 4.0)를 바탕으로 만듦
 - 공개 문의 요지: 서울시설공단 주차 「시민의 소리」, 서울시 응답소 「공개 민원사례」(이름 · 연락처 · 번호 없음)
 - 서울 경계: © OpenStreetMap contributors(ODbL)
+- 소관 부서 · 처리 기관(`web/data/agencies.json`): 국가법령정보센터 조례 · 「서울특별시 행정기구 설치 조례 시행규칙」(2026-09-11 시행), 서울시 · 서울시설공단 · 따릉이 · 미래한강본부 · 자치구 누리집의 공식 안내, 공개 답변 사례(2026-11-11 받음). 자료에 적힌 출처 주소 37곳:
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171833
+  - https://www.law.go.kr/LSW/ordinInfoR.do
+  - https://www.sisul.or.kr/open_content/main/introduce/found.jsp
+  - https://www.sisul.or.kr/open_content/parking/
+  - https://news.seoul.go.kr/traffic/archives/514606
+  - https://www.sisul.or.kr/open_content/parking/parkingRefund/parkingRefundList.do?pgno=1063
+  - https://news.seoul.go.kr/traffic/archives/26877
+  - https://www.gwangjin.go.kr/portal/main/contents.do?menuNo=200622
+  - https://news.seoul.go.kr/traffic/archives/1853
+  - https://news.seoul.go.kr/traffic/archives/513697
+  - https://www.junggu.seoul.kr/content.do?cmsid=14494
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2147709
+  - https://junggu.seoul.kr/content.do?cmsid=14424
+  - https://news.seoul.go.kr/env/archives/563805
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171767
+  - https://www.bikeseoul.com/app/use/moveUseMenuClauseInfo.do
+  - https://www.bikeseoul.com/app/use/moveUseMenuInsurance.do
+  - https://news.seoul.go.kr/traffic/archives/507121
+  - https://news.seoul.go.kr/traffic/archives/512347
+  - https://hangang.seoul.go.kr/www/contents/759.do?mid=509
+  - https://news.seoul.go.kr/traffic/archives/507954
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171803
+  - https://mediahub.seoul.go.kr/archives/977687
+  - https://news.seoul.go.kr/welfare/archives/243465
+  - https://mediahub.seoul.go.kr/archives/1024246
+  - https://www.mapo.go.kr/site/health/content/health04030303
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2171829
+  - https://news.seoul.go.kr/env/archives/category/animal-protection-news_c1/animal-welfare_c1/animal-registration
+  - https://news.seoul.go.kr/env/archives/category/animal-protection-news_c1/animal-welfare_c1/animal-rescue
+  - https://news.seoul.go.kr/env/archives/216413
+  - https://news.seoul.go.kr/env/archives/559051
+  - https://www.law.go.kr/LSW/ordinInfoP.do?ordinSeq=2054497
+  - https://mediahub.seoul.go.kr/archives/2014727
+  - https://news.seoul.go.kr/gov/archives/574771
+  - https://news.seoul.go.kr/traffic/archives/518138
+  - https://mediahub.seoul.go.kr/archives/2002479
+  - https://mediahub.seoul.go.kr/archives/2017598
 - 지도: © OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors(화면 오른쪽 아래 표시), MapLibre GL JS(BSD-3-Clause), 글꼴 Pretendard(OFL)
 - 조례: 국가법령정보센터 자치법규 원문(2026-10-01 시행본 기준)

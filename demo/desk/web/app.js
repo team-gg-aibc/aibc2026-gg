@@ -30,8 +30,19 @@ const kindOf = (q) => (q.approved ? 'approved' : q.kind);
 const titleOf = (q) => (q.form && q.form.title) || '';   // 시민 화면에서 쓴 제목(시연 문의 · 앞 판 서버에는 없음)
 const fmt = (iso) => { if (!iso) return '—'; const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
   return `${String(d.getFullYear()).slice(2)}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
-const deptRows = () => tbl('C', '소관 부서와 처리 기관');
-const deptsOf = (q) => [...new Set(((q.card || {}).citations || []).map((c) => deptRows().find((r) => c.law.includes(r[0]))).filter(Boolean).map((r) => r[1]))];
+// ---- 소관 부서 · 처리 기관: data/agencies.json 한 곳에서 읽는다(조례 6종 × 갈래 37, 소관-처리-기관 조사)
+let AG = null;
+const lawOf = (name) => (AG && AG['조례'][name]) || null;
+const deptsOf = (q) => [...new Set(((q.card || {}).citations || []).map((c) => lawOf(c.law)).filter(Boolean).map((L) => L['소관 부서']))];
+// 갈래는 엔진이 인용한 조 · 항으로만 찾는다. 「제12조의2 제7항」처럼 항이 적힌 줄이 있으면 그 줄이 이긴다. 문의 글의 낱말은 보지 않는다
+function galOf(c) {
+  const L = lawOf(c.law);
+  if (!L) return null;
+  const a = c.article.replace(/\s+/g, ' ').trim(), m = /^(제\d+조(?:의\d+)?)(?: (제\d+항))?/.exec(a), b = /^별표 ?(\d+)/.exec(a);
+  const keys = m ? [m[2] ? `${m[1]} ${m[2]}` : '', m[1]] : b ? [`별표 ${b[1]}`, '별표'] : [a];
+  const id = keys.filter(Boolean).map((k) => L['조항→갈래'][k]).find(Boolean);
+  return { L, g: id ? L['갈래'].find((x) => x.id === id) : null };
+}
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -294,8 +305,7 @@ function draftSections(q) {
   const value = ui.dirty[q.id] ?? q.draft ?? '', edited = (q.approved ? q.approved.text : value) !== c.answer;
   const verdict = c.conclusion ? (verdictMap[c.conclusion] || c.conclusion) : verdictMap['없음'];
   const done = !!q.approved, opts = its('C', '처리 상태', '보기')[0].parts;
-  const D = sec('C', '소관 부서와 처리 기관'), dl = D.items.map((i) => split2(i.text)[0]);
-  const rows = [...new Map(c.citations.map((x) => [x.law, deptRows().find((r) => x.law.includes(r[0]))])).values()].filter(Boolean);
+  const D = sec('C', '소관 부서와 처리 기관');
   return `<section><h3><label for="c-draft">${esc(inp[0])}</label>${edited ? ` <span class="badge k-edit">${esc(st['고친 글이 있음'])}</span>` : ''}</h3>
       <p class="lead">${esc(doc('C').lead)}</p>
       <textarea id="c-draft" rows="7" placeholder="${esc(inp[1] || '')}" ${done ? 'readonly' : ''} aria-describedby="c-draft-help c-draft-err">${esc(done ? q.approved.text : value)}</textarea>
@@ -311,10 +321,7 @@ function draftSections(q) {
         <dt>${esc(BL[3])}</dt><dd>${esc(x.effective || '—')}</dd>
         <dt>${esc(BL[4])}</dt><dd>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(B[BL[4]])}</a>` : '—'}</dd></dl></div>`).join('')}
     </section>
-    <section><h3>${esc(D.name)}</h3><dl class="kv">
-      <dt>${esc(dl[0])}</dt><dd>${esc(rows.map((r) => r[1]).join(' · ') || '—')}</dd>
-      <dt>${esc(dl[1])}</dt><dd>${esc(rows.map((r) => r[2]).filter((v) => v && v !== '—').join(' · ') || '—')}</dd></dl>
-      <p class="note">${esc(D.smalls[0])}</p></section>
+    ${agencyBlock(q, D)}
     <section><h3 id="c-status-h">${esc(sec('C', '처리 상태').name)}</h3><p class="lead">${esc(sec('C', '처리 상태').lead)}</p>
       <div class="radios" role="radiogroup" aria-labelledby="c-status-h">
         ${opts.map((o, i) => `<label class="radio${(i === 1) === done ? ' on' : ''}"><input type="radio" name="c-status" value="${i}" ${(i === 1) === done ? 'checked' : ''} ${done && i === 0 ? 'disabled' : ''}> ${esc(o)}</label>`).join('')}
@@ -322,6 +329,35 @@ function draftSections(q) {
       ${done ? `<p class="note why">${esc(st['승인한 뒤 「검토 중」'])}</p><p class="msg ok" role="status">${esc(st['승인 완료'])} · ${esc(fmt(q.approved.at))}</p>`
              : `<p class="note">${esc(sec('C', '처리 상태').smalls[0])}</p>`}
       <p class="err" id="c-approve-err" role="alert" hidden></p></section>`;
+}
+
+// 카드의 「소관 부서와 처리 기관」. 첫 인용 조항의 갈래 → 공원 · 주차장은 고른 장소로 한 번 더 좁힘 → 자치구는 「자치구가 처리」로만
+function agencyBlock(q, D) {
+  const W = Object.fromEntries(D.items.map((i) => split2(i.text))), basis = kv('C', '소관 부서와 처리 기관');
+  const first = q.card.citations[0], hit = first && galOf(first);
+  if (!hit) return '';
+  const { L, g } = hit, p = q.place && S.places[q.place];
+  const place = g && g['장소에 따라'] && p && p['처리 장소'] ? L['장소별 처리 기관'].find((e) => e['장소'] === p['처리 장소']) : null;
+  const gu = (t) => /^자치구/.test(t || ''), GU = '자치구가 처리', PICK = '고른 장소 기준';   // content 「소관 부서와 처리 기관」 목록의 열쇠(· 앞) 이름
+  let who, note = '', cap = g ? g['믿을 만한 정도'] : '확인 전';
+  if (!g || !g['처리 기관']) { who = `<span class="badge k-check">${esc(split2(basis['확인 전'])[0])}</span> ${esc(split2(basis['확인 전'])[1])}`; cap = ''; }
+  else if (place) {
+    who = esc(gu(place['처리 기관']) ? GU : place['처리 기관']);
+    note = `<p class="note">${esc(PICK)} · ${esc(place['장소'])}</p>`;
+    cap = p['처리 장소 믿을 만한 정도'] || place['믿을 만한 정도'];
+  } else if (g['자치구가 처리'] === '예') who = esc(GU);
+  else if (g['같은가'] === '같다') who = `${esc(g['처리 기관'])} <span class="side">· ${esc(W['소관 부서와 같음'])}</span>`;
+  else who = esc(g['처리 기관']);
+  if (!place && g && g['자치구가 처리'] === '일부') note += `<p class="note">${esc(W['자치구가 처리하기도 함'])}</p>`;
+  const links = g ? [...new Map((g['출처'] || []).map((o) => [o['주소'], o])).values()] : [];
+  const lbl = D.items.map((i) => split2(i.text)[0]);
+  return `<section><h3>${esc(D.name)}</h3><dl class="kv">
+      <dt>${esc(lbl[0])}</dt><dd>${esc(L['소관 부서'])}</dd>
+      <dt>${esc(lbl[1])}</dt><dd>${who}${note}${cap && basis[cap] ? `<p class="note">${esc(basis[cap])}</p>` : ''}</dd>
+      ${g ? `<dt>${esc(lbl[2])}</dt><dd>${esc(g['갈래'])}</dd>` : ''}</dl>
+      ${g && g['근거'] ? `<details class="why-src"><summary>${esc(lbl[lbl.length - 1])}</summary><p>${esc(g['근거'])}</p>
+        <ul>${links.map((o) => `<li><a href="${esc(o['주소'])}" target="_blank" rel="noopener">${esc(o['주소'].replace(/^https?:\/\//, '').slice(0, 60))}</a></li>`).join('')}</ul></details>` : ''}
+      <p class="note">${esc(D.smalls[0])}</p></section>`;
 }
 
 function sourceLine(q) {
@@ -467,6 +503,7 @@ function bind() {
 (async function main() {
   document.body.dataset.tab = 'staff';
   bind();
+  try { AG = await (await fetch('data/agencies.json')).json(); } catch { AG = null; }   // 없으면 카드에 소관 부서 칸이 빠질 뿐 나머지는 돈다
   await refresh();
   if (!T) { $('list-msg').textContent = '문의 목록을 불러오지 못했습니다.'; }   // ponytail: content를 한 번도 못 받은 때만 쓰는 마지막 문장(서버가 꺼져 content도 못 읽음)
   initMap(); renderCitizen();

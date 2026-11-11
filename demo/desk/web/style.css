@@ -162,6 +162,11 @@ blockquote.full { border-left-color: #8a95a3; white-space: pre-line; max-height:
 .radio input { width: 18px; height: 18px; accent-color: var(--primary); }
 .radio:has(input:disabled) { color: var(--sub); cursor: not-allowed; border-style: dashed; }
 .why { color: var(--text); }
+.why-src { margin-top: 8px; font-size: var(--s-sub); }
+.why-src summary { cursor: pointer; font-weight: 700; color: var(--primary); min-height: 32px; display: flex; align-items: center; }
+.why-src p { margin: 4px 0; color: var(--text); }
+.why-src ul { margin: 4px 0 0; padding-left: 18px; color: var(--sub); }
+.why-src a { color: var(--primary); overflow-wrap: anywhere; }
 .gap .lead { font-weight: 700; color: var(--ink); }
 .gap.k-out, .gap.k-notfound, .gap.k-failed { background: none; }
 .gap { border-left: 4px solid currentColor; padding-left: 12px; }
