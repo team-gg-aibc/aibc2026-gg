@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>문의 답변 창구 (시연)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="desk.css">
+</head>
+<body data-tone="light">
+<!-- 3판 담당자 화면: 서울 3D 지도가 화면 전체, 그 위에 맨 위 띠 · 들어온 문의(왼쪽) · 답변 초안(오른쪽)이 떠 있다. 글자는 모두 /api/text(docs/content/A-01_답변창구-3판.md)에서 채운다 -->
+<div id="map" aria-hidden="true"></div>
+<p id="map-failed" class="map-failed" hidden></p>
+
+<header class="top" id="top">
+  <h1 id="t-title"></h1>
+  <span class="basis" id="t-basis"></span>
+  <p class="live" id="t-engine" role="status"></p>
+  <span class="grow"></span>
+  <div class="seg" role="group" id="t-tone"></div>
+  <div class="tg" role="group" id="toggles">
+    <button type="button" id="tg-list" aria-controls="list" aria-expanded="true"></button>
+    <button type="button" id="tg-card" aria-controls="card" aria-expanded="false" disabled></button>
+  </div>
+  <a class="cit" id="t-citizen" href="citizen.html" target="_blank" rel="noopener"></a>
+</header>
+
+<section class="list glass" id="list" aria-labelledby="l-title">
+  <header>
+    <h2 id="l-title"><b id="l-count">0</b> <span id="l-name"></span></h2>
+    <p class="lead" id="l-lead"></p>
+    <div class="chips" role="group" id="chips"></div>
+    <label class="dept"><span class="sr" id="l-dept-l"></span><select id="l-dept"></select></label>
+  </header>
+  <p class="msg" id="l-msg" role="status"></p>
+  <ol class="rows" id="rows"></ol>
+  <footer><p class="small" id="l-small"></p><button type="button" class="ghost" id="btn-reset"></button></footer>
+  <p class="err" id="text-err" role="alert" hidden></p>
+</section>
+
+<article class="card glass" id="card" hidden></article>
+<div class="fixpop glass" id="fixpop" hidden></div>
+<div class="toast glass" id="toast" role="status" hidden></div>
+<div class="legend glass" id="legend" aria-label=""></div>
+<div class="credit" id="credit"></div>
+
+<dialog id="dlg" aria-labelledby="dlg-text">
+  <p id="dlg-text"></p>
+  <div class="dlg-btns"><button type="button" class="outline" id="dlg-no"></button><button type="button" class="primary" id="dlg-yes"></button></div>
+</dialog>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script src="common.js"></script>
+<script src="desk.js"></script>
+</body>
+</html>

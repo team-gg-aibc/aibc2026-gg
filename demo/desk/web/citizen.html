@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>민원 신청 (시연)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<style>
+/* 3판 시민 화면. 서울시 응답소 「시정일반 건의ㆍ질의」 작성 칸 · 순서 · 낱말과 응답소 CSS(2025-07 판)의 색 · 꼴을 따랐다. 기관 이름 · 로고는 쓰지 않는다.
+   「민원 장소」 줄은 시연에서 더한 칸(꼴은 서울톡 「현장민원 신청」). 위치 지도는 평면(기울임 · 3D 건물 없음). 글자는 /api/text(docs/content/U-02_시민접수-3판.md)에서만 */
+:root { --p: #b14487; --th: #f5f8fc; --ln: #e5e5e5; --in: #b9bec9; --tx: #222; --tx2: #4a4a4a; --tx3: #5f5f5f; --blue: #3a5bb8; --navy: #3f55ad; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9ebef; color: var(--tx); font: 14px/1.55 "Pretendard Variable", Pretendard, -apple-system, sans-serif; word-break: keep-all; }
+.phone { max-width: 460px; min-height: 100vh; padding-bottom: 24px; margin: 0 auto; background: #fff; box-shadow: 0 0 0 1px #d9dce2; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.demo { background: #222; color: #fff; font-size: 12px; text-align: center; padding: 6px 10px; margin: 0; }
+.gnb { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--ln); }
+.gnb b { font-size: 17px; letter-spacing: -.02em; } .gnb span { font-size: 12px; color: var(--tx3); }
+.wrap { padding: 16px 16px 40px; }
+h1 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.03em; }
+.lead { margin: 0 0 12px; color: var(--tx2); font-size: 13px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 0 16px; padding: 0; list-style: none; }
+.steps li { text-align: center; padding: 6px 2px; border-radius: 4px; background: #f2f3f6; color: var(--tx3); font-size: 11.5px; font-weight: 600; }
+.steps li b { display: block; font-size: 12px; }
+.steps li[aria-current="step"] { background: var(--p); color: #fff; }
+h2 { margin: 20px 0 8px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+h2::before { content: ""; width: 3px; height: 15px; background: var(--blue); }
+.form { border-top: 1px solid #000; }
+.tr { display: flex; border-bottom: 1px solid var(--ln); min-height: 46px; }
+.th { flex: 0 0 27%; background: var(--th); padding: 10px 8px; font-weight: 500; font-size: 13.5px; display: flex; align-items: center; }
+.th em { color: var(--p); font-style: normal; font-weight: 700; margin-left: 2px; }
+.td { flex: 1; padding: 8px; font-size: 13.5px; min-width: 0; }
+.in { width: 100%; min-height: 38px; border: 1px solid var(--in); border-radius: 3px; padding: 7px 9px; background: #fff; }
+.in.ro { background: #f6f6f8; color: var(--tx2); display: flex; align-items: center; }
+textarea.in { height: 130px; resize: vertical; line-height: 1.55; }
+select.in { appearance: auto; }
+.cnt { margin-top: 4px; font-size: 12px; color: var(--tx3); }
+.chk { display: inline-flex; align-items: center; gap: 5px; margin: 2px 12px 2px 0; font-size: 13.5px; color: var(--tx2); cursor: pointer; }
+.chk input { accent-color: var(--p); width: 16px; height: 16px; margin: 0; }
+.file { font-size: 12.5px; color: var(--tx3); }
+.q { padding: 10px 0; border-bottom: 1px solid var(--ln); font-size: 13.5px; }
+.agree { margin-top: 10px; padding: 10px; border: 1px solid var(--in); border-radius: 3px; font-size: 12.5px; color: var(--tx2); }
+.agree p { margin: 0 0 3px; }
+.btns { display: flex; gap: 6px; justify-content: center; margin-top: 18px; }
+.btn { min-width: 92px; padding: 11px 14px; border-radius: 4px; border: 1px solid var(--in); background: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
+.btn.go { background: var(--p); border-color: var(--p); color: #fff; min-width: 120px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.sbtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.sbtn { padding: 7px 10px; border-radius: 3px; border: 1px solid var(--in); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sbtn.navy { background: var(--navy); border-color: var(--navy); color: #fff; }
+.err { margin: 6px 0 0; padding: 8px 10px; border-radius: 3px; background: #fff4f4; border: 1px solid #f0b9b9; color: #a8221a; font-size: 13px; }
+.err:empty { display: none; }
+/* 지도(평면) */
+.mini { height: 160px; border: 1px solid var(--in); border-radius: 3px; overflow: hidden; }
+.bigmap { height: 340px; border: 1px solid var(--in); border-radius: 3px; overflow: hidden; }
+.attr { margin-top: 2px; font-size: 10.5px; color: var(--tx3); text-align: right; }
+.locline { margin-top: 6px; font-size: 14px; } .locline b { color: var(--tx); } .locline span { color: var(--tx3); font-size: 12.5px; }
+.mk { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.mk .nm { margin-bottom: 4px; padding: 3px 9px; border-radius: 6px; background: #1d2433; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
+.mk .nm:empty { display: none; }
+.mk .pin { width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--p); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+.search { display: flex; gap: 6px; } .search input { flex: 1; }
+.results { margin: 6px 0 8px; padding: 0; list-style: none; border: 1px solid var(--ln); border-radius: 3px; }
+.results:empty { display: none; }
+.results button { width: 100%; padding: 9px 10px; border: 0; border-bottom: 1px solid var(--ln); background: #fff; text-align: left; font-size: 14px; cursor: pointer; }
+.results li:last-child button { border-bottom: 0; }
+.results button[aria-pressed="true"] { background: #fbf2f7; color: var(--p); font-weight: 700; }
+.results p { margin: 0; padding: 9px 10px; color: var(--tx3); }
+.picked { margin-top: 8px; font-size: 14px; }
+/* 보낸 문의 · 받은 답(응답소 「공개 민원사례」 꼴) */
+.kv { display: grid; grid-template-columns: 30% 1fr; border-top: 1px solid #000; margin: 0; }
+.kv dt, .kv dd { margin: 0; padding: 9px 8px; border-bottom: 1px solid var(--ln); font-size: 13.5px; }
+.kv dt { background: var(--th); }
+.state { display: inline-block; padding: 2px 8px; border-radius: 99px; background: #eef1fa; color: var(--navy); font-weight: 700; font-size: 12.5px; }
+.state.done { background: #e8f5ec; color: #1b6b3c; }
+.case h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.02em; }
+.case .meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--tx3); margin-bottom: 10px; }
+.case .yo { font-size: 15px; font-weight: 600; margin: 14px 0 4px; }
+.case .yo + p { margin: 0 0 14px; color: #323232; font-size: 14px; }
+.ans { background: #fafafa; padding: 16px 12px; }
+.ans .tit { margin: 0 0 10px; font-size: 19px; color: var(--blue); font-weight: 700; }
+.ans .td p { margin: 0 0 8px; }
+.law { color: var(--navy); font-weight: 600; text-decoration: underline; }
+.arrived { margin: 0 0 10px; padding: 8px 10px; border-radius: 4px; background: #e8f5ec; color: #1b6b3c; font-weight: 700; }
+.demoloc { position: fixed; right: 8px; bottom: 6px; z-index: 9; margin: 0; font-size: 11px; color: #6f747d; background: rgba(255, 255, 255, .9); padding: 1px 5px; border-radius: 3px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <p class="demo" id="u-demo"></p>
+  <div class="gnb"><b id="u-gnb"></b><span id="u-who"></span></div>
+  <main class="wrap">
+    <!-- 작성 -->
+    <section id="v-write">
+      <h1 id="u-title"></h1><p class="lead" id="u-lead"></p><ol class="steps" id="steps-w"></ol>
+      <div class="form" id="f-who"></div>
+      <h2 id="h-notify"></h2><div class="form" id="f-notify"></div>
+      <h2 id="h-body"></h2>
+      <div class="form">
+        <div class="tr"><label class="th" for="gu"><span id="l-gu"></span><em>*</em></label><div class="td"><select class="in" id="gu"></select><div class="cnt" id="gu-from"></div></div></div>
+        <div class="tr"><div class="th" id="l-loc-th"><span id="l-loc"></span><em>*</em></div><div class="td">
+          <div class="mini" id="mini" aria-hidden="true"></div><div class="attr">© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors</div>
+          <div class="locline" id="locline" role="status"></div>
+          <p class="err" id="locwarn" role="alert"></p>
+          <div class="sbtns"><button type="button" class="sbtn" id="b-here"></button><button type="button" class="sbtn navy" id="b-pick"></button></div>
+          <div class="cnt" id="loc-why"></div></div></div>
+        <div class="tr"><label class="th" for="title"><span id="l-title"></span><em>*</em></label><div class="td"><input class="in" id="title" maxlength="30"><div class="cnt" id="title-n"></div></div></div>
+        <div class="tr"><label class="th" for="text"><span id="l-text"></span><em>*</em></label><div class="td"><textarea class="in" id="text" maxlength="3000"></textarea><div class="cnt" id="text-n"></div>
+          <div class="sbtns"><button type="button" class="sbtn" id="b-example"></button></div></div></div>
+        <div class="tr"><div class="th" id="l-file"></div><div class="td"><div class="file" id="file"></div></div></div>
+      </div>
+      <p class="cnt" id="u-privacy"></p>
+      <h2 id="h-public"></h2><div class="q"><span id="q-public"></span><div id="r-public"></div></div>
+      <h2 id="h-agree"></h2><div class="agree" id="agree-text"></div>
+      <div class="q"><label class="chk"><input type="checkbox" id="agree"> <span id="l-agree"></span></label></div>
+      <p class="err" id="send-err" role="alert"></p>
+      <div class="btns"><button type="button" class="btn go" id="b-send"></button></div>
+    </section>
+    <!-- 지도에서 직접 지정 -->
+    <section id="v-pick" hidden>
+      <h1 id="p-title"></h1><p class="lead" id="p-lead"></p>
+      <div class="search"><input class="in" id="p-q"><button type="button" class="sbtn navy" id="p-go"></button></div>
+      <ul class="results" id="p-res"></ul>
+      <div class="bigmap" id="big"></div>
+      <p class="picked" id="picked" role="status"></p>
+      <p class="err" id="p-warn" role="alert"></p>
+      <div class="btns"><button type="button" class="btn" id="p-cancel"></button><button type="button" class="btn go" id="p-ok" disabled></button></div>
+    </section>
+    <!-- 보낸 문의 · 받은 답 -->
+    <section id="v-sent" hidden>
+      <h1 id="s-title"></h1><ol class="steps" id="steps-s"></ol><p class="lead" id="s-lead"></p>
+      <dl class="kv" id="s-kv"></dl>
+      <div class="btns"><button type="button" class="btn" id="s-new"></button></div>
+    </section>
+    <section id="v-answer" hidden>
+      <h1 id="a-title"></h1><ol class="steps" id="steps-a"></ol>
+      <p class="arrived" id="a-arrived" role="status"></p>
+      <div class="case" id="a-case"></div>
+      <div class="ans" id="a-ans"></div>
+      <div class="btns"><button type="button" class="btn" id="a-new"></button></div>
+    </section>
+  </main>
+</div>
+<p class="demoloc" id="demoloc" hidden></p>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script src="common.js"></script>
+<script>
+'use strict';
+// 주소 칸: scene = a | b (시연 방식에서 「현재 위치」로 잡힐 장소), loc = demo | real (없으면 서버 설정 DESK_LOC)
+const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const GU = ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'];
+const Q = new URLSearchParams(location.search), SCENE = Q.get('scene') === 'b' ? 'b' : 'a', KEY = `citizen3.${SCENE}`;
+let T = null, U = null, S0 = null, RING = null, LOC = 'demo', SC = null, cur = null, mini = null, miniMk = null, big = null, bigMk = null, picked = null;
+const ss = { get: () => { try { return sessionStorage.getItem(KEY); } catch { return null; } }, set: (v) => { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch { /* 없어도 돈다 */ } } };
+const sit = () => U('상황별 안내').tab('상황');
+const B = () => U('민원내용').kv;
+function view(v) { for (const id of ['write', 'pick', 'sent', 'answer']) $(`v-${id}`).hidden = id !== v; $('demoloc').hidden = LOC !== 'demo' || v === 'answer'; scrollTo(0, 0); }
+const steps = (el, n) => { $(el).innerHTML = U('머리').pick('보기').map((s, i) => `<li ${i === n ? 'aria-current="step"' : ''}><b>0${i + 1}</b>${esc(s)}</li>`).join(''); };
+function mkEl() { const e = document.createElement('div'); e.className = 'mk'; e.innerHTML = '<span class="nm"></span><span class="pin"></span>'; return e; }
+function flatMap(container, center, zoom, interactive) {   // 평면 지도: 기울임 · 돌리기 · 3D 건물 없음(동규 11-11 밤)
+  const m = new maplibregl.Map({ container, style: STYLE, center, zoom, pitch: 0, maxPitch: 0, dragRotate: false, touchPitch: false, interactive, attributionControl: interactive ? { compact: true } : false });   // 작은 지도는 저작권 표시를 지도 아래 글줄로
+  m.touchZoomRotate && m.touchZoomRotate.disableRotation();
+  m.on('style.load', () => {
+    koLabels(m);
+    for (const l of m.getStyle().layers) if (l.type === 'fill-extrusion') m.setLayoutProperty(l.id, 'visibility', 'none');
+    if (RING) {
+      m.addSource('mask', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], RING] } } });
+      m.addLayer({ id: 'mask', type: 'fill', source: 'mask', paint: { 'fill-color': '#5b6270', 'fill-opacity': 0.28 } });
+      m.addLayer({ id: 'seoul', type: 'line', source: 'mask', paint: { 'line-color': '#3f55ad', 'line-width': 1.6, 'line-dasharray': [3, 2] } });
+    }
+  });
+  return m;
+}
+const label = (c) => { const p = nearPlace(S0.places, c); return { p, text: p ? fill(B()['부근'], { 장소: p.name }) : B()['이름 없는 자리'] }; };
+
+// ---- 글자 놓기
+function placeText() {
+  const D = T['U-02_시민접수-3판'], H = U('머리').kv, b = B();
+  document.title = `${H['화면 이름']} (시연)`;
+  $('u-demo').textContent = D.smalls[0] || ''; $('u-gnb').textContent = H['화면 이름']; $('u-who').textContent = H['신청인'];
+  $('u-title').textContent = D.title; $('u-lead').textContent = D.lead; steps('steps-w', 0);
+  const row = (k, v, req = true) => `<div class="tr"><div class="th">${esc(k)}${req ? '<em>*</em>' : ''}</div><div class="td"><div class="in ro">${esc(v)}</div></div></div>`;
+  $('f-who').innerHTML = Object.entries(U('신청인 정보').kv).map(([k, v]) => row(k, v)).join('');
+  $('h-notify').textContent = U('진행상황 및 결과 수신').name;
+  const keep = [...document.querySelectorAll('#f-notify input')].map((x) => x.checked);
+  let n = 0;
+  $('f-notify').innerHTML = Object.entries(U('진행상황 및 결과 수신').kv).map(([k, v]) => `<div class="tr"><div class="th">${esc(k)}</div><div class="td">${v.split(' · ').map((o) => { const i = n++; return `<label class="chk"><input type="checkbox" value="${esc(k)}:${esc(o)}" ${(keep.length ? keep[i] : o !== '알림톡' && o !== '서신') ? 'checked' : ''}> ${esc(o)}</label>`; }).join('')}</div></div>`).join('');
+  $('h-body').textContent = U('민원내용').name;
+  $('l-gu').textContent = b['민원발생지역'];
+  const g = $('gu').value; $('gu').innerHTML = `<option value="">${esc(b['선택'])}</option>` + GU.map((x) => `<option>${x}</option>`).join(''); $('gu').value = g;
+  $('l-loc').textContent = b['민원 장소']; $('loc-why').textContent = b['위치 목적'];
+  const bs = U('민원내용').items.filter((i) => i.kind === '버튼').map((i) => i.text);
+  $('b-here').textContent = bs[0]; $('b-pick').textContent = bs[1]; $('b-example').textContent = bs[2];
+  $('l-title').textContent = b['제목']; $('title').placeholder = b['제목 예시'];
+  $('l-text').textContent = b['내용']; $('text').placeholder = b['내용 예시'];
+  $('l-file').textContent = b['첨부파일']; $('file').textContent = b['첨부 없음'];
+  $('u-privacy').textContent = U('민원내용').smalls[0] || '';
+  $('h-public').textContent = U('선택사항').name; $('q-public').textContent = U('선택사항').lead;
+  const pv = (document.querySelector('input[name="pub"]:checked') || {}).value || '0';
+  $('r-public').innerHTML = U('선택사항').pick('보기').map((o, i) => `<label class="chk"><input type="radio" name="pub" value="${i}" ${String(i) === pv ? 'checked' : ''}> ${esc(o)}</label>`).join('');
+  const A = U('개인정보 수집·이용 동의');
+  $('h-agree').textContent = A.name; $('agree-text').innerHTML = A.kv['동의 글'].split(' / ').map((x) => `<p>${esc(x)}</p>`).join('');
+  $('l-agree').textContent = A.kv['동의']; $('b-send').textContent = A.btn()[0];
+  const P = U('지도에서 직접 지정');
+  $('p-title').textContent = P.kv['화면 이름']; $('p-lead').textContent = P.lead; $('p-q').placeholder = P.kv['찾기 칸'];
+  $('p-go').textContent = P.btn(0)[0]; [$('p-cancel').textContent, $('p-ok').textContent] = P.btn(1);
+  $('s-new').textContent = $('a-new').textContent = U('보낸 문의').btn()[0];
+  $('demoloc').textContent = U('화면 아래').smalls[0] || '';
+  counts();
+}
+const counts = () => { $('title-n').textContent = fill(B()['제목 글자'], { n: $('title').value.length }); $('text-n').textContent = fill(B()['내용 글자'], { n: $('text').value.length.toLocaleString() }); };
+
+// ---- 민원 장소
+function setLoc(c, how) {   // 고른 자리를 칸에 채움. 서울 밖이면 안내하고 「지도에서 직접 지정」으로 이끔
+  const b = B(), ok = inRing(c, RING), { p, text } = label(c);
+  cur = ok ? { lon: c[0], lat: c[1], how, demo: LOC === 'demo' && how === 'here' } : null;
+  if (!mini) { mini = flatMap('mini', c, 15, false); miniMk = new maplibregl.Marker({ element: mkEl(), anchor: 'bottom' }).setLngLat(c).addTo(mini); }
+  mini.jumpTo({ center: c, zoom: 15 }); miniMk.setLngLat(c);
+  miniMk.getElement().querySelector('.nm').textContent = ok ? (p ? p.name : '') : b['서울 밖'];
+  $('locline').innerHTML = ok ? `<b>${esc(text)}</b> <span>· ${esc(how === 'here' ? b['현재 위치'] : b['지도에서 지정'])}</span>` : `<b>${esc(b['서울 밖'])}</b>`;
+  $('locwarn').textContent = ok ? '' : sit()['서울 밖'];
+  if (ok && p && p.gu) { $('gu').value = p.gu; $('gu-from').textContent = b['장소에서 채움']; } else $('gu-from').textContent = '';
+}
+function locate() {
+  const b = B();
+  if (LOC === 'demo') { const p = S0.places[SC.place]; return setLoc([p.lon, p.lat], 'here'); }   // 시연: 장면마다 정한 자리를 현재 위치로
+  $('locline').textContent = b['찾는 중']; $('locwarn').textContent = '';
+  if (!navigator.geolocation) return fail();
+  navigator.geolocation.getCurrentPosition((p) => setLoc([p.coords.longitude, p.coords.latitude], 'here'), fail, { enableHighAccuracy: true, timeout: 8000 });
+}
+function fail() { cur = null; $('locline').innerHTML = `<b>${esc(B()['쓸 수 없음'])}</b>`; $('locwarn').textContent = sit()['위치 허락 안 함']; }
+
+// ---- 지도에서 직접 지정(평면 지도)
+function openPick() {
+  view('pick'); $('p-res').innerHTML = ''; $('p-warn').textContent = ''; $('picked').textContent = U('지도에서 직접 지정').kv['처음']; $('p-ok').disabled = true; picked = null;
+  const c = cur ? [cur.lon, cur.lat] : [126.99, 37.55];
+  if (!big) {
+    big = flatMap('big', c, cur ? 15 : 10.6, true);
+    big.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    bigMk = new maplibregl.Marker({ element: mkEl(), anchor: 'bottom' });
+    big.on('click', (e) => choose([e.lngLat.lng, e.lngLat.lat]));
+  } else { big.resize(); big.jumpTo({ center: c, zoom: cur ? 15 : 10.6 }); }
+}
+function choose(c) {
+  const P = U('지도에서 직접 지정').kv, ok = inRing(c, RING), { p, text } = label(c);
+  picked = c; bigMk.setLngLat(c).addTo(big);
+  bigMk.getElement().querySelector('.nm').textContent = p ? p.name : '';
+  $('picked').innerHTML = esc(fill(P['고른 자리'], { 장소: text }));
+  $('p-warn').textContent = ok ? '' : sit()['고른 자리 서울 밖'];
+  $('p-ok').disabled = !ok;
+}
+function search() {
+  const P = U('지도에서 직접 지정').kv, s = $('p-q').value.trim(), hits = s ? Object.values(S0.places).filter((p) => p.name.includes(s)) : [];
+  $('p-res').innerHTML = hits.length ? hits.map((p, n) => `<li><button type="button" data-id="${p.id}" aria-pressed="${n === 0}">${esc(p.name)}${p.gu ? ' · ' + esc(p.gu) : ''}</button></li>`).join('') : (s ? `<li><p>${esc(P['찾은 것 없음'])}</p></li>` : '');
+  if (hits[0]) { big.jumpTo({ center: [hits[0].lon, hits[0].lat], zoom: 15 }); choose([hits[0].lon, hits[0].lat]); }
+}
+
+// ---- 등록 · 보낸 문의 · 받은 답
+async function send() {
+  const s = sit(), err = $('send-err'), title = $('title').value.trim(), text = $('text').value.trim();
+  const miss = !cur ? [s['장소 없음'], 'b-pick'] : !title ? [s['제목 없음'], 'title'] : !text ? [s['내용 없음'], 'text'] : !$('agree').checked ? [s['동의 안 함'], 'agree'] : null;
+  if (miss) { err.textContent = miss[0]; $(miss[1]).focus(); return; }
+  err.textContent = ''; const b = $('b-send'); b.disabled = true; b.textContent = s['보내는 중'];
+  try {
+    const r = await api('/api/inquiries', { title, text, agree: true, region: $('gu').value, loc: cur,
+      public: (document.querySelector('input[name="pub"]:checked') || {}).value === '1', notify: [...document.querySelectorAll('#f-notify input:checked')].map((x) => x.value) });
+    ss.set(r.id); $('title').value = $('text').value = ''; $('agree').checked = false; counts();
+    await showMine();
+  } catch { err.textContent = s['보내지 못함']; }
+  b.disabled = false; b.textContent = U('개인정보 수집·이용 동의').btn()[0];
+}
+let lastShown = '';
+async function showMine() {
+  const id = ss.get();
+  if (!id) { if (!$('v-sent').hidden || !$('v-answer').hidden) view('write'); return; }   // 작성 · 지도 화면은 그대로 둔다(1.5초마다 맨 위로 올라가지 않게)
+  let c;
+  try { c = await api(`/api/citizen/${id}`); } catch { ss.set(null); return view('write'); }
+  const key = JSON.stringify(c); if (key === lastShown) return; lastShown = key;
+  if (!c.answer) {
+    const K = U('보낸 문의'), k = K.kv, [w0, w1] = split2(k['처리 중']), loc = c.loc || {};
+    $('s-title').textContent = U('머리').pick('보기')[1]; steps('steps-s', 2); $('s-lead').textContent = K.lead;
+    $('s-kv').innerHTML = `<dt>${esc(k['접수 번호'])}</dt><dd>${c.no}</dd><dt>${esc(k['제목'])}</dt><dd>${esc(c.title)}</dd>
+      <dt>${esc(k['민원 장소'])}</dt><dd>${esc(loc.name ? fill(B()['부근'], { 장소: loc.name }) : B()['이름 없는 자리'])}</dd>
+      <dt>${esc(k['진행상황'])}</dt><dd><span class="state">${esc(w0)}</span> ${esc(w1)}</dd>`;
+    return view('sent');
+  }
+  const A = U('받은 답'), a = A.kv;
+  $('a-title').textContent = A.lead; steps('steps-a', 3); $('a-arrived').textContent = sit()['답 도착'];
+  $('a-case').innerHTML = `<h3>${esc(c.title)}</h3><div class="meta"><span>${esc(fill(a['신청일'], { 날짜: ymd(c.received) }))}</span><span><span class="state done">${esc(a['처리완료'])}</span></span></div>
+    <div class="yo">${esc(a['민원요지'])}</div><p>${esc(c.text)}</p>`;
+  const paras = c.answer.split(/\n+|(?<=다\.)\s+/).filter(Boolean);
+  $('a-ans').innerHTML = `<p class="tit">${esc(a['민원답변'])}</p><dl class="kv">
+    <dt>${esc(a['담당부서'])}</dt><dd>${esc(a['담당'])}${c.office ? ` · ${esc(c.office)}` : ''}</dd>
+    <dt>${esc(a['내용'])}</dt><dd><p>1. ${esc(a['인사'])}</p>${paras.map((p, i) => `<p>${i + 2}. ${esc(p)}</p>`).join('')}</dd>
+    ${c.citations.length ? `<dt>${esc(a['관련법령'])}</dt><dd>${c.citations.map((x) => `<span class="law">${esc(x.label)}</span>`).join('<br>')}<div class="cnt">${esc(a['기준'])}</div></dd>` : ''}
+    <dt>${esc(a['처리 일시'])}</dt><dd>${esc(ymd(c.approved_at))} ${esc(hhmm(c.approved_at))}</dd></dl>`;
+  view('answer');
+}
+function bind() {
+  $('b-here').onclick = locate; $('b-pick').onclick = openPick;
+  $('b-example').onclick = () => { $('title').value = S0.pair.title; $('text').value = S0.pair.text; counts(); };
+  $('title').oninput = $('text').oninput = counts;
+  $('b-send').onclick = send;
+  $('p-go').onclick = search; $('p-q').onkeydown = (e) => { if (e.key === 'Enter') search(); };
+  $('p-res').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const p = S0.places[b.dataset.id];
+    document.querySelectorAll('#p-res button').forEach((x) => x.setAttribute('aria-pressed', x === b)); big.flyTo({ center: [p.lon, p.lat], zoom: 15 }); choose([p.lon, p.lat]); };
+  $('p-cancel').onclick = () => view('write');
+  $('p-ok').onclick = () => { if (picked) { view('write'); setLoc(picked, 'map'); mini.resize(); } };
+  $('s-new').onclick = $('a-new').onclick = () => { ss.set(null); lastShown = ''; view('write'); locate(); };
+}
+
+(async function main() {
+  bind();
+  try {
+    const [t, st, sj] = await Promise.all([api('/api/text'), api('/api/state'), fetch('data/seoul.geojson').then((r) => r.json())]);
+    T = t.text; U = texts(T, 'U-02_시민접수-3판'); S0 = st; RING = sj.features[0].geometry.coordinates[0];
+  } catch { document.querySelector('main').textContent = '화면을 불러오지 못했습니다. 화면 서버가 켜져 있는지 확인해 주세요.'; return; }   // ponytail: 글자 파일도 못 받은 때만 쓰는 마지막 문장
+  LOC = ['demo', 'real'].includes(Q.get('loc')) ? Q.get('loc') : S0.loc_mode;
+  SC = S0.scenes[SCENE];
+  placeText();
+  view('write');
+  if (window.maplibregl) locate();
+  await showMine();
+  setInterval(showMine, 1500);
+  window.CIT = { get cur() { return cur; }, choose: (c) => choose(c), setLoc, get LOC() { return LOC; } };   // 점검용
+})();
+</script>
+</body>
+</html>

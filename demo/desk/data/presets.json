@@ -1,0 +1,620 @@
+{
+ "note": "3판 본 화면의 문의 47건(실제 글 30 · 가상 17). source: real = 공개 게시판 글(요지) · faq = 기관 자주 묻는 질문 · virtual = 가상 문의(NVIDIA Nemotron-Personas-Korea, CC BY 4.0을 바탕으로 만듦) · team = 팀이 쓴 가상 문의. set_id는 _orch-tools/reports/문의세트/의 번호(P0 · P1 · G01은 팀이 쓴 글). loc.virtual = 문의에 장소가 없어 구 안의 대략 자리에 놓은 것. approved = 화면을 보이려고 정한 승인 상태(엔진 답은 그대로). 엔진 답은 data/saved.json(모두 기록된 실제 실행 결과).",
+ "pair": {
+  "title": "공원 안 음료 노점 가능 여부 문의",
+  "text": "이 공원에서 돗자리를 펴 놓고 음료를 파는 노점을 해도 되나요?"
+ },
+ "presets": [
+  {
+   "set_id": "P0",
+   "text": "보라매공원 산책로에서 커피를 파는 푸드트럭을 열어도 되나요?",
+   "source": "team",
+   "loc": {
+    "name": "보라매공원",
+    "lon": 126.92,
+    "lat": 37.492,
+    "virtual": false,
+    "place": "boramae"
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R01",
+   "text": "동작대교 공영주차장 요금이 5분에 450원이던데, 이게 제대로 매긴 요금이 맞나요?",
+   "source": "real",
+   "loc": {
+    "name": "동작대교 공영주차장",
+    "lon": 126.98,
+    "lat": 37.5035,
+    "virtual": false,
+    "place": "dongjak"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R02",
+   "text": "동작대교 공영주차장에서 직원이 퇴근한다고 2시간 요금을 선불로 받았는데, 안 쓴 한 시간 요금은 환불되나요?",
+   "source": "real",
+   "loc": {
+    "name": "동작대교 공영주차장",
+    "lon": 126.9806,
+    "lat": 37.5041,
+    "virtual": false,
+    "place": "dongjak"
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R03",
+   "text": "125cc 미만 이륜자동차도 공영주차장에서 경차처럼 주차요금 50% 감면을 받나요?",
+   "source": "real",
+   "loc": {
+    "name": "종로구 공영주차장",
+    "lon": 126.991,
+    "lat": 37.573,
+    "virtual": true,
+    "place": null
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R04",
+   "text": "장애인 차량으로 등록하지 못한 차인데, 복지카드를 보여 주면 공영주차장 장애인 80% 할인을 받을 수 있나요?",
+   "source": "real",
+   "loc": {
+    "name": "영등포구 공영주차장",
+    "lon": 126.8963,
+    "lat": 37.5264,
+    "virtual": true,
+    "place": null
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R05",
+   "text": "마른내길 공영주차장에서 운영 끝나는 시간까지 요금을 미리 내라고 하던데, 원래 그렇게 선결제하는 게 맞나요?",
+   "source": "real",
+   "loc": {
+    "name": "마른내길 공영주차장",
+    "lon": 126.9975,
+    "lat": 37.5652,
+    "virtual": false,
+    "place": "marunnae"
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R06",
+   "text": "도봉산 환승 공영주차장에서 모바일 교통카드로 지하철을 탔는데, 환승 할인을 받으려면 역장 확인서가 꼭 있어야 하나요?",
+   "source": "real",
+   "loc": {
+    "name": "도봉산 환승 공영주차장",
+    "lon": 127.0458,
+    "lat": 37.6896,
+    "virtual": false,
+    "place": "dobongsan"
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R07",
+   "text": "어린이대공원 잔디공원에서 수강료를 받고 요가·필라테스 수업을 해도 되나요?",
+   "source": "real",
+   "loc": {
+    "name": "서울어린이대공원 잔디공원",
+    "lon": 127.0805,
+    "lat": 37.549,
+    "virtual": false,
+    "place": "childrenpark-lawn"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R08",
+   "text": "어린이대공원에 개를 유모차나 캐리어에 태우면 데리고 산책해도 되나요?",
+   "source": "real",
+   "loc": {
+    "name": "서울어린이대공원",
+    "lon": 127.0825,
+    "lat": 37.5475,
+    "virtual": false,
+    "place": "childrenpark"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R09",
+   "text": "서울시 조례로 저공해차는 공영주차장 요금 감면을 받는데, 어린이대공원 주차장은 왜 감면이 자동으로 안 되나요?",
+   "source": "real",
+   "loc": {
+    "name": "서울어린이대공원 구의문 주차장",
+    "lon": 127.086,
+    "lat": 37.5455,
+    "virtual": false,
+    "place": "childrenpark-parking"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R10",
+   "text": "어린이대공원 고양이들은 중성화 표시(귀 끝 자르기)가 안 보이던데, 중성화했는지 어떻게 알 수 있나요?",
+   "source": "real",
+   "loc": {
+    "name": "서울어린이대공원",
+    "lon": 127.0812,
+    "lat": 37.55,
+    "virtual": false,
+    "place": "childrenpark"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R11",
+   "text": "따릉이 기본 대여시간을 넘기면 추가요금이 얼마나 붙나요?",
+   "source": "faq",
+   "loc": {
+    "name": "여의도 따릉이 대여소",
+    "lon": 126.9246,
+    "lat": 37.5216,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R12",
+   "text": "따릉이 이용권을 쓰다가 환불받으려면 규정이 어떻게 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "신촌역 따릉이 대여소",
+    "lon": 126.9368,
+    "lat": 37.5551,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R13",
+   "text": "만 13세 아이가 따릉이에 가입할 때 따로 필요한 게 있나요?",
+   "source": "faq",
+   "loc": {
+    "name": "강남역 따릉이 대여소",
+    "lon": 127.0266,
+    "lat": 37.4972,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R14",
+   "text": "서울시 조례로 정한 금연구역에서 담배를 피우면 과태료가 얼마인가요?",
+   "source": "real",
+   "loc": {
+    "name": "강남역 출입구",
+    "lon": 127.0287,
+    "lat": 37.499,
+    "virtual": true,
+    "place": null
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R15",
+   "text": "바로녹색결제로 공영주차장 요금을 내면 다자녀 할인도 자동으로 되나요?",
+   "source": "real",
+   "loc": {
+    "name": "송파구 공영주차장",
+    "lon": 127.1059,
+    "lat": 37.5145,
+    "virtual": true,
+    "place": null
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R16",
+   "text": "서울시 청년수당을 받는 도중에 자격 요건이 바뀌면 지급이 끊기나요?",
+   "source": "real",
+   "loc": {
+    "name": "마포구 청년센터",
+    "lon": 126.922,
+    "lat": 37.549,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R17",
+   "text": "학적이 두 개인데, 서울시 학자금대출 이자지원을 둘 다 받을 수 있나요?",
+   "source": "real",
+   "loc": {
+    "name": "관악구 청년센터",
+    "lon": 126.952,
+    "lat": 37.481,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R18",
+   "text": "서울시 청년수당이랑 정부 사업을 같이 참여해도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "노원구 청년센터",
+    "lon": 127.0617,
+    "lat": 37.6559,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R19",
+   "text": "서울시 청년수당으로 태블릿이나 노트북을 사도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "성동구 청년센터",
+    "lon": 127.04,
+    "lat": 37.563,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R20",
+   "text": "서울시 공원에서 하면 안 되는 일은 뭐고, 어기면 어떻게 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "월드컵공원",
+    "lon": 126.885,
+    "lat": 37.568,
+    "virtual": true,
+    "place": null
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R21",
+   "text": "서울시 공원에 반려동물을 데려가도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.036,
+    "lat": 37.5452,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": true
+  },
+  {
+   "set_id": "R22",
+   "text": "서울숲에서 그늘막이나 텐트를 쳐도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.0385,
+    "lat": 37.5437,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R23",
+   "text": "서울숲 주차장 이용료는 얼마인가요?",
+   "source": "faq",
+   "loc": {
+    "name": "서울숲 주차장",
+    "lon": 127.042,
+    "lat": 37.543,
+    "virtual": false,
+    "place": "seoulforest-parking"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R24",
+   "text": "서울숲에서 공놀이나 연날리기를 해도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.037,
+    "lat": 37.546,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R25",
+   "text": "세종로 공영주차장 월 정기권을 쓰는 하이브리드차도 차량 5부제 대상인가요?",
+   "source": "real",
+   "loc": {
+    "name": "세종로 공영주차장",
+    "lon": 126.977,
+    "lat": 37.5725,
+    "virtual": false,
+    "place": "sejongro"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R26",
+   "text": "한강공원에서 하면 안 되는 금지행위가 있나요?",
+   "source": "faq",
+   "loc": {
+    "name": "반포 한강공원",
+    "lon": 126.996,
+    "lat": 37.51,
+    "virtual": false,
+    "place": "banpo-hangang"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R27",
+   "text": "한강공원에서 전동킥보드 같은 개인형 이동장치를 타도 되나요?",
+   "source": "faq",
+   "loc": {
+    "name": "여의도 한강공원",
+    "lon": 126.934,
+    "lat": 37.528,
+    "virtual": false,
+    "place": "yeouido-hangang"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R28",
+   "text": "한강 자전거도로에서 어른이 인라인스케이트를 타는 건 금지인가요?",
+   "source": "real",
+   "loc": {
+    "name": "광나루 한강공원 자전거도로",
+    "lon": 127.12,
+    "lat": 37.548,
+    "virtual": false,
+    "place": "gwangnaru-hangang"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R29",
+   "text": "고양이 모래가 섞인 배설물은 어떻게 버려야 하나요?",
+   "source": "real",
+   "loc": {
+    "name": "노원구",
+    "lon": 127.0565,
+    "lat": 37.6542,
+    "virtual": false,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "R30",
+   "text": "다둥이 가족 청소년이 청소년 수련시설을 쓸 때 할인을 왜 줄이나요?",
+   "source": "real",
+   "loc": {
+    "name": "강동구 청소년 수련시설",
+    "lon": 127.1238,
+    "lat": 37.5301,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V025",
+   "text": "구의역 자전거 거치대에 바람 빠진 자전거가 몇 달째 묶여 있어요. 버린 것 같은데 구청에서 치워 가나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "구의역 자전거 거치대",
+    "lon": 127.0857,
+    "lat": 37.537,
+    "virtual": false,
+    "place": "guui"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V058",
+   "text": "목동 학원가는 밤 10시만 되면 학원 차랑 데리러 온 차들이 이중주차로 도로를 막아요. 이런 건 어디에 신고해요?",
+   "source": "virtual",
+   "loc": {
+    "name": "목동 학원가",
+    "lon": 126.875,
+    "lat": 37.526,
+    "virtual": false,
+    "place": "mokdong"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V059",
+   "text": "망원시장 앞 인도에 차가 반쯤 올라와 있어서 유모차가 못 지나가요. 사진 찍어서 신고하면 과태료 나오나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "망원시장 앞",
+    "lon": 126.905,
+    "lat": 37.556,
+    "virtual": false,
+    "place": "mangwon"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V062",
+   "text": "불광동 좁은 골목에 화물차가 밤새 서 있어서 부모님 모시고 병원 갈 때 차가 못 빠져나가요. 밤에도 단속해요?",
+   "source": "virtual",
+   "loc": {
+    "name": "불광동 골목",
+    "lon": 126.93,
+    "lat": 37.611,
+    "virtual": false,
+    "place": "bulgwang"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V071",
+   "text": "연남동 골목 술집들이 새벽 두 시까지 시끄러워서 잠을 못 자요. 가게 소음은 어디에 신고해요?",
+   "source": "virtual",
+   "loc": {
+    "name": "연남동 골목",
+    "lon": 126.923,
+    "lat": 37.562,
+    "virtual": false,
+    "place": "yeonnam"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V077",
+   "text": "마곡나루역 근처 공사장이 일요일 아침 7시부터 공사를 해요. 주말엔 공사 시간 제한이 없나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "마곡나루역 근처",
+    "lon": 126.827,
+    "lat": 37.567,
+    "virtual": false,
+    "place": "magoknaru"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V090",
+   "text": "양재천 산책로 가로등이 며칠째 꺼져 있어서 밤에 걷기가 무서워요. 고장 신고는 어디에 해요?",
+   "source": "virtual",
+   "loc": {
+    "name": "양재천 산책로",
+    "lon": 127.039,
+    "lat": 37.48,
+    "virtual": false,
+    "place": "yangjaecheon"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V038",
+   "text": "아들 차 타고 남산 위까지 올라가 보려는데, 남산공원은 차 들어가면 통행료 받나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "남산공원",
+    "lon": 126.9882,
+    "lat": 37.5512,
+    "virtual": false,
+    "place": "namsan"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V005",
+   "text": "차 몰고 가서 지하철역 옆 공영주차장에 세워 두고 지하철로 갈아타면 할인된다던데, 환승한 건 어떻게 확인받아요?",
+   "source": "virtual",
+   "loc": {
+    "name": "신도림역 환승주차장",
+    "lon": 126.891,
+    "lat": 37.509,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V051",
+   "text": "아이 데리고 서울형 키즈카페 가는데 입구 앞에서 어른들이 담배를 피워요. 키즈카페 근처도 금연구역인가요?",
+   "source": "virtual",
+   "loc": {
+    "name": "노원구 키즈카페",
+    "lon": 127.066,
+    "lat": 37.65,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V011",
+   "text": "포메라니안 중성화 수술을 막 끝냈는데 이제 동물등록 하려고요. 중성화했으면 등록비 깎아준다는 게 맞나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "성북구",
+    "lon": 127.0167,
+    "lat": 37.5894,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V034",
+   "text": "동네 친구들이랑 아파트 옆 어린이공원 정자에서 막걸리 한잔씩 하는데, 거기서 술 마시면 과태료라는 게 사실이에요?",
+   "source": "virtual",
+   "loc": {
+    "name": "은평구 어린이공원",
+    "lon": 126.929,
+    "lat": 37.6027,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V045",
+   "text": "학원 다니느라 지하철이랑 버스를 매일 타는데 청년 교통비 지원받을 수 있나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "관악구",
+    "lon": 126.9516,
+    "lat": 37.4784,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "V036",
+   "text": "강아지랑 공원 산책하다가 화장실 가야 할 때 강아지를 어디 둬야 할지 모르겠어요. 공원에 개 잠깐 묶어 두는 데 같은 거 있나요?",
+   "source": "virtual",
+   "loc": {
+    "name": "보라매공원",
+    "lon": 126.918,
+    "lat": 37.4935,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "G01",
+   "text": "마포구 주차장 조례를 보면 거주자우선주차 요금은 한 달에 얼마인가요?",
+   "source": "team",
+   "loc": {
+    "name": "마포구",
+    "lon": 126.9017,
+    "lat": 37.5663,
+    "virtual": true,
+    "place": null
+   },
+   "approved": false
+  },
+  {
+   "set_id": "P1",
+   "text": "서울숲에서 돗자리를 펴 놓고 음료를 파는 노점을 해도 되나요?",
+   "source": "team",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.036,
+    "lat": 37.5455,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  }
+ ]
+}

@@ -1,18 +1,22 @@
-"""문의 답변 창구 시연 화면의 얇은 서버 (표준 라이브러리만). 문의 저장 · 엔진 부르기 · 고친 글과 승인 · 시민 쪽 답 받기 · 재생.
+"""문의 답변 창구 시연 화면(3판)의 얇은 서버 (표준 라이브러리만). 문의 저장 · 엔진 부르기 · 접수 위치 · 위치 바로잡기 · 고친 글과 승인 · 시민 쪽 답.
 
-띄우기 (레포 맨 위에서):   python3 demo/desk/server.py                      → http://127.0.0.1:8770
+띄우기 (레포 맨 위에서):   python3 demo/desk/server.py      → 담당자 화면 http://127.0.0.1:8770 · 시민 화면 /citizen.html
 설정 (환경 변수, 한 줄로 바꾼다):
   DESK_ENGINE_URL   엔진 주소. 기본 http://127.0.0.1:8000 (demo/desk/engine_trace.py). 채점 서버 주소(/ask까지 적어도 됨)로 바꿔도 돈다
-  DESK_ENGINE       live = 시민 화면에서 보낸 문의는 그때 엔진을 부른다(기본) · saved = 엔진을 부르지 않고 미리 받은 답만 쓴다
-  DESK_PORT · DESK_REPLAY_SEC(재생 간격, 기본 2.5초) · DESK_STATE(저장 파일, 기본 demo/desk/runtime/state.json)
-미리 받은 답 만들기:       python3 demo/desk/server.py --save   (같은 통로로 엔진을 불러 data/saved.json에 저장. 없는 글만 받는다, 모두 다시 받으려면 --all)
+  DESK_ENGINE       live = 시민 문의 · 위치 바로잡기는 그때 엔진을 부른다(기본) · saved = 엔진을 부르지 않고 미리 받은 답만 쓴다
+  DESK_LOC          demo = 시민 화면의 「현재 위치」가 장면마다 미리 정한 자리(기본, 영상용) · real = 휴대폰 위치 기능
+  DESK_PORT · DESK_STATE(저장 파일, 기본 demo/desk/runtime/state.json)
+미리 받은 답 만들기:       python3 demo/desk/server.py --save   (같은 통로로 엔진을 불러 data/saved.json에 저장. 없는 글만, 모두 다시는 --all)
 스스로 시험:               python3 demo/desk/server.py --selftest   (엔진 · 인터넷 없이)
 
-- 시연 문의(재생)는 늘 미리 받은 답으로 뜬다. 시민 화면에서 보낸 문의만 그때 엔진을 부른다(PRD 3판 3절 추천안).
-- 화면 문구는 docs/content/에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
+- 처음 띄우면(또는 「처음 상태로」) 문의 47건(data/presets.json)이 미리 받은 답으로 들어와 있다. 시민 화면에서 보낸 문의만 그때 엔진을 부른다.
+- 엔진은 글만 받는다. 시민이 지정한 접수 위치가 이름 있는 장소면 글 앞에 「○○에서 」를 붙여 보낸다(「이 공원에서 · 여기서」는 그 자리 이름으로 바꾼다).
+- 화면 문구는 docs/content/의 3판 파일 둘에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
 - 시민 쪽 길(/api/citizen/<번호>)은 승인된 답만 준다. 승인 전 초안은 시민 화면이 받을 수 없다.
+- 앞 판(2판) 화면 web/index.html · app.js · style.css는 지우지 않고 쓰지 않는다(이 서버의 /api는 3판 꼴).
 """
 import json
+import math
 import os
 import re
 import sys
@@ -33,18 +37,22 @@ KST = timezone(timedelta(hours=9))
 ENGINE_URL = os.environ.get("DESK_ENGINE_URL", "http://127.0.0.1:8000").rstrip("/")
 ENGINE_BASE = ENGINE_URL[:-4] if ENGINE_URL.endswith("/ask") else ENGINE_URL
 MODE = os.environ.get("DESK_ENGINE", "live")
+LOC_MODE = "real" if os.environ.get("DESK_LOC") == "real" else "demo"
 PORT = int(os.environ.get("DESK_PORT", "8770"))
-REPLAY_SEC = float(os.environ.get("DESK_REPLAY_SEC", "2.5"))
 TIMEOUT = 90
-TEXT_FILES = ("A-01_답변화면", "C-01_답변초안카드", "U-02_시민문의")
+TEXT_FILES = ("A-01_답변창구-3판", "U-02_시민접수-3판")
 STATE_FILE = Path(os.environ.get("DESK_STATE") or HERE / "runtime" / "state.json")   # 둘을 함께 띄울 때만 바꾼다
 SAVED_FILE = HERE / "data" / "saved.json"
 OUT_REASONS = {"6종 밖 조례", "관할 밖", "질문 범위 밖"}   # 엔진이 「6종이 다루지 않는 조례 · 관할」이라고 가른 것만 6종 밖
 FAIL_REASONS = {"시간 초과", "오류"}
+NEAR_KM = 0.9          # 고른 자리에서 이만큼 안의 가장 가까운 장소 이름을 붙인다(주소 찾기 서비스는 쓰지 않음)
+HERE_WORDS = re.compile(r"^(여기서|여기에서|이곳에서|이 공원에서|이 근처에서)\s*")
 
 lock = threading.Lock()
-replay = json.loads((HERE / "data" / "replay.json").read_text(encoding="utf-8"))
-places = {p["id"]: p for p in json.loads((HERE / "data" / "places.json").read_text(encoding="utf-8"))["places"]}
+presets = json.loads((HERE / "data" / "presets.json").read_text(encoding="utf-8"))
+_pl = json.loads((HERE / "data" / "places.json").read_text(encoding="utf-8"))
+places, scenes = {p["id"]: p for p in _pl["places"]}, _pl["scenes"]
+RING = json.loads((HERE / "web" / "data" / "seoul.geojson").read_text(encoding="utf-8"))["features"][0]["geometry"]["coordinates"][0]
 saved = json.loads(SAVED_FILE.read_text(encoding="utf-8")) if SAVED_FILE.exists() else {}
 engine = {"trace": None, "reachable": None, "checked": 0}   # trace: /ask/trace가 있나(None = 아직 모름)
 
@@ -53,14 +61,71 @@ def now():
     return datetime.now(KST).isoformat(timespec="seconds")
 
 
+# ---- 장소: 서울 안인가 · 가까운 이름 · 엔진에 보낼 글
+def in_seoul(lon, lat):
+    inside, j = False, len(RING) - 1
+    for i in range(len(RING)):
+        (xi, yi), (xj, yj) = RING[i], RING[j]
+        if (yi > lat) != (yj > lat) and lon < (xj - xi) * (lat - yi) / (yj - yi) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def km(a, b):
+    return math.hypot((a[0] - b[0]) * 88.2, (a[1] - b[1]) * 111)   # 서울 위도에서 대략 거리
+
+
+def near_place(lon, lat):
+    d, p = min(((km((lon, lat), (p["lon"], p["lat"])), p) for p in places.values()), key=lambda x: x[0])
+    return p if d <= NEAR_KM else None
+
+
+def make_loc(lon, lat, how, place_id=None):
+    p = places.get(place_id) if place_id else near_place(lon, lat)
+    if p and place_id:
+        lon, lat = p["lon"], p["lat"]
+    return {"name": p["name"] if p else None, "place": p["id"] if p else None, "gu": p.get("gu", "") if p else "",
+            "lon": round(lon, 6), "lat": round(lat, 6), "how": how, "virtual": False}
+
+
+def engine_text(text, loc):
+    """시민 · 담당자가 지정한 위치가 이름 있는 장소면 그 이름을 글에 넣는다(엔진은 글만 받는다). 시연 문의 47건은 기록한 글 그대로."""
+    name = loc and loc.get("how") in ("here", "map", "staff") and loc.get("name")
+    if not name:
+        return text
+    if HERE_WORDS.match(text):
+        return HERE_WORDS.sub(f"{name}에서 ", text, count=1)
+    return text if name in text else f"{name}에서 {text}"
+
+
+# ---- 처음 상태: 문의 47건(미리 받은 답). 받은 시각은 띄운 때에서 거꾸로 약 11분 간격(시연용으로 정한 값)
+def fresh_state():
+    t0, n = datetime.now(KST), len(presets["presets"])
+    inq = []
+    for i, p in enumerate(presets["presets"], 1):
+        at = (t0 - timedelta(minutes=11 * (n - i) + 6)).isoformat(timespec="seconds")
+        q = {"id": f"p{i}", "no": i, "text": p["text"], "source": p["source"], "set_id": p["set_id"], "form": {}, "received": at,
+             "loc": {**p["loc"], "how": "preset", "gu": (places.get(p["loc"].get("place")) or {}).get("gu", "")},
+             "loc_from": None, "prev": None, "approved": None}
+        q["engine_text"] = q["text"]
+        res = saved.get(q["engine_text"]) or {"response": None, "error": "미리 받은 답 없음"}
+        apply_result(q, res, "saved")
+        if p["approved"] and q["kind"] == "draft":
+            q["approved"] = {"text": q["card"]["answer"], "at": (t0 - timedelta(minutes=11 * (n - i))).isoformat(timespec="seconds"),
+                             "by": "처리담당자(시연)", "edited": False, "reply": "draft", "office": ""}
+        inq.append(q)
+    return {"v": 3, "inquiries": inq}
+
+
 def load_state():
     try:
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        st = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        if st.get("v") == 3:
+            return st
     except (OSError, ValueError):
-        return {"inquiries": [], "replay_next": 0}
-
-
-state = load_state()
+        pass
+    return None                              # 없거나 앞 판(2판) 꼴이면 처음 상태로
 
 
 def save_state():
@@ -80,10 +145,12 @@ def _chunks():
 
 
 CHUNKS = _chunks()
+LAWS = {x["law"] for x in CHUNKS.values()}
 _squash = lambda s: re.sub(r"\s+", "", (s or "").replace("[조항]", ""))   # noqa: E731
+_inner = lambda s: (s or "").replace("(※ 그 내용은 이 자료에 없다)", "").strip()   # noqa: E731  엔진 안쪽 표시는 화면에 내지 않는다
 
 
-# ---- 엔진 부르기 (같은 통로: 시민 문의도, 미리 받은 답 만들기도 이 함수 하나)
+# ---- 엔진 부르기 (같은 통로: 시민 문의도, 위치 바로잡기도, 미리 받은 답 만들기도 이 함수 하나)
 def post(url, body):
     req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
@@ -125,11 +192,11 @@ def kind_of(res):
 def card_of(res):
     """엔진 결과 → 카드에 쓰는 자료(낱말 없이 값만)."""
     r, t = res.get("response") or {}, res.get("trace") or {}
-    ev = [(_squash(re.sub(r"\([^)]*\)", "", e["label"])), e["quote"]) for e in t.get("evidence") or [] if e.get("quote")]
+    ev = [(_squash(re.sub(r"\([^)]*\)", "", e["label"])), _inner(e["quote"])) for e in t.get("evidence") or [] if e.get("quote")]
     cites = []
     for label in r.get("citation") or []:
         c = CHUNKS.get(label, {})
-        law = c.get("law") or next((n for n in {x["law"] for x in CHUNKS.values()} if label.startswith(n)), "")
+        law = c.get("law") or next((n for n in LAWS if label.startswith(n)), "")
         lab, body = _squash(label), _squash(c.get("text"))
         # 구절이 그 조항 원문 안에 있으면 그 조항의 구절(⑤ 구절 관문이 이미 글자를 대 봄). 별표처럼 원문 자료와 꼴이 다르면 라벨로 짝짓는다
         short = _squash(label[len(law):]) if law else lab
@@ -144,16 +211,16 @@ def card_of(res):
 
 def apply_result(q, res, how):
     q.update(kind=kind_of(res), card=card_of(res), engine={"how": how, "at": res.get("at") or now(), "sec": res.get("sec"),
-                                                            "settings": (res.get("trace") or {}).get("settings")})
+                                                            "made_by": res.get("made_by"), "settings": (res.get("trace") or {}).get("settings")})
     q["draft"] = q["card"]["answer"]
 
 
 def run_engine(qid):
     with lock:
         q = next(x for x in state["inquiries"] if x["id"] == qid)
-        text = q["text"]
-    hit = saved.get(text)
-    if MODE == "saved" or q["source"] != "citizen":
+        text, use_saved = q["engine_text"], MODE == "saved" or (q["source"] != "citizen" and q["loc"]["how"] != "staff")
+    if use_saved:
+        hit = saved.get(text)
         res, how = (hit, "saved") if hit else ({"response": None, "error": "미리 받은 답 없음"}, "saved")
     else:
         res, how = call_engine(text), "live"
@@ -163,29 +230,16 @@ def run_engine(qid):
         save_state()
 
 
-def add_inquiry(text, source, place, set_id=None, form=None):
+def add_inquiry(text, form, loc):
     with lock:
         no = max([x["no"] for x in state["inquiries"]], default=0) + 1
-        q = {"id": f"q{no}-{int(time.time() * 1000) % 100000}", "no": no, "text": text, "source": source, "place": place,
-             "set_id": set_id, "form": form or {}, "received": now(), "kind": "making", "card": None, "draft": None, "approved": None, "engine": None}
+        q = {"id": f"q{no}-{int(time.time() * 1000) % 100000}", "no": no, "text": text, "source": "citizen", "set_id": None,
+             "form": form, "received": now(), "loc": loc, "loc_from": None, "prev": None, "engine_text": engine_text(text, loc),
+             "kind": "making", "card": None, "draft": None, "approved": None, "engine": None}
         state["inquiries"].append(q)
         save_state()
     threading.Thread(target=run_engine, args=(q["id"],), daemon=True).start()
     return q
-
-
-def replay_loop():
-    while True:
-        with lock:
-            i = state["replay_next"]
-            if i >= len(replay["replay"]) or not state.get("replaying"):
-                state["replaying"] = False
-                save_state()
-                return
-            state["replay_next"] = i + 1
-        item = replay["replay"][i]
-        add_inquiry(item["text"], item["source"], item.get("place"), item["set_id"])
-        time.sleep(REPLAY_SEC)
 
 
 def engine_status():
@@ -217,7 +271,7 @@ def text_bundle():
         _text["version"] = version
         try:
             data = {n: C.parse(n) for n in TEXT_FILES}
-            data["C-01_답변초안카드"]["sections"]["소관 부서와 처리 기관"]["tables"][0]["rows"][0]   # 쓰는 표가 있나
+            data["A-01_답변창구-3판"]["sections"]["상황별 안내"]["tables"][0]["rows"][0]   # 쓰는 표가 있나
             _text.update(data=data, error=None)
         except (Exception, SystemExit) as e:  # noqa: BLE001
             _text["error"] = f"{type(e).__name__}: {e}"[:200]
@@ -226,9 +280,19 @@ def text_bundle():
 
 def citizen_view(q):
     a = q.get("approved")
+    cites = (q.get("card") or {}).get("citations") or []
     return {"no": q["no"], "text": q["text"], "title": (q.get("form") or {}).get("title", ""), "received": q["received"],
-            "answer": a["text"] if a else None, "approved_at": a["at"] if a else None,
-            "citations": [{"label": c["label"], "effective": c["effective"]} for c in (q["card"] or {}).get("citations", [])] if a else []}
+            "loc": q.get("loc_from") or q.get("loc"), "answer": a["text"] if a else None, "approved_at": a["at"] if a else None,
+            "office": a.get("office", "") if a else "",
+            "citations": [{"label": c["label"], "effective": c["effective"]} for c in cites] if a and a.get("reply") == "draft" else []}
+
+
+def str_or(v, n):
+    return str(v).strip()[:n] if isinstance(v, (str, int, float)) else ""
+
+
+def num(v):
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -251,7 +315,7 @@ class Handler(SimpleHTTPRequestHandler):
         """요청 본문 → dict. 길이 머리말이 이상하거나 JSON이 깨졌거나 dict가 아니면 빈 dict(서버가 죽지 않고 400 · 409로 답한다)."""
         try:
             n = int(self.headers.get("Content-Length") or 0)
-            d = json.loads(self.rfile.read(n).decode("utf-8")) if n > 0 else {}
+            d = json.loads(self.rfile.read(n).decode("utf-8")) if 0 < n < 200_000 else {}
         except ValueError:
             return {}
         return d if isinstance(d, dict) else {}
@@ -263,15 +327,18 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         p = self.path.split("?")[0]
+        if p == "/":                                  # 3판 담당자 화면(앞 판 index.html은 쓰지 않음)
+            self.send_response(302)
+            self.send_header("Location", "/desk.html")
+            self.end_headers()
+            return None
         if p == "/api/text":
             return self.send_json(text_bundle())
         if p == "/api/state":
             status = engine_status()      # 엔진이 살아 있는지 보는 호출(길면 3초)은 잠금 밖에서: 그동안 다른 요청이 멈추지 않게
             with lock:
-                return self.send_json({"inquiries": state["inquiries"], "places": places, "engine": status,
-                                       "engine_url": ENGINE_BASE, "replaying": bool(state.get("replaying")),
-                                       "replay_left": len(replay["replay"]) - state["replay_next"], "core": replay["core"],
-                                       "text_version": text_bundle()["version"]})
+                return self.send_json({"inquiries": state["inquiries"], "places": places, "scenes": scenes, "pair": presets["pair"],
+                                       "engine": status, "loc_mode": LOC_MODE, "text_version": text_bundle()["version"]})
         m = re.fullmatch(r"/api/citizen/([\w-]+)", p)
         if m:
             with lock:
@@ -282,85 +349,98 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         p, b = self.path.split("?")[0], self.body()
         if p == "/api/inquiries":
-            text = str(b.get("text") or "").strip()
-            if not text:
-                return self.send_json({"error": "빈 문의"}, 400)
-            place = b.get("place") if isinstance(b.get("place"), str) and b.get("place") in places else None
-            if b.get("agree") is False:                       # 실제 신청 화면처럼 개인정보 수집 · 이용 동의가 있어야 받는다
+            text, title = str_or(b.get("text"), 3000), str_or(b.get("title"), 30)
+            if not text or not title:
+                return self.send_json({"error": "빈 제목 · 내용"}, 400)
+            if b.get("agree") is not True:                    # 실제 신청 화면처럼 개인정보 수집 · 이용 동의가 있어야 받는다
                 return self.send_json({"error": "동의 필요"}, 400)
-            form = {"title": str(b.get("title") or "").strip()[:30], "region": str(b.get("region") or "").strip()[:20],
-                    "public": b.get("public") is True,
-                    "notify": [str(x)[:10] for x in b.get("notify")][:3] if isinstance(b.get("notify"), list) else []}
-            q = add_inquiry(text[:3000], "citizen", place, form=form)
+            lo = b.get("loc") if isinstance(b.get("loc"), dict) else {}
+            lon, lat = num(lo.get("lon")), num(lo.get("lat"))
+            if lon is None or lat is None or not in_seoul(lon, lat):
+                return self.send_json({"error": "서울 안의 민원 장소 필요"}, 400)
+            loc = make_loc(lon, lat, "map" if lo.get("how") == "map" else "here")
+            loc["demo"] = lo.get("demo") is True
+            form = {"title": title, "region": str_or(b.get("region"), 20), "public": b.get("public") is True,
+                    "notify": [str_or(x, 10) for x in b.get("notify")][:4] if isinstance(b.get("notify"), list) else []}
+            q = add_inquiry(text, form, loc)
             return self.send_json({"id": q["id"], "no": q["no"]})
-        if p == "/api/replay":
-            with lock:
-                start = not state.get("replaying") and state["replay_next"] < len(replay["replay"])
-                state["replaying"] = state.get("replaying") or start
-            if start:
-                threading.Thread(target=replay_loop, daemon=True).start()
-            return self.send_json({"ok": True})
         if p == "/api/reset":
             with lock:
                 state.clear()
-                state.update(inquiries=[], replay_next=0, replaying=False)
+                state.update(fresh_state())
                 save_state()
             return self.send_json({"ok": True})
-        m = re.fullmatch(r"/api/inquiries/([\w-]+)/(draft|approve|retry)", p)
+        m = re.fullmatch(r"/api/inquiries/([\w-]+)/(draft|approve|retry|relocate)", p)
         if not m:
             return self.send_json({"error": "없는 길"}, 404)
+        act = m.group(2)
         with lock:
             q = next((x for x in state["inquiries"] if x["id"] == m.group(1)), None)
             if q is None:
                 return self.send_json({"error": "없음"}, 404)
-            act = m.group(2)
             if act == "retry":
                 if q["kind"] != "failed":
                     return self.send_json({"error": "불러오지 못한 문의가 아님"}, 409)
                 q["kind"] = "making"
-                save_state()
             elif q["approved"]:
                 return self.send_json({"error": "이미 시민에게 보낸 답"}, 409)     # 되돌릴 수 없다
-            elif q["kind"] != "draft":
-                return self.send_json({"error": "초안이 없는 문의"}, 409)
+            elif act == "relocate":
+                if q["kind"] == "making":
+                    return self.send_json({"error": "초안을 만드는 중"}, 409)
+                pid, lon, lat = b.get("place"), num(b.get("lon")), num(b.get("lat"))
+                if isinstance(pid, str) and pid in places:
+                    loc = make_loc(0, 0, "staff", pid)
+                elif lon is not None and lat is not None and in_seoul(lon, lat):
+                    loc = make_loc(lon, lat, "staff")
+                else:
+                    return self.send_json({"error": "서울 안의 장소 필요"}, 400)
+                q["prev"] = {"kind": q["kind"], "card": q["card"], "loc": q["loc"]}
+                q["loc_from"] = q["loc_from"] or q["loc"]
+                q.update(loc=loc, kind="making", engine_text=engine_text(q["text"], loc))
+            elif q["kind"] not in ("draft", "out", "notfound"):
+                return self.send_json({"error": "답을 쓸 수 없는 상태"}, 409)
             else:
-                text = str(b.get("text") or "").strip()
+                text = str_or(b.get("text"), 3000)
                 if act == "approve" and not text:
                     return self.send_json({"error": "빈 답"}, 400)
                 q["draft"] = text or q["draft"]
                 if act == "approve":
-                    q["approved"] = {"text": text, "at": now(), "by": "처리담당자(시연)", "edited": text != q["card"]["answer"]}
-                save_state()
-        if act == "retry":
+                    reply = b.get("reply") if b.get("reply") in ("draft", "direct", "guide") else "direct"
+                    if q["kind"] != "draft":
+                        reply = "guide" if reply == "guide" else "direct"     # 초안이 없는 문의는 근거 조항 없이 나간다
+                    q["approved"] = {"text": text, "at": now(), "by": "처리담당자(시연)", "edited": text != (q["card"] or {}).get("answer"),
+                                     "reply": reply, "office": str_or(b.get("office"), 80)}
+            save_state()
+        if act in ("retry", "relocate"):
             threading.Thread(target=run_engine, args=(q["id"],), daemon=True).start()
         return self.send_json({"ok": True})
 
 
 def save_answers():
-    """시연 문의(재생 + 첫 장면)를 같은 통로(call_engine)로 엔진에 넣어 data/saved.json에 저장한다."""
-    items = [replay["core"], *replay["replay"]]
-    want = {it["text"] for it in items}
-    out = {t: r for t, r in saved.items() if t in want}   # 시연 세트에서 빠진 글의 답은 버리고, 이미 받은 답은 그대로 둔다
-    for item in items:
-        if item["text"] in out and "--all" not in sys.argv:
+    """시연 문의 47건과 장면마다 「접수 위치 + 두 시민 글」을 같은 통로(call_engine)로 엔진에 넣어 data/saved.json에 저장한다."""
+    texts = [p["text"] for p in presets["presets"]]
+    texts += [engine_text(presets["pair"]["text"], make_loc(0, 0, "here", s["place"])) for s in scenes.values()]
+    out = dict(saved)                         # 이미 받은 답은 그대로 둔다(--all이면 다시 받는다)
+    for t in texts:
+        if t in out and "--all" not in sys.argv:
             continue
-        res = call_engine(item["text"])
+        res = call_engine(t)
         if res["error"]:
-            print("못 받음:", item["set_id"], res["error"])
+            print("못 받음:", t[:30], res["error"])
             continue
-        res["at"] = now()
-        out[item["text"]] = res
-        print(item["set_id"], kind_of(res), res["sec"], "초", (res["response"].get("citation") or ["—"])[0])
+        res.update(at=now(), made_by=os.environ.get("DESK_MADE_BY", "새 흐름 7판"))
+        out[t] = res
+        print(kind_of(res), res["sec"], "초", (res["response"].get("citation") or ["—"])[0], "|", t[:30])
     SAVED_FILE.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("저장:", SAVED_FILE)
 
 
 def selftest():
     ok = {"response": {"answer": "네.", "citation": ["서울특별시 주차장 설치 및 관리 조례 제13조 제2항"], "source_url": "u", "effective_date": "2026-10-01"},
-          "trace": {"conclusion": "네", "evidence": [{"label": "[조항] 서울특별시 주차장 설치 및 관리 조례 제13조 제2항", "quote": "구절"}]}}
+          "trace": {"conclusion": "네", "evidence": [{"label": "[조항] 서울특별시 주차장 설치 및 관리 조례 제13조 제2항", "quote": "구절(※ 그 내용은 이 자료에 없다)"}]}}
     unk = {"answer": "확인 불가", "citation": [], "source_url": "", "effective_date": ""}
     assert kind_of(ok) == "draft"
-    assert kind_of({"response": unk, "trace": {"reason": "관할 밖"}}) == "out"
+    assert kind_of({"response": unk, "trace": {"reason": "6종 밖 조례"}}) == "out"
     assert kind_of({"response": unk, "trace": {"reason": "found 거짓"}}) == "notfound"
     assert kind_of({"response": unk, "trace": None}) == "notfound"                 # 네 칸만: 6종 밖이라 부르지 않는다
     assert kind_of({"response": unk, "trace": {"reason": "시간 초과"}}) == "failed"
@@ -369,12 +449,31 @@ def selftest():
     assert c["law"] == "서울특별시 주차장 설치 및 관리 조례" and c["article"] == "제13조 제2항" and c["quotes"] == ["구절"], c
     assert c["text"] and c["url"].startswith("https://www.law.go.kr"), c                    # 링크 · 시행일 · 원문은 자료에서
     assert card_of({"response": unk, "trace": {}})["answer"] is None
+    # 장소: 서울 안 · 밖, 이름 붙이기, 엔진에 보낼 글
+    sf, tt = places["seoulforest"], places["ttukseom-hangang"]
+    assert in_seoul(sf["lon"], sf["lat"]) and not in_seoul(127.11, 37.40)            # 판교는 서울 밖
+    assert make_loc(sf["lon"] + 0.002, sf["lat"], "here")["name"] == "서울숲"
+    assert make_loc(127.0, 37.62, "here")["name"] is None                            # 0.9km 안에 아는 장소 없음
+    pt = presets["pair"]["text"]
+    assert engine_text(pt, make_loc(0, 0, "here", "seoulforest")).startswith("서울숲에서 돗자리를")
+    assert engine_text(pt, make_loc(0, 0, "staff", tt["id"])).startswith("뚝섬한강공원에서 돗자리를")
+    assert engine_text("요금이 얼마인가요?", make_loc(0, 0, "map", "dongjak")) == "동작대교 공영주차장에서 요금이 얼마인가요?"
+    assert engine_text("동작대교 공영주차장 요금은?", make_loc(0, 0, "here", "dongjak")) == "동작대교 공영주차장 요금은?"
+    assert engine_text("요금은?", {**make_loc(0, 0, "here", "dongjak"), "how": "preset"}) == "요금은?"   # 47건은 기록한 글 그대로
+    # 두 시민 장면 · 47건은 미리 받은 답이 모두 있다
+    for s in scenes.values():
+        assert engine_text(pt, make_loc(0, 0, "here", s["place"])) in saved, s
+    st = fresh_state()
+    assert len(st["inquiries"]) == 47 and all(q["kind"] != "failed" for q in st["inquiries"]), [q["set_id"] for q in st["inquiries"] if q["kind"] == "failed"]
+    assert sum(q["source"] in ("real", "faq") for q in st["inquiries"]) == 30
     tb = text_bundle()
     assert tb["error"] is None and set(tb["text"]) == set(TEXT_FILES), tb["error"]
-    q = {"no": 1, "text": "t", "received": "x", "card": card_of(ok), "approved": None}
+    q = {"no": 1, "text": "t", "received": "x", "card": card_of(ok), "approved": None, "loc": None}
     assert citizen_view(q)["answer"] is None and citizen_view(q)["citations"] == []          # 승인 전 초안은 시민에게 가지 않는다
     print("server 스스로 시험 통과")
 
+
+state = load_state() or fresh_state()
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
@@ -382,7 +481,6 @@ if __name__ == "__main__":
     elif "--save" in sys.argv:
         save_answers()
     else:
-        with lock:
-            state["replaying"] = False
-        print(f"문의 답변 창구: http://127.0.0.1:{PORT}  · 엔진 {ENGINE_BASE} · 방식 {MODE}")
+        save_state()
+        print(f"문의 답변 창구: http://127.0.0.1:{PORT}  · 시민 화면 /citizen.html · 엔진 {ENGINE_BASE} · 방식 {MODE} · 위치 {LOC_MODE}")
         ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
