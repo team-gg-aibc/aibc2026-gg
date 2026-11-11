@@ -113,7 +113,7 @@ def fresh_state():
         apply_result(q, res, "saved")
         if p["approved"] and q["kind"] == "draft":
             q["approved"] = {"text": q["card"]["answer"], "at": (t0 - timedelta(minutes=11 * (n - i))).isoformat(timespec="seconds"),
-                             "by": "처리담당자(시연)", "edited": False, "reply": "draft", "office": ""}
+                             "by": "처리담당자(시연)", "edited": False, "reply": "draft"}
         inq.append(q)
     return {"v": 3, "inquiries": inq}
 
@@ -283,7 +283,6 @@ def citizen_view(q):
     cites = (q.get("card") or {}).get("citations") or []
     return {"no": q["no"], "text": q["text"], "title": (q.get("form") or {}).get("title", ""), "received": q["received"],
             "loc": q.get("loc_from") or q.get("loc"), "answer": a["text"] if a else None, "approved_at": a["at"] if a else None,
-            "office": a.get("office", "") if a else "",
             "citations": [{"label": c["label"], "effective": c["effective"]} for c in cites] if a and a.get("reply") == "draft" else []}
 
 
@@ -409,7 +408,7 @@ class Handler(SimpleHTTPRequestHandler):
                     if q["kind"] != "draft":
                         reply = "guide" if reply == "guide" else "direct"     # 초안이 없는 문의는 근거 조항 없이 나간다
                     q["approved"] = {"text": text, "at": now(), "by": "처리담당자(시연)", "edited": text != (q["card"] or {}).get("answer"),
-                                     "reply": reply, "office": str_or(b.get("office"), 80)}
+                                     "reply": reply}   # 시민 답의 담당부서 줄에는 기관 이름을 싣지 않는다(답한 곳처럼 읽혀서, 점검 11-11)
             save_state()
         if act in ("retry", "relocate"):
             threading.Thread(target=run_engine, args=(q["id"],), daemon=True).start()

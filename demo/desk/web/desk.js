@@ -48,7 +48,7 @@ function agencyOf(q) {
   const C = W('답변 초안').kv, p = q.loc && q.loc.place && S.places[q.loc.place];
   if (q.kind === 'out') {
     const info = p && p['6종 밖'];
-    return info ? { out: true, exact: true, law: info['조례'], url: info['원문'], dept: info['소관 부서'], agency: info['처리 기관'], cap: info['믿을 만한 정도'], why: info['근거'], links: [] }
+    return info ? { out: true, law: info['조례'], url: info['원문'], dept: info['소관 부서'], agency: info['처리 기관'], cap: info['믿을 만한 정도'], why: info['근거'], links: [] }
                 : { out: true, dept: '—', agency: C['처리 기관 확인 전'], cap: '', links: [] };
   }
   if (q.kind !== 'draft' || !q.card) return null;
@@ -56,14 +56,14 @@ function agencyOf(q) {
   if (!hit) return null;
   const { L, g } = hit, gu = (t) => /^자치구/.test(t || '');
   const place = g && g['장소에 따라'] && p && p['처리 장소'] ? L['장소별 처리 기관'].find((e) => e['장소'] === p['처리 장소']) : null;
-  let agency, agencyNote = '', cap = g ? g['믿을 만한 정도'] : '', exact = false;   // exact: 처리 기관이 한 곳으로 좁혀짐(시민 답의 담당부서 줄에 씀)
+  let agency, agencyNote = '', cap = g ? g['믿을 만한 정도'] : '';
   if (!g || !g['처리 기관']) { agency = C['처리 기관 확인 전']; cap = ''; }
-  else if (place) { agency = gu(place['처리 기관']) ? C['자치구가 처리'] : place['처리 기관']; cap = p['처리 장소 믿을 만한 정도'] || place['믿을 만한 정도']; exact = !gu(place['처리 기관']); }
+  else if (place) { agency = gu(place['처리 기관']) ? C['자치구가 처리'] : place['처리 기관']; cap = p['처리 장소 믿을 만한 정도'] || place['믿을 만한 정도']; }
   else if (g['자치구가 처리'] === '예') agency = C['자치구가 처리'];
-  else if (g['같은가'] === '같다') { agency = g['처리 기관']; agencyNote = C['소관 부서와 같음']; exact = true; }
+  else if (g['같은가'] === '같다') { agency = g['처리 기관']; agencyNote = C['소관 부서와 같음']; }
   else agency = g['처리 기관'];
   if (!place && g && g['자치구가 처리'] === '일부') agencyNote = C['자치구가 처리하기도 함'];
-  return { dept: L['소관 부서'], agency, agencyNote, cap, exact, gal: g && g['갈래'], why: g && g['근거'],
+  return { dept: L['소관 부서'], agency, agencyNote, cap, gal: g && g['갈래'], why: g && g['근거'],
            links: g ? [...new Map((g['출처'] || []).map((o) => [o['주소'], o])).values()] : [] };
 }
 const deptsOf = (q) => (q.kind === 'draft' && q.card ? [...new Set(q.card.citations.map((c) => (lawOf(c.law) || {})['소관 부서']).filter(Boolean))] : []);
@@ -555,14 +555,14 @@ function askApprove(q) {
   const back = () => { const r0 = document.querySelector('input[name="c-status"][value="0"]'); if (r0) r0.checked = true; };
   if (!text) { err.textContent = SIT()['답이 비어 있음']; err.hidden = false; back(); if (ta) ta.focus(); return; }
   err.hidden = true;
-  const dlg = $('dlg'), s = SIT(), a = agencyOf(q) || {};
+  const dlg = $('dlg'), s = SIT();
   $('dlg-text').textContent = s['승인 확인']; $('dlg-yes').textContent = s['승인 확인 · 보내기'];
   $('dlg-no').onclick = () => { dlg.close(); back(); };
   dlg.oncancel = () => back();
   $('dlg-yes').onclick = async () => {
     $('dlg-yes').disabled = $('dlg-no').disabled = true;
     try {
-      await api(`/api/inquiries/${q.id}/approve`, { text, reply: q.kind === 'draft' ? 'draft' : ui.reply[q.id], office: a.exact ? a.agency : (a.dept || '') });
+      await api(`/api/inquiries/${q.id}/approve`, { text, reply: q.kind === 'draft' ? 'draft' : ui.reply[q.id] });
       delete ui.dirty[q.id]; ui.editing[q.id] = false;
     } catch { back(); const e = $('c-err'); if (e) { e.textContent = s['승인하지 못함']; e.hidden = false; } }
     finally { $('dlg-yes').disabled = $('dlg-no').disabled = false; dlg.close(); }
