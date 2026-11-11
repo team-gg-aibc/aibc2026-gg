@@ -479,7 +479,7 @@ function bodyOf(q, o = {}) {   // o.compact(나란히 보기의 한 칸) · o.cm
     h += `<div class="gap"><p class="lead2">${esc(B.lead)}</p>${B.smalls.map((x) => `<p class="note">${esc(x)}</p>`).join('')}</div>`;
     if (law) h += `<h3><span>${esc(here(q, W('답변 초안').kv['근거 조항']))}${mark(d.cite, word)}</span></h3><div class="cite"><div class="lb">${esc(fill(O['근거 줄'], { 조례: shortLaw(law) }))}</div><p class="note">${esc(O['근거 설명'])}</p></div>`;
     if (k === 'out') h += agencyBlock(q, d, word, o.compact);
-    if (!o.compact) h += replyBlock(q) + (ui.reply[q.id] || q.approved ? statusBlock(q) : '');
+    if (!o.compact) h += replyBlock(q);
   } else {
     const dr = draftBlock(q, o.compact);
     h += dr.html + citesBlock(q, d, word, o.compact, dr.on) + agencyBlock(q, d, word, o.compact);
@@ -487,7 +487,6 @@ function bodyOf(q, o = {}) {   // o.compact(나란히 보기의 한 칸) · o.cm
       const past = !q.approved && pastFor(q), PA = W('지난번에 승인한 답');
       if (past) h += `<div class="past"><div class="t">${esc(fill(PA.kv['머리'], { 번호: past.no, 조항: `${shortLaw(past.card.citations[0].law)} ${past.card.citations[0].article}` }))}</div>
         <div class="a">${esc(past.approved.text)}</div><button type="button" class="outline" data-act="past" data-id="${past.id}">${esc(PA.btn()[0])}</button><p class="note">${esc(PA.smalls[0] || '')}</p></div>`;
-      h += statusBlock(q);
     }
   }
   if (prev && !o.compact && (d.cite || d.dept || d.agency)) h = `<p class="note">${esc(W('위치 바로잡기').kv['바뀜 설명'])}</p>` + h;
@@ -525,7 +524,9 @@ function renderCard(force) {
   if (!force && key === drawn.card) return;
   drawn.card = key; ui.lastKind = q.kind;
   const scroll = box.querySelector('.c-scroll'), top = scroll ? scroll.scrollTop : 0;
-  box.innerHTML = navBar(q) + `<div class="c-scroll">${head(q)}<div class="bd">${bodyOf(q)}</div></div>` + sourceLine(q);
+  // 처리 상태(승인)는 카드 아래 붙박이: 카드를 내리지 않아도 늘 보인다(시연 흐름 손질 2)
+  const st = q.kind === 'draft' || (['out', 'notfound'].includes(q.kind) && (ui.reply[q.id] || q.approved)) ? `<div class="c-status">${statusBlock(q)}</div>` : '';
+  box.innerHTML = navBar(q) + `<div class="c-scroll">${head(q)}<div class="bd">${bodyOf(q)}</div></div>` + st + sourceLine(q);
   if (!force) box.querySelector('.c-scroll').scrollTop = top;
   renderFix(q);
 }

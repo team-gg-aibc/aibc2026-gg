@@ -134,6 +134,9 @@ details.why a { color: var(--accent); word-break: break-all; }
 .past .t { color: var(--ink); font-size: 12px; font-weight: 800; }
 .past .a { margin: 4px 0 6px; color: var(--text); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .status { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.c-status { padding: 8px 14px 10px; border-top: 1px solid var(--line); background: var(--panel-solid); box-shadow: 0 -8px 14px -12px rgba(0, 0, 0, .35); }
+.c-status .status { margin: 0; padding: 0; border: 0; }
+.c-status h3 { margin: 0 0 2px; } .c-status .lead2 { margin: 0 0 6px; } .c-status .note { margin-top: 4px; } .c-status .okmsg { margin-top: 4px; }
 .radios { display: flex; gap: 6px; flex-wrap: wrap; }
 .radio { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 8px; border: 1px solid var(--line); font-weight: 700; color: var(--text); cursor: pointer; }
 .radio.on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
