@@ -1,0 +1,144 @@
+{
+  "run_id": "20261111-113024-82-place-scope-dev",
+  "group": "20261111-113024-82-place-scope-dev",
+  "repeat": 1,
+  "repeats": 1,
+  "created": "2026-11-11T11:47:14+09:00",
+  "experiment": {
+    "name": "82-place-scope",
+    "issue": "82",
+    "note": "#82 다른 조례가 다스리는 곳 가리기: 새 흐름 7판 + ③ 규칙 C(flow2_place_scope). 질문에 곳 표(engine/flow2/places.json: 한강공원 · 광장 여섯 · 청계천 · 노들섬)의 낱말이 있고, ③이 고른 조례가 모두 그 곳의 rivals(도시공원 조례)이며 고른 조례 원문에 그 낱말이 없으면 「6종 밖 조례」로 끝낸다. 나머지는 pm-flow2-v7.json과 같다",
+    "cycle": 3,
+    "file": "eval/configs/82-place-scope.json",
+    "file_sha": "bca2636b1fa4"
+  },
+  "conclusion": "채택 의견 — 문턱 통과: 장면 여덟 번 기대대로(한강공원 8/8 규칙 C로 확인 불가, 여의도공원은 규칙 C가 걸리지 않고 제22조로 답함 · ⑥ 판정 거절이 켠 판 · 7판 모두 가끔 남), 7판 기록에 대어 본 막은 정상 문항 dev 0 · 극한 0(막은 함정 극한 park-X032), 켠 판 dev 한 번 가중 95.5 · 오류 · 시간 초과 · 형식 오류 0, 규칙 C가 막은 dev 문항 0(기록 대어 보기와 같음)",
+  "lesson": [
+    "좋아짐: 6종 밖 조례가 따로 정의한 곳(한강공원 · 광장 여섯 · 청계천 · 노들섬)을 도시공원 조례로 답하던 질문을 ③에서 막는다(시연 장면 한강공원 0/4 → 확인 불가 8/8, 극한 park-X032). 나빠짐: 없음(dev 막은 문항 0)",
+    "곳 낱말만 보지 않고 「③이 고른 조례가 모두 rivals이고 그 원문에 낱말이 없을 때」만 막아서 금연 조례 한강공원 문항 · 목줄처럼 곳을 가리지 않는 조례 문항을 지킨다",
+    "가중 · 함정 · 과잉 포기 두 번씩은 배분일 합친 판에서 PM 쪽이 본다. 곳 표 SKIP(남산공원 · 동대문역사문화공원 등)은 도시공원이 될 수 있어 넣지 않았다. 「한강」 수상레저(T020)는 곳이 아니라 활동이라 이 규칙 밖"
+  ],
+  "args": {
+    "config": "eval/configs/82-place-scope.json",
+    "split": "dev",
+    "sample": null,
+    "seed": 0,
+    "mode": "full",
+    "url": null,
+    "workers": 4
+  },
+  "settings": {
+    "chat_model": "solar-pro4",
+    "embed_passage": "solar-embedding-2-passage",
+    "embed_query": "solar-embedding-2-query",
+    "temperature": 0.0,
+    "reasoning_effort": null,
+    "chunk_unit": "paragraph",
+    "top_k": 20,
+    "hybrid_cos_weight": 0.7,
+    "use_embedding": true,
+    "use_verify": true,
+    "min_score": 0.25,
+    "answer_prompt": "v2",
+    "verify_prompt": "v1",
+    "timeout_sec": 75,
+    "explore": false,
+    "exit_check": true,
+    "max_citations": 4,
+    "retry_budget": true,
+    "max_concurrent_calls": 6,
+    "on_deadline": "unknown",
+    "select_mode": "prefilter",
+    "prefilter_keep": 8,
+    "prefilter_empty_abstain": true,
+    "max_per_article": 0,
+    "group_by_article": true,
+    "gate": "off",
+    "question_fence": false,
+    "flow2_place_scope": true,
+    "flow": "flow2",
+    "flow2_ontology": true,
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10
+  },
+  "settings_hash": "520624d4e86c",
+  "switches": {
+    "flow2_place_scope": true,
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10
+  },
+  "env": {
+    "code_commit": "4eb11f6",
+    "code_hash": "28d567b6a509",
+    "eval_code_hash": "6697c84fa901",
+    "code_dirty": false,
+    "eval_commit": "17f8cc2",
+    "questions_hash": "8cf67c797eaa",
+    "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+    "retrieval_used": [
+      "hybrid"
+    ],
+    "key_present": true,
+    "server": null,
+    "python": "3.11.15",
+    "packages": {
+      "numpy": "2.2.6",
+      "openai": "3.39.0",
+      "requests": "2.34.2"
+    },
+    "platform": "Windows-10"
+  },
+  "metrics": {
+    "n": 661,
+    "n_gold": 619,
+    "n_trap": 42,
+    "weighted": 95.5,
+    "by_type": {
+      "단순": 98.0,
+      "조건": 95.5,
+      "결합": 91.6,
+      "함정": 97.6
+    },
+    "trap": 97.6,
+    "by_law": {
+      "animal": 95.5,
+      "bicycle": 99.4,
+      "common": 90.0,
+      "park": 94.2,
+      "parking": 94.0,
+      "smoking": 93.9,
+      "youth": 98.3
+    },
+    "over_abstain": 2.6,
+    "citations_per_answer": 1.62,
+    "retrieval_hit": 99.8,
+    "format_errors": 0,
+    "late": 0,
+    "over_90s": 0,
+    "timeouts": 0,
+    "errors": 0,
+    "latency_p50": 5.906,
+    "latency_p95": 9.12,
+    "latency_max": 19.606,
+    "causes": {
+      "후보에 있는데 잘못 고름": 20,
+      "판정이 맞는 답을 거절": 12,
+      "답이 있는데 확인 불가 (구절 불일치)": 3,
+      "정답이 후보에 없음": 2,
+      "함정에 답함": 1
+    }
+  },
+  "cost_usd": 1.3181,
+  "tokens": {
+    "in": 10440289,
+    "cached": 9027136,
+    "out": 301674
+  },
+  "calls": 2592,
+  "wall_sec": 1009.6,
+  "hashes": {
+    "retrieval": "b1eeb13fc3ea",
+    "answers": "0512d5895e34"
+  }
+}
