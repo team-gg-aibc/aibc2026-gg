@@ -30,3 +30,6 @@ eval/fresh_*.json
 
 # 채점 서버: 문항별 판단 기록(engine/server.py)
 logs/
+
+# 시연 화면(demo/desk): 서버가 저장하는 문의 · 승인 상태(시연할 때마다 바뀜)
+demo/desk/runtime/

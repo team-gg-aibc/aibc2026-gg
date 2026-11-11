@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>문의 답변 창구 (시연)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 화면 글자는 모두 /api/text(= docs/content/의 A-01_답변화면 · C-01_답변초안카드 · U-02_시민문의)에서 채운다. 이 파일에는 자리만 있다 -->
+<nav class="tabs" aria-label="화면 고르기">
+  <button type="button" data-tab="citizen" aria-pressed="false" id="tab-citizen"></button>
+  <button type="button" data-tab="staff" aria-pressed="true" id="tab-staff"></button>
+</nav>
+
+<div id="map" aria-hidden="true"></div>
+<p id="map-failed" class="map-failed" hidden></p>
+
+
+<main class="layout">
+  <!-- 시민 화면 (U-02) -->
+  <section class="phone" id="phone" aria-labelledby="u-title">
+    <div class="screen">
+      <header class="u-head"><h2 id="u-title"></h2><p id="u-lead"></p></header>
+      <section id="u-write">
+        <h3 id="u-write-h"></h3>
+        <label class="field"><span id="u-text-l"></span>
+          <textarea id="u-text" rows="5" maxlength="1000"></textarea></label>
+        <label class="field"><span id="u-place-l"></span><select id="u-place"></select></label>
+        <p class="note warn" id="u-privacy"></p>
+        <p class="err" id="u-err" role="alert" hidden></p>
+        <div class="u-btns"><button type="button" class="primary" id="u-send"></button><button type="button" class="ghost" id="u-example"></button></div>
+        <p class="note" id="u-demo"></p>
+      </section>
+      <section id="u-sent" hidden>
+        <h3 id="u-sent-h"></h3><p class="lead" id="u-sent-lead"></p>
+        <dl class="kv" id="u-sent-kv"></dl>
+      </section>
+      <section id="u-answer" hidden>
+        <h3 id="u-answer-h"></h3><p class="lead arrived" id="u-answer-lead" role="status"></p>
+        <dl class="kv" id="u-answer-kv"></dl>
+        <p class="note" id="u-answer-note"></p>
+        <button type="button" class="ghost" id="u-new"></button>
+      </section>
+    </div>
+  </section>
+
+  <!-- 담당자 답변 화면 (A-01) -->
+  <section class="panel inbox" id="inbox" aria-labelledby="a-title">
+    <header>
+      <h1 id="a-title"></h1>
+      <p class="lead" id="a-lead"></p>
+      <ul class="basis" id="a-basis"></ul>
+      <p class="engine" id="a-engine" role="status"></p>
+      <p class="err" id="a-text-err" role="alert" hidden></p>
+    </header>
+    <h2 id="list-h"></h2>
+    <p class="sub" id="list-lead"></p>
+    <div class="seg" role="group" id="views"></div>
+    <div class="chips" role="group" id="chips"></div>
+    <div class="row-btns"><button type="button" class="outline" id="btn-replay"></button><button type="button" class="ghost" id="btn-reset"></button></div>
+    <p class="note" id="list-note"></p>
+    <p class="msg" id="list-msg" role="status"></p>
+    <ol class="rows" id="rows" aria-busy="false"></ol>
+    <ul class="map-notes" id="map-notes"></ul>
+  </section>
+
+  <!-- 답변 초안 카드 (C-01) -->
+  <article class="panel card" id="card" hidden aria-live="off"></article>
+</main>
+
+<dialog id="dlg" aria-labelledby="dlg-text">
+  <p id="dlg-text"></p>
+  <div class="dlg-btns"><button type="button" class="outline" id="dlg-no"></button><button type="button" class="primary" id="dlg-yes"></button></div>
+</dialog>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>

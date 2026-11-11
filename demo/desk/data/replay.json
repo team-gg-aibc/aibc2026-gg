@@ -1,0 +1,71 @@
+{
+ "note": "시연 문의. V = 가상 문의(NVIDIA Nemotron-Personas-Korea, CC BY 4.0을 바탕으로 만든 것), R = 공개 게시판 글의 요지(이름 · 전화 · 차량번호 없음). set_id는 _orch-tools/reports/문의세트/의 번호. core는 시민 화면 첫 장면에 쓰는 대본 문의다.",
+ "core": {
+  "set_id": "R02",
+  "text": "동작대교 공영주차장에서 직원이 퇴근한다고 2시간 요금을 선불로 받았는데, 안 쓴 한 시간 요금은 환불되나요?",
+  "source": "real",
+  "place": "dongjak"
+ },
+ "replay": [
+  {
+   "set_id": "R05",
+   "text": "마른내길 공영주차장에서 운영 끝나는 시간까지 요금을 미리 내라고 하던데, 원래 그렇게 선결제하는 게 맞나요?",
+   "source": "real",
+   "place": "marunnae"
+  },
+  {
+   "set_id": "V038",
+   "text": "아들 차 타고 남산 위까지 올라가 보려는데, 남산공원은 차 들어가면 통행료 받나요?",
+   "source": "virtual",
+   "place": "namsan"
+  },
+  {
+   "set_id": "V063",
+   "text": "우리 집 대문 앞에 모르는 차가 이틀째 서 있어서 제 차를 못 빼요. 견인해 달라고 할 수 있나요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "V051",
+   "text": "아이 데리고 서울형 키즈카페 가는데 입구 앞에서 어른들이 담배를 피워요. 키즈카페 근처도 금연구역인가요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "V005",
+   "text": "차 몰고 가서 지하철역 옆 공영주차장에 세워 두고 지하철로 갈아타면 할인된다던데, 환승한 건 어떻게 확인받아요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "R29",
+   "text": "고양이 모래가 섞인 배설물은 어떻게 버려야 하나요?",
+   "source": "real",
+   "place": null
+  },
+  {
+   "set_id": "V043",
+   "text": "지금 서른여섯인데 서울시 청년 정책은 몇 살까지 신청할 수 있어요? 군대 다녀온 건 따로 쳐 주나요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "V011",
+   "text": "포메라니안 중성화 수술을 막 끝냈는데 이제 동물등록 하려고요. 중성화했으면 등록비 깎아준다는 게 맞나요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "V071",
+   "text": "연남동 골목 술집들이 새벽 두 시까지 시끄러워서 잠을 못 자요. 가게 소음은 어디에 신고해요?",
+   "source": "virtual",
+   "place": null
+  },
+  {
+   "set_id": "V025",
+   "text": "구의역 자전거 거치대에 바람 빠진 자전거가 몇 달째 묶여 있어요. 버린 것 같은데 구청에서 치워 가나요?",
+   "source": "virtual",
+   "place": "guui"
+  }
+ ]
+}
