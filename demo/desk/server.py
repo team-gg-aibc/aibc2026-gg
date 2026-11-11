@@ -94,15 +94,14 @@ def call_engine(text):
     """→ {"response", "trace"(없으면 None), "sec", "error"(없으면 None)}. 예외를 밖으로 내지 않는다."""
     t0 = time.time()
     try:
-        if engine["trace"] is not False:
-            try:
-                d = post(ENGINE_BASE + "/ask/trace", {"question": text})
-                engine["trace"] = True
-                return {"response": d["response"], "trace": d["trace"], "sec": round(time.time() - t0, 1), "error": None}
-            except urllib.error.HTTPError as e:
-                if e.code not in (404, 405):
-                    raise
-                engine["trace"] = False          # 채점 서버처럼 /ask만 있는 엔진
+        try:                                 # 문의마다 기록 길부터 불러 본다(엔진을 바꿔 띄워도 화면 서버를 다시 띄울 필요가 없게)
+            d = post(ENGINE_BASE + "/ask/trace", {"question": text})
+            engine["trace"] = True
+            return {"response": d["response"], "trace": d["trace"], "sec": round(time.time() - t0, 1), "error": None}
+        except urllib.error.HTTPError as e:
+            if e.code not in (404, 405):
+                raise
+            engine["trace"] = False          # 채점 서버처럼 /ask만 있는 엔진
         d = post(ENGINE_BASE + "/ask", {"question": text})
         return {"response": d, "trace": None, "sec": round(time.time() - t0, 1), "error": None}
     except Exception as e:  # noqa: BLE001  연결 실패 · 시간 초과 · 깨진 응답 → 「불러오지 못함」
