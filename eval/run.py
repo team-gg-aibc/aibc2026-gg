@@ -4,6 +4,7 @@
   python3 eval/run.py --config eval/configs/<실험>.json --split dev            끝까지 (키 필요)
   python3 eval/run.py --config eval/configs/baseline.json --sample 100 --repeat 3   흔들림 폭
   python3 eval/run.py --check eval/runs/<실행>.json   재현 점검: 같은 조건으로 다시 돌려 그때 결과와 견줌
+  python3 eval/run.py --regrade eval/results/<실행>.jsonl   지난 기록을 지금 정답 표기 · 채점 규칙으로 다시 채점(모델 호출 없음)
   python3 eval/run.py --url http://localhost:8000/ask --split kit   서버로 (응답만, 틀린 원인은 못 나눔)
   python3 eval/run.py --selftest
 
@@ -106,8 +107,19 @@ def score_answer(preds, gold):
 
 
 # ---- 문항 고르기 ----
-GRAY = "[회색지대]"
-GRAY_LABEL = re.compile(r"서울특별시 [^,·—(]*?조례 (?:제\d+조(?:의\d+)?(?: 제\d+항)?|별표 ?\d*)")   # note의 「후보 조항: A, B」에서 조항 이름
+GRAY = "[회색지대]"                       # 정답 꼴을 아직 정하지 않아 점수에서 빼는 문항(note의 표시)
+# 11-11에 받은 답대로 정답 표기를 고친 문항(note의 표시). 고치기 전 기준의 점수도 함께 내려고 남긴다(before).
+WAS_OUT = "[고침 11-11: 전에는 뺌]"       # 회색지대였던 문항: 그때는 점수에서 뺐고 지금은 근거 조항 인용이 정답
+WAS_TRAP = "[고침 11-11: 전에는 함정]"    # 그때는 「확인 불가」가 정답이던 문항
+TRAP = "근거 없음 (함정)"
+
+
+def before(q):
+    """11-11에 정답 표기를 고치기 전의 (유형, gold). 그때 점수에서 빼던 문항이면 None."""
+    note = q.get("note", "")
+    if WAS_OUT in note:
+        return None
+    return (TRAP, []) if WAS_TRAP in note else (q["type"], q["gold"])
 
 
 def load(split):
@@ -115,15 +127,14 @@ def load(split):
     mix = 조례 원문에서 새로 쓴 섞인 질문 · 없는 조 번호 · 틀린 전제 · 행위 주체 함정(PM 별도 실험 flow2 2판 확인, eval/mix_*.json).
     fresh = 조례 원문에서 새로 쓴 일반 묶음(단순 · 조건 · 결합 · 함정, PM 별도 실험 flow2 3판의 「고칠 때 안 본 세트」, eval/fresh_*.json).
     para · mix · fresh 파일은 레포에 없을 수 있다(eval/README.md 「파일」 표). 문항이 0개면 돌지 않고 멈춘다.
-    gray = dev의 회색지대 문항만. 11-11 업스테이지 답 1-(1)대로 「근거 조항 인용」을 정답으로 보고 잰다(문항 파일은 그대로 두고,
-    note의 「후보 조항」 가운데 하나면 정답). dev 점수와 섞지 않는다."""
+    gray = dev 가운데 회색지대였던 문항만(11-11에 「근거 조항 인용」을 정답으로 정한 32문항, dev에도 들어 있다). 엔진이 값 · 세부가
+    조례에 없는 질문에 어떻게 답하는지만 빨리 볼 때 쓴다."""
     pattern = {"dev": "questions_*.json", "holdout": "questions_*.json", "stress": "stress_*.json", "gray": "questions_*.json",
                "kit": "kit_questions.json", "para": "para_*.json", "mix": "mix_*.json", "fresh": "fresh_*.json"}[split]
     files = sorted(EVAL.glob(pattern))
     qs = [q for f in files for q in json.loads(f.read_text(encoding="utf-8"))]
     if split == "gray":
-        return [dict(q, type="단순 조회", gold=[[x.strip() for x in GRAY_LABEL.findall(q["note"].split("후보 조항:")[1])]])
-                for q in qs if GRAY in q.get("note", "") and q.get("split") == "dev"]
+        return [q for q in qs if WAS_OUT in q.get("note", "") and q.get("split") == "dev"]
     qs = [q for q in qs if GRAY not in q.get("note", "")
           and (split not in ("dev", "holdout") or q.get("split") == split)]
     if not qs:      # 없는 묶음을 고르면 0문항으로 오류 없이 끝나던 것을 막는다
@@ -165,6 +176,20 @@ def law(q):
 
 
 # ---- 한 문항 ----
+def points(gold, citation, unknown, dead, rule):
+    """한 문항 점수. dead = 오류 · 90초 넘음 · 꼴 오류(0점). gold가 비면 함정: 「확인 불가」 + 빈 인용이어야 1점."""
+    if dead:
+        return 0.0
+    return rule(citation, gold) if gold else float(unknown)
+
+
+def both(q, citation, unknown, dead):
+    """→ (받은 규칙 점수, 11-11 전 기준 점수, 11-11 전 유형). 11-11 전 = 고치기 전 정답 표기 + 킷 채점식. 그때 빼던 문항은 None."""
+    old = before(q)
+    return (points(q["gold"], citation, unknown, dead, score_answer),
+            None if old is None else points(old[1], citation, unknown, dead, score_citation), old and old[0])
+
+
 def grade(q, resp, tr, sec, err, cfg):
     """대회 규칙으로 채점하고 틀린 원인을 붙인다. tr(판단 기록)이 있으면 엔진을 직접 부른 것."""
     timeout = tr is not None and sec > cfg["timeout_sec"]
@@ -178,10 +203,7 @@ def grade(q, resp, tr, sec, err, cfg):
     slow = sec > LIMIT_SEC
     late = slow and not cfg["explore"]   # 탐색 모드는 90초를 넘어도 점수에서 빼지 않는다(시간은 기록만)
     broken = bool(err) or not fmt_ok or (tr is not None and tr["reason"] == pipeline.ERROR)
-    if q["gold"]:
-        score = 0.0 if err or late or not fmt_ok else score_answer(resp["citation"], q["gold"])
-    else:
-        score = 1.0 if unknown and not err and not late else 0.0
+    score, score_before, type_before = both(q, resp["citation"] if shape else [], unknown, bool(err) or late or not fmt_ok)
     cand = None
     if tr is not None and tr["candidates"] and q["gold"]:
         cand = score_citation([c["label"] for c in tr["candidates"]], q["gold"])
@@ -208,7 +230,8 @@ def grade(q, resp, tr, sec, err, cfg):
         else:
             cause = "틀림 (판단 기록 없음)"
     return {"id": q["id"], "type": q["type"], "law": law(q), "question": q["question"], "gold": q["gold"],
-            "answer_key": q.get("answer_key", ""), "score": score, "cand": cand, "unknown": unknown,
+            "answer_key": q.get("answer_key", ""), "score": score, "score_before": score_before, "type_before": type_before,
+            "cand": cand, "unknown": unknown,
             "fmt_ok": fmt_ok, "slow": slow, "late": late, "timeout": timeout, "error": err or (tr and tr["error"]),
             "sec": round(sec, 3), "cause": cause, "response": resp, "trace": tr}
 
@@ -269,6 +292,13 @@ def nearest_rank(sorted_xs, p):
     return sorted_xs[max(0, math.ceil(p * len(sorted_xs)) - 1)] if sorted_xs else None
 
 
+def weigh(items):
+    """[(유형, 점수)] → (가중, 유형별). 네 유형이 다 있어야 가중이 나온다."""
+    by_type = {TYPES[t]: pct(s for u, s in items if u == t) for t in TYPES if any(u == t for u, _ in items)}
+    full = all(by_type.get(k) is not None for k in WEIGHTS)
+    return (round(sum(WEIGHTS[k] * by_type[k] for k in WEIGHTS) / sum(WEIGHTS.values()), 1) if full else None), by_type
+
+
 def summarize(rows, mode, top_k):
     if mode == "retrieval":
         rows = [r for r in rows if r["gold"]]
@@ -278,14 +308,16 @@ def summarize(rows, mode, top_k):
                 "by_law": {k: pct(r["hits"][str(top_k)] for r in rows if r["law"] == k)
                            for k in sorted({r["law"] for r in rows})}}
     gold = [r for r in rows if r["gold"]]
-    by_type = {TYPES[t]: pct(r["score"] for r in rows if r["type"] == t) for t in TYPES if any(r["type"] == t for r in rows)}
+    weighted, by_type = weigh([(r["type"], r["score"]) for r in rows])
+    old = [(r["type_before"], r["score_before"]) for r in rows if r.get("score_before") is not None]
+    w0, bt0 = weigh(old)
     secs = sorted(r["sec"] for r in rows)
     answered = [r for r in rows if r["fmt_ok"] and not r["unknown"]]
     causes = Counter(r["cause"] for r in rows if r["cause"])
     return {"n": len(rows), "n_gold": len(gold), "n_trap": len(rows) - len(gold),
-            "weighted": round(sum(WEIGHTS[k] * by_type[k] for k in WEIGHTS) / sum(WEIGHTS.values()), 1)
-            if all(by_type.get(k) is not None for k in WEIGHTS) else None,
-            "by_type": by_type, "trap": by_type.get("함정"),
+            "weighted": weighted, "by_type": by_type, "trap": by_type.get("함정"),
+            # 11-11에 정답 표기와 채점 규칙을 고치기 전 기준으로 같은 응답을 채점한 값(그때 빼던 문항은 뺀다). 앞선 실행과 견줄 때 쓴다
+            "before": {"n": len(old), "weighted": w0, "by_type": bt0},
             "by_law": {k: pct(r["score"] for r in gold if r["law"] == k) for k in sorted({r["law"] for r in gold})},
             "over_abstain": pct(r["unknown"] for r in gold),
             "citations_per_answer": round(sum(len(r["response"]["citation"]) for r in answered) / len(answered), 2)
@@ -375,6 +407,10 @@ def show(s):
         print("  적중률 " + " · ".join(f"top-{k} {v}%" for k, v in m["hit"].items()))
         print("  유형별 top-%d: %s" % (s["settings"]["top_k"], " · ".join(f"{k} {v}%" for k, v in m["by_type"].items())))
     else:
+        if m.get("before", {}).get("n"):
+            b = m["before"]
+            print(f"  [11-11 전 기준으로는] 가중 {b['weighted']} · " + " · ".join(f"{k} {v}" for k, v in b["by_type"].items())
+                  + f" · {b['n']}문항 (고치기 전 정답 표기 + 킷 채점식. 앞선 실행과는 이 줄로 견준다)")
         print(f"  가중 {m['weighted']} · " + " · ".join(f"{k} {v}" for k, v in m["by_type"].items())
               + f" · 과잉 포기 {m['over_abstain']}% · 인용 수 {m['citations_per_answer']}")
         print(f"  지연 95% {m['latency_p95']}초 · 형식 오류 {m['format_errors']} · 90초 넘음 {m.get('over_90s')}"
@@ -485,6 +521,35 @@ def check(args):
     sys.exit(0 if same else 1)
 
 
+def regrade(paths):
+    """지난 실행의 문항별 기록(eval/results/<실행>.jsonl)을 지금 정답 표기 · 채점 규칙으로 다시 채점한다. 모델을 부르지 않는다.
+    한 실행의 기록만 준다(그때 빼고 잰 문항을 따로 잰 기록이 있으면 함께). 기록에 없는 문항은 0점이 아니라 빼고 계산한다."""
+    rows = [json.loads(x) for p in paths for x in Path(p).read_text(encoding="utf-8").splitlines() if x.strip()]
+    ids = [r["id"] for r in rows]
+    if len(ids) != len(set(ids)):
+        sys.exit("✗ 같은 문항이 두 번 들어 있습니다. 한 실행의 기록만 주세요(반복 실행은 하나씩).")
+    split = max(("dev", "stress", "kit"), key=lambda s: len({q["id"] for q in load(s)} & set(ids)))
+    qs = {q["id"]: q for q in load(split)}
+    new, old = [], []
+    for r in rows:
+        q = qs.get(r["id"])
+        if q is None:                     # 지금 그 묶음에 없는 문항
+            continue
+        resp = r["response"] if isinstance(r["response"], dict) else {}
+        cites = resp.get("citation") if isinstance(resp.get("citation"), list) else []
+        dead = (r["trace"] is None and bool(r["error"])) or r["late"] or not r["fmt_ok"]
+        s1, s0, t0 = both(q, cites, r["unknown"], dead)
+        new.append((q["type"], s1))
+        if s0 is not None:
+            old.append((t0, s0))
+    absent = len(qs) - len(new)
+    print(f"{split} {len(new)}/{len(qs)}문항" + (f" (이 기록에 없는 {absent}문항은 빼고 계산)" if absent else ""))
+    for name, items in (("받은 규칙 (지금 정답 표기 + 11-11 채점 규칙)", new), ("11-11 전 기준 (고치기 전 정답 표기 + 킷 채점식)", old)):
+        w, bt = weigh(items)
+        print(f"  {name}: 가중 {w} · " + " · ".join(f"{k} {v}" for k, v in bt.items()) + f" · {len(items)}문항")
+    return weigh(new), weigh(old)
+
+
 # ---- 스스로 시험 ----
 class _Fake:
     """가짜 업스테이지: 근거 1 · 3번을 고르고 grounded라고 판정한다. 「따릉이」가 든 질문은 근거 없음."""
@@ -526,9 +591,10 @@ def selftest():
     assert score_answer([], [[a]]) == 0.0 and score_answer([a], []) is None
     labels = {c["label"] for c in retrieve.load("paragraph")[0]}
     assert not any(outside(x) for x in labels)                                       # 6종 색인 라벨은 하나도 걸리지 않는다
-    gray = load("gray")     # 회색지대 묶음: dev만, 문항마다 정답 근거(색인에 있는 조항)가 하나 이상, dev 묶음과 겹치지 않는다
-    assert gray and all(q["split"] == "dev" and q["gold"][0] and set(q["gold"][0]) <= labels for q in gray)
-    assert not {q["id"] for q in gray} & {q["id"] for q in load("dev")}
+    gray = load("gray")     # 회색지대였던 문항: dev 안에 있고, 정답 근거(색인에 있는 조항)가 있고, 11-11 전에는 점수에서 뺐다
+    assert gray and all(q["gold"] and set(q["gold"][0]) <= labels and before(q) is None for q in gray)
+    assert {q["id"] for q in gray} <= {q["id"] for q in load("dev")}
+    assert not any(GRAY in q.get("note", "") for s in ("dev", "stress", "gray") for q in load(s))
 
     qs = [{"id": f"x-{t}{i}", "type": t} for t in TYPES for i in range(25)]
     s0 = sample(qs, 20, 0)
@@ -572,7 +638,14 @@ def selftest():
     guided = dict(unk, answer="확인 불가. 이 내용은 도로교통법에서 정합니다.")    # 11-11 답 3번: 확인 불가로 시작 + 빈 인용이면 뒤 안내가 있어도 정답
     assert grade(trap_q, guided, tr(), 1, None, cfg)["score"] == 1.0 and grade(trap_q, dict(guided, citation=[a]), tr(), 1, None, cfg)["score"] == 0.0
     assert grade(gold_q, guided, tr(pipeline.NOT_FOUND), 1, None, cfg)["score"] == 0.0    # 답 1번: 근거가 있는 문항에 확인 불가면 0점
-    assert grade(gold_q, dict(ok, citation=[a, c3, c9, c18]), tr(), 1, None, cfg)["score"] == 0.75      # 답 2번: 인용이 너무 많으면 깎인다
+    r = grade(gold_q, dict(ok, citation=[a, c3, c9, c18]), tr(), 1, None, cfg)      # 답 2번: 인용이 너무 많으면 깎인다(11-11 전 기준으로는 만점)
+    assert (r["score"], r["score_before"], r["type_before"]) == (0.75, 1.0, "조건 판단")
+    was_trap, was_out = dict(gold_q, note=WAS_TRAP + " …"), dict(gold_q, note=WAS_OUT + " …")       # 11-11에 정답 표기를 고친 문항
+    r = grade(was_trap, unk, tr(pipeline.NOT_FOUND), 1, None, cfg)
+    assert (r["score"], r["score_before"], r["type_before"]) == (0.0, 1.0, TRAP)      # 확인 불가: 지금은 0점, 그때는 정답
+    r = grade(was_trap, ok, tr(), 1, None, cfg)
+    assert (r["score"], r["score_before"]) == (1.0, 0.0)                               # 인용해 답함: 지금은 정답, 그때는 함정에 답함
+    assert grade(was_out, ok, tr(), 1, None, cfg)["score_before"] is None             # 그때 점수에서 빼던 문항
     r = grade(trap_q, ok, tr(), 80, None, cfg)          # 75초 넘으면 서버가 확인 불가로 답한다
     assert r["score"] == 1.0 and r["timeout"] and r["sec"] == 75
     assert grade(gold_q, ok, tr(), 80, None, cfg)["cause"] == TIMEOUT
@@ -588,6 +661,9 @@ def selftest():
     rows = [grade(gold_q | {"type": t}, ok, tr(), 1, None, cfg) for t in list(TYPES)[:3]] + [grade(trap_q, unk, tr(), 1, None, cfg)]
     m = summarize(rows, "full", 6)
     assert m["weighted"] == 100.0 and m["over_abstain"] == 0.0 and m["citations_per_answer"] == 1.0
+    assert m["before"] == {"n": 4, "weighted": 100.0, "by_type": m["by_type"]}
+    m2 = summarize(rows + [grade(was_out, ok, tr(), 1, None, cfg), grade(was_trap, ok, tr(), 1, None, cfg)], "full", 6)
+    assert m2["n"] == 6 and m2["weighted"] == 100.0 and m2["before"]["n"] == 5 and m2["before"]["by_type"]["함정"] == 50.0
     m = summarize(rows[:3] + [grade(trap_q, ok, tr(), 1, None, cfg)], "full", 6)
     assert m["weighted"] == round(900 / 11, 1) and m["causes"] == {TRAP_ANSWERED: 1}
     assert nearest_rank(list(range(1, 101)), 0.95) == 95
@@ -627,11 +703,15 @@ def main():
     ap.add_argument("--workers", type=int, help="동시에 돌릴 문항 수 (기본: 엔진 직접 4, --url이면 대회 채점기처럼 2)")
     ap.add_argument("--max-cost", type=float, help="한 실행에 쓸 최대 달러(기본: 상한 없음, 동규 11-06). 넘으면 남은 문항을 건너뛴다")
     ap.add_argument("--check", help="재현 점검할 실행 요약 파일 (eval/runs/*.json)")
+    ap.add_argument("--regrade", nargs="+", metavar="JSONL",
+                    help="지난 실행의 문항별 기록(eval/results/<실행>.jsonl)을 지금 정답 표기 · 채점 규칙으로 다시 채점(모델 호출 없음)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     args.workers = args.workers or (URL_WORKERS if args.url else 4)
     if args.selftest:
         selftest()
+    elif args.regrade:
+        regrade(args.regrade)
     elif args.check:
         check(args)
     else:
