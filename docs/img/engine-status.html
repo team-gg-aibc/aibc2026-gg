@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>엔진, 지금 어디까지 왔나</title>
+<!--
+  docs/img/engine-status.png의 원본이다. 회의 문서(docs/meetings/)와 엔진 문서에서 이 그림을 쓴다.
+  숫자는 docs/engine/flow2.md 1절 · docs/engine/scoring-rules.md 1절 · docs/engine/releases.md와 같게 쓴다.
+  「PM 쪽 측정」은 PM 쪽이 잰 값이다. 「11/13 낮에 채움」 자리는 3주기 결과가 나오면 고치고 PNG를 다시 만든다.
+  글꼴: 제목 도현체(Do Hyeon), 본문 Pretendard. 컴퓨터에 깔려 있어야 한다.
+  PNG 다시 만들기 (레포 맨 위 폴더에서, 맥): bash docs/img/render.sh
+  글이 길어져 맨 아래 줄이 잘리면 .page의 height와 render.sh의 창 높이를 함께 늘린다.
+-->
+<style>
+:root{
+  --bg:#F6F4EF; --ink:#1D2230; --muted:#596070; --line:#E3DED2; --card:#FFFFFF;
+  --orange:#C2410C; --orange-l:#FFEDE0;
+  --blue:#1864AB; --blue-l:#E6EFFA;
+  --green:#2B7A3B; --green-l:#E6F4E9;
+  --violet:#5F3DC4; --violet-l:#EFEAFD;
+  --gray:#8A919E; --gray-l:#ECE8DD;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg)}
+body{font-family:"Pretendard",sans-serif;color:var(--ink);font-size:28px;line-height:1.4;word-break:keep-all;-webkit-font-smoothing:antialiased}
+b,strong{font-weight:700}
+.nb{white-space:nowrap}
+.page{width:1080px;height:2340px;padding:48px 56px 34px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.label{font-weight:700;font-size:23px;letter-spacing:.06em;color:var(--muted)}
+h1{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:72px;line-height:1.1;margin:4px 0 0}
+.sub{font-size:27px;color:var(--muted);margin-top:4px}
+h2{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:42px;line-height:1.15;margin:6px 0 0;display:flex;align-items:center;gap:12px}
+h2::before{content:"";width:11px;height:34px;border-radius:6px;background:var(--ink)}
+.note{font-size:23px;color:var(--muted);line-height:1.4}
+
+/* 점수 막대 */
+.bars{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:14px 20px;display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:center}
+.bar .name{font-size:24px;line-height:1.25}
+.bar .name small{display:block;font-size:20px;color:var(--muted)}
+.track{position:relative;height:44px;background:#F1EEE6;border-radius:10px}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:10px;background:var(--c)}
+.val{position:absolute;top:0;bottom:0;display:flex;align-items:center;font-weight:700;font-size:25px;padding:0 12px;white-space:nowrap}
+.val.in{right:0;color:#fff}
+.val.out{color:var(--ink)}
+.todo .track{background:repeating-linear-gradient(135deg,#F1EEE6 0 14px,#E7E3D8 14px 28px)}
+.todo .val{left:0;color:var(--muted);font-weight:600}
+
+/* 단계 */
+.flow{display:flex;flex-direction:column;gap:7px}
+.step{display:grid;grid-template-columns:214px 1fr;gap:14px;align-items:start;background:var(--card);border-radius:18px;padding:10px 16px 10px 14px;border-left:10px solid var(--c)}
+.stage{font-weight:700;font-size:25px;line-height:1.25}
+.stage small{display:block;font-weight:600;font-size:20px;color:var(--c)}
+.does{font-size:23px;line-height:1.34;color:var(--muted)}
+.fix{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:6px}
+.who{display:inline-block;font-size:22px;line-height:1.28;border-radius:11px;padding:5px 11px;font-weight:600}
+.who b{font-weight:700}
+.team{background:var(--blue-l);color:var(--blue)}
+.pm{background:var(--orange-l);color:var(--orange)}
+.spare{background:var(--gray-l);color:#4A5160}
+.m{--c:var(--violet)}
+.c{--c:var(--green)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:21px}
+.across{background:var(--orange-l);border:2px dashed #E9B594;border-radius:16px;padding:10px 16px;font-size:23px;line-height:1.36;color:#7A2C0A}
+.across b{color:var(--orange)}
+
+/* 앞으로 */
+.road{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.stop{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:10px 10px 12px;text-align:center;position:relative}
+.stop .d{font-weight:700;font-size:23px;color:var(--c)}
+.stop .t{font-family:"Do Hyeon",sans-serif;font-size:31px;line-height:1.12;margin-top:2px}
+.stop .s{font-size:19.5px;line-height:1.3;color:var(--muted);margin-top:4px}
+.stop.now{border-color:var(--blue);background:var(--blue-l)}
+.o{--c:var(--orange)} .b{--c:var(--blue)} .g{--c:var(--green)} .v{--c:var(--violet)}
+.plan{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:10px 18px;font-size:23px;line-height:1.36}
+.plan .tag{display:inline-block;background:var(--orange-l);color:var(--orange);font-weight:700;font-size:20px;border-radius:9px;padding:2px 9px;margin-right:8px}
+
+.foot{margin-top:auto;font-size:22px;color:var(--muted);border-top:2px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;gap:20px}
+</style>
+</head>
+<body>
+<section class="page" id="p1">
+  <div>
+    <div class="label">TEAM GG · 엔진 상황 한 장 · 11/11 기준</div>
+    <h1>엔진, 지금 어디까지 왔나</h1>
+    <div class="sub">점수는 우리 평가셋(dev)의 가중 점수예요. 100점 만점.</div>
+  </div>
+
+  <h2>점수는 이렇게 움직였어요</h2>
+  <div class="bars">
+    <div class="bar" style="--c:var(--gray)"><div class="name">출발 판<small>스타터 킷 그대로 · 11/6</small></div><div class="track"><div class="fill" style="width:68.1%"></div><div class="val in" style="right:31.9%">68.1</div></div></div>
+    <div class="bar" style="--c:var(--gray)"><div class="name">지금 흐름<small>1주기 채택분을 켠 판 · 11/10</small></div><div class="track"><div class="fill" style="width:76.9%"></div><div class="val in" style="right:23.1%">76.9</div></div></div>
+    <div class="bar" style="--c:var(--blue)"><div class="name"><b>새 흐름 7판</b><small>3주기부터 팀 실험의 바탕</small></div><div class="track"><div class="fill" style="width:95.65%"></div><div class="val in" style="right:4.35%">95.9 · 95.4</div></div></div>
+    <div class="bar" style="--c:var(--orange)"><div class="name"><b>받은 규칙으로 다시 본 7판</b><small>11/11 업스테이지 답 · PM 쪽 측정</small></div><div class="track"><div class="fill" style="width:92.75%"></div><div class="val in" style="right:7.25%">93.0 · 92.5</div></div></div>
+    <div class="bar todo"><div class="name">3주기 채택분을 합친 판</div><div class="track"><div class="val">11/13 낮에 채움</div></div></div>
+  </div>
+  <div class="note">점 둘은 같은 판을 두 번 잰 값이에요. 받은 규칙으로 내려간 까닭: 조문은 있는데 금액이 조례에 없는 질문 32개 가운데 28~29개를 「확인 불가」로 냈어요. 이런 질문은 조항을 인용해 답해야 해요(지금 흐름은 같은 규칙으로 74.8 · 74.7). 어려운 문항만 모은 극한 세트는 지금 흐름 64.7 · 60.8 → 새 흐름 88.2 · 88.8이에요.</div>
+
+  <h2>다섯 단계와 지금 고치는 곳</h2>
+  <div class="legend"><span class="who team"><b>팀원</b> 3주기 실험</span><span class="who pm"><b>PM 쪽</b> 실험</span><span class="who spare"><b>예비</b> 끝 보고를 올린 사람이 가져감</span></div>
+  <div class="flow">
+    <div class="step m"><div class="stage">① 질문 분석<small>모델</small></div><div><div class="does">답하지 않고 질문을 칸으로 풀어요: 묻는 대상, 알고 싶은 것, 조례 이름, 지역.</div></div></div>
+    <div class="step c"><div class="stage">③ 조례 확정<small>코드</small></div><div><div class="does">읽을 조례를 정하고, 6종 밖 조례나 자치구 것을 물으면 여기서 끝내요.</div>
+      <div class="fix"><span class="who team"><b>동욱 #82</b> 한강공원처럼 다른 조례가 다스리는 곳 가리기</span></div></div></div>
+    <div class="step m"><div class="stage">④ 조례 읽기 · 답 쓰기<small>모델</small></div><div><div class="does">고른 조례의 원문 전체를 읽고 답과 근거 조항을 내요.</div>
+      <div class="fix"><span class="who team"><b>종희 #81</b> 물음이 둘인 질문의 근거를 빠짐없이</span><span class="who pm"><b>PM 쪽</b> 온톨로지로 근거 조항 고르기</span><span class="who spare"><b>예비 #85</b> 읽기 단계에만 생각하기</span></div></div></div>
+    <div class="step c"><div class="stage">⑤ 구절 관문<small>코드</small></div><div><div class="does">근거로 옮긴 구절이 조례 원문에 글자 그대로 있는지 대조해요.</div>
+      <div class="fix"><span class="who spare"><b>예비 #84</b> 맞는 인용을 버리지 않게</span></div></div></div>
+    <div class="step m"><div class="stage">⑥ 마지막 검사<small>모델</small></div><div><div class="does">남은 근거가 질문이 묻는 것을 정말 정하고 있는지 판정해요.</div>
+      <div class="fix"><span class="who pm"><b>PM 쪽</b> 「조례에 정해져 있지 않다」고 맞게 쓴 답 살리기</span></div></div></div>
+    <div class="step c"><div class="stage">출력<small>코드</small></div><div><div class="does">답 · 인용 · 원문 링크 · 시행일 네 칸으로 내보내요.</div>
+      <div class="fix"><span class="who team"><b>건영 #83</b> 답 첫머리에 「네 · 아니요」 붙이기, 답 글 재는 틀</span></div></div></div>
+  </div>
+  <div class="across"><b>PM 쪽 · 같은 문의를 다시 넣으면 답이 바뀌는 문제</b>는 모델을 부르는 세 단계(① · ④ · ⑥)에 걸쳐 있어요. 같은 호출을 세 번 불러 과반으로 정하면 두 번 넣어 같은 근거가 나오는 비율이 75~77% → 81~82%, 점수는 그대로, 비용은 2.9배예요(PM 쪽 측정).</div>
+  <div class="note">팀원 실험 셋과 예비의 결과 · 채택 판단은 <b>11/13 낮에 채워요.</b> PM 쪽 실험은 모두 새 스위치이고 기본값은 7판 그대로예요.</div>
+
+  <h2>앞으로</h2>
+  <div class="road">
+    <div class="stop now b"><div class="d">11/11 ~ 12</div><div class="t">3주기</div><div class="s">지금. 끝 보고 11/12 24:00</div></div>
+    <div class="stop b"><div class="d">11/13 ~ 14</div><div class="t">4주기</div><div class="s">배정은 11/13 낮에 글로 알려요</div></div>
+    <div class="stop v"><div class="d">날짜는 회의에서</div><div class="t">낼 판</div><div class="s">정하고 채점 서버에 올리기</div></div>
+    <div class="stop o"><div class="d">11/19 (목)</div><div class="t">사전 점검</div><div class="s">업스테이지가 공개 예시 문항으로 불러요</div></div>
+    <div class="stop g"><div class="d">11/22 (일) 24:00</div><div class="t">제출</div><div class="s">채점 API 주소. 마감 뒤 한 번 채점</div></div>
+  </div>
+  <div class="plan"><span class="tag">동규 안 · 11/13 회의에서 논의</span>팀 전체가 엔진에 집중하는 기간은 이번 주(11/14 토)까지로 하고, 다음 주 한 주(11/16~)는 서비스를 실제로 만드는 데 집중해요.</div>
+
+  <div class="foot"><span>자세히: docs/engine/flow2.md · scoring-rules.md</span><span>물을 것은 디스코드에</span></div>
+</section>
+</body>
+</html>
