@@ -11,8 +11,8 @@
 2. 인용을 비우지 않는다. 호출이 늦거나 깨지거나 「직접」이 하나도 없으면 7판 인용 그대로 나간다.
 3. 붙는 조항은 같은 조례 안의 조 · 항 · 별표뿐이고, 붙인 까닭(원문 구절)을 판단 기록 flow2.cite에 남긴다.
 4. 합쳐 3개까지(LIMIT). 대회 채점은 「정답 근거 수 + 2개」까지 감점이 없어, 정답 근거가 1개인 문항도 3개까지는 안전하다.
-함께 켤 때: 맡긴 답 살리기(flow2_handed)가 살린 답도 「⑥을 지난 답」으로 이 단계에 온다. 그 스위치가 켜져 있으면 「조례에 정해져 있지
-않다 + 누가 정한다」 꼴 답이 기대는 조항(맡기는 구절이 든 조항)은 덜어 내지 않는다(_handed_label). 출력 저장(flow2_memo)이 켜져 있으면 다시 고르기 호출도 적어 둔다. 다수결(flow2_votes)은 이 호출에 걸리지 않는다.
+함께 켤 때: 맡긴 답 살리기(flow2_handed)가 살린 답도 「⑥을 지난 답」으로 이 단계에 온다. 그 답을 살린 근거 조항(맡기는 구절이 든 조항,
+판단 기록 flow2.handed.label)은 덜어 내지 않는다(_handed_label). 출력 저장(flow2_memo)이 켜져 있으면 다시 고르기 호출도 적어 둔다. 다수결(flow2_votes)은 이 호출에 걸리지 않는다.
 규칙과 프롬프트는 조례 원문의 구조에서만 만들었다. 끈 판(7판)의 인용은 판단 기록 flow2.gate.kept의 앞 네 개로 되살릴 수 있다.
 
 스스로 시험(키 없이, 몇 초): python -m engine.flow2.cite --selftest
@@ -125,17 +125,15 @@ def _mode(cfg):
     return mode or ""
 
 
-def _handed_label(st, cfg, kept):
-    """맡긴 답 살리기(flow2_handed)가 켜져 있고 답이 「조례에 정해져 있지 않다 + 누가 · 어느 법령이 정한다」 꼴이면, 그 답이 기대는 조항
-    (맡기는 구절이 든 조항)을 지킬 조항으로 돌려준다. ⑥이 거절해 살린 답이든 ⑥이 통과시킨 답이든 같다. 가리는 법은 flow.handed_over 그대로."""
+def _handed_label(st):
+    """맡긴 답 살리기(flow2_handed)가 ⑥의 거절을 되돌린 답이면, 그 답을 살린 근거 조항(맡기는 구절이 든 조항)을 지킬 조항으로 돌려준다.
+    그 답은 그 조항의 「따로 정한다」가 곧 답이라, 다시 고르기가 「참고」로 봐도 덜어 내지 않는다. ⑥이 스스로 통과시킨 답은 보통 규칙대로다
+    (답 글의 꼴만 보고 넓게 지키던 첫 규칙은 「그 밖의 사항은 규칙으로 정한다」고 덧붙인 보통 답까지 잡았다. dev 실행마다 7~9답)."""
     from . import flow
-    mode = cfg.get("flow2_handed")
-    if not mode:
-        return set()
-    hit = flow.handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in set(kept)], law=mode == "law")
-    if hit:
-        flow._f2(st)["cite"]["protect"] = hit[0]
-    return {hit[0]} if hit else set()
+    label = (flow._f2(st).get("handed") or {}).get("label")
+    if label:
+        flow._f2(st)["cite"]["protect"] = label
+    return {label} if label else set()
 
 
 # ---- 단계 둘 (flow.STAGES에 끼운다) ----
@@ -171,7 +169,7 @@ def settle(st, cfg):
                 if box.get("flow2"):
                     flow._f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
                 rec["roles"] = roles
-                out = choose(kept, labels, roles, protect=_handed_label(st, cfg, kept)) or kept
+                out = choose(kept, labels, roles, protect=_handed_label(st)) or kept
         if "fill" in mode:
             out, rec["filled"] = fill(out)
     except FutureTimeout:
@@ -283,12 +281,8 @@ def selftest():
         assert pipeline.answer(qb, dict(both, flow2_cite=None))[0]["citation"] == [who, rate]        # 근거 정리를 끄면 살린 답의 인용 그대로
         assert t["flow2"]["cite"]["protect"] == rate
         plan["target_check"] = {"reason": "", "asks": [{"ask": "감면율", "verdict": "grounded"}], "done": True}
-        assert pipeline.answer(qb, both)[0]["citation"][:2] == [who, rate]                           # ⑥이 통과시킨 「맡긴 답」도 그 조항을 지킨다
-        r, t = pipeline.answer(qb, dict(both, flow2_handed=False))
-        assert r["citation"][0] == who and rate not in r["citation"] and "protect" not in t["flow2"]["cite"]   # 살리기를 끄면 보통 규칙대로(곁가지 항은 던다)
-        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="감면 대상자는 청소년 등입니다.")
-        assert rate not in pipeline.answer(qb, both)[0]["citation"]                                  # 「맡긴 답」 꼴이 아니면 지키지 않는다
-        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer=say)
+        r, t = pipeline.answer(qb, both)                                                             # ⑥이 스스로 통과시킨 답은 보통 규칙대로(곁가지 항은 던다)
+        assert r["citation"][0] == who and rate not in r["citation"] and "protect" not in t["flow2"]["cite"] and "handed" not in t["flow2"], r
         # 출력 저장(flow2_memo)과 함께: 같은 문의를 다시 넣으면 다시 고르기도 부르지 않고 같은 인용을 낸다
         memo = dict(cfg, flow2_cite="pick+fill", flow2_memo=":memory:")
         r1, t1 = pipeline.answer(q2 := "서울 공공자전거 요금 감면율은 누가 정해요?", memo)
