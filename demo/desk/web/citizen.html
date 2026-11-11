@@ -103,7 +103,7 @@ select.in { appearance: auto; }
       <div class="form">
         <div class="tr"><label class="th" for="gu"><span id="l-gu"></span><em>*</em></label><div class="td"><select class="in" id="gu"></select><div class="cnt" id="gu-from"></div></div></div>
         <div class="tr"><div class="th" id="l-loc-th"><span id="l-loc"></span><em>*</em></div><div class="td">
-          <div class="mini" id="mini" aria-hidden="true"></div><div class="attr">© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors</div>
+          <div class="mini" id="mini" aria-hidden="true" hidden></div><div class="attr" id="mini-attr" hidden>© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors</div>
           <div class="locline" id="locline" role="status"></div>
           <p class="err" id="locwarn" role="alert"></p>
           <div class="sbtns"><button type="button" class="sbtn" id="b-here"></button><button type="button" class="sbtn navy" id="b-pick"></button></div>
@@ -194,7 +194,7 @@ function placeText() {
   const g = $('gu').value; $('gu').innerHTML = `<option value="">${esc(b['선택'])}</option>` + GU.map((x) => `<option>${x}</option>`).join(''); $('gu').value = g;
   $('l-loc').textContent = b['민원 장소']; $('loc-why').textContent = b['위치 목적'];
   const bs = U('민원내용').items.filter((i) => i.kind === '버튼').map((i) => i.text);
-  $('b-here').textContent = bs[0]; $('b-pick').textContent = bs[1]; $('b-example').textContent = bs[2];
+  $('b-pick').textContent = bs[1]; $('b-example').textContent = bs[2]; hereLabel();
   $('l-title').textContent = b['제목']; $('title').placeholder = b['제목 예시'];
   $('l-text').textContent = b['내용']; $('text').placeholder = b['내용 예시'];
   $('l-file').textContent = b['첨부파일']; $('file').textContent = b['첨부 없음'];
@@ -215,16 +215,25 @@ function placeText() {
 const counts = () => { $('title-n').textContent = fill(B()['제목 글자'], { n: $('title').value.length }); $('text-n').textContent = fill(B()['내용 글자'], { n: $('text').value.length.toLocaleString() }); };
 
 // ---- 민원 장소
+const hereLabel = () => { $('b-here').textContent = U('민원내용').items.filter((i) => i.kind === '버튼')[0].parts[cur ? 1 : 0]; };   // 「현재 위치로 지정」 · 위치가 정해지면 「… 다시 지정」
+function clearLoc() {   // 실제 방식: 위치를 아직 묻지 않은 처음 상태(화면을 열 때 묻지 않고, 단추를 누를 때 묻는다)
+  cur = null; $('mini').hidden = $('mini-attr').hidden = true;
+  $('locline').textContent = B()['장소 정하기 안내']; $('locwarn').textContent = ''; $('gu-from').textContent = '';
+  hereLabel();
+}
 function setLoc(c, how) {   // 고른 자리를 칸에 채움. 서울 밖이면 안내하고 「지도에서 직접 지정」으로 이끔
   const b = B(), ok = inRing(c, RING), { p, text } = label(c);
   cur = ok ? { lon: c[0], lat: c[1], how, demo: LOC === 'demo' && how === 'here' } : null;
-  if (!mini) { mini = flatMap('mini', c, 15, false); miniMk = new maplibregl.Marker({ element: mkEl(), anchor: 'bottom' }).setLngLat(c).addTo(mini); }
+  const shown = !$('mini').hidden; $('mini').hidden = $('mini-attr').hidden = false;
+  if (!mini) { mini = flatMap('mini', c, 15, false); miniMk = new maplibregl.Marker({ element: mkEl(), anchor: 'bottom' }).setLngLat(c).addTo(mini); } else if (!shown) mini.resize();
   mini.jumpTo({ center: c, zoom: 15 }); miniMk.setLngLat(c);
   miniMk.getElement().querySelector('.nm').textContent = ok ? (p ? p.name : '') : b['서울 밖'];
   $('locline').innerHTML = ok ? `<b>${esc(text)}</b> <span>· ${esc(how === 'here' ? b['현재 위치'] : b['지도에서 지정'])}</span>` : `<b>${esc(b['서울 밖'])}</b>`;
   $('locwarn').textContent = ok ? '' : sit()['서울 밖'];
   if (ok && p && p.gu) { $('gu').value = p.gu; $('gu-from').textContent = b['장소에서 채움']; } else $('gu-from').textContent = '';
+  hereLabel();
 }
+const startLoc = () => { if (!window.maplibregl) return; if (LOC === 'demo') locate(); else clearLoc(); };   // 시연 방식만 자리를 채운 채로 연다
 function locate() {
   const b = B();
   if (LOC === 'demo') { const p = S0.places[SC.place]; return setLoc([p.lon, p.lat], 'here'); }   // 시연: 장면마다 정한 자리를 현재 위치로
@@ -232,7 +241,7 @@ function locate() {
   if (!navigator.geolocation) return fail();
   navigator.geolocation.getCurrentPosition((p) => setLoc([p.coords.longitude, p.coords.latitude], 'here'), fail, { enableHighAccuracy: true, timeout: 8000 });
 }
-function fail() { cur = null; $('locline').innerHTML = `<b>${esc(B()['쓸 수 없음'])}</b>`; $('locwarn').textContent = sit()['위치 허락 안 함']; }
+function fail() { cur = null; $('locline').innerHTML = `<b>${esc(B()['쓸 수 없음'])}</b>`; $('locwarn').textContent = sit()['위치 허락 안 함']; hereLabel(); }
 
 // ---- 지도에서 직접 지정(평면 지도)
 function openPick() {
@@ -262,7 +271,7 @@ function search() {
 // ---- 등록 · 보낸 문의 · 받은 답
 async function send() {
   const s = sit(), err = $('send-err'), title = $('title').value.trim(), text = $('text').value.trim();
-  const miss = !cur ? [s['장소 없음'], 'b-pick'] : !title ? [s['제목 없음'], 'title'] : !text ? [s['내용 없음'], 'text'] : !$('agree').checked ? [s['동의 안 함'], 'agree'] : null;
+  const miss = !cur ? [s['장소 없음'], 'b-here'] : !title ? [s['제목 없음'], 'title'] : !text ? [s['내용 없음'], 'text'] : !$('agree').checked ? [s['동의 안 함'], 'agree'] : null;
   if (miss) { err.textContent = miss[0]; $(miss[1]).focus(); return; }
   err.textContent = ''; const b = $('b-send'); b.disabled = true; b.textContent = s['보내는 중'];
   try {
@@ -310,7 +319,7 @@ function bind() {
     document.querySelectorAll('#p-res button').forEach((x) => x.setAttribute('aria-pressed', x === b)); big.flyTo({ center: [p.lon, p.lat], zoom: 15 }); choose([p.lon, p.lat]); };
   $('p-cancel').onclick = () => view('write');
   $('p-ok').onclick = () => { if (picked) { view('write'); setLoc(picked, 'map'); mini.resize(); } };
-  $('s-new').onclick = $('a-new').onclick = () => { ss.set(null); lastShown = ''; view('write'); locate(); };
+  $('s-new').onclick = $('a-new').onclick = () => { ss.set(null); lastShown = ''; view('write'); startLoc(); };
 }
 
 (async function main() {
@@ -323,7 +332,7 @@ function bind() {
   SC = S0.scenes[SCENE];
   placeText();
   view('write');
-  if (window.maplibregl) locate();
+  startLoc();
   await showMine();
   setInterval(showMine, 1500);
   window.CIT = { get cur() { return cur; }, choose: (c) => choose(c), setLoc, get LOC() { return LOC; } };   // 점검용
