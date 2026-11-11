@@ -16,7 +16,7 @@ body { margin: 0; background: #e9ebef; color: var(--tx); font: 14px/1.55 "Preten
 .phone { max-width: 460px; min-height: 100vh; padding-bottom: 24px; margin: 0 auto; background: #fff; box-shadow: 0 0 0 1px #d9dce2; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.demo { background: #222; color: #fff; font-size: 12px; text-align: center; padding: 6px 10px; margin: 0; }
+.demo { position: sticky; top: 0; z-index: 10; background: #222; color: #fff; font-size: 12px; text-align: center; padding: 6px 10px; margin: 0; }   /* 내려 읽어도 늘 보이게(점검 11-11 밤) */
 .gnb { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--ln); }
 .gnb b { font-size: 17px; letter-spacing: -.02em; } .gnb span { font-size: 12px; color: var(--tx3); }
 .wrap { padding: 16px 16px 40px; }
