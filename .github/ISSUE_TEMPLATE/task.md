@@ -20,7 +20,7 @@ labels: []
 
 ## 앞뒤 맥락
 <!-- 필수. 처음 보는 사람이 이 글만 보고 시작할 수 있게 여섯 줄을 다 쓴다. 공통 설명은 링크로 두고, 이 이슈에 해당하는 것을 쓴다. -->
-- 대회와 채점: <이 일이 닿는 채점 항목 한두 줄>. 전체 설명은 [앞뒤 맥락](https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/work-method.md#앞뒤-맥락)
+- 대회와 채점: <이 일이 닿는 채점 항목 한두 줄>. 전체 설명은 [앞뒤 맥락](https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/work-method.md#앞뒤-맥락), 11/11에 받은 채점 규칙은 [받은 규칙](https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/engine/scoring-rules.md)(엔진 · 평가 · 답 글을 고치기 전에 읽는다)
 - 우리 팀 방식: 2일 주기로 실험하고, 배분일에 결과를 모아 다음 가설을 나눈다. 보고 · 이어받기는 [일하는 방식](https://github.com/team-gg-aibc/aibc2026-gg/blob/main/docs/work-method.md)
 - 지금 엔진 상태: <리더보드의 지금 main 줄: 가중 점수 · 적중률 · 커밋. 이 일에 닿는 약점(몇 문항이 왜 틀리나)>
 - 이 일이 고치는 것: <어느 단계의 어떤 실패를 줄이나. 실제 질문 하나로 예를 든다. 고장이면 조건 → 재현 단계 → 실제 결과 vs 기대 결과>

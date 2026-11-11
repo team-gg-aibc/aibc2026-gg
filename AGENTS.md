@@ -29,7 +29,7 @@
 | `docs/schedule.md` | 일정과 불참 |
 | `docs/` | 문제 정의, PRD, 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
 | `engine/` | 엔진 코드. 돌리는 법은 `engine/README.md` |
-| `docs/engine/` | 엔진 계획(`plan.md`), 새 흐름 한 장(`flow2.md`, 3주기부터 팀 실험의 바탕), 재는 순서와 기록 남기는 법(`reproducibility.md`), 리더보드(`leaderboard.md`) |
+| `docs/engine/` | 엔진 계획(`plan.md`), 받은 채점 · 서버 · 제출 규칙(`scoring-rules.md`, 엔진 · 평가 · 답 글을 고치기 전에 읽는다), 새 흐름 한 장(`flow2.md`, 3주기부터 팀 실험의 바탕), 재는 순서와 기록 남기는 법(`reproducibility.md`), 리더보드(`leaderboard.md`) |
 | `eval/` | 평가셋(문제집), 점수 재는 도구, 실험 설정 파일(`eval/configs/`). 평가셋 쓰는 법은 `eval/README.md` |
 | `demo/` | 시연 화면 (한강 3D 상황판) |
 | `app/` | 코드 (구현을 시작하면 만든다) |
@@ -59,7 +59,8 @@
 2. `docs/decisions.md`: 정한 것. 어긋나는 일이면 멈추고 PM에게 묻는다
 3. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
 4. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
-5. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
+5. 엔진 · 평가셋 · 채점 도구 · 답 글 · 채점 서버를 고치는 일이면 `docs/engine/scoring-rules.md`: 11/11에 받은 채점 · 서버 · 제출 규칙이다. 고치기 전에 그 문서 0절의 여섯 물음에 답하고, 끝 보고에 해당 절의 「스스로 확인하는 법」 결과를 붙인다
+6. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
 
 맡은 이슈가 없으면 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`)로 지금 어디까지 왔는지 보고 PM에게 묻는다.
 
@@ -84,10 +85,10 @@
 
 ```text
 너는 팀 GG(AIBC2026 업스테이지 트랙)의 엔진 실험을 돕는 AI야. 내 이슈는 #<번호>야.
-1. 코드를 고치기 전에 AGENTS.md를 읽고, 6절 「AI 세션 시작 순서」대로 docs/decisions.md → docs/work-method.md → 이슈 #<번호>(맨 위 「앞뒤 맥락」부터 본문과 댓글 전부) → engine/README.md → docs/engine/reproducibility.md를 읽어. 새 흐름 위의 실험(3주기부터)이면 docs/engine/flow2.md도 읽어.
+1. 코드를 고치기 전에 AGENTS.md를 읽고, 6절 「AI 세션 시작 순서」대로 docs/decisions.md → docs/work-method.md → 이슈 #<번호>(맨 위 「앞뒤 맥락」부터 본문과 댓글 전부) → docs/engine/scoring-rules.md(받은 채점 규칙) → engine/README.md → docs/engine/reproducibility.md를 읽어. 새 흐름 위의 실험(3주기부터)이면 docs/engine/flow2.md도 읽어.
 2. 다 읽으면 코드는 아직 고치지 말고 다섯 가지를 답해: ① 이 이슈의 가설 한 문장 ② 켜고 끌 스위치 이름과 고칠 파일 ③ 「하지 않을 것」 ④ 완료 조건과 잴 명령 ⑤ 모르는 것 · 헷갈리는 것.
 3. 이 이슈에 앞선 작업(시작 보고 · 브랜치 · draft PR)이 이미 있으면 새로 만들지 말고 docs/work-method.md 6절 순서로 그 브랜치에서 이어서 해. 처음 시작이면, 내가 확인한 뒤 시작 보고를 docs/work-method.md 3절 틀대로 만들어 이슈에 댓글로 올리고 시작해: 첫 줄 **[보고] 시작**, 그 다섯 줄, 맨 끝 「- 마감까지:」(지킬 수 있음 · 어려움 · 모름 중 하나는 나에게 물어서). 브랜치는 main에서 영문이름/<번호>-짧은설명으로 만들고 첫 push 때 draft PR을 열어.
-4. 이슈 범위 밖으로 넓혀야 하거나 docs/decisions.md와 어긋나면 멈추고 나에게 물어. 실험은 설정 스위치로만 켜고, 점수는 eval/run.py로만 재(끈 판과 재는 법은 이슈의 「재는 법」대로. 따로 적혀 있지 않으면 dev 전체, 켠 판 · 끈 판 각각 두 번).
+4. 이슈 범위 밖으로 넓혀야 하거나 docs/decisions.md와 어긋나면 멈추고 나에게 물어. 엔진 · 평가 · 답 글을 고치기 전에 docs/engine/scoring-rules.md 0절의 여섯 물음에 답하고, 받은 규칙과 어긋나는 변경이면 멈추고 나에게 물어. 실험은 설정 스위치로만 켜고, 점수는 eval/run.py로만 재(끈 판과 재는 법은 이슈의 「재는 법」대로. 따로 적혀 있지 않으면 dev 전체, 켠 판 · 끈 판 각각 두 번).
 5. 끝낼 때는 push하고 「[보고] 세션 끝」 댓글 초안을 나에게 먼저 보여 줘.
 ```
 
@@ -109,6 +110,7 @@
 - 이미 있는 코드 · 부품과 같은 일을 하는 것을 새로 만듦
 - 화면 문구를 코드에 직접 적음 (`docs/content/`에서 가져와야 함)
 - 바깥 서비스(국가법령정보 API, Upstage) 호출을 정해 둔 한 곳 밖에서 함
+- 받은 채점 규칙(`docs/engine/scoring-rules.md`)을 어김: 6종 조례가 다루는 질문을 「확인 불가」로 보내는 규칙 · 프롬프트를 과잉 포기 측정 없이 더함, 인용 상한을 올리거나 인용을 늘리면서 인용 수를 재지 않음, 인용에 조례명이 빠지거나 6종 밖 법령 · 자치구 조례 · 규칙이 들어갈 길이 생김, 업스테이지 것이 아닌 모델을 엔진에 넣음(그 문서 7절)
 
 ### 더 조심해서 볼 곳
-- 근거 조항을 찾고 붙이는 코드, 프롬프트, 평가 질문 세트: 바꾸면 근거 정확도가 흔들린다. 바뀐 출력 예시가 PR 「검증」에 있는지 본다
+- 근거 조항을 찾고 붙이는 코드, 프롬프트, 평가 질문 세트: 바꾸면 근거 정확도가 흔들린다. 바뀐 출력 예시가 PR 「검증」에 있는지 본다. 받은 채점 규칙(`docs/engine/scoring-rules.md`)의 「스스로 확인하는 법」 결과(과잉 포기 · 인용 수)가 함께 있는지도 본다
