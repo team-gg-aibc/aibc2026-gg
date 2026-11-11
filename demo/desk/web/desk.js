@@ -613,7 +613,13 @@ function cardClick(e) {
   if (act === 'retry') { b.disabled = true; return api(`/api/inquiries/${q.id}/retry`, {}).catch(() => {}).then(refresh); }
 }
 // 새로 생긴 글 칸(직접 답 · 처리 기관 안내 답 · 가져와 고치기 · 글 고치기)으로 카드를 내리고 초점을 준다(시연 흐름 손질 4)
-function toText() { const ta = $('c-text'); if (!ta) return; ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); ta.focus({ preventScroll: true }); }
+// 부드러운 스크롤(scrollIntoView smooth)은 화면이 그려질 때마다 조금씩 옮겨서, 앱 안 브라우저가 뒤에 있으면 맨 위에 멈춰 있었다(11-12) — 누르는 순간 바로 옮긴다
+function toText() {
+  const ta = $('c-text'), sc = ta && ta.closest('.c-scroll');
+  if (!ta) return;
+  if (sc) { const r = ta.getBoundingClientRect(), v = sc.getBoundingClientRect(); sc.scrollTop += r.top - v.top - Math.max(12, (v.height - r.height) / 2); }
+  ta.focus({ preventScroll: true });
+}
 function saveDraft(q) { const ta = $('c-text'); if (ta) ui.dirty[q.id] = ta.value; if (ui.dirty[q.id] != null && !q.approved) api(`/api/inquiries/${q.id}/draft`, { text: ui.dirty[q.id] }).catch(() => {}); }
 
 // ---- 새 문의 알림 · 갱신
