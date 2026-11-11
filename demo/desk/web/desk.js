@@ -359,6 +359,8 @@ function openPair(id) {
   requestAnimationFrame(() => relayout(true));
 }
 const mark = (on, word) => (on ? `<span class="chg">${esc(word)}</span>` : '');
+// 「이 위치 기준」은 위치를 실제로 엔진에 넘겨 받은 답에만(시민 접수 · 담당자 바로잡기 + 이름 있는 장소). 처음 47건은 글만 넘겼다
+const here = (q, label) => (q.loc && ['here', 'map', 'staff'].includes(q.loc.how) && q.loc.name ? `${label} · ${W('답변 초안').kv['이 위치 기준']}` : label);
 function locRow(q, compact) {
   const C = W('답변 초안').kv, L = q.loc || {}, name = L.name || C['이름 없는 자리'];
   const how = L.how === 'here' ? C['현재 위치'] + (L.demo ? ` · ${C['시연용 자리']}` : '') : L.how === 'map' ? C['지도에서 지정']
@@ -384,13 +386,13 @@ function prevOf(q) { return q.prev && q.loc && q.loc.how === 'staff' && q.kind !
 function agBox(q, d, word) {
   const a = agencyOf(q), O = W('6종 밖').kv;
   if (!a || !a.law) return '';
-  return `<div class="agbox"><div class="k">${esc(O['처리 기관 머리'])}${mark(d.agency, word)}</div><div class="v">${esc(a.agency)}</div>
+  return `<div class="agbox"><div class="k">${esc(here(q, O['처리 기관 머리']))}${mark(d.agency, word)}</div><div class="v">${esc(a.agency)}</div>
     <div class="r">${esc(fill(O['다른 조례'], { 조례: a.law, 부서: a.dept }))}</div>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(O['다른 조례 원문'])}</a>` : ''}</div>`;
 }
 function citesBlock(q, d, word, compact, on) {
   const C = W('답변 초안').kv, c = q.card, V = W('답변 초안').tab('초안의 결론');
   const verdict = c.conclusion && V[c.conclusion] && !V[c.conclusion].startsWith('[') ? `<p class="note">${esc(fill(C['판정'], { 판정: V[c.conclusion] }))}</p>` : '';
-  return `<h3><span>${esc(C['근거 조항'])}${mark(d.cite, word)}</span><span class="r">${esc(C['근거 조항 작은 글'])}</span></h3>${compact ? '' : verdict}
+  return `<h3><span>${esc(here(q, C['근거 조항']))}${mark(d.cite, word)}</span><span class="r">${esc(C['근거 조항 작은 글'])}</span></h3>${compact ? '' : verdict}
     ${c.citations.map((x, ci) => `<div class="cite${on && on.ci === ci ? ' on' : ''}"><div class="lb">${esc(shortLaw(x.law))} ${esc(x.article)}<span>${esc(fill(C['시행일'], { 날짜: x.effective || '—' }))}</span></div>
       ${x.quotes.length ? x.quotes.slice(0, compact ? 1 : 9).map((t, qi) => `<blockquote class="${on && on.ci === ci && on.qi === qi ? 'on' : ''}">${esc(t)}</blockquote>`).join('')
         : `<p class="note">${esc(C['원문 구절 없음'])}</p><blockquote class="full">${esc(x.text || '—')}</blockquote>`}
@@ -400,7 +402,7 @@ function agencyBlock(q, d, word, compact) {
   const C = W('답변 초안').kv, a = agencyOf(q);
   if (!a) return '';
   const capNote = a.cap && C[a.cap] && !C[a.cap].startsWith('[') ? C[a.cap] : '';
-  return `<h3><span>${esc(C['소관 처리'])}</span></h3><dl class="kv">
+  return `<h3><span>${esc(here(q, C['소관 처리']))}</span></h3><dl class="kv">
       <dt>${esc(C['소관 부서'])}</dt><dd>${esc(a.dept)}${mark(d.dept, word)}</dd>
       <dt>${esc(C['처리 기관'])}</dt><dd>${esc(a.agency)}${mark(d.agency, word)}${a.agencyNote ? `<span class="note">${esc(a.agencyNote)}</span>` : ''}${capNote && !compact ? `<span class="note">${esc(capNote)}</span>` : ''}</dd>
       ${a.gal && !compact ? `<dt>${esc(C['일의 갈래'])}</dt><dd>${esc(a.gal)}</dd>` : ''}</dl>
@@ -470,7 +472,7 @@ function bodyOf(q, o = {}) {   // o.compact(나란히 보기의 한 칸) · o.cm
     const law = k === 'out' && (agencyOf(q) || {}).law, O = W('6종 밖').kv;
     h += agBox(q, d, word);
     h += `<div class="gap"><p class="lead2">${esc(B.lead)}</p>${B.smalls.map((x) => `<p class="note">${esc(x)}</p>`).join('')}</div>`;
-    if (law) h += `<h3><span>${esc(W('답변 초안').kv['근거 조항'])}${mark(d.cite, word)}</span></h3><div class="cite"><div class="lb">${esc(fill(O['근거 줄'], { 조례: shortLaw(law) }))}</div><p class="note">${esc(O['근거 설명'])}</p></div>`;
+    if (law) h += `<h3><span>${esc(here(q, W('답변 초안').kv['근거 조항']))}${mark(d.cite, word)}</span></h3><div class="cite"><div class="lb">${esc(fill(O['근거 줄'], { 조례: shortLaw(law) }))}</div><p class="note">${esc(O['근거 설명'])}</p></div>`;
     if (k === 'out') h += agencyBlock(q, d, word, o.compact);
     if (!o.compact) h += replyBlock(q) + (ui.reply[q.id] || q.approved ? statusBlock(q) : '');
   } else {
