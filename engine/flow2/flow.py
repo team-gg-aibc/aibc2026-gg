@@ -417,6 +417,12 @@ def check(st, cfg):
 STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
           ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
 
+# ---- PM 실험(11-11): 온톨로지로 근거 묶음 정리(cite.py). 스위치 flow2_cite가 None(기본값)이면 두 단계는 아무 일도 하지 않는다 ----
+# STAGES 줄을 고치지 않고 이름으로 찾아 끼운다(같은 주기의 다른 실험이 그 줄에 단계를 더한다).
+from . import cite  # noqa: E402  (cite는 flow를 함수 안에서만 부른다)
+for _after, _stage in (("구절 관문", ("근거 고르기", cite.start)), ("질문 대조", ("근거 정리", cite.settle))):
+    STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
+
 
 # ---- 스스로 시험 (키 없이) ----
 def selftest():
