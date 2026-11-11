@@ -150,6 +150,18 @@ details.why a { color: var(--accent); word-break: break-all; }
 .sk.short { width: 60%; }
 @keyframes sk { to { background-position: -200% 0; } }
 /* 두 시민 · 나란히 */
+.loc .samebtn { grid-column: 1 / 4; justify-self: start; margin-top: 6px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink); font-weight: 700; font-size: 12px; }
+.same-scroll { flex: 1; overflow: auto; padding: 4px 14px 12px; }
+table.same { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
+table.same th, table.same td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; color: var(--text); }
+table.same thead th { color: var(--ink); vertical-align: bottom; }
+table.same thead th:first-child, table.same tbody th { width: 112px; color: var(--sub); font-weight: 700; font-size: 12px; }
+table.same .sq { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--sub); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+table.same .sq .n { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 800; text-decoration: none; }
+table.same .qq { margin: 6px 0 0; font-size: 13px; }
+table.same td b { color: var(--ink); font-size: 13px; }
+table.same td .note { display: block; }
+table.same tr.src td { color: var(--sub); font-size: 11.5px; }
 .pairhd { padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--ink); font-weight: 800; font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .pairhd span { color: var(--sub); font-weight: 500; font-size: 12px; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }

@@ -20,7 +20,7 @@ const PAL = {
 };
 
 let T = null, X = null, AG = null, RING = null, S = null, textVersion = null, map = null, mapOk = false;
-const ui = { open: null, pair: null, chip: 0, dept: 0, list: true, card: true, listBeforePair: true, editing: {}, dirty: {}, sent: {}, reply: {},
+const ui = { open: null, pair: null, same: null, chip: 0, dept: 0, list: true, card: true, listBeforePair: true, editing: {}, dirty: {}, sent: {}, reply: {},
              fix: false, picking: false, seen: null, fresh: new Set(), tone: 'light' };
 const drawn = { list: '', card: '', pins: '' };
 const markers = {}, extra = [];
@@ -115,11 +115,11 @@ function drawLegend() {
 
 // ---- 칸 접고 펴기 · 톤
 function applyPanels(move = true) {
-  const b = document.body, top = W('맨 위 띠'), open = !!(ui.open || ui.pair);
+  const b = document.body, top = W('맨 위 띠'), open = !!(ui.open || ui.pair || ui.same);
   b.classList.toggle('nolist', !ui.list);
   b.classList.toggle('nocard', !ui.card || !open);
   b.classList.toggle('cardon', ui.card && open);
-  b.classList.toggle('pairing', !!ui.pair);
+  b.classList.toggle('pairing', !!(ui.pair || ui.same));
   const [lOn, lOff] = top.btn(0), [cOn, cOff] = top.btn(1);
   $('tg-list').textContent = ui.list ? lOn : lOff; $('tg-list').setAttribute('aria-expanded', ui.list);
   $('tg-card').textContent = ui.card && open ? cOn : cOff; $('tg-card').setAttribute('aria-expanded', ui.card && open); $('tg-card').disabled = !open;
@@ -147,7 +147,7 @@ function renderList() {
   $('chips').innerHTML = names.map((n, i) => `<button type="button" data-chip="${i}" aria-pressed="${i === ui.chip}" class="${CHIP_KINDS[i] ? 'k-' + CHIP_KINDS[i] : ''}">${CHIP_KINDS[i] ? '<i class="kb"></i>' : ''}${esc(n)} <b>${cnt(CHIP_KINDS[i])}</b></button>`).join('');
   const list = filtered().slice().reverse();
   $('l-msg').textContent = !S.inquiries.length ? SIT()['들어온 문의 없음'] : !list.length ? SIT()['거른 결과 없음'] : '';
-  const sel = new Set(ui.pair || (ui.open ? [ui.open] : []));
+  const sel = new Set(ui.pair || ui.same || (ui.open ? [ui.open] : []));
   $('rows').innerHTML = list.map((q) => {
     const k = kindOf(q), same = sameText(q).length;
     return `<li><button type="button" class="row${sel.has(q.id) ? ' sel' : ''}${ui.fresh.has(q.id) ? ' new' : ''}" data-id="${q.id}" aria-current="${sel.has(q.id)}">
@@ -200,7 +200,7 @@ function focusCam(pts) {   // 고른 문의(들)가 칸 · 위치 바로잡기 �
   return fitPoints(pts, { l, r, t, b, w: r - l, h: b - t, cx: (l + r) / 2, cy: (t + b) / 2 }, FOCUS, 0.85, pts.length > 1 ? 15.2 : 15.6)[0];
 }
 const focusPts = () => {
-  const ids = ui.pair || (ui.open ? [ui.open] : []), pts = [];
+  const ids = ui.pair || ui.same || (ui.open ? [ui.open] : []), pts = [];
   for (const id of ids) { const q = byId(id); if (q && q.loc) { pts.push([q.loc.lon, q.loc.lat]); if (q.loc_from && ui.fix) pts.push([q.loc_from.lon, q.loc_from.lat]); } }
   return pts;
 };
@@ -302,7 +302,7 @@ function mapFailed() { $('map-failed').hidden = false; if (T) $('map-failed').te
 const POS = { left: ['right', [-24, 0]], right: ['left', [24, 0]], top: ['bottom', [0, -24]], bottom: ['top', [0, 24]] };
 function renderPins() {
   if (!mapOk) return;
-  const focus = new Set(ui.pair || (ui.open ? [ui.open] : []));
+  const focus = new Set(ui.pair || ui.same || (ui.open ? [ui.open] : []));
   const key = JSON.stringify([S.inquiries.map((q) => [q.id, kindOf(q), q.loc && q.loc.lon, q.loc && q.loc.lat]), [...focus], ui.fix, [...ui.fresh]]);
   if (key === drawn.pins) return;
   drawn.pins = key;
@@ -332,8 +332,9 @@ function renderPins() {
   ids.forEach((id, i) => {
     const q = byId(id); if (!q || !q.loc) return;
     const c = [q.loc.lon, q.loc.lat];
-    sel.push(circle(c));
-    label(c, `${q.no} · ${q.loc.name || W('답변 초안').kv['이름 없는 자리']}`, ids.length > 1 ? (i ? 'bottom' : 'top') : 'top');
+    sel.push(circle(c, ids.length > 2 ? 90 : 170));   // 셋 이상이면 띠를 줄여 겹침을 덜어 낸다
+    if (ui.same) { if (!i) label(c, fill(W('같은 장소, 다른 일').kv['지도 글'], { 장소: q.loc.name || '', n: ids.length }), 'top'); }   // 같은 장소: 이름표 하나
+    else label(c, `${q.no} · ${q.loc.name || W('답변 초안').kv['이름 없는 자리']}`, ids.length > 1 ? (i ? 'bottom' : 'top') : 'top');
     if (q.loc_from && q.loc_from.lon !== q.loc.lon) {
       const f = [q.loc_from.lon, q.loc_from.lat], e = document.createElement('div');
       e.className = 'pin was'; e.textContent = q.no; extra.push(new maplibregl.Marker({ element: e }).setLngLat(f).addTo(map));
@@ -347,16 +348,37 @@ function renderPins() {
 
 // ---- 답변 초안 카드
 function openCard(id) {
-  ui.open = id; ui.pair = null; ui.card = true; ui.fix = false; ui.picking = false; ui.list = ui.listBeforePair;
+  ui.open = id; ui.pair = null; ui.same = null; ui.card = true; ui.fix = false; ui.picking = false; ui.list = ui.listBeforePair;
   applyPanels(false); renderAll(true);
   requestAnimationFrame(() => relayout(true));
 }
-function closeCard() { ui.open = null; ui.pair = null; ui.fix = false; ui.picking = false; ui.list = ui.listBeforePair; applyPanels(false); renderAll(true); requestAnimationFrame(() => relayout(true)); }
+function closeCard() { ui.open = null; ui.pair = null; ui.same = null; ui.fix = false; ui.picking = false; ui.list = ui.listBeforePair; applyPanels(false); renderAll(true); requestAnimationFrame(() => relayout(true)); }
 function openPair(id) {
   const q = byId(id), o = q && sameText(q)[0];
   if (!o) return;
   if (!ui.pair) ui.listBeforePair = ui.list;
-  ui.pair = [q, o].sort((a, b) => a.no - b.no).map((x) => x.id); ui.open = null; ui.card = true; ui.fix = false; ui.list = false;
+  ui.pair = [q, o].sort((a, b) => a.no - b.no).map((x) => x.id); ui.open = null; ui.same = null; ui.card = true; ui.fix = false; ui.list = false;
+  applyPanels(false); renderAll(true);
+  requestAnimationFrame(() => relayout(true));
+}
+// ---- 같은 장소, 다른 일: 이 문의와 같은 장소(이름 있는 장소)의 초안 가운데 근거 조례가 다른 것, 조례마다 하나(처리 기관이 공식 문서로 확인된 것 · 최근 것 먼저), 둘까지
+function samePlaceFor(q) {
+  if (!q || q.kind !== 'draft' || !q.loc || !q.loc.place || !q.card.citations.length) return [];
+  const lawQ = q.card.citations[0].law, best = {};
+  for (const x of S.inquiries) {
+    if (x.id === q.id || x.kind !== 'draft' || !x.loc || x.loc.place !== q.loc.place || !x.card.citations.length) continue;
+    const law = x.card.citations[0].law;
+    if (law === lawQ) continue;
+    const a = agencyOf(x) || {}, rank = [a.cap === '공식 문서로 확인' ? 1 : 0, x.received];
+    if (!best[law] || rank[0] > best[law].rank[0] || (rank[0] === best[law].rank[0] && rank[1] > best[law].rank[1])) best[law] = { x, rank };
+  }
+  return Object.values(best).sort((a, b) => b.rank[0] - a.rank[0] || b.rank[1].localeCompare(a.rank[1])).slice(0, 2).map((v) => v.x);
+}
+function openSame(id) {
+  const q = byId(id), others = samePlaceFor(q);
+  if (!others.length) return;
+  if (!ui.pair && !ui.same) ui.listBeforePair = ui.list;
+  ui.same = [q, ...others].map((x) => x.id); ui.open = null; ui.pair = null; ui.card = true; ui.fix = false; ui.list = false;
   applyPanels(false); renderAll(true);
   requestAnimationFrame(() => relayout(true));
 }
@@ -370,7 +392,11 @@ function locRow(q, compact) {
   const canFix = !compact && !q.approved && q.kind !== 'making';
   return `<div class="loc"><span class="k">${esc(C['접수 위치'])}</span><b>${esc(name)}</b>
     ${canFix ? `<button type="button" class="fixbtn" data-act="fix" aria-expanded="${ui.fix}">${esc(C['위치 바로잡기'])}</button>` : ''}
-    <span class="how">${esc(how)}</span></div>`;
+    <span class="how">${esc(how)}</span>${sameBtn(q, compact)}</div>`;
+}
+function sameBtn(q, compact) {   // 「이 장소의 다른 일 n건 보기」(같은 글 나란히 보기와 짝)
+  const n = compact ? 0 : samePlaceFor(q).length;
+  return n ? `<button type="button" class="samebtn" data-act="same-on" data-id="${q.id}">${esc(fill(W('같은 장소, 다른 일').kv['여는 단추'], { n }))}</button>` : '';
 }
 function head(q, compact) {
   const C = W('답변 초안').kv, k = kindOf(q), t = (q.form || {}).title;
@@ -512,6 +538,7 @@ function navBar(q) {
 }
 function renderCard(force) {
   const box = $('card');
+  if (ui.same) return renderSame(force);
   if (ui.pair) {
     const [a, b] = ui.pair.map(byId);
     if (!a || !b) { ui.pair = null; return renderCard(true); }
@@ -538,6 +565,27 @@ function renderCard(force) {
   box.innerHTML = navBar(q) + `<div class="c-scroll">${head(q)}<div class="bd">${bodyOf(q)}</div></div>` + st + sourceLine(q);
   if (!force) box.querySelector('.c-scroll').scrollTop = top;
   renderFix(q);
+}
+// 같은 장소, 다른 일: 문의마다 일의 갈래 · 근거 조례와 조항 · 결론 · 소관 부서 · 처리 기관을 한 표로, 첫 문의와 다른 칸에 「다름」
+function renderSame(force) {
+  const box = $('card'), qs = ui.same.map(byId);
+  if (qs.some((q) => !q)) { ui.same = null; applyPanels(); return renderCard(true); }
+  const key = JSON.stringify(['same', qs, ui.tone, textVersion]);
+  if (!force && key === drawn.card) return;
+  drawn.card = key; $('fixpop').hidden = true;
+  const P = W('같은 장소, 다른 일'), K = P.kv, C = W('답변 초안').kv, D = W('두 시민').kv['다름'], V = W('답변 초안').tab('초안의 결론'), O = W('초안의 출처');
+  const col = qs.map((q) => { const a = agencyOf(q) || {}, c = q.card.citations;
+    return { q, gal: a.gal || '—', law: shortLaw(c[0].law), cites: c.map((x) => `${shortLaw(x.law)} ${x.article}`), verdict: q.card.conclusion && V[q.card.conclusion] && !V[q.card.conclusion].startsWith('[') ? V[q.card.conclusion] : '—',
+             dept: a.dept || '—', agency: a.agency || '—', note: a.agencyNote || '', src: q.engine ? `${(O.plain()[q.engine.how === 'live' ? 0 : 1] || [''])[0]} · ${hhmm(q.engine.at)}` : '' }; });
+  const cell = (i, k, html) => `<td>${html}${i && col[i][k] !== col[0][k] ? mark(true, D) : ''}</td>`;
+  const row = (name, k, f) => `<tr><th scope="row">${esc(name)}</th>${col.map((c, i) => cell(i, k, f(c))).join('')}</tr>`;
+  box.innerHTML = `<div class="pairhd">${esc(fill(K['머리'], { 장소: qs[0].loc.name, n: qs.length }))}<span>${esc(K['머리 설명'])}</span><button type="button" class="outline" data-act="same-off">${esc(P.btn()[0])}</button></div>
+    <div class="same-scroll"><table class="same">
+      <thead><tr><th scope="col"><span class="sr">${esc(K['문의'])}</span></th>${col.map((c) => `<th scope="col"><button type="button" class="sq" data-act="go" data-id="${c.q.id}"><span class="n">${c.q.no}</span>${esc(srcLabel(c.q.source))}</button><p class="qq">${esc(c.q.text)}</p></th>`).join('')}</tr></thead>
+      <tbody>${row(K['일의 갈래'], 'gal', (c) => esc(c.gal))}${row(K['근거'], 'law', (c) => c.cites.map(esc).join('<br>'))}${row(K['결론'], 'verdict', (c) => esc(c.verdict))}
+        ${row(C['소관 부서'], 'dept', (c) => `<b>${esc(c.dept)}</b>`)}${row(C['처리 기관'], 'agency', (c) => `<b>${esc(c.agency)}</b>${c.note ? `<span class="note">${esc(c.note)}</span>` : ''}`)}
+        <tr class="src"><th scope="row">${esc(O.name)}</th>${col.map((c) => `<td>${esc(c.src)}</td>`).join('')}</tr></tbody></table>
+      <p class="note">${esc(C['처리 기관 뜻'])}</p></div>`;
 }
 function renderFix(q) {
   const pop = $('fixpop'), F = W('위치 바로잡기'), K = F.kv;
@@ -595,6 +643,8 @@ function cardClick(e) {
   if (act === 'go') return b.dataset.id && openCard(b.dataset.id);
   if (act === 'pair-on') return openPair(b.dataset.id);
   if (act === 'pair-off') { const id = ui.pair[0]; ui.pair = null; return openCard(id); }
+  if (act === 'same-on') return openSame(b.dataset.id);
+  if (act === 'same-off') { const id = ui.same[0]; ui.same = null; return openCard(id); }
   if (act === 'fix-close') { ui.fix = false; ui.picking = false; renderCard(true); return requestAnimationFrame(() => relayout(true)); }
   if (act === 'pick') { ui.picking = !ui.picking; return renderFix(q); }
   if (act === 'reloc') { const o = $('fixpop')._opts[+b.dataset.i]; return o && relocate(q.id, o.loc.place ? { place: o.loc.place } : { lon: o.loc.lon, lat: o.loc.lat }); }
@@ -634,7 +684,7 @@ function noticeNew(list) {
 }
 function renderAll(force) {
   if (!S || !T) return;
-  const lk = JSON.stringify([S.inquiries.map((q) => [q.id, kindOf(q), q.loc && q.loc.name]), S.engine, ui.chip, ui.dept, ui.open, ui.pair, [...ui.fresh], textVersion]);
+  const lk = JSON.stringify([S.inquiries.map((q) => [q.id, kindOf(q), q.loc && q.loc.name]), S.engine, ui.chip, ui.dept, ui.open, ui.pair, ui.same, [...ui.fresh], textVersion]);
   if (force || lk !== drawn.list) { drawn.list = lk; renderList(); }
   renderCard(force); renderPins();
 }
