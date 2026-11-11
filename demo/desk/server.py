@@ -206,7 +206,8 @@ def card_of(res):
         cites.append({"label": label, "law": law, "article": label[len(law):].strip() if law else label,
                       "quotes": list(dict.fromkeys(quotes)), "text": c.get("text"),
                       "url": c.get("url") or r.get("source_url"), "effective": c.get("effective") or r.get("effective_date")})
-    return {"answer": _inner(r.get("answer")) if cites else None,   # 실제 호출 답 글에도 안쪽 표시가 들어온다(점검 11-11 밤) "conclusion": t.get("conclusion") if cites else None,
+    # 실제 호출 답 글에도 안쪽 표시가 들어온다(점검 11-11 밤)
+    return {"answer": _inner(r.get("answer")) if cites else None, "conclusion": t.get("conclusion") if cites else None,
             "citations": cites, "reason": t.get("reason"), "has_trace": bool(t), "error": res.get("error")}
 
 
@@ -445,6 +446,7 @@ def selftest():
     assert kind_of({"response": unk, "trace": None}) == "notfound"                 # 네 칸만: 6종 밖이라 부르지 않는다
     assert kind_of({"response": unk, "trace": {"reason": "시간 초과"}}) == "failed"
     assert kind_of({"response": None, "error": "URLError"}) == "failed"
+    assert card_of(ok)["conclusion"] == "네"   # 초안의 결론 칸(한 줄 주석에 묻혀 빠졌던 것, 11-12)
     c = card_of(ok)["citations"][0]
     assert c["law"] == "서울특별시 주차장 설치 및 관리 조례" and c["article"] == "제13조 제2항" and c["quotes"] == ["구절"], c
     assert c["text"] and c["url"].startswith("https://www.law.go.kr"), c                    # 링크 · 시행일 · 원문은 자료에서
