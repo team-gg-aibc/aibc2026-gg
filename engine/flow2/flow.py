@@ -205,7 +205,7 @@ def _f2(st):
 # 연결 오류: 4판 dev 두 번째 실행(15:50쯤 네트워크가 끊김)에서 102문항이 검색 단계의 APIConnectionError로 끝났다. upstage.py는
 # 15.5초 동안 여섯 번 부르고 그만둔다(마감 75초까지 59초가 남는데도). 그래서 마감까지 20초 넘게 남았으면 한 바퀴 더 부른다.
 # 팀원 파일 upstage.py는 고치지 않는다. 문항 마감(timeout_sec)은 그대로 upstage 예산이 시도마다 본다.
-_POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="flow2")
+_POOL = ThreadPoolExecutor(max_workers=64, thread_name_prefix="flow2")   # 16 → 64(11-11): 다수결(flow2_votes)을 켜면 호출이 세 배다
 TRIES = 3   # 한 단계에 많아야 세 번(늦어서 하나 더 · JSON이 깨져서 다시, 합쳐서)
 RETRY_LEFT_SEC = 20   # 연결 오류 · 5xx · 429로 끝난 호출은 문항 마감까지 이보다 많이 남았을 때만 다시 부른다
 
@@ -254,7 +254,138 @@ def _ask(st, cfg, step, user):
     """모델 호출 하나(시스템 프롬프트 · JSON 칸은 판이 고른다) → 읽어 들인 JSON."""
     _, system, schema = prompts.SETS[cfg["flow2_version"]][step]
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
+
+    def one(s):
+        return guarded(s, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
+    n = (cfg["flow2_votes"] or {}).get(step, 1)
+    return one(st) if n <= 1 else _voted(st, cfg, step, one, n)     # 스위치가 꺼져 있으면(기본) 7판 그대로 한 번만 부른다
+
+
+# ---- 흔들림 줄이기 (스위치 flow2_votes, 11-11): 같은 호출을 여러 번 불러 다수결 ----
+# 7판 dev 두 실행(11-10)을 견주니 ④는 보낸 글이 글자까지 같은 648문항 중 643문항의 출력이 달랐고 284문항은 근거 조항 묶음까지
+# 달랐다(temperature 0, seed · top_p를 보내도 같다 — 11-11 작은 시험 8문항 × 4번). 모델이 같은 입력에 다른 출력을 내는 것은 못 막으니,
+# 같은 호출을 n번 나란히 부르고 「결정」만 다수결로 정한다. 글(답 문장 · 구절)은 다수 쪽 출력 하나를 그대로 쓴다(섞어 짓지 않는다).
+# - ① analyze: 조례 고르기에 쓰는 칸(이름 든 조례 · 관할 · 관할 낱말 · 가까운 조례)이 가장 많이 겹치는 출력.
+# - ④ read: found는 과반. 근거 조항은 과반이 든 조항만(조항 이름은 ⑤와 같은 방법으로 원문 조각에 맞춘다). 구절은 그 조항을 든 출력들의
+#   구절 가운데 원문에 글자 그대로 있는 것. 답 글은 근거 묶음이 다수결 결과와 가장 가까운 출력의 것.
+# - ⑥ check: 과반이 notGrounded일 때만 거절.
+# 온 표만으로 결과가 정해지면(예: 세 번 중 먼저 온 둘이 같다) 나머지는 기다리지 않는다. 결과는 다 기다린 것과 같다.
+# 기다리지 않은 호출의 토큰은 기록(calls)에 안 잡힌다. 몇 표를 불렀고 몇 표를 썼는지는 flow2.vote에 남긴다.
+_VOTE = ThreadPoolExecutor(max_workers=48, thread_name_prefix="flow2-vote")   # 안에서 guarded가 _POOL을 쓰므로 풀을 나눈다
+_ROUTE_KEYS = ("named_rule", "jurisdiction", "jurisdiction_word", "law_guess")
+
+
+def _dump(o):
+    return json.dumps(o, ensure_ascii=False, sort_keys=True)
+
+
+def _verdict(out):
+    """⑥ 출력 하나의 판정(check와 같은 셈): 물음 하나라도 grounded면 grounded, 모두 notGrounded면 notGrounded."""
+    if "asks" not in out:                 # 1판(c1)은 verdict 칸 하나
+        return out.get("verdict")
+    vs = [a.get("verdict") for a in out.get("asks") or []]
+    return "grounded" if "grounded" in vs else "notGrounded" if vs and set(vs) == {"notGrounded"} else "notSure"
+
+
+def _ev_label(ev, v, body, cfg):
+    """④ 출력의 근거 하나 → 원문 조각 이름(⑤ gate와 같은 방법). 목록에 없는 조항이면 None."""
+    lab = ev.get("label", "").replace("[조항]", "").strip()
+    found = label_ids([lab], v) or by_quote(lab, ev.get("quote", "").replace(DELEG_MARK, ""), v, body)
+    return v[found[0] - 1]["label"] if found else None
+
+
+def pick_slots(outs, left, need):
+    """① 다수결. 남은 표(left)가 와도 안 바뀌면 고른 출력, 아니면 None."""
+    key = lambda o: tuple(_norm(str(o.get(k, ""))) for k in _ROUTE_KEYS)
+    count = {}
+    for o in outs:
+        count[key(o)] = count.get(key(o), 0) + 1
+    top = max(count.values())
+    if top < need and left:
+        return None
+    if top >= need or top > 1:
+        k = max(count, key=lambda x: (count[x], x))
+        return min((o for o in outs if key(o) == k), key=_dump)
+    # 모두 다르면: 칸마다 다수 값과 가장 많이 겹치는 출력
+    cols = list(zip(*map(key, outs)))
+    score = lambda o: sum(cols[i].count(x) for i, x in enumerate(key(o)))
+    return max(outs, key=lambda o: (score(o), _dump(o)))
+
+
+def pick_read(outs, left, need, v, cfg):
+    """④ 다수결. 남은 표가 와도 found와 근거 조항 묶음이 안 바뀌면 합친 출력, 아니면 None."""
+    yes = [o for o in outs if o.get("found")]
+    no = [o for o in outs if not o.get("found")]
+    if left and len(yes) < need and len(no) < need:
+        return None
+    if len(no) >= need or (not left and len(yes) <= len(no)):       # 과반이 「답할 수 없다」(반반이면 답하지 않는 쪽)
+        return dict(min(no, key=_dump), _vote={"found": [bool(o.get("found")) for o in outs]})
+    body = {}
+    for c in v:
+        body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
+    sets = [[lab for lab in dict.fromkeys(_ev_label(ev, v, body, cfg) for ev in o.get("evidence") or []) if lab] for o in yes]
+    count = {}
+    for labs in sets:
+        for lab in labs:
+            count[lab] = count.get(lab, 0) + 1
+    if left and any(n < need <= n + left for n in count.values()) or left >= need:   # 아직 과반이 될 수 있는 조항이 있다
+        return None
+    need_now = need if left or len(outs) >= 2 * need - 1 else len(outs) // 2 + 1     # 표가 모자라게 끝났으면 온 표의 과반
+    major = [c["label"] for c in v if count.get(c["label"], 0) >= need_now]
+    concl = [o.get("conclusion") for o in yes]
+    order = sorted(range(len(yes)), key=lambda i: (-len(set(sets[i]) & set(major)) / (len(set(sets[i]) | set(major)) or 1),
+                                                   -concl.count(concl[i]), _dump(yes[i])))
+    rep = yes[order[0]]                                              # 근거 묶음이 다수결 결과와 가장 가까운 출력(같으면 결론이 다수인 쪽)
+    vote = {"found": [bool(o.get("found")) for o in outs], "sets": sets, "kept": major}
+    if not major:                                                    # 과반이 든 조항이 하나도 없으면 그 출력의 근거를 그대로 쓴다
+        return dict(rep, _vote=vote)
+    paren, evidence = cfg["flow2_version"] >= 3, []
+    for lab in major:
+        quotes = sorted({ev.get("quote", "").replace(DELEG_MARK, "") for o, labs in zip(yes, sets) if lab in labs
+                         for ev in o.get("evidence") or [] if _ev_label(ev, v, body, cfg) == lab})
+        ok = [q for q in quotes if quote_in(q, body[lab], paren=paren)]
+        evidence.append({"label": lab, "quote": (ok or quotes)[0]})   # 원문에 있는 구절을 먼저. 하나도 없으면 ⑤가 버린다
+    return dict(rep, evidence=evidence, _vote=vote)
+
+
+def pick_check(outs, left, need):
+    """⑥ 다수결: 과반이 notGrounded일 때만 거절. 남은 표가 와도 안 바뀌면 그쪽 출력, 아니면 None."""
+    bad = [o for o in outs if _verdict(o) == "notGrounded"]
+    good = [o for o in outs if _verdict(o) != "notGrounded"]
+    votes = {"_vote": {"verdicts": [_verdict(o) for o in outs]}}
+    if len(bad) >= need or (not left and len(bad) > len(good)):
+        return dict(min(bad, key=_dump), **votes)
+    if left and len(bad) + left >= need:
+        return None
+    return dict(min(good, key=lambda o: (_verdict(o) != "grounded", _dump(o))), **votes)
+
+
+def _voted(st, cfg, step, one, n):
+    """one(상태) → 출력을 n번 나란히 부르고 다수결로 하나를 돌려준다. 호출 기록 · 더 부른 기록은 온 표의 것만 st에 붙인다."""
+    need = n // 2 + 1
+    pick = {"analyze": lambda o, left: pick_slots(o, left, need),
+            "read": lambda o, left: pick_read(o, left, need, st["_view"], cfg),
+            "check": lambda o, left: pick_check(o, left, need)}[step]
+    boxes = [{"calls": []} for _ in range(n)]
+    pend = {_VOTE.submit(contextvars.copy_context().run, one, b): b for b in boxes}
+    outs, err = [], None
+    while pend:
+        done, _ = wait(pend, timeout=_left(), return_when=FIRST_COMPLETED)
+        if not done:
+            raise upstage.DeadlineExceeded("다수결 호출이 마감 전에 안 끝남")
+        for f in done:
+            box = pend.pop(f)
+            if f.exception() is not None:
+                err = f.exception()
+                continue
+            outs.append(f.result())
+            st["calls"].extend(box["calls"])
+            if box.get("flow2"):
+                _f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
+        out = pick(outs, len(pend)) if outs else None
+        if out is not None:
+            return dict(out, _vote=dict(out.get("_vote") or {}, n=n, used=len(outs)))
+    raise err
 
 
 # ---- 6판: ④ 미리 읽기 ----
@@ -288,8 +419,9 @@ def search(st, cfg):
     st.update({k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")})
     laws = lawmap.pick_laws(st["_hits"]) if cfg["flow2_version"] >= 6 and not st["reason"] else []
     if laws:
-        box = {"calls": []}
-        user = _read_user(st["question"], view(laws, cfg["chunk_unit"]), cfg)
+        v = view(laws, cfg["chunk_unit"])
+        box = {"calls": [], "_view": v}       # _view: 다수결(flow2_votes)이 조항 이름을 원문 조각에 맞출 때 쓴다
+        user = _read_user(st["question"], v, cfg)
         st["_spec"] = (laws, box, _SPEC.submit(contextvars.copy_context().run, _ask, box, cfg, "read", user))
 
 
@@ -343,6 +475,8 @@ def read(st, cfg):
 def gate(st, cfg):
     """⑤ 구절 관문(코드만): 목록에 있는 조항 · 자치구 아님 · 구절이 그 조항 글에 글자 그대로 있음 → 인용."""
     v, out = st["_view"], st["_read"]
+    if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
+        _f2(st).setdefault("vote", {})["read"] = out["_vote"]
     body = {}
     for c in v:
         body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
@@ -410,6 +544,8 @@ def check(st, cfg):
     else:
         st["verdict"] = out.get("verdict")
     _f2(st)["check"] = {"verdict": st["verdict"], "reason": out.get("reason", ""), "targets": marks, "asks": out.get("asks")}
+    if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
+        _f2(st).setdefault("vote", {})["check"] = out["_vote"]
     if st["verdict"] == "notGrounded":
         st["reason"] = pipeline.REJECTED
 
@@ -632,6 +768,62 @@ def selftest():
         assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
         pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
         assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]
+        # 흔들림 줄이기(flow2_votes): 같은 호출 세 번 → 결정만 다수결. 스위치가 꺼져 있으면(기본) 한 번만 부르고 기록도 그대로다
+        other = next(c for c in chunks if c["label"] != target["label"] and len(c["text"]) > 30)
+        oq = other["text"][:15]
+        ok_ev, bad_ev, other_ev = ({"label": target["label"], "quote": quote}, {"label": target["label"], "quote": "원문에 없는 말"},
+                                   {"label": other["label"], "quote": oq})
+        rd = lambda found, ev, ans="네, 감면됩니다.": {"found": found, "check": "", "conclusion": "네", "answer": ans, "evidence": ev}
+        ck = lambda v: {"reason": "", "asks": [{"ask": "경차 할인", "verdict": v}], "done": True}
+        need = 2
+        assert pick_check([ck("notGrounded"), ck("grounded")], 1, need) is None                       # 아직 모름 → 셋째를 기다림
+        assert _verdict(pick_check([ck("grounded"), ck("notSure")], 1, need)) == "grounded"            # 둘이 통과면 셋째를 안 기다림
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded"), ck("notGrounded")], 0, need)) == "notGrounded"
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded"), ck("grounded")], 0, need)) == "grounded"   # 한 번의 거절로는 안 버림
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded")], 0, 2)) == "grounded"           # 두 번 부르면: 둘 다 거절일 때만 거절
+        v7 = [target, other]
+        assert pick_read([rd(True, [ok_ev]), rd(True, [ok_ev, other_ev])], 1, need, v7, cfg7) is None  # 한쪽만 든 조항이 있다 → 기다림
+        got = pick_read([rd(True, [ok_ev]), rd(True, [ok_ev])], 1, need, v7, cfg7)                      # 둘이 같으면 안 기다림
+        assert [e["label"] for e in got["evidence"]] == [target["label"]]
+        got = pick_read([rd(True, [ok_ev], "답 1"), rd(True, [bad_ev, other_ev], "답 2"), rd(True, [other_ev, ok_ev], "답 3")], 0, need, v7, cfg7)
+        assert got["evidence"] == [ok_ev, other_ev] and got["answer"] == "답 2", got                   # 과반이 든 조항(원문 순서) · 원문에 있는 구절 · 근거가 같은 출력의 답
+        assert pick_read([rd(True, [ok_ev]), rd(False, []), rd(False, [])], 0, need, v7, cfg7)["found"] is False
+        assert pick_read([rd(True, [ok_ev]), rd(False, [])], 1, need, v7, cfg7) is None
+        got = pick_read([rd(True, [ok_ev]), rd(True, [other_ev]), rd(False, [])], 0, need, v7, cfg7)    # 과반이 든 조항이 없으면 한 출력의 근거 그대로
+        assert got["found"] and len(got["evidence"]) == 1 and got["_vote"]["kept"] == []
+        sl = lambda **kw: dict(slots, actor="시민", **kw)
+        assert pick_slots([sl(), sl(law_guess="금연")], 1, need) is None
+        assert pick_slots([sl(law_guess="금연"), sl(), sl(targets=["경형자동차"])], 0, need)["law_guess"] == "주차장"
+        import threading
+        seq, lock = {}, threading.Lock()
+
+        def seq_chat(messages, cfg, calls=None, response_format=None):
+            name = response_format["json_schema"]["name"]
+            with lock:
+                out = seq[name].pop(0) if seq.get(name) else plan[name]
+            if calls is not None:
+                calls.append({"model": "fake", "in": 1, "cached": 0, "out": 1, "sec": 0.0})
+            return json.dumps(out, ensure_ascii=False)
+
+        upstage.chat = seq_chat
+        plan.update(question_slots=sl(), law_answer_quotes=rd(True, [ok_ev]), target_check=ck("grounded"))
+        on = dict(cfg7, flow2_votes={"analyze": 3, "read": 3, "check": 3})
+        qv = "경차를 공영주차장에 세우면 할인돼요?"
+        seq.update(law_answer_quotes=[rd(True, [bad_ev, other_ev]), rd(True, [ok_ev]), rd(True, [ok_ev])],
+                   target_check=[ck("notGrounded"), ck("grounded"), ck("grounded")])
+        r, t = pipeline.answer(qv, on)
+        assert r["citation"] == [target["label"]] and t["verdict"] == "grounded", (t["reason"], t["flow2"].get("vote"))
+        assert t["flow2"]["vote"]["read"]["kept"] == [target["label"]] and t["flow2"]["vote"]["check"]["n"] == 3
+        assert t["flow2"]["slots"]["_vote"]["n"] == 3 and len(t["calls"]) >= 6
+        seq.update(law_answer_quotes=[rd(True, [bad_ev, other_ev])], target_check=[ck("notGrounded")])
+        r, t = pipeline.answer(qv, cfg7)                 # 꺼 두면: 첫 출력 하나로 정한다(다른 조항 · 한 번의 거절로 확인 불가)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and t["draft"]["citation"] == [other["label"]]
+        assert "vote" not in t["flow2"] and [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"]
+        seq.clear()
+        seq.update(target_check=[ck("notGrounded"), ck("notGrounded"), ck("grounded")])
+        assert pipeline.answer(qv, on)[1]["reason"] == pipeline.REJECTED          # 과반이 거절이면 거절
+        seq.clear()
+        assert config.DEFAULTS["flow2_votes"] is None
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
