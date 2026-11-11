@@ -69,9 +69,10 @@ jobs:
       - name: 검사기 자체 시험
         run: python3 .github/scripts/check_pr.py --selftest
 
-      # app/(화면 · 코드)을 바꾼 PR만 화면 증거 절을 요구하려고 바뀐 파일 목록을 넘긴다.
+      # app/(화면 · 코드)을 바꾼 PR만 화면 증거 절을 요구하고, PRD와 요약이 함께 바뀌었는지 보려고 바뀐 파일 목록을 넘긴다.
+      # core.quotePath=false: 한글 파일 이름(docs/PRD-요약.md)을 "\354…"로 감싸지 않고 그대로 적게 한다.
       - name: 바뀐 파일 목록
-        run: git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > "$RUNNER_TEMP/changed.txt"
+        run: git -c core.quotePath=false diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > "$RUNNER_TEMP/changed.txt"
 
       # PR 제목 · 본문은 ${{ }}로 명령에 직접 끼우지 않고 환경 변수로 넘긴다(명령 주입 방지, GitHub 공식 권고).
       - name: PR 제목 · 본문 양식 검사
