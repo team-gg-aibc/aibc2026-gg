@@ -150,6 +150,7 @@ details.why a { color: var(--accent); word-break: break-all; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }
 .cols > section { display: flex; flex-direction: column; overflow-y: auto; border-right: 1px solid var(--line); } .cols > section:last-child { border-right: 0; }
 .cols .draft { font-size: 13px; }
+.cols > section .bd { flex: 1; }   /* 출처 줄은 칸 맨 아래 */
 /* 위치 바로잡기 */
 .fixpop { position: fixed; z-index: 5; top: 64px; width: 340px; padding: 10px 12px; }
 .fixpop h4 { margin: 0 0 4px; color: var(--ink); font-size: 13.5px; display: flex; justify-content: space-between; } .fixpop h4 span { color: var(--sub); font-size: 12px; font-weight: 600; }

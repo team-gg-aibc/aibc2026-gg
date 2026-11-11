@@ -509,7 +509,7 @@ function renderCard(force) {
     $('fixpop').hidden = true;
     box.innerHTML = `<div class="pairhd">${esc(P.kv['머리'])}<span>${esc(P.kv['다름 설명'])}</span><button type="button" class="outline" data-act="pair-off">${esc(P.btn()[0])}</button></div>
       <div class="cols">${[a, b].map((q, i) => `<section>${head(q, true)}<div class="bd">${bodyOf(q, { compact: true, cmp: i ? a : null, word: P.kv['다름'] })}
-        <div class="rowbtn"><button type="button" class="outline" data-act="go" data-id="${q.id}">${esc(String(q.no))} · ${esc(W('답변 초안').name)}</button></div></div></section>`).join('')}</div>`;
+        <div class="rowbtn"><button type="button" class="outline" data-act="go" data-id="${q.id}">${esc(String(q.no))} · ${esc(W('답변 초안').name)}</button></div></div>${sourceLine(q)}</section>`).join('')}</div>`;   // 출처 줄도 칸마다(미리 받은 답 · 반영 전 기능을 영상 한 장면 안에서 밝힘)
     return;
   }
   const q = byId(ui.open);
