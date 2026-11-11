@@ -11,6 +11,8 @@
 2. 인용을 비우지 않는다. 호출이 늦거나 깨지거나 「직접」이 하나도 없으면 7판 인용 그대로 나간다.
 3. 붙는 조항은 같은 조례 안의 조 · 항 · 별표뿐이고, 붙인 까닭(원문 구절)을 판단 기록 flow2.cite에 남긴다.
 4. 합쳐 3개까지(LIMIT). 대회 채점은 「정답 근거 수 + 2개」까지 감점이 없어, 정답 근거가 1개인 문항도 3개까지는 안전하다.
+함께 켤 때: 맡긴 답 살리기(flow2_handed)가 살린 답도 「⑥을 지난 답」으로 이 단계에 온다. 그 스위치가 켜져 있으면 「조례에 정해져 있지
+않다 + 누가 정한다」 꼴 답이 기대는 조항(맡기는 구절이 든 조항)은 덜어 내지 않는다(_handed_label). 출력 저장(flow2_memo)이 켜져 있으면 다시 고르기 호출도 적어 둔다. 다수결(flow2_votes)은 이 호출에 걸리지 않는다.
 규칙과 프롬프트는 조례 원문의 구조에서만 만들었다. 끈 판(7판)의 인용은 판단 기록 flow2.gate.kept의 앞 네 개로 되살릴 수 있다.
 
 스스로 시험(키 없이, 몇 초): python -m engine.flow2.cite --selftest
@@ -69,18 +71,19 @@ def widen(kept, view):
     return [c for c in view if c["label"] in want]
 
 
-def choose(kept, cands, roles, limit=LIMIT):
+def choose(kept, cands, roles, limit=LIMIT, protect=()):
     """다시 고르기 판정으로 근거 묶음을 정한다. 「직접」이 없으면 None(7판 그대로).
     - 「직접」인 조항은 모두 든다(④가 안 든 것도).
     - ④가 든 조항 가운데 「직접」이 아닌 것은, 같은 조에서 ④가 든 다른 항이 「직접」일 때만 던다. 곧 같은 조 안의 곁가지 항만 정리한다.
       다른 조의 조항과, ④가 든 항을 하나도 확인하지 못한 조는 ④의 판단을 따른다(④가 든 항을 안 든 항으로 바꿔치기하지 않는다).
+    - protect에 든 조항은 덜어 내지 않는다(맡긴 답 살리기가 살린 답의 근거 조항: 그 답은 그 조항의 「따로 정한다」가 곧 답이다).
     - 차례: ④가 든 것(④의 차례) 다음에 새로 더한 것(원문 차례). 상한 limit은 더할 때만 건다. ④가 든 조항은 상한으로 자르지 않는다
       (첫 규칙은 모두 limit개로 잘랐는데, 근거가 여럿 필요한 질문에서 ④가 넷째로 든 정답 조항을 잃었다. 7판 기록 dev 여섯 실행에서 10답)."""
     role = dict(zip(cands, roles))
     if "직접" not in role.values():
         return None
     confirmed = {article(x) for x in kept if role.get(x) == "직접"}
-    out = [x for x in kept if role.get(x) == "직접" or article(x) not in confirmed]
+    out = [x for x in kept if role.get(x) == "직접" or article(x) not in confirmed or x in protect]
     for c in cands:
         if role[c] == "직접" and c not in kept and len(out) < limit:
             out.append(c)
@@ -107,7 +110,11 @@ def _ask(box, cfg, question, cands):
     from . import flow
     messages = [{"role": "system", "content": PICK}, {"role": "user", "content": pick_user(question, cands)}]
     schema = pick_schema(len(cands))
-    out = flow.guarded(box, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), "pick")
+
+    def run():
+        return flow.guarded(box, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), "pick")
+    # 출력 저장(flow2_memo)이 켜져 있으면 이 호출도 적어 둔다. 안 그러면 같은 문의의 답 글은 같은데 인용만 달라질 수 있다
+    out = flow._memoed(box, cfg, ["pick", PICK, messages[1]["content"]], run) if cfg.get("flow2_memo") else run()
     return [out.get(f"c{i}") for i in range(1, len(cands) + 1)]
 
 
@@ -116,6 +123,19 @@ def _mode(cfg):
     if mode not in MODES:
         raise ValueError(f"flow2_cite 값 {mode!r}: {MODES} 가운데 하나여야 합니다")
     return mode or ""
+
+
+def _handed_label(st, cfg, kept):
+    """맡긴 답 살리기(flow2_handed)가 켜져 있고 답이 「조례에 정해져 있지 않다 + 누가 · 어느 법령이 정한다」 꼴이면, 그 답이 기대는 조항
+    (맡기는 구절이 든 조항)을 지킬 조항으로 돌려준다. ⑥이 거절해 살린 답이든 ⑥이 통과시킨 답이든 같다. 가리는 법은 flow.handed_over 그대로."""
+    from . import flow
+    mode = cfg.get("flow2_handed")
+    if not mode:
+        return set()
+    hit = flow.handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in set(kept)], law=mode == "law")
+    if hit:
+        flow._f2(st)["cite"]["protect"] = hit[0]
+    return {hit[0]} if hit else set()
 
 
 # ---- 단계 둘 (flow.STAGES에 끼운다) ----
@@ -151,7 +171,7 @@ def settle(st, cfg):
                 if box.get("flow2"):
                     flow._f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
                 rec["roles"] = roles
-                out = choose(kept, labels, roles) or kept
+                out = choose(kept, labels, roles, protect=_handed_label(st, cfg, kept)) or kept
         if "fill" in mode:
             out, rec["filled"] = fill(out)
     except FutureTimeout:
@@ -193,6 +213,7 @@ def selftest():
     four = [*three, p("제13조 제4항")]
     assert choose(four, c4, ["참고", "직접", "직접", "직접"]) == four                                  # ④가 든 조항은 상한으로 자르지 않는다
     assert choose([three[0]], c4, ["참고", "참고", "무관", "무관"]) is None                           # 직접이 없으면 그대로
+    assert choose([three[0], three[1]], c4, ["참고", "직접", "참고", "참고"], protect={three[1]}) == [three[0], three[1]]   # 지킬 조항은 안 던다
     assert "c4" in pick_user("질문", [dict(c, law=park) for c in view if c["label"] in c4]) and len(pick_schema(4)["json_schema"]["schema"]["required"]) == 4
 
     # 흐름: 꺼 두면 7판 그대로(호출 3번 · 기록 없음), 켜면 인용만 바뀐다
@@ -244,6 +265,36 @@ def selftest():
         assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and "cite" not in t["flow2"], t["reason"]
         r, t = pipeline.answer(q, dict(cfg, flow2_cite="짝"))                      # 모르는 값은 오류로 드러난다
         assert r == contract.UNKNOWN and t["reason"] == pipeline.ERROR
+        # 맡긴 답 살리기(flow2_handed)와 함께: ⑥이 거절한 답을 살리면 이 단계에 오고, 그 답의 근거 조항(「시장이 따로 정한다」)은 덜어 내지 않는다
+        bike = ontology.LAW_KEYS["자전거"]
+        who, rate = f"{bike} 제12조의3 제2항", f"{bike} 제12조의3 제3항"
+        say = "감면율은 이 조례에 정해져 있지 않고 시장이 따로 정합니다."
+        plan.update(question_slots=dict(plan["question_slots"], targets=["공공자전거"], law_guess="자전거"),
+                    law_answer_quotes={"found": True, "check": "", "conclusion": "정보", "answer": say,
+                                       "evidence": [{"label": who, "quote": "감면 대상자는 다음 각 호의 기준에 따른다"},
+                                                    {"label": rate, "quote": "감면율 및 운영에 관한 사항은 시장이 따로 정한다"}]},
+                    evidence_pick={"c1": "참고", "c2": "직접", "c3": "참고", "c4": "무관", "c5": "참고"})
+        qb = "서울 공공자전거 이용요금은 몇 퍼센트 감면돼요?"
+        both = dict(cfg, flow2_cite="pick+fill", flow2_handed=True)
+        r, t = pipeline.answer(qb, both)
+        assert t["flow2"]["cite"]["cands"][1:3] == [who, rate] and t["flow2"]["handed"]["label"] == rate, (t["reason"], t["flow2"].get("cite"))
+        assert r["answer"] == say and r["citation"][:2] == [who, rate] and len(r["citation"]) == 3 and t["verdict"] == "notGrounded", r
+        assert pipeline.answer(qb, dict(both, flow2_handed=False))[0] == contract.UNKNOWN            # 살리기를 끄면 7판 그대로 확인 불가
+        assert pipeline.answer(qb, dict(both, flow2_cite=None))[0]["citation"] == [who, rate]        # 근거 정리를 끄면 살린 답의 인용 그대로
+        assert t["flow2"]["cite"]["protect"] == rate
+        plan["target_check"] = {"reason": "", "asks": [{"ask": "감면율", "verdict": "grounded"}], "done": True}
+        assert pipeline.answer(qb, both)[0]["citation"][:2] == [who, rate]                           # ⑥이 통과시킨 「맡긴 답」도 그 조항을 지킨다
+        r, t = pipeline.answer(qb, dict(both, flow2_handed=False))
+        assert r["citation"][0] == who and rate not in r["citation"] and "protect" not in t["flow2"]["cite"]   # 살리기를 끄면 보통 규칙대로(곁가지 항은 던다)
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="감면 대상자는 청소년 등입니다.")
+        assert rate not in pipeline.answer(qb, both)[0]["citation"]                                  # 「맡긴 답」 꼴이 아니면 지키지 않는다
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer=say)
+        # 출력 저장(flow2_memo)과 함께: 같은 문의를 다시 넣으면 다시 고르기도 부르지 않고 같은 인용을 낸다
+        memo = dict(cfg, flow2_cite="pick+fill", flow2_memo=":memory:")
+        r1, t1 = pipeline.answer(q2 := "서울 공공자전거 요금 감면율은 누가 정해요?", memo)
+        plan["evidence_pick"] = {"c1": "직접", "c2": "직접", "c3": "직접", "c4": "직접", "c5": "직접"}      # 모델이 다른 판정을 내도
+        r2, t2 = pipeline.answer(q2, memo)
+        assert r2 == r1 and all(c.get("kind") == "memo" for c in t2["calls"]), (r1["citation"], r2["citation"])
     finally:
         upstage.chat, upstage.has_key = old
     print("flow2 근거 묶음 정리 스스로 시험: 통과")
