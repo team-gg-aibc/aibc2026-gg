@@ -1,0 +1,10 @@
+{
+  "name": "pm-flow2-noonto",
+  "issue": "",
+  "cycle": 2,
+  "note": "PM 별도 실험: 새 흐름 flow2에서 온톨로지만 끔 — ③은 단순 규칙(정식 이름 글자 같음 · 분석이 자치구/다른 시도면 막음), ⑥은 인용 법령 목록 없이. 온톨로지 몫 재기용",
+  "engine": {
+    "flow": "flow2",
+    "flow2_ontology": false
+  }
+}
