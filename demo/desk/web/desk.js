@@ -106,9 +106,11 @@ function placeText() {
 }
 function drawLegend() {
   const M = W('지도').kv, P = PAL[ui.tone];
-  $('legend').innerHTML = `<b>${esc(M['범례'])}</b><span><i style="background:${P.park};box-shadow:inset 0 0 0 1px ${P.parkLine}"></i>${esc(M['공원'])}</span>
+  // 둘째 줄: 문의 점 색의 뜻을 글로(색만으로 가르지 않는다, 점검 11-11 밤)
+  $('legend').innerHTML = `<div class="lr"><b>${esc(M['범례'])}</b><span><i style="background:${P.park};box-shadow:inset 0 0 0 1px ${P.parkLine}"></i>${esc(M['공원'])}</span>
     <span><i style="background:${P.water}"></i>${esc(M['한강'])}</span><span><i class="P" style="background:${P.P}">P</i>${esc(M['주차장'])}</span>
-    <span class="opt2"><i class="dot" style="background:var(--draft)"></i>${esc(M['문의'])}</span><span><i class="ring"></i>${esc(M['고른 자리'])}</span>`;
+    <span><i class="ring"></i>${esc(M['고른 자리'])}</span></div>
+    <div class="lr"><b>${esc(M['문의'])}</b>${['draft', 'approved', 'notfound', 'out'].map((k) => `<span class="k-${k}"><i class="dot kb"></i>${esc(kindLabel(k))}</span>`).join('')}</div>`;
 }
 
 // ---- 칸 접고 펴기 · 톤

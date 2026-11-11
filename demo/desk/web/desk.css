@@ -174,7 +174,8 @@ body[data-tone="light"] .pin.k-notfound, body[data-tone="light"] .pin.k-out { co
 @keyframes ping { 0% { box-shadow: 0 0 0 0 var(--accent); } 100% { box-shadow: 0 0 0 18px rgba(0, 0, 0, 0); } }
 .plabel { padding: 3px 9px; border-radius: 7px; font-size: 12.5px; font-weight: 800; white-space: nowrap; background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); box-shadow: var(--shadow); pointer-events: none; }
 .plabel.was { border-style: dashed; color: var(--sub); }
-.legend { position: fixed; left: 344px; bottom: 10px; z-index: 2; display: flex; gap: 10px; align-items: center; padding: 6px 10px; font-size: 11.5px; color: var(--text); }
+.legend { position: fixed; left: 344px; bottom: 10px; z-index: 2; display: flex; flex-direction: column; gap: 3px; padding: 6px 10px; font-size: 11.5px; color: var(--text); }
+.legend .lr { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 body.nolist .legend { left: 10px; }
 .legend b { color: var(--sub); font-weight: 700; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -182,7 +183,6 @@ body.nolist .legend { left: 10px; }
 .legend i.dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
 .legend i.ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent); background: var(--accent-soft); }
 .legend i.P { width: 14px; height: 14px; border-radius: 50%; color: #fff; font-size: 9px; font-weight: 800; display: inline-grid; place-items: center; font-style: normal; }
-@media (max-width: 1300px) { .legend .opt2 { display: none; } }
 .credit { position: fixed; right: 10px; bottom: 34px; z-index: 2; max-width: 430px; text-align: right; font-size: 11px; line-height: 1.4; color: var(--credit); pointer-events: none; }
 .credit p { margin: 0; display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--top); }
 .toast { position: fixed; z-index: 7; top: 62px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 8px 14px; font-weight: 700; color: var(--ink); border-color: var(--accent); cursor: pointer; }
