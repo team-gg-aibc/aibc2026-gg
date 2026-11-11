@@ -5,7 +5,8 @@
 - 문항별 결과(eval/results/)는 git에 안 올리니, 실험한 사람이 자기 컴퓨터에서 돌려 이 md를 브랜치에 커밋한다.
   버린 실험이어도 「결과만 PR」이 이 md를 main에 남긴다(재현 규칙 8절).
 - 기준을 안 주면 리더보드의 「기준」 판(같은 문항 표의 출발 판 가운데 엔진 코드가 같은 것, 없으면 가장 최근 것)을 쓰되,
-  이 컴퓨터에 문항별 결과가 있는 것만 고른다. 같은 문항(문항 지문)끼리만 견주고, holdout은 견주지 않는다.
+  이 컴퓨터에 문항별 결과가 있는 것만 고른다. 같은 문항(문항 지문)끼리만 견주고, holdout · 처음 보는 문항(fresh)은 견주지 않는다
+  (이 md에는 질문과 정답 조항이 실리고 레포에 커밋된다).
 """
 import argparse
 import json
@@ -14,7 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 from board import LAWS, groups, local_runs
-from run import CAUSES, RESULTS, ROOT, RUNS, TYPES, WEIGHTS
+from run import CAUSES, RESULTS, ROOT, RUNS, TYPES, WEIGHTS, private
 
 OUT = ROOT / "docs" / "engine" / "compare"
 OK = "맞음"
@@ -25,8 +26,8 @@ def load(run):
     if not (RUNS / f"{run_id}.json").exists():
         sys.exit(f"✗ 실행 요약 eval/runs/{run_id}.json이 없습니다.")
     summary = json.loads((RUNS / f"{run_id}.json").read_text(encoding="utf-8"))
-    if summary["args"]["split"] == "holdout":
-        sys.exit("✗ holdout은 견주지 않습니다(보고 고치지 않게, 계획 5-1절).")
+    if private(summary):
+        sys.exit(f"✗ {private(summary)} 실행은 견주지 않습니다(보고 고치지 않게: holdout은 계획 5-1절, 처음 보는 문항 fresh는 decisions 11-11).")
     if summary["args"]["mode"] != "full":
         sys.exit("✗ 끝까지 잰 실행만 견줍니다(검색만 잰 실행은 리더보드의 적중률 표로 본다).")
     path = RESULTS / f"{run_id}.jsonl"

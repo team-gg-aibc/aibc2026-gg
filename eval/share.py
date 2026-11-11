@@ -8,7 +8,8 @@
 
 줄이기: 문항 둘 이상이 같이 보낸 긴 줄(조례 조각 · 시스템 프롬프트)을 지문(sha256 앞 12자리)으로 바꾸고, 그 글은 출처와 함께
 파일 첫 줄에 한 번만 둔다. 질문 · 모델 출력 · 단계 · 사유 · 토큰 · 시간은 그대로다. load()로 되살리면 원래 기록과 같다.
-거부: holdout 문항이 하나라도 든 실행 · 끝까지 잰 실행이 아닌 것 · 열쇠처럼 보이는 글이 든 것. 집 폴더 경로의 사용자 이름은 ~로 가린다.
+거부: holdout · 처음 보는 문항(fresh) 실행 · holdout 문항이 하나라도 든 실행 · 끝까지 잰 실행이 아닌 것 · 열쇠처럼 보이는 글이 든 것.
+집 폴더 경로의 사용자 이름은 ~로 가린다.
 """
 import argparse
 import gzip
@@ -20,7 +21,7 @@ import sys
 import time
 from pathlib import Path
 
-from run import EVAL, RESULTS, ROOT, RUNS, answer, config, verify
+from run import EVAL, RESULTS, ROOT, RUNS, answer, config, private, verify
 
 SHARED = RESULTS / "shared"
 MIN_LINE = 32          # 이보다 짧은 줄은 그대로 둔다(지문 표시 {"blob": …}가 24자라)
@@ -129,8 +130,9 @@ def holdout_ids():
 
 def refuse(summary, text):
     """올리면 안 되는 까닭(없으면 None)."""
-    if summary["args"]["split"] == "holdout":
-        return "holdout 실행은 올리지 않습니다(보고 고치지 않게, 계획 5-1절)."
+    kind = private(summary)
+    if kind:
+        return f"{kind} 실행은 올리지 않습니다(보고 고치지 않게: holdout은 계획 5-1절, 처음 보는 문항 fresh는 decisions 11-11)."
     bad = sorted({json.loads(ln)["id"] for ln in lines(text)} & holdout_ids())
     if bad:
         return f"holdout 문항 {len(bad)}개가 들어 있습니다(예: {bad[:3]}). 올리지 않습니다."
@@ -168,7 +170,7 @@ def upload(path, cycle):
     if gh("release", "view", t, check=False).returncode:
         gh("release", "create", t, "--prerelease", "--title", f"{cycle}주기 문항별 기록",
            "--notes", f"eval/share.py가 올린 {cycle}주기 실행의 문항별 기록(<실행>.jsonl.gz). "
-                      f"보는 법: python3 eval/failures.py --cycle {cycle}. holdout은 올리지 않는다.")
+                      f"보는 법: python3 eval/failures.py --cycle {cycle}. holdout · 처음 보는 문항(fresh)은 올리지 않는다.")
     gh("release", "upload", t, str(path), "--clobber")
 
 
@@ -239,6 +241,8 @@ def selftest():
     hid = sorted(holdout_ids())[0]
     assert "holdout 문항" in refuse(summary, dumps([{"id": hid}]))
     assert "holdout 실행" in refuse(dict(summary, args={"split": "holdout", "mode": "full"}), text)
+    assert "fresh 실행" in refuse(dict(summary, args={"split": "fresh", "mode": "full"}), text)       # 처음 보는 문항도 올리지 않는다
+    assert "fresh 실행" in refuse(dict(summary, run_id="20261110-213655-x-fresh-r1"), text)            # 요약의 split 칸이 달라도 실행 이름으로
     assert "끝까지" in refuse(dict(summary, args={"split": "dev", "mode": "retrieval"}), text)
     assert "열쇠" in refuse(summary, dumps([{"id": "x", "error": "AuthenticationError up_" + "a1B2" * 8}]))
     assert refuse(summary, text) is None

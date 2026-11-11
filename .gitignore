@@ -25,6 +25,8 @@ engine/data/annex_files/
 
 # 점수 틀: 문항별 결과(요약은 eval/runs/에 남기고 남길 것만 커밋)
 eval/results/
+# 점수 틀: 처음 보는 문항 파일. PM 쪽 컴퓨터에만 두고 레포에 넣지 않는다(docs/decisions.md 11-11, PR 검사도 막는다)
+eval/fresh_*.json
 
 # 채점 서버: 문항별 판단 기록(engine/server.py)
 logs/

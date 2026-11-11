@@ -2,6 +2,7 @@
 
 늘 필수: 제목 앞머리, 첫 줄(Closes/Refs/티켓 없음), 「무엇이 좋아지나 · 검증 · 정리」.
 화면 · 코드(app/)를 바꾼 PR만 필수: 「바로 확인 · Before / After · 이 흐름이 자연스러운가 · 화면 점검 · 흐름 다이어그램」.
+처음 보는 문항 파일(eval/fresh_*.json)이 든 PR은 막는다(docs/decisions.md 11-11. .gitignore는 이미 추적 중인 파일을 못 막아서 여기서 본다).
 CI에서는 환경 변수 PR_TITLE · PR_BODY · CHANGED_FILES_PATH로 받는다(본문을 명령에 직접 끼우지 않으려고).
 `python3 check_pr.py --selftest`로 검사기 자체를 시험한다.
 """
@@ -12,6 +13,7 @@ import sys
 TYPES = "feat|fix|docs|refactor|style|test|chore|ci"
 CORE = ["무엇이 좋아지나", "검증", "정리"]
 SCREEN = ["바로 확인", "Before / After", "이 흐름이 자연스러운가", "화면 점검", "흐름 다이어그램"]
+FRESH = re.compile(r"^eval/fresh_[^/]*\.json$")     # 처음 보는 문항 파일(숫자만 든 실행 요약 eval/runs/…-fresh….json은 괜찮다)
 
 
 def sections(text: str) -> dict[str, str]:
@@ -29,6 +31,8 @@ def check(title: str, body: str, changed: list[str]) -> list[str]:
     errors = []
     screen_pr = any(path.startswith("app/") for path in changed)
     required = CORE + SCREEN if screen_pr else CORE
+    if any(FRESH.match(path) for path in changed):
+        errors.append("처음 보는 문항 파일(eval/fresh_*.json)은 레포에 넣지 않아요(docs/decisions.md 11-11). `git rm --cached <파일>`로 PR에서 빼 주세요.")
     if not re.match(rf"^({TYPES})(\([^)]+\))?: \S", title or ""):
         errors.append(f"PR 제목은 「{TYPES.replace('|', ' · ')}」 중 하나로 시작해야 해요. 예: feat: 검색 결과에 근거 조항 붙이기")
     text = re.sub(r"<!--.*?-->", "", body or "", flags=re.S)
@@ -64,6 +68,8 @@ def selftest() -> None:
     assert check("docs: x", "Closes #3\n" + core.replace("## 검증\n내용", "## 검증\n"), docs)
     assert check("docs: x", "Closes #3\n" + core.replace("## 정리\n내용\n", ""), docs)
     assert check("docs: x", "Closes #3\n" + core.replace("## 검증\n내용", "## 검증\n<채우기: 확인한 것>"), docs)
+    assert check("docs: x", "Closes #3\n" + core, docs + ["eval/fresh_pm.json"])                      # 처음 보는 문항 파일은 막는다
+    assert check("docs: x", "Closes #3\n" + core, docs + ["eval/runs/20261110-1-x-fresh-r1.json"]) == []   # 숫자만 든 실행 요약은 괜찮다
     print("selftest ok")
 
 

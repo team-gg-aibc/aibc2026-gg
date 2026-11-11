@@ -116,6 +116,7 @@ PowerShell 기준이다.
 | `verify.py` | 확인 불가 판정: ① 1위 의미 점수 문턱 ② solar-pro4 판정, 프롬프트 판(`PROMPTS`) | 동욱 (#30) |
 | `contract.py` | 4칸 응답 꼴, 확인 불가 꼴 | 동욱 (#22) |
 | `pipeline.py` | 흐름과 판단 기록 | 동규 (바꿀 땐 PM 리뷰) |
+| `flow2/` | 새 흐름. 설정 `flow`가 `"flow2"`일 때만 돈다(기본값 `"kit"`은 위 흐름 그대로): 질문 분석 → 조례 확정 → 조례 통째로 읽기 → 구절 관문 → 질문 대조. 단계 · 스위치 · 재는 법은 [새 흐름 한 장](../docs/engine/flow2.md) | 3주기부터 팀 실험의 바탕 (이슈마다 자기 스위치로만) |
 | `server.py` | 채점 API (`POST /ask`, `GET /health`) | 동욱 (#31) |
 | `build_index.py` · `parse_annex.py` | 조각 · 임베딩 만들기, 별표 읽기 | 건영 (#23) |
 | `data/` | 원문(`ordinances.json`), 별표 읽은 결과(`annex/`), 조각(`chunks_paragraph.json`), 조각 임베딩(`vectors_paragraph.npy`), 둘의 짝 지문(`index_paragraph.json`) | 색인을 바꾸는 이슈 |
