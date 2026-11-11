@@ -168,9 +168,9 @@ function openCard(id) {
 function closeCard() { openId = null; $('card').hidden = true; renderList(); renderMarkers(); }
 
 function placeLine(q) {
-  const notes = Object.fromEntries(sec('A', '지도').items.map((i) => split2(i.text)));
+  const pairs = sec('A', '지도').items.map((i) => split2(i.text)), notes = Object.fromEntries(pairs);
   const p = q.place && S.places[q.place];
-  if (!p) return `<span class="badge k-check">장소 확인 필요</span> ${esc(notes['장소 확인 필요'])}`;
+  if (!p) { const [nb, ns] = pairs[pairs.length - 1]; return `<span class="badge k-check">${esc(nb)}</span> ${esc(ns)}`; }   // 지도 구역 맨 끝 줄 = 장소 없음
   const attr = p.kind === '공원' ? '공원 구분' : p.kind === '공영주차장' ? '급지' : '';
   return `${esc(p.name)}${attr ? ` <span class="badge k-check">${esc(attr)} ${esc(notes[attr])}</span>` : ''}`;
 }
@@ -245,8 +245,8 @@ function draftSections(q) {
 }
 
 function sourceLine(q) {
-  if (!q.engine) return '';
-  const it = sec('C', '이 초안의 출처').items.map((i) => split2(i.text)), [b, s] = it[q.engine.how === 'live' ? 0 : 1];
+  if (!q.engine || kindOf(q) === 'failed') return '';   // 받은 답이 없으면 출처 줄도 없다
+  const it = sec('C', '엔진 답의 출처').items.map((i) => split2(i.text)), [b, s] = it[q.engine.how === 'live' ? 0 : 1];
   const meta = [fmt(q.engine.at), q.engine.sec != null ? `${q.engine.sec}초` : ''].filter(Boolean).join(' · ');
   return `<footer class="c-src s-${q.engine.how}"><b>${esc(b)}</b> ${esc(s)} <span class="meta">${esc(meta)}</span></footer>`;
 }
