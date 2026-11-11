@@ -1,5 +1,5 @@
 {
- "note": "3판 본 화면의 문의 47건(실제 글 30 · 가상 17). source: real = 공개 게시판 글(요지) · faq = 기관 자주 묻는 질문 · virtual = 가상 문의(NVIDIA Nemotron-Personas-Korea, CC BY 4.0을 바탕으로 만듦) · team = 팀이 쓴 가상 문의. set_id는 _orch-tools/reports/문의세트/의 번호(P0 · P1 · G01은 팀이 쓴 글). loc.virtual = 문의에 장소가 없어 구 안의 대략 자리에 놓은 것. approved = 화면을 보이려고 정한 승인 상태(엔진 답은 그대로). 엔진 답은 data/saved.json(모두 기록된 실제 실행 결과).",
+ "note": "3판 본 화면의 문의 50건(실제 글 30 · 가상 20). source: real = 공개 게시판 글(요지) · faq = 기관 자주 묻는 질문 · virtual = 가상 문의(NVIDIA Nemotron-Personas-Korea, CC BY 4.0을 바탕으로 만듦) · team = 팀이 쓴 가상 문의. set_id는 _orch-tools/reports/문의세트/의 번호(P0 · P1 · G01 · S01~S03은 팀이 쓴 글. S01~S03은 「같은 장소, 다른 일」 장면: 서울숲에서 도시공원 · 금연 · 자전거 조례로 갈리는 문의, 11-12 main 엔진에 세 번씩 넣어 세 번 모두 같았던 글). loc.virtual = 문의에 장소가 없어 구 안의 대략 자리에 놓은 것. approved = 화면을 보이려고 정한 승인 상태(엔진 답은 그대로). 엔진 답은 data/saved.json(모두 기록된 실제 실행 결과).",
  "pair": {
   "title": "공원 안 음료 노점 가능 여부 문의",
   "text": "이 공원에서 돗자리를 펴 놓고 음료를 파는 노점을 해도 되나요?"
@@ -611,6 +611,45 @@
     "name": "서울숲",
     "lon": 127.036,
     "lat": 37.5455,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "S01",
+   "text": "서울숲 공원 시설을 예약했는데 태풍 때문에 취소하면 낸 이용료를 전부 돌려받나요?",
+   "source": "team",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.0381,
+    "lat": 37.5449,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "S02",
+   "text": "서울숲 산책로에서 담배를 피워도 되나요? 공원도 금연구역으로 정할 수 있나요?",
+   "source": "team",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.0366,
+    "lat": 37.5439,
+    "virtual": false,
+    "place": "seoulforest"
+   },
+   "approved": false
+  },
+  {
+   "set_id": "S03",
+   "text": "서울숲에서 따릉이를 타려는데, 17살 고등학생도 따릉이 이용요금 할인이 되나요?",
+   "source": "team",
+   "loc": {
+    "name": "서울숲",
+    "lon": 127.0388,
+    "lat": 37.5437,
     "virtual": false,
     "place": "seoulforest"
    },

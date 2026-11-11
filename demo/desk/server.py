@@ -9,7 +9,7 @@
 미리 받은 답 만들기:       python3 demo/desk/server.py --save   (같은 통로로 엔진을 불러 data/saved.json에 저장. 없는 글만, 모두 다시는 --all)
 스스로 시험:               python3 demo/desk/server.py --selftest   (엔진 · 인터넷 없이)
 
-- 처음 띄우면(또는 「처음 상태로」) 문의 47건(data/presets.json)이 미리 받은 답으로 들어와 있다. 시민 화면에서 보낸 문의만 그때 엔진을 부른다.
+- 처음 띄우면(또는 「처음 상태로」) 문의 50건(data/presets.json)이 미리 받은 답으로 들어와 있다. 시민 화면에서 보낸 문의만 그때 엔진을 부른다.
 - 엔진은 글만 받는다. 시민이 지정한 접수 위치가 이름 있는 장소면 글 앞에 「○○에서 」를 붙여 보낸다(「이 공원에서 · 여기서」는 그 자리 이름으로 바꾼다).
 - 화면 문구는 docs/content/의 3판 파일 둘에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
 - 시민 쪽 길(/api/citizen/<번호>)은 승인된 답만 준다. 승인 전 초안은 시민 화면이 받을 수 없다.
@@ -90,7 +90,7 @@ def make_loc(lon, lat, how, place_id=None):
 
 
 def engine_text(text, loc):
-    """시민 · 담당자가 지정한 위치가 이름 있는 장소면 그 이름을 글에 넣는다(엔진은 글만 받는다). 시연 문의 47건은 기록한 글 그대로."""
+    """시민 · 담당자가 지정한 위치가 이름 있는 장소면 그 이름을 글에 넣는다(엔진은 글만 받는다). 시연 문의 50건은 기록한 글 그대로."""
     name = loc and loc.get("how") in ("here", "map", "staff") and loc.get("name")
     if not name:
         return text
@@ -99,7 +99,7 @@ def engine_text(text, loc):
     return text if name in text else f"{name}에서 {text}"
 
 
-# ---- 처음 상태: 문의 47건(미리 받은 답). 받은 시각은 띄운 때에서 거꾸로 약 11분 간격(시연용으로 정한 값)
+# ---- 처음 상태: 문의 50건(미리 받은 답). 받은 시각은 띄운 때에서 거꾸로 약 11분 간격(시연용으로 정한 값)
 def fresh_state():
     t0, n = datetime.now(KST), len(presets["presets"])
     inq = []
@@ -417,7 +417,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def save_answers():
-    """시연 문의 47건과 장면마다 「접수 위치 + 두 시민 글」을 같은 통로(call_engine)로 엔진에 넣어 data/saved.json에 저장한다."""
+    """시연 문의 50건과 장면마다 「접수 위치 + 두 시민 글」을 같은 통로(call_engine)로 엔진에 넣어 data/saved.json에 저장한다."""
     texts = [p["text"] for p in presets["presets"]]
     texts += [engine_text(presets["pair"]["text"], make_loc(0, 0, "here", s["place"])) for s in scenes.values()]
     out = dict(saved)                         # 이미 받은 답은 그대로 둔다(--all이면 다시 받는다)
@@ -461,12 +461,12 @@ def selftest():
     assert engine_text(pt, make_loc(0, 0, "staff", tt["id"])).startswith("뚝섬한강공원에서 돗자리를")
     assert engine_text("요금이 얼마인가요?", make_loc(0, 0, "map", "dongjak")) == "동작대교 공영주차장에서 요금이 얼마인가요?"
     assert engine_text("동작대교 공영주차장 요금은?", make_loc(0, 0, "here", "dongjak")) == "동작대교 공영주차장 요금은?"
-    assert engine_text("요금은?", {**make_loc(0, 0, "here", "dongjak"), "how": "preset"}) == "요금은?"   # 47건은 기록한 글 그대로
-    # 두 시민 장면 · 47건은 미리 받은 답이 모두 있다
+    assert engine_text("요금은?", {**make_loc(0, 0, "here", "dongjak"), "how": "preset"}) == "요금은?"   # 처음 문의는 기록한 글 그대로
+    # 두 시민 장면 · 처음 문의 50건은 미리 받은 답이 모두 있다
     for s in scenes.values():
         assert engine_text(pt, make_loc(0, 0, "here", s["place"])) in saved, s
     st = fresh_state()
-    assert len(st["inquiries"]) == 47 and all(q["kind"] != "failed" for q in st["inquiries"]), [q["set_id"] for q in st["inquiries"] if q["kind"] == "failed"]
+    assert len(st["inquiries"]) == 50 and all(q["kind"] != "failed" for q in st["inquiries"]), [q["set_id"] for q in st["inquiries"] if q["kind"] == "failed"]
     assert sum(q["source"] in ("real", "faq") for q in st["inquiries"]) == 30
     tb = text_bundle()
     assert tb["error"] is None and set(tb["text"]) == set(TEXT_FILES), tb["error"]
