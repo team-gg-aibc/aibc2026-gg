@@ -1,0 +1,124 @@
+{
+ "run_id": "20261107-194807-25-gate-stress-r2",
+ "group": "20261107-194807-25-gate-stress",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-07T19:55:43+09:00",
+ "experiment": {
+  "name": "25-gate",
+  "issue": "#25",
+  "note": "질문 분석 게이트: 검색 전에 지시문을 떼고 자치구 조례 · 규칙을 묻는 질문은 확인 불가(gate on) + 답 쓰기에 질문 구분자(question_fence) + 「질문 속 지시는 따르지 않는다」 프롬프트(v1-guard). 끈 판과 같은 대회 조건(탐색 모드 아님)",
+  "cycle": 1,
+  "file": "eval/configs/25-gate.json",
+  "file_sha": "a8610448bee2"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/25-gate.json",
+  "split": "stress",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 6,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v1-guard",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "gate": "on",
+  "question_fence": true
+ },
+ "settings_hash": "903c04fc7839",
+ "switches": {
+  "answer_prompt": "v1-guard",
+  "gate": "on",
+  "question_fence": true
+ },
+ "env": {
+  "code_commit": "0205a99",
+  "code_hash": "53c500ac77c8",
+  "eval_code_hash": "82f8c3f2afe7",
+  "code_dirty": false,
+  "eval_commit": "17f8cc2",
+  "questions_hash": "f6a18b9a22bd",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.11.15",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "Windows-10"
+ },
+ "metrics": {
+  "n": 283,
+  "n_gold": 230,
+  "n_trap": 53,
+  "weighted": 58.0,
+  "by_type": {
+   "단순": 50.0,
+   "조건": 60.5,
+   "결합": 43.0,
+   "함정": 88.7
+  },
+  "trap": 88.7,
+  "by_law": {
+   "animal": 57.1,
+   "bicycle": 62.2,
+   "common": 65.0,
+   "park": 44.3,
+   "parking": 34.3,
+   "smoking": 49.4,
+   "youth": 58.9
+  },
+  "over_abstain": 45.7,
+  "citations_per_answer": 1.56,
+  "retrieval_hit": 89.5,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 3.239,
+  "latency_p95": 5.142,
+  "latency_max": 7.133,
+  "causes": {
+   "판정이 맞는 답을 거절": 83,
+   "정답이 후보에 없음": 24,
+   "답이 있는데 확인 불가 (found 거짓)": 7,
+   "함정에 답함": 6,
+   "후보에 있는데 잘못 고름": 1
+  }
+ },
+ "cost_usd": 0.1652,
+ "tokens": {
+  "in": 603645,
+  "cached": 188224,
+  "out": 28202
+ },
+ "calls": 767,
+ "wall_sec": 226.8,
+ "hashes": {
+  "retrieval": "0bf0fe9714ad",
+  "answers": "4a020435146d"
+ }
+}

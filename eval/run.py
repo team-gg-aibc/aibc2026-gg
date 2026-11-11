@@ -86,12 +86,30 @@ def score_citation(preds, gold):
 def load(split):
     """회색지대(정답 꼴 미정)는 뺀다. kit = 스타터 킷 예시 11문항. para = 조례 원문에서 새로 쓴 바꿔 말한 질문(PM 별도 실험 일반화 확인, eval/para_*.json).
     mix = 조례 원문에서 새로 쓴 섞인 질문 · 없는 조 번호 · 틀린 전제 · 행위 주체 함정(PM 별도 실험 flow2 2판 확인, eval/mix_*.json).
-    fresh = 조례 원문에서 새로 쓴 일반 묶음(단순 · 조건 · 결합 · 함정, PM 별도 실험 flow2 3판의 「고칠 때 안 본 세트」, eval/fresh_*.json)."""
+    fresh = 조례 원문에서 새로 쓴 일반 묶음(단순 · 조건 · 결합 · 함정, PM 별도 실험 flow2 3판의 「고칠 때 안 본 세트」, eval/fresh_*.json).
+    para · mix · fresh 파일은 레포에 없을 수 있다(eval/README.md 「파일」 표). 문항이 0개면 돌지 않고 멈춘다."""
     pattern = {"dev": "questions_*.json", "holdout": "questions_*.json", "stress": "stress_*.json",
                "kit": "kit_questions.json", "para": "para_*.json", "mix": "mix_*.json", "fresh": "fresh_*.json"}[split]
-    qs = [q for f in sorted(EVAL.glob(pattern)) for q in json.loads(f.read_text(encoding="utf-8"))]
-    return [q for q in qs if "[회색지대]" not in q.get("note", "")
-            and (split not in ("dev", "holdout") or q.get("split") == split)]
+    files = sorted(EVAL.glob(pattern))
+    qs = [q for f in files for q in json.loads(f.read_text(encoding="utf-8"))]
+    qs = [q for q in qs if "[회색지대]" not in q.get("note", "")
+          and (split not in ("dev", "holdout") or q.get("split") == split)]
+    if not qs:      # 없는 묶음을 고르면 0문항으로 오류 없이 끝나던 것을 막는다
+        sys.exit(f"✗ --split {split}: 문항이 0개입니다(eval/{pattern} 파일 {len(files)}개). para · mix 파일은 결과 PR #77이 "
+                 "병합되면 들어오고, fresh 파일은 레포에 두지 않습니다(eval/README.md 「파일」 표).")
+    return qs
+
+
+PRIVATE = ("holdout", "fresh")      # 보고 고치지 않는 묶음. 문항별 기록을 팀이 받는 곳(릴리스 · 비교 문서 · 실패 모음)에 두지 않는다
+
+
+def private(summary):
+    """실행 요약이 PRIVATE 묶음의 것이면 그 묶음 이름, 아니면 None. 요약의 split 칸과 실행 이름(…-<묶음>[-n수][-r번]) 둘 다 본다."""
+    split = (summary.get("args") or {}).get("split")
+    if split in PRIVATE:
+        return split
+    m = re.search(rf"-({'|'.join(PRIVATE)})(?:-n\d+)?(?:-r\d+)?$", summary.get("run_id") or "")
+    return m.group(1) if m else None
 
 
 def sample(qs, n, seed):
@@ -355,7 +373,9 @@ def run(args):
     cfg, exp, mode, qs = prepare(args)
     if args.split == "holdout":
         print("· holdout: 큰 이정표에서만 잽니다(계획 5-1절). 문항별 결과는 남기지 않습니다.")
-    stamp = datetime.now(KST).strftime("%Y%m%d-%H%M%S")
+    if args.split == "fresh":
+        print("· fresh: 문항별 결과는 이 컴퓨터의 eval/results/에만 둡니다. share · compare · failures는 이 실행을 거부합니다(decisions 11-11).")
+    stamp =datetime.now(KST).strftime("%Y%m%d-%H%M%S")
     group = "-".join([stamp, re.sub(r"[^\w.-]+", "-", exp["name"]), args.split] + ([f"n{args.sample}"] if args.sample else []))
     out = []
     for rep in range(1, args.repeat + 1):
@@ -469,6 +489,19 @@ def selftest():
     assert Counter(q["type"] for q in s0) == {t: 5 for t in TYPES}
     assert {q["id"] for q in s0} != {q["id"] for q in sample(qs, 20, 1)}
     assert len(sample(qs, 7, 0)) == 7 and sample(qs, None, 0) == qs
+
+    global EVAL                         # 문항 파일이 없는 묶음은 0문항으로 조용히 끝나지 않고 멈춘다
+    keep, EVAL = EVAL, EVAL / "configs"
+    try:
+        load("para")
+        raise AssertionError("문항이 0개인데 멈추지 않았다")
+    except SystemExit as e:
+        assert "--split para" in str(e)
+    finally:
+        EVAL = keep
+    assert private({"args": {"split": "fresh"}}) == "fresh" and private({"args": {"split": "holdout"}}) == "holdout"
+    assert private({"args": {"split": "dev"}, "run_id": "20261111-090000-x-fresh-r2"}) == "fresh"       # 요약의 split 칸이 달라도 실행 이름으로
+    assert private({"args": {"split": "dev"}, "run_id": "20261111-090000-83-fresh-start-dev-r1"}) is None and private({}) is None
 
     cfg = dict(config.load(), select_mode="direct")   # 가짜 업스테이지는 답 쓰기 한 번만 흉내 낸다(DEFAULTS의 #24 먼저 추리기는 끔)
     ok = {"answer": "네", "citation": [a], "source_url": "https://www.law.go.kr/x", "effective_date": "2026-10-01"}

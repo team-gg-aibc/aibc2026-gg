@@ -1,0 +1,7 @@
+{
+  "name": "68-scope",
+  "issue": "#68",
+  "cycle": 2,
+  "note": "관할 규칙 넓히기: 게이트(gate on)에 규칙 ① 자치구 이름 + 그 문장에 「서울」 없음, 규칙 ② 6종 밖 이름 붙은 조례를 더한 판. question_fence · v1-guard는 끔(이번에 안 잼). 끈 판은 rc-c1(baseline.json)",
+  "engine": {"gate": "on"}
+}
