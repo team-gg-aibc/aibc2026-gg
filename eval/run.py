@@ -40,6 +40,8 @@ TYPES = {"단순 조회": "단순", "조건 판단": "조건", "여러 조항 �
 WEIGHTS = {"단순": 3, "조건": 3, "결합": 3, "함정": 2}          # 킷 예시 비율
 FIELDS = {"answer", "citation", "source_url", "effective_date"}
 LIMIT_SEC = 90                                                  # 대회 제한, 넘으면 0점
+CONNECT_SEC = 10                                                # 서버로 부를 때 접속 제한(대회 채점기와 같게)
+URL_WORKERS = 2                                                 # 대회 채점기는 한 팀에 2문항씩 동시에 보낸다
 NOT_IN = "정답이 후보에 없음"
 MISPICK = "후보에 있는데 잘못 고름"
 REJECTED_OK = "판정이 맞는 답을 거절"
@@ -76,10 +78,31 @@ def match(pred, gold):
 
 
 def score_citation(preds, gold):
-    """gold: [[대안1, 대안2], [다음 필수 근거], ...]"""
+    """gold: [[대안1, 대안2], [다음 필수 근거], ...]. 필요한 근거마다 따로 채점해 평균을 낸다(일부만 맞혀도 맞힌 비율만큼)."""
     if not gold:
         return None
     return sum(max((match(p, a) for p in preds for a in alts), default=0.0) for alts in gold) / len(gold)
+
+
+# ---- 대회 채점 규칙 더하기 (11-11에 받은 업스테이지 답 2번, eval/README.md 「점수 잴 때」) ----
+EXTRA_FREE = 2      # 인용은 「정답 근거 수 + 2개」까지 감점 없음
+
+
+def outside(c):
+    """자치구 조례(「… OO구 … 조례」)나 규칙(시행규칙 포함) 인용인가. 하나라도 섞이면 그 문항은 0점이다."""
+    return "규칙" in c or re.search(r"(?:^|\s)\S+구\s+\S.*조례", c) is not None
+
+
+def score_answer(preds, gold):
+    """응답의 인용을 대회 규칙으로 채점한다. score_citation(근거마다 채점해 평균)에 두 가지를 더한다.
+    - 자치구 조례 · 규칙이 하나라도 섞이면 0점
+    - 인용 수가 「정답 근거 수 + 2」를 넘으면 넘은 만큼 비례해 깎는다(정답 근거 1개에 4개 인용 → 받은 점수의 3/4)
+    조례명 없는 인용(「제7조 제1항」)은 CITE가 읽지 못해 0점이다. 후보 · 검색 적중률은 깎지 않으니 score_citation을 그대로 쓴다."""
+    if not gold:
+        return None
+    if any(outside(c) for c in preds):
+        return 0.0
+    return score_citation(preds, gold) * min(1.0, (len(gold) + EXTRA_FREE) / max(len(preds), 1))
 
 
 # ---- 문항 고르기 ----
@@ -147,7 +170,7 @@ def grade(q, resp, tr, sec, err, cfg):
     late = slow and not cfg["explore"]   # 탐색 모드는 90초를 넘어도 점수에서 빼지 않는다(시간은 기록만)
     broken = bool(err) or not fmt_ok or (tr is not None and tr["reason"] == pipeline.ERROR)
     if q["gold"]:
-        score = 0.0 if err or late or not fmt_ok else score_citation(resp["citation"], q["gold"])
+        score = 0.0 if err or late or not fmt_ok else score_answer(resp["citation"], q["gold"])
     else:
         score = 1.0 if unknown and not err and not late else 0.0
     cand = None
@@ -192,7 +215,8 @@ def ask(q, cfg, mode, url):
     if url:
         import requests
         try:
-            r = requests.post(url, json={"question": q["question"]}, timeout=LIMIT_SEC)
+            # 대회 채점기처럼: 접속은 10초 안에 돼야 하고 다시 시도하지 않는다. 90초는 보낸 때부터 응답을 다 받을 때까지(11-11 답 7번)
+            r = requests.post(url, json={"question": q["question"]}, timeout=(CONNECT_SEC, LIMIT_SEC))
             resp, err = r.json(), (None if r.status_code == 200 else f"HTTP {r.status_code}")
         except Exception as e:  # noqa: BLE001
             resp, err = {}, type(e).__name__
@@ -483,6 +507,16 @@ def selftest():
     assert score_citation(["서울특별시 금연환경 조성 및 간접흡연 피해방지조례 제2조"],
                           [["서울특별시 금연환경 조성 및 간접흡연 피해방지조례 제2조"]]) == 1.0
 
+    # 11-11 업스테이지 답 2번: 조례명 필수 · 「정답 근거 수 + 2」 초과 감점 · 자치구 조례나 규칙이 섞이면 0점
+    c3, c9, c18 = (f"서울특별시 주차장 설치 및 관리 조례 제{n}조 제1항" for n in (3, 9, 18))
+    assert score_answer(["제7조 제1항"], [[a]]) == 0.0 and score_answer(["주차장 조례 제7조 제1항"], [[a]]) == 0.0
+    assert score_answer([a, c3, c9], [[a]]) == 1.0 and score_answer([a, c3, c9, c18], [[a]]) == 0.75   # 1개 정답에 3개까지, 4개면 3/4
+    assert score_answer([a, b, c3, c9], [[a], [b]]) == 1.0 and score_answer([a, c3, c9, c18], [[a], [b]]) == 0.5
+    assert score_answer([a, "서울특별시 강남구 주차장 설치 및 관리 조례 제3조"], [[a]]) == 0.0
+    assert score_answer([a, "서울특별시 주차장 설치 및 관리 조례 시행규칙 제2조"], [[a]]) == 0.0
+    assert score_answer([], [[a]]) == 0.0 and score_answer([a], []) is None
+    assert not any(outside(c["label"]) for c in retrieve.load("paragraph")[0])       # 6종 색인 라벨은 하나도 걸리지 않는다
+
     qs = [{"id": f"x-{t}{i}", "type": t} for t in TYPES for i in range(25)]
     s0 = sample(qs, 20, 0)
     assert [q["id"] for q in s0] == [q["id"] for q in sample(qs, 20, 0)]
@@ -522,6 +556,10 @@ def selftest():
     assert grade(gold_q, unk, tr(pipeline.REJECTED, draft=dict(ok, citation=[b])), 1, None, cfg)["cause"] == MISPICK
     assert grade(gold_q, dict(ok, citation=[7]), tr(), 1, None, cfg)["cause"] == BROKEN
     assert grade(trap_q, ok, tr(), 1, None, cfg)["cause"] == TRAP_ANSWERED
+    guided = dict(unk, answer="확인 불가. 이 내용은 도로교통법에서 정합니다.")    # 11-11 답 3번: 확인 불가로 시작 + 빈 인용이면 뒤 안내가 있어도 정답
+    assert grade(trap_q, guided, tr(), 1, None, cfg)["score"] == 1.0 and grade(trap_q, dict(guided, citation=[a]), tr(), 1, None, cfg)["score"] == 0.0
+    assert grade(gold_q, guided, tr(pipeline.NOT_FOUND), 1, None, cfg)["score"] == 0.0    # 답 1번: 근거가 있는 문항에 확인 불가면 0점
+    assert grade(gold_q, dict(ok, citation=[a, c3, c9, c18]), tr(), 1, None, cfg)["score"] == 0.75      # 답 2번: 인용이 너무 많으면 깎인다
     r = grade(trap_q, ok, tr(), 80, None, cfg)          # 75초 넘으면 서버가 확인 불가로 답한다
     assert r["score"] == 1.0 and r["timeout"] and r["sec"] == 75
     assert grade(gold_q, ok, tr(), 80, None, cfg)["cause"] == TIMEOUT
@@ -573,11 +611,12 @@ def main():
     ap.add_argument("--mode", default="auto", choices=["auto", "retrieval", "full"],
                     help="retrieval = 검색 적중률만, full = 끝까지. auto는 키가 있으면 full")
     ap.add_argument("--url", help="엔진 대신 서버 주소로 부르기 (예: http://localhost:8000/ask)")
-    ap.add_argument("--workers", type=int, default=4, help="동시에 돌릴 문항 수")
+    ap.add_argument("--workers", type=int, help="동시에 돌릴 문항 수 (기본: 엔진 직접 4, --url이면 대회 채점기처럼 2)")
     ap.add_argument("--max-cost", type=float, help="한 실행에 쓸 최대 달러(기본: 상한 없음, 동규 11-06). 넘으면 남은 문항을 건너뛴다")
     ap.add_argument("--check", help="재현 점검할 실행 요약 파일 (eval/runs/*.json)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
+    args.workers = args.workers or (URL_WORKERS if args.url else 4)
     if args.selftest:
         selftest()
     elif args.check:
