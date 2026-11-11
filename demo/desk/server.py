@@ -147,7 +147,8 @@ def _chunks():
 CHUNKS = _chunks()
 LAWS = {x["law"] for x in CHUNKS.values()}
 _squash = lambda s: re.sub(r"\s+", "", (s or "").replace("[조항]", ""))   # noqa: E731
-_inner = lambda s: (s or "").replace("(※ 그 내용은 이 자료에 없다)", "").strip()   # noqa: E731  엔진 안쪽 표시는 화면에 내지 않는다
+DELEG_MARK = "(※ 그 내용은 이 자료에 없다)"   # 엔진(flow2)이 조례가 다른 법령에 넘긴 구절에 붙이는 안쪽 표시. 구절에도 답 글에도 그대로 들어올 수 있다
+_inner = lambda s: re.sub(r"\s*" + re.escape(DELEG_MARK), "", s or "").strip()   # noqa: E731  엔진 안쪽 표시는 화면 · 시민 답에 내지 않는다
 
 
 # ---- 엔진 부르기 (같은 통로: 시민 문의도, 위치 바로잡기도, 미리 받은 답 만들기도 이 함수 하나)
@@ -205,7 +206,7 @@ def card_of(res):
         cites.append({"label": label, "law": law, "article": label[len(law):].strip() if law else label,
                       "quotes": list(dict.fromkeys(quotes)), "text": c.get("text"),
                       "url": c.get("url") or r.get("source_url"), "effective": c.get("effective") or r.get("effective_date")})
-    return {"answer": r.get("answer") if cites else None, "conclusion": t.get("conclusion") if cites else None,
+    return {"answer": _inner(r.get("answer")) if cites else None,   # 실제 호출 답 글에도 안쪽 표시가 들어온다(점검 11-11 밤) "conclusion": t.get("conclusion") if cites else None,
             "citations": cites, "reason": t.get("reason"), "has_trace": bool(t), "error": res.get("error")}
 
 
@@ -448,6 +449,8 @@ def selftest():
     assert c["law"] == "서울특별시 주차장 설치 및 관리 조례" and c["article"] == "제13조 제2항" and c["quotes"] == ["구절"], c
     assert c["text"] and c["url"].startswith("https://www.law.go.kr"), c                    # 링크 · 시행일 · 원문은 자료에서
     assert card_of({"response": unk, "trace": {}})["answer"] is None
+    mk = {"response": {**ok["response"], "answer": "각 호의 행위 (※ 그 내용은 이 자료에 없다)를 하면 안 됩니다."}, "trace": ok["trace"]}
+    assert card_of(mk)["answer"] == "각 호의 행위를 하면 안 됩니다.", card_of(mk)["answer"]   # 답 글의 안쪽 표시도 지운다
     # 장소: 서울 안 · 밖, 이름 붙이기, 엔진에 보낼 글
     sf, tt = places["seoulforest"], places["ttukseom-hangang"]
     assert in_seoul(sf["lon"], sf["lat"]) and not in_seoul(127.11, 37.40)            # 판교는 서울 밖
