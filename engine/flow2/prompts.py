@@ -345,3 +345,31 @@ SETS = {
     7: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ7_V, READ7, READ4_SCHEMA),
         "check": (CHECK8_V, CHECK8, CHECK8_SCHEMA)},
 }
+
+# ---- #81 결합 질문의 근거를 빠짐없이 (종희, 3주기 11-11) ----
+# 7판 dev 두 실행에서 결합 문항 114개 중 ④가 정답 조항을 들지 않은 것이 15 · 17개였다(두 번 다 14개: 물음 하나의 근거만 듦 4 ·
+# 다른 조항을 대신 듦 4 · 같은 조의 다른 항을 빠뜨림 4 · 별표를 빠뜨림 2). r8-81은 r7에 한 규칙을 더하고, 답 · 근거를 쓰기 전에
+# 물음마다 조항 이름을 적는 칸 asks를 둔다(칸 순서가 생성 순서다). 호출 수는 그대로다. 설정 flow2_read_asks가 켜질 때만 쓴다.
+READ81_V = "r8-81"
+_EVID = "- 답의 문장마다 그 내용이 실제로 적힌 조항을 찾아 evidence에 모두 넣는다."
+READ81 = READ7.replace(_EVID, (
+    "- asks에는 답을 쓰기 전에 질문이 묻는 것을 물음 하나씩 나눠 적고(ask), 물음마다 그 답이 실제로 적힌 조항 이름을 labels에 모두 적는다. "
+    "한 물음의 답이 여러 조항에 나뉘어 있으면(원칙과 예외 · 단서, 조문과 그 조문이 가리키는 별표, 같은 조의 다른 항, 절차의 앞 단계와 다음 단계) "
+    "그 조항을 다 적는다. [근거]가 답하지 않는 물음은 labels를 비운다.\n"
+    "- evidence에는 asks의 labels에 적은 조항을 하나도 빠뜨리지 않고 넣는다.\n") + _EVID)
+assert READ81.count("\n") == READ7.count("\n") + 2 and "asks" in READ81
+_R4 = READ4_SCHEMA["json_schema"]["schema"]["properties"]
+READ81_SCHEMA = _schema("law_answer_asks", {
+    "found": _R4["found"], "check": _R4["check"],
+    "asks": {"type": "array", "items": {"type": "object", "properties": {
+        "ask": {"type": "string"}, "labels": {"type": "array", "items": {"type": "string"}}},
+        "required": ["ask", "labels"], "additionalProperties": False}},
+    **{k: v for k, v in _R4.items() if k not in ("found", "check")},
+})
+
+
+def pick(cfg, step):
+    """단계의 (판 이름, 프롬프트, JSON 칸). 판(flow2_version)이 고른 것을 실험 스위치가 바꿀 때만 바꾼다."""
+    if step == "read" and cfg.get("flow2_read_asks"):
+        return READ81_V, READ81, READ81_SCHEMA
+    return SETS[cfg["flow2_version"]][step]

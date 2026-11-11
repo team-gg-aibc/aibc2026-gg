@@ -31,7 +31,7 @@ QUOTE_FAIL = "구절 불일치"     # ⑤ 고른 조항의 구절이 그 조항 
 
 def prompt_versions(cfg):
     """판단 기록에 남길 단계별 프롬프트 판 이름(설정 flow2_version이 고른 판)."""
-    return {k: v[0] for k, v in prompts.SETS[cfg["flow2_version"]].items()}
+    return {k: prompts.pick(cfg, k)[0] for k in prompts.SETS[cfg["flow2_version"]]}
 
 
 # ---- 조항 이름 맞추기: #27 engine/whole.py(종희, PR #63)에서 옮김. #63 병합 뒤 `from ..whole import label_ids`로 바꾼다 ----
@@ -252,7 +252,7 @@ def guarded(st, cfg, fn, name):
 
 def _ask(st, cfg, step, user):
     """모델 호출 하나(시스템 프롬프트 · JSON 칸은 판이 고른다) → 읽어 들인 JSON."""
-    _, system, schema = prompts.SETS[cfg["flow2_version"]][step]
+    _, system, schema = prompts.pick(cfg, step)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
 
@@ -336,6 +336,8 @@ def read(st, cfg):
     _f2(st)["read"] = {k: out.get(k) for k in ("found", "conclusion", "evidence")}
     if "check" in out:                       # 3판(r4): 결론 앞에 쓴 조건 대조
         _f2(st)["read"]["check"] = out["check"]
+    if "asks" in out:                        # #81(r8-81): 물음마다 든 조항 이름
+        _f2(st)["read"]["asks"] = out["asks"]
     if not out.get("found"):
         st["reason"] = pipeline.NOT_FOUND
 
@@ -632,6 +634,16 @@ def selftest():
         assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
         pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
         assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]
+        # #81: flow2_read_asks를 켜면 ④가 r8-81(물음마다 조항 이름 칸 asks)을 쓰고 asks를 기록한다. 끄면(기본) 7판 그대로 r7
+        assert config.DEFAULTS["flow2_read_asks"] is False
+        qb = "서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?"
+        plan["law_answer_asks"] = dict(plan["law_answer_quotes"], asks=[{"ask": "금지 행위를 정한 법", "labels": [ban["label"]]}])
+        r, t = pipeline.answer(qb, dict(cfg7, flow2_read_asks=True))
+        assert r["citation"] == [ban["label"]] and t["prompts"] == {"analyze": "a2", "read": "r8-81", "check": "c8"}, t["reason"]
+        assert t["flow2"]["read"]["asks"][0]["labels"] == [ban["label"]] and seen["law_answer_asks"][0]["content"] == prompts.READ81
+        r, t = pipeline.answer(qb, cfg7)
+        assert r["citation"] == [ban["label"]] and t["prompts"]["read"] == "r7" and "asks" not in t["flow2"]["read"]
+        assert seen["law_answer_quotes"][0]["content"] == prompts.READ7
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
