@@ -106,16 +106,25 @@ def score_answer(preds, gold):
 
 
 # ---- 문항 고르기 ----
+GRAY = "[회색지대]"
+GRAY_LABEL = re.compile(r"서울특별시 [^,·—(]*?조례 (?:제\d+조(?:의\d+)?(?: 제\d+항)?|별표 ?\d*)")   # note의 「후보 조항: A, B」에서 조항 이름
+
+
 def load(split):
     """회색지대(정답 꼴 미정)는 뺀다. kit = 스타터 킷 예시 11문항. para = 조례 원문에서 새로 쓴 바꿔 말한 질문(PM 별도 실험 일반화 확인, eval/para_*.json).
     mix = 조례 원문에서 새로 쓴 섞인 질문 · 없는 조 번호 · 틀린 전제 · 행위 주체 함정(PM 별도 실험 flow2 2판 확인, eval/mix_*.json).
     fresh = 조례 원문에서 새로 쓴 일반 묶음(단순 · 조건 · 결합 · 함정, PM 별도 실험 flow2 3판의 「고칠 때 안 본 세트」, eval/fresh_*.json).
-    para · mix · fresh 파일은 레포에 없을 수 있다(eval/README.md 「파일」 표). 문항이 0개면 돌지 않고 멈춘다."""
-    pattern = {"dev": "questions_*.json", "holdout": "questions_*.json", "stress": "stress_*.json",
+    para · mix · fresh 파일은 레포에 없을 수 있다(eval/README.md 「파일」 표). 문항이 0개면 돌지 않고 멈춘다.
+    gray = dev의 회색지대 문항만. 11-11 업스테이지 답 1-(1)대로 「근거 조항 인용」을 정답으로 보고 잰다(문항 파일은 그대로 두고,
+    note의 「후보 조항」 가운데 하나면 정답). dev 점수와 섞지 않는다."""
+    pattern = {"dev": "questions_*.json", "holdout": "questions_*.json", "stress": "stress_*.json", "gray": "questions_*.json",
                "kit": "kit_questions.json", "para": "para_*.json", "mix": "mix_*.json", "fresh": "fresh_*.json"}[split]
     files = sorted(EVAL.glob(pattern))
     qs = [q for f in files for q in json.loads(f.read_text(encoding="utf-8"))]
-    qs = [q for q in qs if "[회색지대]" not in q.get("note", "")
+    if split == "gray":
+        return [dict(q, type="단순 조회", gold=[[x.strip() for x in GRAY_LABEL.findall(q["note"].split("후보 조항:")[1])]])
+                for q in qs if GRAY in q.get("note", "") and q.get("split") == "dev"]
+    qs = [q for q in qs if GRAY not in q.get("note", "")
           and (split not in ("dev", "holdout") or q.get("split") == split)]
     if not qs:      # 없는 묶음을 고르면 0문항으로 오류 없이 끝나던 것을 막는다
         sys.exit(f"✗ --split {split}: 문항이 0개입니다(eval/{pattern} 파일 {len(files)}개). para · mix 파일은 결과 PR #77이 "
@@ -515,7 +524,11 @@ def selftest():
     assert score_answer([a, "서울특별시 강남구 주차장 설치 및 관리 조례 제3조"], [[a]]) == 0.0
     assert score_answer([a, "서울특별시 주차장 설치 및 관리 조례 시행규칙 제2조"], [[a]]) == 0.0
     assert score_answer([], [[a]]) == 0.0 and score_answer([a], []) is None
-    assert not any(outside(c["label"]) for c in retrieve.load("paragraph")[0])       # 6종 색인 라벨은 하나도 걸리지 않는다
+    labels = {c["label"] for c in retrieve.load("paragraph")[0]}
+    assert not any(outside(x) for x in labels)                                       # 6종 색인 라벨은 하나도 걸리지 않는다
+    gray = load("gray")     # 회색지대 묶음: dev만, 문항마다 정답 근거(색인에 있는 조항)가 하나 이상, dev 묶음과 겹치지 않는다
+    assert gray and all(q["split"] == "dev" and q["gold"][0] and set(q["gold"][0]) <= labels for q in gray)
+    assert not {q["id"] for q in gray} & {q["id"] for q in load("dev")}
 
     qs = [{"id": f"x-{t}{i}", "type": t} for t in TYPES for i in range(25)]
     s0 = sample(qs, 20, 0)
@@ -604,7 +617,7 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser(description="점수 재는 틀 (eval/run.py 맨 위 설명 참고)")
     ap.add_argument("--config", default=BASELINE, help="실험 설정 파일 (기본: 출발 판)")
-    ap.add_argument("--split", default="dev", choices=["dev", "holdout", "stress", "kit", "para", "mix", "fresh"])
+    ap.add_argument("--split", default="dev", choices=["dev", "holdout", "stress", "kit", "para", "mix", "fresh", "gray"])
     ap.add_argument("--sample", type=int, help="유형 비율대로 뽑을 문항 수 (기본: 전부)")
     ap.add_argument("--seed", type=int, default=0, help="표본 뽑기 씨앗")
     ap.add_argument("--repeat", type=int, default=1, help="같은 설정 반복 횟수 (흔들림 폭)")
