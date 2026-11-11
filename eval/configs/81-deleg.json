@@ -1,0 +1,10 @@
+{
+  "issue": "#81",
+  "note": "#81 PM 가이드(11-11 받은 답): 새 흐름 7판 + ④ 읽기를 r8-deleg로(조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 「확인 불가」 대신 그 조항으로 답함). 나머지는 pm-flow2-v7과 같다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_deleg": true
+  }
+}

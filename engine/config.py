@@ -63,6 +63,7 @@ DEFAULTS = {
     "flow2_hedge_sec": None,         # flow2만: 호출 하나가 이 초 안에 안 돌아오면 기다리면서 하나 더 부르고 먼저 온 것을 쓴다. 깨진 JSON 출력도 다시 부른다(많아야 세 번). None = 끔(1~4판)
     # ---- #81 결합 질문의 근거를 빠짐없이 (종희) ----
     "flow2_read_asks": False,        # flow2만: True면 ④ 읽기가 r8-81을 쓴다(답 · 근거 전에 물음마다 조항 이름을 적는 칸 asks). False = 판이 고른 프롬프트(7판은 r7)
+    "flow2_read_deleg": False,       # flow2만: True면 ④ 읽기가 r8-deleg를 쓴다(조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 그 조항으로 답함, 11-11 받은 답). False = 판이 고른 프롬프트(7판은 r7)
 }
 
 

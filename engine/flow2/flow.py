@@ -644,6 +644,13 @@ def selftest():
         r, t = pipeline.answer(qb, cfg7)
         assert r["citation"] == [ban["label"]] and t["prompts"]["read"] == "r7" and "asks" not in t["flow2"]["read"]
         assert seen["law_answer_quotes"][0]["content"] == prompts.READ7
+        # #81 PM 가이드: flow2_read_deleg를 켜면 ④가 r8-deleg(값 · 세부가 없거나 다른 법령에 넘긴 조항으로 답하기)를 쓴다. 끄면(기본) r7
+        assert config.DEFAULTS["flow2_read_deleg"] is False and prompts._DELEG_OLD not in prompts.READ_DELEG
+        r, t = pipeline.answer(qb, dict(cfg7, flow2_read_deleg=True))
+        assert r["citation"] == [ban["label"]] and t["prompts"] == {"analyze": "a2", "read": "r8-deleg", "check": "c8"}, t["reason"]
+        assert seen["law_answer_quotes"][0]["content"] == prompts.READ_DELEG and "asks" not in t["flow2"]["read"]
+        r, t = pipeline.answer(qb, dict(cfg7, flow2_read_deleg=True, flow2_read_asks=True))
+        assert t["prompts"]["read"] == "r8-81-deleg" and seen["law_answer_asks"][0]["content"] == prompts._deleg(prompts.READ81)
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
