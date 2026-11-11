@@ -17,25 +17,26 @@ body { margin: 0; background: #e9ebef; color: var(--tx); font: 14px/1.55 "Preten
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .demo { position: sticky; top: 0; z-index: 10; background: #222; color: #fff; font-size: 12px; text-align: center; padding: 6px 10px; margin: 0; }   /* 내려 읽어도 늘 보이게(점검 11-11 밤) */
-.gnb { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--ln); }
+.gnb { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid var(--ln); }
 .gnb b { font-size: 17px; letter-spacing: -.02em; } .gnb span { font-size: 12px; color: var(--tx3); }
-.wrap { padding: 16px 16px 40px; }
+.wrap { padding: 12px 16px 40px; }
 h1 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.03em; }
-.lead { margin: 0 0 12px; color: var(--tx2); font-size: 13px; }
-.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 0 16px; padding: 0; list-style: none; }
-.steps li { text-align: center; padding: 6px 2px; border-radius: 4px; background: #f2f3f6; color: var(--tx3); font-size: 11.5px; font-weight: 600; }
+.lead { margin: 0 0 10px; color: var(--tx2); font-size: 13px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.steps li { text-align: center; padding: 4px 2px; border-radius: 4px; background: #f2f3f6; color: var(--tx3); font-size: 11.5px; font-weight: 600; }
 .steps li b { display: block; font-size: 12px; }
 .steps li[aria-current="step"] { background: var(--p); color: #fff; }
-h2 { margin: 20px 0 8px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+h2 { margin: 16px 0 6px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 h2::before { content: ""; width: 3px; height: 15px; background: var(--blue); }
 .form { border-top: 1px solid #000; }
 .tr { display: flex; border-bottom: 1px solid var(--ln); min-height: 46px; }
 .th { flex: 0 0 27%; background: var(--th); padding: 10px 8px; font-weight: 500; font-size: 13.5px; display: flex; align-items: center; }
+.th.top { align-items: flex-start; padding-top: 16px; }   /* 내용 칸 이름이 첫 화면에 들어오게 */
 .th em { color: var(--p); font-style: normal; font-weight: 700; margin-left: 2px; }
 .td { flex: 1; padding: 8px; font-size: 13.5px; min-width: 0; }
 .in { width: 100%; min-height: 38px; border: 1px solid var(--in); border-radius: 3px; padding: 7px 9px; background: #fff; }
 .in.ro { background: #f6f6f8; color: var(--tx2); display: flex; align-items: center; }
-textarea.in { height: 130px; resize: vertical; line-height: 1.55; }
+textarea.in { height: 112px; resize: vertical; line-height: 1.55; }
 select.in { appearance: auto; }
 .cnt { margin-top: 4px; font-size: 12px; color: var(--tx3); }
 .chk { display: inline-flex; align-items: center; gap: 5px; margin: 2px 12px 2px 0; font-size: 13.5px; color: var(--tx2); cursor: pointer; }
@@ -54,9 +55,18 @@ select.in { appearance: auto; }
 .err { margin: 6px 0 0; padding: 8px 10px; border-radius: 3px; background: #fff4f4; border: 1px solid #f0b9b9; color: #a8221a; font-size: 13px; }
 .err:empty { display: none; }
 /* 지도(평면) */
-.mini { height: 160px; border: 1px solid var(--in); border-radius: 3px; overflow: hidden; }
+.mini { height: 112px; border: 1px solid var(--in); border-radius: 3px; overflow: hidden; }
 .bigmap { height: 340px; border: 1px solid var(--in); border-radius: 3px; overflow: hidden; }
-.attr { margin-top: 2px; font-size: 10.5px; color: var(--tx3); text-align: right; }
+/* 신청인 · 수신 구역은 처음에 접힌 한 줄(시연 흐름: 민원내용이 첫 화면에 보이게) */
+.who { border-top: 1px solid #000; border-bottom: 1px solid var(--ln); }
+.who > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; padding: 9px 8px; background: var(--th); font-size: 13.5px; }
+.who > summary::-webkit-details-marker { display: none; }
+.who .w1 { font-weight: 600; } .who .w2 { grid-column: 1; color: var(--tx2); font-size: 12.5px; }
+.who .w3 { grid-row: 1 / 3; grid-column: 2; align-self: center; color: var(--blue); font-weight: 600; font-size: 13px; text-decoration: underline; }
+.who[open] > .form:first-of-type { border-top: 0; }
+.miniwrap { position: relative; }
+.attr { position: absolute; right: 1px; bottom: 1px; margin: 0; padding: 0 4px; border-radius: 2px; background: rgba(255, 255, 255, .85); font-size: 9.5px; color: #444; }
+.gurow { display: flex; align-items: center; gap: 6px; } .gurow select { flex: 1; min-width: 0; } .gurow .cnt { margin: 0; white-space: nowrap; }
 .locline { margin-top: 6px; font-size: 14px; } .locline b { color: var(--tx); } .locline span { color: var(--tx3); font-size: 12.5px; }
 .mk { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 .mk .nm { margin-bottom: 4px; padding: 3px 9px; border-radius: 6px; background: #1d2433; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
@@ -97,19 +107,20 @@ select.in { appearance: auto; }
     <!-- 작성 -->
     <section id="v-write">
       <h1 id="u-title"></h1><p class="lead" id="u-lead"></p><ol class="steps" id="steps-w"></ol>
-      <div class="form" id="f-who"></div>
-      <h2 id="h-notify"></h2><div class="form" id="f-notify"></div>
+      <details class="who" id="who-box"><summary><span class="w1" id="who-h"></span><span class="w2" id="who-s"></span><span class="w3" id="who-more"></span></summary>
+        <div class="form" id="f-who"></div>
+        <h2 id="h-notify"></h2><div class="form" id="f-notify"></div></details>
       <h2 id="h-body"></h2>
       <div class="form">
-        <div class="tr"><label class="th" for="gu"><span id="l-gu"></span><em>*</em></label><div class="td"><select class="in" id="gu"></select><div class="cnt" id="gu-from"></div></div></div>
+        <div class="tr"><label class="th" for="gu"><span id="l-gu"></span><em>*</em></label><div class="td gurow"><select class="in" id="gu"></select><div class="cnt" id="gu-from"></div></div></div>
         <div class="tr"><div class="th" id="l-loc-th"><span id="l-loc"></span><em>*</em></div><div class="td">
-          <div class="mini" id="mini" aria-hidden="true" hidden></div><div class="attr" id="mini-attr" hidden>© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors</div>
+          <div class="miniwrap"><div class="mini" id="mini" aria-hidden="true" hidden></div><div class="attr" id="mini-attr" hidden>© OpenFreeMap · OpenMapTiles · OpenStreetMap</div></div>
           <div class="locline" id="locline" role="status"></div>
           <p class="err" id="locwarn" role="alert"></p>
           <div class="sbtns"><button type="button" class="sbtn" id="b-here"></button><button type="button" class="sbtn navy" id="b-pick"></button></div>
           <div class="cnt" id="loc-why"></div></div></div>
         <div class="tr"><label class="th" for="title"><span id="l-title"></span><em>*</em></label><div class="td"><input class="in" id="title" maxlength="30"><div class="cnt" id="title-n"></div></div></div>
-        <div class="tr"><label class="th" for="text"><span id="l-text"></span><em>*</em></label><div class="td"><textarea class="in" id="text" maxlength="3000"></textarea><div class="cnt" id="text-n"></div>
+        <div class="tr"><label class="th top" for="text"><span id="l-text"></span><em>*</em></label><div class="td"><textarea class="in" id="text" maxlength="3000"></textarea><div class="cnt" id="text-n"></div>
           <div class="sbtns"><button type="button" class="sbtn" id="b-example"></button></div></div></div>
         <div class="tr"><div class="th" id="l-file"></div><div class="td"><div class="file" id="file"></div></div></div>
       </div>
@@ -184,6 +195,7 @@ function placeText() {
   $('u-demo').textContent = D.smalls[0] || ''; $('u-gnb').textContent = H['화면 이름']; $('u-who').textContent = H['신청인'];
   $('u-title').textContent = D.title; $('u-lead').textContent = D.lead; steps('steps-w', 0);
   const row = (k, v, req = true) => `<div class="tr"><div class="th">${esc(k)}${req ? '<em>*</em>' : ''}</div><div class="td"><div class="in ro">${esc(v)}</div></div></div>`;
+  $('who-h').textContent = H['접힌 줄 제목']; $('who-s').textContent = H['접힌 줄 내용']; whoMore();
   $('f-who').innerHTML = Object.entries(U('신청인 정보').kv).map(([k, v]) => row(k, v)).join('');
   $('h-notify').textContent = U('진행상황 및 결과 수신').name;
   const keep = [...document.querySelectorAll('#f-notify input')].map((x) => x.checked);
@@ -309,8 +321,9 @@ async function showMine() {
     <dt>${esc(a['처리 일시'])}</dt><dd>${esc(ymd(c.approved_at))} ${esc(hhmm(c.approved_at))}</dd></dl>`;
   view('answer');
 }
+const whoMore = () => { const H = U('머리').kv; $('who-more').textContent = $('who-box').open ? H['접기'] : H['펼쳐 보기']; };
 function bind() {
-  $('b-here').onclick = locate; $('b-pick').onclick = openPick;
+  $('b-here').onclick = locate; $('b-pick').onclick = openPick; $('who-box').addEventListener('toggle', whoMore);
   $('b-example').onclick = () => { $('title').value = S0.pair.title; $('text').value = S0.pair.text; counts(); };
   $('title').oninput = $('text').oninput = counts;
   $('b-send').onclick = send;
