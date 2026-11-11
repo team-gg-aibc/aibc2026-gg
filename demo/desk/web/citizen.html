@@ -296,7 +296,7 @@ async function showMine() {
   $('a-ans').innerHTML = `<p class="tit">${esc(a['민원답변'])}</p><dl class="kv">
     <dt>${esc(a['담당부서'])}</dt><dd>${esc(a['담당'])}</dd>
     <dt>${esc(a['내용'])}</dt><dd><p>1. ${esc(a['인사'])}</p>${paras.map((p, i) => `<p>${i + 2}. ${esc(p)}</p>`).join('')}</dd>
-    ${c.citations.length ? `<dt>${esc(a['관련법령'])}</dt><dd>${c.citations.map((x) => `<span class="law">${esc(x.label)}</span>`).join('<br>')}<div class="cnt">${esc(a['기준'])}</div></dd>` : ''}
+    ${c.citations.length ? `<dt>${esc(a['관련법령'])}</dt><dd>${c.citations.map((x) => (x.url ? `<a class="law" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(a['원문 링크'])}">${esc(x.label)}</a>` : `<span>${esc(x.label)}</span>`)).join('<br>')}<div class="cnt">${esc(a['기준'])}</div></dd>` : ''}
     <dt>${esc(a['처리 일시'])}</dt><dd>${esc(ymd(c.approved_at))} ${esc(hhmm(c.approved_at))}</dd></dl>`;
   view('answer');
 }

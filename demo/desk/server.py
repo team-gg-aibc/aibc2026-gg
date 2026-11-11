@@ -284,7 +284,7 @@ def citizen_view(q):
     cites = (q.get("card") or {}).get("citations") or []
     return {"no": q["no"], "text": q["text"], "title": (q.get("form") or {}).get("title", ""), "received": q["received"],
             "loc": q.get("loc_from") or q.get("loc"), "answer": a["text"] if a else None, "approved_at": a["at"] if a else None,
-            "citations": [{"label": c["label"], "effective": c["effective"]} for c in cites] if a and a.get("reply") == "draft" else []}
+            "citations": [{"label": c["label"], "effective": c["effective"], "url": c.get("url")} for c in cites] if a and a.get("reply") == "draft" else []}
 
 
 def str_or(v, n):
