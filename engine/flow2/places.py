@@ -17,11 +17,8 @@
 점검:  python -m engine.flow2.places --check                   (키 없이: 칸 모양 · 곳 낱말이 증거 구절에 있는지)
 """
 import json
-import os
 import re
 import sys
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 PATH = Path(__file__).resolve().parent / "places.json"
@@ -67,40 +64,26 @@ SKIP = {
 }
 
 
-def _list(value):
-    return value if isinstance(value, list) else [value] if value else []
+def _law_api():
+    """법령 API는 eval/fetch_source.py 한 곳에서만 부른다(--build 때만 읽어 온다. 채점 중 엔진은 이 파일을 쓰지 않는다)."""
+    sys.path.insert(0, str(PATH.parents[2] / "eval"))
+    import fetch_source
+    return fetch_source
 
 
-def _get(path, **params):
-    oc = os.environ.get("LAW_OC")
-    if not oc:
-        sys.exit("LAW_OC 환경 변수가 없습니다 (.env.example 참고)")
-    q = urllib.parse.urlencode({"OC": oc, "type": "JSON", **params})
-    raw = urllib.request.urlopen(f"https://www.law.go.kr/DRF/{path}?{q}", timeout=60).read().decode("utf-8")
-    return json.loads(raw.replace(oc, ""))          # 응답 안 링크의 열쇠는 지운다
-
-
-def seoul_ordinances():
+def seoul_ordinances(api):
     """서울특별시 본청 조례 목록: [{name, mst, effective_date}]."""
-    out, page = [], 1
-    while True:
-        d = _get("lawSearch.do", target="ordin", org=SEOUL, knd="30001", display=100, page=page)["OrdinSearch"]
-        items = _list(d.get("law"))
-        if not items:
-            return out
-        out += [{"name": it["자치법규명"], "mst": str(it["자치법규일련번호"]), "effective_date": it["시행일자"]}
-                for it in items if it.get("지자체기관명", "서울특별시") == "서울특별시"]
-        page += 1
+    return [{"name": it["자치법규명"], "mst": str(it["자치법규일련번호"]), "effective_date": it["시행일자"]}
+            for it in api.search_ordinances(SEOUL, "30001") if it.get("지자체기관명", "서울특별시") == "서울특별시"]
 
 
-def _articles(mst):
-    law = _get("lawService.do", target="ordin", MST=mst)["LawService"]
+def _articles(api, mst):
+    law = api.fetch(mst)
     arts = {}
-    for item in _list(law["조문"]["조"]):
+    for item in api.as_list(law["조문"]["조"]):
         if item.get("조문여부") == "Y":
-            num = item["조문번호"][0] if isinstance(item["조문번호"], list) else item["조문번호"]
-            label = f"제{int(num[:4])}조" + (f"의{int(num[4:])}" if num[4:].strip("0") else "")
-            arts[label] = re.sub(r"\s+", " ", item["조내용"]).strip()
+            a = api.parse_article(item, "")
+            arts[a["label"]] = re.sub(r"\s+", " ", item["조내용"]).strip()
     return law["자치법규기본정보"], arts
 
 
@@ -114,14 +97,15 @@ def _sentence(text, start, end=None):
 
 
 def build():
-    names = seoul_ordinances()
+    api = _law_api()
+    names = seoul_ordinances(api)
     by_name = {o["name"]: o for o in names}
     rows = []
     for name, (places, rivals, cites, why) in PICK.items():
         o = by_name.get(name)
         if not o:
             sys.exit(f"서울특별시 조례 목록에 없음: {name}")
-        info, arts = _articles(o["mst"])
+        info, arts = _articles(api, o["mst"])
         body = " ".join(arts.values())
         missing = [p for p in places if p not in body]
         if missing:

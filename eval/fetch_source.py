@@ -26,14 +26,28 @@ OUT = Path(__file__).parent / "source"
 CIRCLED = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
 
 
-def fetch(mst: str) -> dict:
+def law_api(path: str, **params) -> dict:
+    """법제처 국가법령정보 OPEN API를 부르는 단 한 곳(AGENTS.md 5절). 키 확인 · 요청 · 응답에서 키 지우기를 여기서만 한다."""
     oc = os.environ.get("LAW_OC")
     if not oc:
         sys.exit("LAW_OC 환경 변수가 없습니다 (.env.example 참고)")
-    query = urllib.parse.urlencode({"OC": oc, "target": "ordin", "type": "JSON", "MST": mst})
-    raw = urllib.request.urlopen(f"https://www.law.go.kr/DRF/lawService.do?{query}", timeout=60).read()
+    query = urllib.parse.urlencode({"OC": oc, "type": "JSON", **params})
+    raw = urllib.request.urlopen(f"https://www.law.go.kr/DRF/{path}?{query}", timeout=60).read()
     # 응답 안의 상세 링크에 인증키가 그대로 들어 있어서, 저장하기 전에 지운다.
-    return json.loads(raw.decode("utf-8").replace(oc, ""))["LawService"]
+    return json.loads(raw.decode("utf-8").replace(oc, ""))
+
+
+def fetch(mst: str) -> dict:
+    return law_api("lawService.do", target="ordin", MST=mst)["LawService"]
+
+
+def search_ordinances(org: str, knd: str) -> list[dict]:
+    """지자체 조례 목록(lawSearch.do)을 끝 쪽까지 넘기며 받는다. org: 지자체 기관 코드, knd: 자치법규 종류(30001 조례)."""
+    out, page = [], 1
+    while items := as_list(law_api("lawSearch.do", target="ordin", org=org, knd=knd, display=100, page=page)["OrdinSearch"].get("law")):
+        out += items
+        page += 1
+    return out
 
 
 def as_list(value) -> list:
