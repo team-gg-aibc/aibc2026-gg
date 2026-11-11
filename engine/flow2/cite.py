@@ -74,13 +74,17 @@ def choose(kept, cands, roles, limit=LIMIT):
     - 「직접」인 조항은 모두 든다(④가 안 든 것도).
     - ④가 든 조항 가운데 「직접」이 아닌 것은, 같은 조에서 ④가 든 다른 항이 「직접」일 때만 던다. 곧 같은 조 안의 곁가지 항만 정리한다.
       다른 조의 조항과, ④가 든 항을 하나도 확인하지 못한 조는 ④의 판단을 따른다(④가 든 항을 안 든 항으로 바꿔치기하지 않는다).
-    - 차례: ④가 든 것(④의 차례) 다음에 새로 더한 것(원문 차례). limit개까지."""
+    - 차례: ④가 든 것(④의 차례) 다음에 새로 더한 것(원문 차례). 상한 limit은 더할 때만 건다. ④가 든 조항은 상한으로 자르지 않는다
+      (첫 규칙은 모두 limit개로 잘랐는데, 근거가 여럿 필요한 질문에서 ④가 넷째로 든 정답 조항을 잃었다. 7판 기록 dev 여섯 실행에서 10답)."""
     role = dict(zip(cands, roles))
     if "직접" not in role.values():
         return None
     confirmed = {article(x) for x in kept if role.get(x) == "직접"}
-    keep = [x for x in kept if role.get(x) == "직접" or article(x) not in confirmed]
-    return (keep + [c for c in cands if role[c] == "직접" and c not in kept])[:limit]
+    out = [x for x in kept if role.get(x) == "직접" or article(x) not in confirmed]
+    for c in cands:
+        if role[c] == "직접" and c not in kept and len(out) < limit:
+            out.append(c)
+    return out
 
 
 def pick_user(question, cands):
@@ -185,7 +189,9 @@ def selftest():
     assert choose([three[0], three[1]], c4, ["참고", "직접", "참고", "참고"]) == [three[0]]              # 같은 조의 곁가지 항은 던다
     assert choose([three[1]], c4, ["참고", "직접", "참고", "참고"]) == [three[1], three[0]]            # 바꿔치기하지 않고 더한다
     assert choose([three[0], p("제13조 제4항")], c4, ["참고", "직접", "참고", "참고"]) == [three[0], p("제13조 제4항")]   # 다른 조는 ④대로
-    assert choose([three[0]], c4, ["직접", "직접", "직접", "직접"]) == [three[0], c4[0], three[1]]       # 3개까지
+    assert choose([three[0]], c4, ["직접", "직접", "직접", "직접"]) == [three[0], c4[0], three[1]]       # 더하는 것은 합쳐 3개까지
+    four = [*three, p("제13조 제4항")]
+    assert choose(four, c4, ["참고", "직접", "직접", "직접"]) == four                                  # ④가 든 조항은 상한으로 자르지 않는다
     assert choose([three[0]], c4, ["참고", "참고", "무관", "무관"]) is None                           # 직접이 없으면 그대로
     assert "c4" in pick_user("질문", [dict(c, law=park) for c in view if c["label"] in c4]) and len(pick_schema(4)["json_schema"]["schema"]["required"]) == 4
 
