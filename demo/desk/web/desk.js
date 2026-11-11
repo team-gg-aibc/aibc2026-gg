@@ -394,10 +394,12 @@ function agBox(q, d, word) {
 function citesBlock(q, d, word, compact, on) {
   const C = W('답변 초안').kv, c = q.card, V = W('답변 초안').tab('초안의 결론');
   const verdict = c.conclusion && V[c.conclusion] && !V[c.conclusion].startsWith('[') ? `<p class="note">${esc(fill(C['판정'], { 판정: V[c.conclusion] }))}</p>` : '';
-  return `<h3><span>${esc(here(q, C['근거 조항']))}${mark(d.cite, word)}</span><span class="r">${esc(C['근거 조항 작은 글'])}</span></h3>${compact ? '' : verdict}
+  const annex = (x) => /^별표/.test(x.article);   // 별표 구절은 표를 한 줄로 편 꼴이라 「글자까지 맞춰 봄」이 아니다(점검 11-11 밤, 39번)
+  return `<h3><span>${esc(here(q, C['근거 조항']))}${mark(d.cite, word)}</span><span class="r">${esc(C[c.citations.some(annex) ? '근거 조항 작은 글 · 별표' : '근거 조항 작은 글'])}</span></h3>${compact ? '' : verdict}
     ${c.citations.map((x, ci) => `<div class="cite${on && on.ci === ci ? ' on' : ''}"><div class="lb">${esc(shortLaw(x.law))} ${esc(x.article)}<span>${esc(fill(C['시행일'], { 날짜: x.effective || '—' }))}</span></div>
       ${x.quotes.length ? x.quotes.slice(0, compact ? 1 : 9).map((t, qi) => `<blockquote class="${on && on.ci === ci && on.qi === qi ? 'on' : ''}">${esc(t)}</blockquote>`).join('')
         : `<p class="note">${esc(C['원문 구절 없음'])}</p><blockquote class="full">${esc(x.text || '—')}</blockquote>`}
+      ${annex(x) && x.quotes.length && !compact ? `<p class="note">${esc(C['별표 구절'])}</p>` : ''}
       ${compact || !x.url ? '' : `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(C['원문 보기'])}</a>`}</div>`).join('')}`;
 }
 function agencyBlock(q, d, word, compact) {
