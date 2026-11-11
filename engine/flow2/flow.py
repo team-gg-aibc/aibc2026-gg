@@ -271,25 +271,44 @@ def _ask(st, cfg, step, user):      # noqa: F811
         return _ask_one(st, cfg, step, user) if n <= 1 else _voted(st, cfg, step, lambda s: _ask_one(s, cfg, step, user), n)
     if not cfg["flow2_memo"]:
         return run()
-    # 열쇠: 설정 전체 · 단계 · 그 판의 프롬프트 글 · 보낸 글. 하나라도 바뀌면 새로 부른다
-    key = config.digest([config.digest(cfg, 32), step, prompts.SETS[cfg["flow2_version"]][step][1], user], 32)
-    out = _memo_get(cfg, key)
-    if out is None:
-        out = run()
-        _memo_put(cfg, key, out)
-    else:                                    # 부르지 않았다는 것을 호출 기록에 남긴다(토큰 0)
-        st["calls"].append({"kind": "memo", "model": cfg["chat_model"], "in": 0, "cached": 0, "out": 0, "sec": 0.0,
-                            "sent": key, "output": json.dumps(out, ensure_ascii=False)})
-    return out
+    return _memoed(st, cfg, [step, prompts.SETS[cfg["flow2_version"]][step][1], user], run)   # 열쇠: 단계 · 그 판의 프롬프트 글 · 보낸 글
 
 
 # ---- 같은 글에는 같은 출력 (스위치 flow2_memo, 11-11) ----
 # 모델은 같은 글을 보내도 다른 출력을 낸다(아래 「흔들림 줄이기」). 그래서 모델 호출의 출력을 「설정 전체 · 단계 · 프롬프트 글 · 보낸 글」의 지문별로
-# 적어 두고, 같은 글을 다시 보내야 할 때는 부르지 않고 적어 둔 출력을 쓴다. 같은 문의가 다시 오면 ① → ④ → ⑥이 차례로 같은 글을 받으므로
+# 적어 두고, 같은 글을 다시 보내야 할 때는 부르지 않고 적어 둔 출력을 쓴다. 검색 결과도 질문별로 적어 둔다: 임베딩 호출도 같은 질문에 조금씩
+# 다른 벡터를 돌려줘서(7판 dev 두 실행: 같은 조각의 의미 점수가 657문항 중 333문항에서 다르고 후보 묶음이 18문항에서 다름) ③이 다른 조례를 고를 수 있다.
+# 같은 문의가 다시 오면 ① → ④ → ⑥이 차례로 같은 글을 받으므로
 # 답 · 근거가 글자까지 같다. 조례 원문 · 프롬프트 · 설정이 하나라도 바뀌면 지문이 달라져 저절로 새로 부른다. 오류 · 시간 초과로 끝난 호출은 적지 않는다.
 # 값은 파일 경로(레포 맨 위 기준)다. 서버를 다시 띄워도 남는다. ":memory:"면 파일 없이 프로세스 안에만 둔다.
-# ponytail: 같은 문의 둘이 동시에 처음 오면 둘 다 부르고 나중 것이 남는다. 파일은 줄만 덧붙인다(지우기 · 크기 상한 없음) — 문의가 수만 건이 되면 손본다.
-_MEMO, _MEMO_LOCK = {}, threading.Lock()
+# 같은 열쇠를 다른 스레드가 부르는 중이면 끝나기를 기다렸다가 그 값을 쓴다(같은 문의가 동시에 와도 한 번만 부른다. 문의 세트 확인 11-11에서
+# 되풀이가 첫 실행이 끝나기 전에 시작돼 한 문항의 답이 갈렸다).
+# ponytail: 파일은 줄만 덧붙인다(지우기 · 크기 상한 없음, 검색 결과는 문의 하나에 조각 20개의 글) — 문의가 수만 건이 되면 손본다.
+_MEMO, _BUSY, _MEMO_LOCK = {}, {}, threading.Lock()
+
+
+def _memoed(st, cfg, parts, run):
+    """열쇠(설정 전체 + parts)에 적어 둔 값이 있으면 그것을, 없으면 run()을 부르고 적는다."""
+    key = config.digest([config.digest(cfg, 32)] + parts, 32)
+    with _MEMO_LOCK:
+        mine = key not in _BUSY
+        busy = _BUSY.setdefault(key, threading.Event())
+    if not mine:
+        busy.wait(timeout=_left())               # 먼저 부른 쪽을 문항 마감 전까지 기다린다
+    try:
+        out = _memo_get(cfg, key)
+        if out is None:
+            out = run()
+            _memo_put(cfg, key, out)
+            return out
+    finally:
+        if mine:
+            with _MEMO_LOCK:
+                _BUSY.pop(key, None)
+            busy.set()
+    st["calls"].append({"kind": "memo", "model": cfg["chat_model"], "in": 0, "cached": 0, "out": 0, "sec": 0.0,     # 안 불렀다는 기록(토큰 0)
+                        "sent": key, "output": json.dumps(out, ensure_ascii=False, default=float)[:2000]})
+    return out
 
 
 def _memo_table(cfg):
@@ -316,11 +335,11 @@ def _memo_get(cfg, key):
 def _memo_put(cfg, key, out):
     table, path = _memo_table(cfg), cfg["flow2_memo"]
     with _MEMO_LOCK:
-        table[key] = json.loads(json.dumps(out))
+        table[key] = json.loads(json.dumps(out, default=float))      # default=float: 검색 점수가 numpy 수일 수 있다
         if path != ":memory:":
             try:
                 with open(config.ROOT / path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps([key, out], ensure_ascii=False) + "\n")
+                    f.write(json.dumps([key, table[key]], ensure_ascii=False) + "\n")
             except OSError:                     # 적지 못해도 답은 낸다
                 pass
 
@@ -485,7 +504,10 @@ def search(st, cfg):
         tmp = {"question": st["question"], "calls": calls, "reason": None}
         pipeline.search(tmp, cfg)
         return tmp
-    st.update({k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")})
+
+    def run():
+        return {k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")}
+    st.update(_memoed(st, cfg, ["search", st["question"]], run) if cfg["flow2_memo"] else run())    # 꺼져 있으면(기본) 그대로 부른다
     laws = lawmap.pick_laws(st["_hits"]) if cfg["flow2_version"] >= 6 and not st["reason"] else []
     if laws:
         v = view(laws, cfg["chunk_unit"])
@@ -955,13 +977,28 @@ def selftest():
         two()
         r1, t1 = pipeline.answer(qv, keep)
         r2, t2 = pipeline.answer(qv, keep)
-        assert r1 == r2 and r1["answer"] == "첫 답" and [c.get("kind") for c in t2["calls"]] == ["memo"] * 3, (r1, r2)
-        assert [c["stage"] for c in t2["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"] and upstage.cost_usd(t2["calls"]) == 0
+        assert r1 == r2 and r1["answer"] == "첫 답" and [c.get("kind") for c in t2["calls"]] == ["memo"] * 4, (r1, r2)
+        assert [c["stage"] for c in t2["calls"]] == ["검색", "질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"] and upstage.cost_usd(t2["calls"]) == 0
         _MEMO.clear()                                    # 프로세스를 다시 띄운 것처럼: 파일에서 읽어 같은 답
         assert pipeline.answer(qv, keep)[0] == r1 and pipeline.answer(qv + " ", keep)[0] != r1   # 글자가 다르면 다른 문의다
         seq.clear()
         two()
         assert pipeline.answer(qv, cfg7)[0]["answer"] == "첫 답" and pipeline.answer(qv, cfg7)[0]["answer"] == "둘째 답"   # 꺼 두면 바뀐다
+        seq.clear()
+        # 같은 문의 둘이 동시에 와도 모델은 한 번씩만 부르고 답이 같다(먼저 부른 쪽을 기다린다)
+        n_call = []
+
+        def slow_chat(messages, cfg, calls=None, response_format=None):
+            n_call.append(response_format["json_schema"]["name"])
+            time.sleep(0.05)
+            return seq_chat(messages, cfg, calls, response_format)
+
+        upstage.chat = slow_chat
+        seq.update(law_answer_quotes=[rd(True, [ok_ev], "한 답"), rd(True, [other_ev], "다른 답")])
+        qc = qv + " 동시에"
+        got = list(ThreadPoolExecutor(2).map(lambda _: pipeline.answer(qc, dict(keep, flow2_memo=":memory:"))[0], range(2)))
+        assert got[0] == got[1] and sorted(n_call) == ["law_answer_quotes", "question_slots", "target_check"], (got, n_call)
+        upstage.chat = seq_chat
         seq.clear()
         assert config.DEFAULTS["flow2_memo"] is None
         # 맡긴 내용을 묻는 질문(flow2_handed): ⑥이 거절해도 답이 「정해져 있지 않다」 꼴이고 근거 조항에 맡기는 구절이 있으면 답을 낸다
