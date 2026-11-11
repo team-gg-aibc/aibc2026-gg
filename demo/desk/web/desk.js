@@ -454,10 +454,11 @@ function statusBlock(q) {
 }
 function sourceLine(q) {
   if (!q.engine || q.kind === 'failed' || q.kind === 'making') return '';
-  const O = W('초안의 출처'), it = O.plain(), [b, s] = it[q.engine.how === 'live' ? 0 : 1] || ['', ''], made = O.tab('만든 판');
-  const by = q.engine.made_by && Object.prototype.hasOwnProperty.call(made, q.engine.made_by) ? ` · ${made[q.engine.made_by]}` : '';
+  const none = q.kind !== 'draft';   // 6종 밖 · 조항 못 찾음: 초안이 없으니 「결과」라고 쓴다
+  const O = W('초안의 출처'), it = O.plain(), [b, s0] = it[(q.engine.how === 'live' ? 0 : 1) + (none ? 2 : 0)] || ['', ''], made = O.tab('만든 판');
+  const key = `${q.engine.made_by}${none ? ' · 초안 없음' : ''}`, s = q.engine.made_by && Object.prototype.hasOwnProperty.call(made, key) ? made[key] : s0;
   const meta = [hhmm(q.engine.at), q.engine.sec != null ? `${q.engine.sec}초` : ''].filter(Boolean).join(' · ');
-  return `<footer class="c-src"><b>${esc(b)}</b> ${esc(s)}${esc(by)} · ${esc(meta)}</footer>`;
+  return `<footer class="c-src"><b>${esc(b)}</b> ${esc(s)} · ${esc(meta)}</footer>`;
 }
 function bodyOf(q, o = {}) {   // o.compact(나란히 보기의 한 칸) · o.cmp(견줄 문의) · o.word(「다름」 · 「바뀜」)
   const s = SIT(), k = q.kind;
