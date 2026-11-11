@@ -665,32 +665,76 @@ _NAMED = re.compile(r"「([^」]{2,60})」")
 SAYS = re.compile(r"(?:시장|구청장|위원장)\s*이\s*(?:따로|별도로)?\s*정[하한할해합함했]|(?:따로|별도로)\s*정[하한할해합함했]|규칙(?:으로|이|에서)\s*정[하한할해합함했]")
 
 
-def handed_over(answer, chunks):
-    """(가)(나)(다)(라)를 다 채우면 (조항 이름, 맡기는 구절), 아니면 None."""
-    if not NOT_SET.search(answer or "") or not SAYS.search(answer or ""):
+# ---- 다른 법령으로 넘기는 꼴 (flow2_handed = "law", 11-11 저녁 업스테이지 2차 답) ----
+# 2차 답: 6종 안에 질문을 다루는 조항이 있고 그 조항이 구체적인 내용을 다른 법령으로 넘기는 경우에도, 그 조항을 인용하고 「세부 내용은 해당
+# 법령에서 정한다」고 안내하는 것이 정답이다(「확인 불가」는 정답이 아님). 그래서 "law"는 위 넷 가운데 (나)(다)(라)를 이렇게 넓힌다.
+#  (나′)(다′) 답 글의 한 문장이 「그 법령 + 정한다 · 따른다 · 규정 · 확인」 꼴이고, 그 법령이 ⑤를 지난 근거 조항의 글에 글자 그대로 있다.
+#        법령은 둘 중 하나로 든 것만 본다: 「」로 든 이름(「○○법」 · 6종이 스스로 드는 다른 서울시 조례) / 조문이 쓰는 줄임말과 조 번호(「법 제○조」 · 「영 제○조」).
+#        6종 원문의 글투다: 「법 제○조」 74조각 · 「영 제○조」 17조각 · 「…법」「…법률」 77조각 · 「…조례」 20조각(521조각 중).
+#        이름도 조 번호도 없이 「관련 법령에서 정합니다」라고만 쓴 답은 살리지 않는다(dev · 극한 기록에 대어 보니 함정 둘이 샜다).
+#        그 문장은 「정해져 있지 않다」고 한 문장이거나 그 뒤 문장이어야 한다(받은 답의 순서: 조례에는 없다 → 그 법령에서 정한다). 앞 문장에서
+#        든 법령은 묻는 것과 다른 일일 수 있다: 순서를 안 보면 dev · 극한 기록 26개에서 함정이 4번 더 샜다(국립공원을 도시공원으로 본 답 등).
+#  (라′)  답이 든 6종 밖 법령은 모두 근거 조항 글에 있어야 한다(없으면 조례가 넘긴 것이 아니라 조례가 안 다루는 일이다).
+#        6종이 들지도 않는 조례(자치구 · 다른 시 · 도의 조례 등, lawmap.name_kind가 「밖」)를 든 답은 살리지 않는다.
+# (가)는 그대로다. 「스스로 맡기는 꼴」(True)의 조건은 바꾸지 않았고, "law"는 그것에 이 길을 더한 것이다.
+_PTR = re.compile(r"(?<![가-힣])(?:법|영)\s*제\d+조(?:의\d+)?")
+_STEM = re.compile(r"정하|정한|정합|정해|정했|따르|따릅|따라|따른|규정|확인|위임")
+_SENT = re.compile(r"[^.?!]+[.?!]?")
+HANDED_MODES = (False, True, "law")
+
+
+def _squash(s):
+    return "".join(s.split())
+
+
+def handed_over(answer, chunks, law=False):
+    """(가)(나)(다)(라)를 다 채우면 (조항 이름, 맡기는 구절), 아니면 None. law=True면 다른 법령으로 넘기는 꼴(위 설명)도 본다."""
+    if not NOT_SET.search(answer or ""):
         return None
-    if any(lawmap.name_kind(n)[0] in ("인용", "밖", "법령") or n.endswith("고시") for n in _NAMED.findall(answer)):
+    kinds = [(n, lawmap.name_kind(n)[0]) for n in _NAMED.findall(answer)]
+    outside = [n for n, k in kinds if k in ("인용", "법령") or n.endswith("고시")]
+    if SAYS.search(answer) and not outside and not any(k == "밖" for _, k in kinds):
+        for c in chunks:
+            for m in HANDED.finditer(c["text"]):
+                if "조례」로" not in c["text"][max(0, m.start() - 8):m.start()]:     # 다른 조례로 넘기는 구절은 뺀다
+                    return c["label"], m.group(0)
+    if not law or any(k == "밖" for _, k in kinds):
         return None
-    for c in chunks:
-        for m in HANDED.finditer(c["text"]):
-            if "조례」로" not in c["text"][max(0, m.start() - 8):m.start()]:     # 다른 조례로 넘기는 구절은 뺀다
-                return c["label"], m.group(0)
+    body = [(c["label"], _squash(c["text"])) for c in chunks]
+    if any(not any(_squash(n) in t for _, t in body) for n in outside):
+        return None
+    sents = _SENT.findall(answer)
+    first = next(i for i, x in enumerate(sents) if NOT_SET.search(x)) if any(NOT_SET.search(x) for x in sents) else 0
+    for sent in sents[first:]:               # 「정해져 있지 않다」고 한 문장이거나 그 뒤 문장만(앞 문장의 법령은 다른 일을 말한 것일 수 있다)
+        if not _STEM.search(sent):
+            continue
+        for ref in [n for n in outside if n in sent] + [m.group(0) for m in _PTR.finditer(sent)]:
+            for label, t in body:
+                if _squash(ref) in t:
+                    return label, ref
     return None
 
 
-def check_stage(st, cfg):
-    """「질문 대조」 단계. ⑥ check를 그대로 부르고, 스위치 flow2_handed가 켜져 있으면 맡긴 내용을 묻는 질문의 답은 거절을 되돌린다."""
-    check(st, cfg)
-    if cfg["flow2_handed"] and st["reason"] == pipeline.REJECTED:
+# check 본문은 그대로 두고 같은 이름으로 한 겹 싼다(STAGES 줄도 main 그대로). 스위치가 꺼져 있으면(기본) 위 check 그대로다.
+_check_one = check
+
+
+def check(st, cfg):      # noqa: F811
+    """「질문 대조」 단계. ⑥(_check_one)을 그대로 부르고, 스위치 flow2_handed가 켜져 있으면 맡긴 내용을 묻는 질문의 답은 거절을 되돌린다."""
+    _check_one(st, cfg)
+    mode = cfg["flow2_handed"]
+    if mode not in HANDED_MODES:
+        raise ValueError(f"flow2_handed 값 {mode!r}: {HANDED_MODES} 가운데 하나여야 합니다")
+    if mode and st["reason"] == pipeline.REJECTED:
         kept = set(_f2(st)["gate"]["kept"])
-        hit = handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in kept])
+        hit = handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in kept], law=mode == "law")
         if hit:
             st["reason"] = None
             _f2(st)["handed"] = {"label": hit[0], "phrase": hit[1]}      # 판정(verdict)은 notGrounded 그대로 남긴다
 
 
 STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
-          ("구절 관문", gate), ("질문 대조", check_stage), ("출력", pipeline.output)]
+          ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
 
 
 # ---- 스스로 시험 (키 없이) ----
@@ -1027,6 +1071,27 @@ def selftest():
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="네, 됩니다.")       # 답이 그 꼴이 아니면 거절 그대로
         assert pipeline.answer(qh, dict(cfg7, flow2_handed=True))[1]["reason"] == pipeline.REJECTED
         assert config.DEFAULTS["flow2_handed"] is False
+        # flow2_handed = "law": 다른 법령으로 넘기는 꼴도 살린다(2차 답). True의 동작은 그대로다
+        fine = next(c for c in allc if c["label"].endswith("도시공원 조례 제23조 제1항"))
+        kids = next(c for c in allc if "「서울특별시 출산 및 양육지원에 관한 조례」" in c["text"])
+        up = "과태료 금액은 이 조례에 정해져 있지 않습니다. 제23조제1항은 과태료를 부과하는 기준이 영 제51조제1항 별표 4와 같다고 정합니다."
+        assert handed_over(up, [fine]) is None and handed_over(up, [fine], law=True) == (fine["label"], "영 제51조")
+        other_law = "다자녀의 기준은 이 조례에 정해져 있지 않습니다. 감면 대상은 「서울특별시 출산 및 양육지원에 관한 조례」에 따른 다자녀 가족으로 규정합니다."
+        assert handed_over(other_law, [kids]) is None and handed_over(other_law, [kids], law=True)[0] == kids["label"]
+        assert handed_over(other_law, [fine], law=True) is None                                  # (라′) 답이 든 법령이 근거 조항 글에 없다
+        assert handed_over("그 요금은 이 조례에 정해져 있지 않습니다. 「서울특별시 강남구 주차장 설치 및 관리 조례」에서 정합니다.", [kids, fine], law=True) is None   # 자치구 조례
+        assert handed_over("그 금액은 이 조례에 정해져 있지 않습니다. 관련 법령에서 정합니다.", [fine], law=True) is None       # 이름도 조 번호도 없다
+        assert handed_over("네, 영 제51조제1항 별표 4와 같다고 정합니다.", [fine], law=True) is None                          # (가) 답 꼴이 아니다
+        assert handed_over("기준은 영 제51조제1항 별표 4와 같다고 정합니다. 그런데 주차 요금은 이 조례에 정해져 있지 않습니다.", [fine], law=True) is None   # 법령 문장이 앞에만 있다
+        assert handed_over(say, [hand], law=True) == handed_over(say, [hand])                    # 스스로 맡기는 꼴은 두 값이 같다
+        fq = fine["text"][fine["text"].index("과태료를 부과하는 기준"):][:22]
+        plan.update(question_slots=dict(sl(), law_guess="도시공원"), target_check=ck("notGrounded"),
+                    law_answer_quotes=dict(rd(True, [{"label": fine["label"], "quote": fq}], up), conclusion="정보"))
+        ql = "공원에서 그 일을 하면 과태료가 얼마예요?"
+        assert pipeline.answer(ql, dict(cfg7, flow2_handed=True))[1]["reason"] == pipeline.REJECTED
+        r, t = pipeline.answer(ql, dict(cfg7, flow2_handed="law"))
+        assert r["citation"] == [fine["label"]] and t["flow2"]["handed"] == {"label": fine["label"], "phrase": "영 제51조"}, (t["reason"], t["flow2"].get("gate"))
+        assert pipeline.answer(ql, dict(cfg7, flow2_handed="yes"))[1]["reason"] == pipeline.ERROR      # 모르는 값은 멈춘다
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
