@@ -608,8 +608,46 @@ def check(st, cfg):
         st["reason"] = pipeline.REJECTED
 
 
+# ---- 맡긴 내용을 묻는 질문의 답 살리기 (스위치 flow2_handed, 11-11) ----
+# 업스테이지 답(11-11): 조문은 있는데 금액 · 세부를 정하지 않은 질문은 「확인 불가」가 아니다. 근거(위임) 조항을 인용하고 「조례에는 정해져 있지
+# 않다」와 어디서 정하는지를 안내해야 하고, 「확인 불가」로 답하면 0점일 수 있다. 7판 ④는 그런 답을 쓰는데 ⑥이 「답이 확인할 수 없다고 적었다」
+# (검사 프롬프트 규칙 5)로 거절한다. 그래서 ⑥이 거절했어도 아래 둘을 다 채우면 판정 전 답을 그대로 낸다(코드만, 모델 호출 수 그대로).
+#  (가) 판정 전 답이 「조례에 정해져 있지 않다」 꼴이다(④ 프롬프트가 시킨 말: 「~는 이 조례에 정해져 있지 않아 …」).
+#  (나) ⑤를 지난 근거 조항의 글에 조례가 스스로 맡기는 구절이 있다.
+# 맡기는 구절은 6종 조례 원문의 글투에서만 뽑았다: 「시장이 따로 정한다」 · 「시장이 별도로 정한다」 · 「시장이 정한다」 · 「구청장이 따로 정할 수 있다」 ·
+# 「위원장이 정한다」 · 「협의하여 별도로 정한다」 · 「규칙으로 정한다」 · 「규칙이 정하는 바에」(528조각 가운데 38조각에 있다).
+# 넣지 않은 것: 상위 법령으로 넘기는 구절(위 DELEG) · 다른 조례로 넘기는 구절(「…조례」로 따로 정한다) · 국가 고시(「…고시를 따른다」) —
+# 이 꼴의 정답은 업스테이지에 다시 묻는 중이라 7판 동작 그대로 둔다. 「예산의 범위에서」도 넣지 않았다(7판 dev 기록 6개에 대어 보니 함정 하나가 샜다).
+# (가)를 빼면 극한 세트 함정 3문항이 샌다(11-10 기록에 대어 봄, 흔들림-도구/replay_handed.py). 평가 문항의 글은 옮기지 않았다.
+NOT_SET = re.compile(r"(?:정해져|정하여져|규정되어|명시되어)\s*있지\s*(?:않|아니)|(?:정하고|규정하고|명시하고)\s*있지\s*(?:않|아니)|정하지\s*(?:않|아니)")
+HANDED = re.compile(r"(?:시장|구청장|위원장)\s*이\s*(?:따로|별도로)?\s*정(?:한다|하는|할\s*수|하여)|(?:따로|별도로)\s*정(?:한다|하는|할\s*수|하여)"
+                    r"|규칙(?:으로|이)\s*정(?:한다|하는|하여)")
+
+
+def handed_over(answer, chunks):
+    """(가)(나)를 다 채우면 (조항 이름, 맡기는 구절), 아니면 None."""
+    if not NOT_SET.search(answer or ""):
+        return None
+    for c in chunks:
+        for m in HANDED.finditer(c["text"]):
+            if "조례」로" not in c["text"][max(0, m.start() - 8):m.start()]:     # 다른 조례로 넘기는 구절은 뺀다
+                return c["label"], m.group(0)
+    return None
+
+
+def check_stage(st, cfg):
+    """「질문 대조」 단계. ⑥ check를 그대로 부르고, 스위치 flow2_handed가 켜져 있으면 맡긴 내용을 묻는 질문의 답은 거절을 되돌린다."""
+    check(st, cfg)
+    if cfg["flow2_handed"] and st["reason"] == pipeline.REJECTED:
+        kept = set(_f2(st)["gate"]["kept"])
+        hit = handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in kept])
+        if hit:
+            st["reason"] = None
+            _f2(st)["handed"] = {"label": hit[0], "phrase": hit[1]}      # 판정(verdict)은 notGrounded 그대로 남긴다
+
+
 STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
-          ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
+          ("구절 관문", gate), ("질문 대조", check_stage), ("출력", pipeline.output)]
 
 
 # ---- 스스로 시험 (키 없이) ----
@@ -905,6 +943,29 @@ def selftest():
         assert pipeline.answer(qv, cfg7)[0]["answer"] == "첫 답" and pipeline.answer(qv, cfg7)[0]["answer"] == "둘째 답"   # 꺼 두면 바뀐다
         seq.clear()
         assert config.DEFAULTS["flow2_memo"] is None
+        # 맡긴 내용을 묻는 질문(flow2_handed): ⑥이 거절해도 답이 「정해져 있지 않다」 꼴이고 근거 조항에 맡기는 구절이 있으면 답을 낸다
+        allc = retrieve.load("paragraph")[0]
+        hand = next(c for c in allc if "시장이 따로 정한다" in c["text"])
+        assert sum(bool(handed_over("정해져 있지 않습니다", [c])) for c in allc) == 38           # 6종 원문 528조각 가운데 이 꼴이 든 조각(원문이 바뀌면 다시 본다)
+        say = "그 금액은 조례에 정해져 있지 않습니다. 시장이 따로 정하도록 되어 있습니다."
+        assert handed_over(say, [hand]) == (hand["label"], "시장이 따로 정한다")
+        assert handed_over("네, 감면됩니다.", [hand]) is None                                  # (가) 답이 그 꼴이 아니면 안 살린다
+        assert handed_over(say, [target]) is None and handed_over(say, [ban]) is None          # (나) 맡기는 구절이 없는 조항 · 상위 법령으로 넘기는 조항
+        assert handed_over(say, [{"label": "x", "text": "…은 「서울특별시교육청 학교 주차장 관리에 관한 조례」로 따로 정한다."}]) is None   # 다른 조례로
+        assert handed_over(say, [{"label": "x", "text": "세부 기준은 농림축산식품부 고시를 따른다."}]) is None
+        assert handed_over(say, [{"label": "x", "text": "시장은 금연구역으로 지정할 수 있다. 수탁자를 선정한다. 예산의 범위에서 지원할 수 있다."}]) is None
+        hq = hand["text"][hand["text"].index("시장이 따로 정한다") - 12:][:22]
+        plan.update(question_slots=sl(), law_answer_quotes=dict(rd(True, [{"label": hand["label"], "quote": hq}], say), conclusion="정보"),
+                    target_check=ck("notGrounded"))
+        qh = "그 금액은 얼마예요?"
+        plan["question_slots"] = dict(sl(), law_guess=next(k for k in prompts.LAW_KEYS if k in hand["law"]))
+        r, t = pipeline.answer(qh, cfg7)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and "handed" not in t["flow2"], (t["reason"], t["flow2"].get("gate"))
+        r, t = pipeline.answer(qh, dict(cfg7, flow2_handed=True))
+        assert r["citation"] == [hand["label"]] and r["answer"] == say and t["verdict"] == "notGrounded" and t["flow2"]["handed"]["label"] == hand["label"]
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="네, 됩니다.")       # 답이 그 꼴이 아니면 거절 그대로
+        assert pipeline.answer(qh, dict(cfg7, flow2_handed=True))[1]["reason"] == pipeline.REJECTED
+        assert config.DEFAULTS["flow2_handed"] is False
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
