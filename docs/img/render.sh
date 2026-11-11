@@ -20,3 +20,6 @@ fi
 if [ "$want" = all ] || [ "$want" = engine-status ]; then
   shot "engine-status.png" "engine-status.html#p1" 2340
 fi
+if [ "$want" = all ] || [ "$want" = evaluation ]; then
+  shot "evaluation.png" "evaluation.html#p1" 2340
+fi

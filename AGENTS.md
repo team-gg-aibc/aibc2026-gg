@@ -23,9 +23,11 @@
 | 위치 | 무엇 |
 |---|---|
 | `docs/decisions.md` | 정한 것과 이유 (한 줄씩) |
+| `docs/evaluation.md` | 평가 기준: 대회 100점이 어떻게 나뉘고 누가 무엇을 보고 매기나 |
 | `docs/work-method.md` | 일하는 방식: 이슈 · 보고 · 검수 · 이어받기 |
 | `docs/meetings/` | 회의 자료와 회의 요약 (안건 · 정한 것 · 할 일 · 일정) |
 | `docs/education/` | 특화교육 정리 |
+| `docs/research/field/` | 현장 조사와 사용자 평가 준비물(누구에게 물을지 · 질문지 · 기록지 · 한 주 일정) |
 | `docs/schedule.md` | 일정과 불참 |
 | `docs/` | 문제 정의, PRD, 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
 | `engine/` | 엔진 코드. 돌리는 법은 `engine/README.md` |
@@ -57,10 +59,11 @@
 **읽는 순서**
 1. 이 파일(`AGENTS.md`)
 2. `docs/decisions.md`: 정한 것. 어긋나는 일이면 멈추고 PM에게 묻는다
-3. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
-4. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
-5. 엔진 · 평가셋 · 채점 도구 · 답 글 · 채점 서버를 고치는 일이면 `docs/engine/scoring-rules.md`: 11/11에 받은 채점 · 서버 · 제출 규칙이다. 고치기 전에 그 문서 0절의 여섯 물음에 답하고, 끝 보고에 해당 절의 「스스로 확인하는 법」 결과를 붙인다
-6. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
+3. `docs/evaluation.md`: 평가 기준. 대회 100점이 어떻게 나뉘고 누가 무엇을 보고 매기는지다. 무엇을 만들지, 무엇부터 할지 고를 때 본다
+4. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
+5. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
+6. 엔진 · 평가셋 · 채점 도구 · 답 글 · 채점 서버를 고치는 일이면 `docs/engine/scoring-rules.md`: 11/11에 받은 채점 · 서버 · 제출 규칙이다. 고치기 전에 그 문서 0절의 여섯 물음에 답하고, 끝 보고에 해당 절의 「스스로 확인하는 법」 결과를 붙인다
+7. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
 
 맡은 이슈가 없으면 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`)로 지금 어디까지 왔는지 보고 PM에게 묻는다.
 
