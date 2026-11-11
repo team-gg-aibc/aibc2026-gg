@@ -1,0 +1,142 @@
+{
+  "run_id": "20261111-184141-81-multi-evidence-dev-r1",
+  "group": "20261111-184141-81-multi-evidence-dev",
+  "repeat": 1,
+  "repeats": 2,
+  "created": "2026-11-11T19:03:01+09:00",
+  "experiment": {
+    "name": "81-multi-evidence",
+    "issue": "#81",
+    "note": "#81 결합 질문의 근거를 빠짐없이: 새 흐름 7판 + ④ 읽기를 r8-81로(답 · 근거 전에 물음마다 조항 이름을 적는 칸 asks). 나머지는 pm-flow2-v7과 같다",
+    "cycle": 3,
+    "file": "eval/configs/81-multi-evidence.json",
+    "file_sha": "8100eccbcabc"
+  },
+  "conclusion": "버림 의견 — dev 가중 96.2 vs 끈 판 95.85(+0.35)로 채택 기준 +1.0에 못 미치고, 함정 common-T025가 두 번 다 뚫림",
+  "lesson": [
+    "좋아짐: dev 결합 93.8 vs 93.2, 잘못 고름 16 vs 20, 과잉 포기 2.35 vs 3.0%. 나빠짐: 함정 T025(구 금연거리 과태료에 시 조례로 답함), 판정 거절 2(animal-C014 · park-S023), 극한 가중 87.2 vs 89.0 · 과잉 포기 13.7 vs 10.85%",
+    "물음을 나눠 적게 해도 근거 수는 늘지 않았다(인용 1.60 vs 1.63, ④ 근거 라벨 1058 · 1051 vs 1096 · 1092). ④가 정답 조항을 두 번 다 안 든 결합 문항도 9 → 9. 물음마다 조항을 하나씩만 고르고, 관할 물음(「강서구」)까지 답할 물음으로 갈라 일반 조항으로 채웠다",
+    "프롬프트 지시만으로는 근거가 늘지 않는다 → ⓑ 질문 분석이 물음 둘 이상인데 근거가 한 조항이면 빠진 물음만 다시 읽기, 또는 ⓒ 든 조항이 가리키는 조 · 항을 코드가 이웃으로 보여 주기"
+  ],
+  "args": {
+    "config": "eval/configs/81-multi-evidence.json",
+    "split": "dev",
+    "sample": null,
+    "seed": 0,
+    "mode": "full",
+    "url": null,
+    "workers": 4
+  },
+  "settings": {
+    "chat_model": "solar-pro4",
+    "embed_passage": "solar-embedding-2-passage",
+    "embed_query": "solar-embedding-2-query",
+    "temperature": 0.0,
+    "reasoning_effort": null,
+    "chunk_unit": "paragraph",
+    "top_k": 20,
+    "hybrid_cos_weight": 0.7,
+    "use_embedding": true,
+    "use_verify": true,
+    "min_score": 0.25,
+    "answer_prompt": "v2",
+    "verify_prompt": "v1",
+    "timeout_sec": 75,
+    "explore": false,
+    "exit_check": true,
+    "max_citations": 4,
+    "retry_budget": true,
+    "max_concurrent_calls": 6,
+    "on_deadline": "unknown",
+    "select_mode": "prefilter",
+    "prefilter_keep": 8,
+    "prefilter_empty_abstain": true,
+    "max_per_article": 0,
+    "group_by_article": true,
+    "flow": "flow2",
+    "flow2_ontology": true,
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_asks": true
+  },
+  "settings_hash": "2d3b05209743",
+  "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_asks": true
+  },
+  "env": {
+    "code_commit": "721dcd9",
+    "code_hash": "32226be666d3",
+    "eval_code_hash": "c2dd2faede88",
+    "code_dirty": false,
+    "eval_commit": "17f8cc2",
+    "questions_hash": "8cf67c797eaa",
+    "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+    "retrieval_used": [
+      "hybrid"
+    ],
+    "key_present": true,
+    "server": null,
+    "python": "3.12.14",
+    "packages": {
+      "numpy": "2.2.6",
+      "openai": "3.39.0",
+      "requests": "2.34.2"
+    },
+    "platform": "macOS-26.6"
+  },
+  "metrics": {
+    "n": 661,
+    "n_gold": 619,
+    "n_trap": 42,
+    "weighted": 96.6,
+    "by_type": {
+      "단순": 97.0,
+      "조건": 97.3,
+      "결합": 94.8,
+      "함정": 97.6
+    },
+    "trap": 97.6,
+    "by_law": {
+      "animal": 95.1,
+      "bicycle": 99.4,
+      "common": 90.0,
+      "park": 95.2,
+      "parking": 96.7,
+      "smoking": 97.6,
+      "youth": 97.8
+    },
+    "over_abstain": 2.1,
+    "citations_per_answer": 1.61,
+    "retrieval_hit": 99.6,
+    "format_errors": 0,
+    "late": 0,
+    "over_90s": 0,
+    "timeouts": 0,
+    "errors": 0,
+    "latency_p50": 7.488,
+    "latency_p95": 12.18,
+    "latency_max": 18.636,
+    "causes": {
+      "후보에 있는데 잘못 고름": 18,
+      "판정이 맞는 답을 거절": 8,
+      "정답이 후보에 없음": 3,
+      "답이 있는데 확인 불가 (구절 불일치)": 2,
+      "함정에 답함": 1
+    }
+  },
+  "cost_usd": 1.552,
+  "tokens": {
+    "in": 10520925,
+    "cached": 8377600,
+    "out": 346449
+  },
+  "calls": 2592,
+  "wall_sec": 1280.0,
+  "hashes": {
+    "retrieval": "ec6609f5c0f5",
+    "answers": "536d79594362"
+  }
+}
