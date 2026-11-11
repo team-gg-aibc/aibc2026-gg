@@ -18,12 +18,13 @@ build_index · verify · contract · upstage)은 고치지 않고 부르기만 �
 import contextvars
 import json
 import re
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from concurrent.futures import TimeoutError as FutureTimeout
 
 from .. import answer as answer_step
-from .. import contract, pipeline, retrieve, upstage
+from .. import config, contract, pipeline, retrieve, upstage
 from . import annex, lawmap, prompts
 
 QUOTE_FAIL = "구절 불일치"     # ⑤ 고른 조항의 구절이 그 조항 글에 글자 그대로 없다
@@ -258,7 +259,59 @@ def _ask(st, cfg, step, user):
     def one(s):
         return guarded(s, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
     n = (cfg["flow2_votes"] or {}).get(step, 1)
-    return one(st) if n <= 1 else _voted(st, cfg, step, one, n)     # 스위치가 꺼져 있으면(기본) 7판 그대로 한 번만 부른다
+    if not cfg["flow2_memo"]:
+        return one(st) if n <= 1 else _voted(st, cfg, step, one, n)     # 스위치가 꺼져 있으면(기본) 7판 그대로 한 번만 부른다
+    key = config.digest([cfg["chat_model"], step, n, messages], 32)      # 프롬프트 글 · 보낸 글 · 표 수가 하나라도 바뀌면 다른 열쇠
+    out = _memo_get(cfg, key)
+    if out is None:
+        out = one(st) if n <= 1 else _voted(st, cfg, step, one, n)
+        _memo_put(cfg, key, out)
+    else:                                    # 부르지 않았다는 것을 호출 기록에 남긴다(토큰 0)
+        st["calls"].append({"kind": "memo", "model": cfg["chat_model"], "in": 0, "cached": 0, "out": 0, "sec": 0.0,
+                            "sent": key, "output": json.dumps(out, ensure_ascii=False)})
+    return out
+
+
+# ---- 같은 글에는 같은 출력 (스위치 flow2_memo, 11-11) ----
+# 모델은 같은 글을 보내도 다른 출력을 낸다(아래 「흔들림 줄이기」). 그래서 모델 호출의 출력을 「모델 · 단계 · 표 수 · 보낸 글 전체」의 지문별로
+# 적어 두고, 같은 글을 다시 보내야 할 때는 부르지 않고 적어 둔 출력을 쓴다. 같은 문의가 다시 오면 ① → ④ → ⑥이 차례로 같은 글을 받으므로
+# 답 · 근거가 글자까지 같다. 조례 원문 · 프롬프트 · 판이 바뀌면 보낸 글이 달라져 저절로 새로 부른다. 오류 · 시간 초과로 끝난 호출은 적지 않는다.
+# 값은 파일 경로(레포 맨 위 기준)다. 서버를 다시 띄워도 남는다. ":memory:"면 파일 없이 프로세스 안에만 둔다.
+# ponytail: 같은 문의 둘이 동시에 처음 오면 둘 다 부르고 나중 것이 남는다. 파일은 줄만 덧붙인다(지우기 · 크기 상한 없음) — 문의가 수만 건이 되면 손본다.
+_MEMO, _MEMO_LOCK = {}, threading.Lock()
+
+
+def _memo_table(cfg):
+    path = cfg["flow2_memo"]
+    with _MEMO_LOCK:
+        if path not in _MEMO:
+            _MEMO[path] = {}
+            f = config.ROOT / path
+            if path != ":memory:" and f.is_file():
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    try:
+                        k, v = json.loads(line)
+                        _MEMO[path][k] = v
+                    except ValueError:          # 쓰다 끊긴 줄은 건너뛴다
+                        pass
+    return _MEMO[path]
+
+
+def _memo_get(cfg, key):
+    out = _memo_table(cfg).get(key)
+    return None if out is None else json.loads(json.dumps(out))      # 사본(단계들이 받은 출력에 칸을 더한다)
+
+
+def _memo_put(cfg, key, out):
+    table, path = _memo_table(cfg), cfg["flow2_memo"]
+    with _MEMO_LOCK:
+        table[key] = json.loads(json.dumps(out))
+        if path != ":memory:":
+            try:
+                with open(config.ROOT / path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps([key, out], ensure_ascii=False) + "\n")
+            except OSError:                     # 적지 못해도 답은 낸다
+                pass
 
 
 # ---- 흔들림 줄이기 (스위치 flow2_votes, 11-11): 같은 호출을 여러 번 불러 다수결 ----
@@ -268,6 +321,9 @@ def _ask(st, cfg, step, user):
 # - ① analyze: 조례 고르기에 쓰는 칸(이름 든 조례 · 관할 · 관할 낱말 · 가까운 조례)이 가장 많이 겹치는 출력.
 # - ④ read: found는 과반. 근거 조항은 과반이 든 조항만(조항 이름은 ⑤와 같은 방법으로 원문 조각에 맞춘다). 구절은 그 조항을 든 출력들의
 #   구절 가운데 원문에 글자 그대로 있는 것. 답 글은 근거 묶음이 다수결 결과와 가장 가까운 출력의 것.
+#   flow2_votes에 "read_all": true를 더하면 과반 대신 「답한 표가 모두 든 조항만」 남긴다. 같은 ④ 입력을 100문항 × 10번 다시 보내
+#   기록으로 견주니(11-11, 흔들림-도구/sim_rules.py) 두 번 넣어 같은 근거가 한 번 76% · 과반(3) 85% · 모두(3) 89%였다. 실행마다 들쭉날쭉한 것은
+#   주로 「덧붙는 조항」이라서다. 대신 셋을 다 기다리고, 근거가 여럿 필요한 질문에서 하나를 잃을 수 있다.
 # - ⑥ check: 과반이 notGrounded일 때만 거절.
 # 온 표만으로 결과가 정해지면(예: 세 번 중 먼저 온 둘이 같다) 나머지는 기다리지 않는다. 결과는 다 기다린 것과 같다.
 # 기다리지 않은 호출의 토큰은 기록(calls)에 안 잡힌다. 몇 표를 불렀고 몇 표를 썼는지는 flow2.vote에 남긴다.
@@ -328,9 +384,11 @@ def pick_read(outs, left, need, v, cfg):
     for labs in sets:
         for lab in labs:
             count[lab] = count.get(lab, 0) + 1
-    if left and any(n < need <= n + left for n in count.values()) or left >= need:   # 아직 과반이 될 수 있는 조항이 있다
+    every = (cfg["flow2_votes"] or {}).get("read_all")     # True면 「답한 표가 모두 든 조항만」(다 올 때까지 기다린다). 없으면 과반
+    if left and (every or any(n < need <= n + left for n in count.values())) or left >= need:   # 아직 결과가 바뀔 수 있다
         return None
     need_now = need if left or len(outs) >= 2 * need - 1 else len(outs) // 2 + 1     # 표가 모자라게 끝났으면 온 표의 과반
+    need_now = len(yes) if every else need_now
     major = [c["label"] for c in v if count.get(c["label"], 0) >= need_now]
     concl = [o.get("conclusion") for o in yes]
     order = sorted(range(len(yes)), key=lambda i: (-len(set(sets[i]) & set(major)) / (len(set(sets[i]) | set(major)) or 1),
@@ -789,6 +847,11 @@ def selftest():
         assert got["evidence"] == [ok_ev, other_ev] and got["answer"] == "답 2", got                   # 과반이 든 조항(원문 순서) · 원문에 있는 구절 · 근거가 같은 출력의 답
         assert pick_read([rd(True, [ok_ev]), rd(False, []), rd(False, [])], 0, need, v7, cfg7)["found"] is False
         assert pick_read([rd(True, [ok_ev]), rd(False, [])], 1, need, v7, cfg7) is None
+        every = dict(cfg7, flow2_votes={"read": 3, "read_all": True})                                   # 「모두 든 조항만」
+        three = [rd(True, [ok_ev, other_ev]), rd(True, [ok_ev, other_ev]), rd(True, [ok_ev])]
+        assert [e["label"] for e in pick_read(three, 0, need, v7, cfg7)["evidence"]] == [target["label"], other["label"]]
+        assert [e["label"] for e in pick_read(three, 0, need, v7, every)["evidence"]] == [target["label"]]
+        assert pick_read(three[:2], 1, need, v7, every) is None and pick_read(three[:2], 1, need, v7, cfg7) is not None   # 모두: 셋째를 기다림
         got = pick_read([rd(True, [ok_ev]), rd(True, [other_ev]), rd(False, [])], 0, need, v7, cfg7)    # 과반이 든 조항이 없으면 한 출력의 근거 그대로
         assert got["found"] and len(got["evidence"]) == 1 and got["_vote"]["kept"] == []
         sl = lambda **kw: dict(slots, actor="시민", **kw)
@@ -824,6 +887,24 @@ def selftest():
         assert pipeline.answer(qv, on)[1]["reason"] == pipeline.REJECTED          # 과반이 거절이면 거절
         seq.clear()
         assert config.DEFAULTS["flow2_votes"] is None
+        # 같은 글에는 같은 출력(flow2_memo): 모델이 두 번째에 다른 출력을 내도 같은 문의에는 같은 답. 꺼 두면(기본) 매번 부른다
+        import os
+        import tempfile
+        memo = os.path.join(tempfile.mkdtemp(), "memo.jsonl")
+        keep = dict(cfg7, flow2_memo=memo)
+        two = lambda: seq.update(law_answer_quotes=[rd(True, [ok_ev], "첫 답"), rd(True, [other_ev], "둘째 답")])
+        two()
+        r1, t1 = pipeline.answer(qv, keep)
+        r2, t2 = pipeline.answer(qv, keep)
+        assert r1 == r2 and r1["answer"] == "첫 답" and [c.get("kind") for c in t2["calls"]] == ["memo"] * 3, (r1, r2)
+        assert [c["stage"] for c in t2["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"] and upstage.cost_usd(t2["calls"]) == 0
+        _MEMO.clear()                                    # 프로세스를 다시 띄운 것처럼: 파일에서 읽어 같은 답
+        assert pipeline.answer(qv, keep)[0] == r1 and pipeline.answer(qv + " ", keep)[0] != r1   # 글자가 다르면 다른 문의다
+        seq.clear()
+        two()
+        assert pipeline.answer(qv, cfg7)[0]["answer"] == "첫 답" and pipeline.answer(qv, cfg7)[0]["answer"] == "둘째 답"   # 꺼 두면 바뀐다
+        seq.clear()
+        assert config.DEFAULTS["flow2_memo"] is None
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
