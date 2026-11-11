@@ -11,7 +11,7 @@ import time
 from functools import lru_cache
 
 from . import answer as answer_step
-from . import config, contract, retrieve, upstage, verify
+from . import config, contract, gate, retrieve, upstage, verify
 
 # 확인 불가를 낸 까닭 (판단 기록 reason)
 LOW_SCORE = "점수 낮음"          # 검증 ①: 1위 후보의 의미 점수가 문턱보다 낮음
@@ -20,10 +20,18 @@ NO_EVIDENCE = "근거 번호 없음"   # 모델이 고른 번호가 없거나 �
 REJECTED = "판정 거절"           # 검증 ②: 판정이 notGrounded
 ERROR = "오류"                   # 호출 실패 · JSON 깨짐 등
 TIMEOUT = "시간 초과"            # #22: 마감 시각(받은 때 + timeout_sec)이 지남
+OUT_OF_SCOPE = gate.OUT          # #25 게이트: 자치구 조례 · 규칙을 묻는 질문 (검색 전에 끝냄)
 
 
 def receive(st, cfg):
-    """질문 받기. 지금은 그대로 넘긴다(#25 질문 분석 게이트가 여기서 관할 밖 · 지시문을 거른다)."""
+    """질문 받기. #25 질문 분석 게이트(gate.py): "on"이면 지시문을 뗀 질문으로 바꾸고, 자치구 조례 · 규칙을 묻으면 확인 불가."""
+    if cfg["gate"] == "off":
+        return
+    st["gate"] = gate.check(st["question"], cfg["gate"])
+    if cfg["gate"] == "on":
+        st["question"] = st["gate"]["question"] or st["question"]
+        if st["gate"]["block"]:
+            st["reason"] = OUT_OF_SCOPE
 
 
 def search(st, cfg):
