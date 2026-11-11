@@ -601,17 +601,19 @@ function cardClick(e) {
   if (!q) return;
   if (act === 'fix') { ui.fix = !ui.fix; ui.picking = false; renderCard(true); return requestAnimationFrame(() => relayout(true)); }
   if (act === 'sent') { ui.sent[q.id] = +b.dataset.i; return renderCard(true); }
-  if (act === 'edit') { ui.editing[q.id] = true; renderCard(true); return $('c-text') && $('c-text').focus(); }
+  if (act === 'edit') { ui.editing[q.id] = true; renderCard(true); return toText(); }
   if (act === 'edit-done') { saveDraft(q); ui.editing[q.id] = false; return renderCard(true); }
   if (act === 'revert') { ui.dirty[q.id] = q.card.answer; api(`/api/inquiries/${q.id}/draft`, { text: q.card.answer }).catch(() => {}); return renderCard(true); }
-  if (act === 'past') { const p = byId(b.dataset.id); ui.dirty[q.id] = p.approved.text; ui.editing[q.id] = true; saveDraft(q); return renderCard(true); }
+  if (act === 'past') { const p = byId(b.dataset.id); ui.dirty[q.id] = p.approved.text; ui.editing[q.id] = true; saveDraft(q); renderCard(true); return toText(); }
   if (act === 'reply') {
     ui.reply[q.id] = b.dataset.r;
     if (b.dataset.r === 'guide') { const a = agencyOf(q); ui.dirty[q.id] = fill(W('6종 밖').kv['안내 답'], { 조례: a.law, 기관: a.agency }); }
-    return renderCard(true);
+    renderCard(true); return toText();
   }
   if (act === 'retry') { b.disabled = true; return api(`/api/inquiries/${q.id}/retry`, {}).catch(() => {}).then(refresh); }
 }
+// 새로 생긴 글 칸(직접 답 · 처리 기관 안내 답 · 가져와 고치기 · 글 고치기)으로 카드를 내리고 초점을 준다(시연 흐름 손질 4)
+function toText() { const ta = $('c-text'); if (!ta) return; ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); ta.focus({ preventScroll: true }); }
 function saveDraft(q) { const ta = $('c-text'); if (ta) ui.dirty[q.id] = ta.value; if (ui.dirty[q.id] != null && !q.approved) api(`/api/inquiries/${q.id}/draft`, { text: ui.dirty[q.id] }).catch(() => {}); }
 
 // ---- 새 문의 알림 · 갱신
