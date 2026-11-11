@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <title>일하는 방식 한눈에</title>
 <!--
-  docs/work-method.md 맨 위 그림 세 장(work-method-1.png · work-method-2.png · work-method-3.png)의 원본이다.
+  docs/work-method.md 맨 위 그림 네 장(work-method-1.png ~ work-method-4.png)의 원본이다. 4장은 「11/22 제출까지」(동규 안)다.
   글 · 숫자 · 날짜는 docs/work-method.md(와 AGENTS.md 6절)와 같게 쓴다. 문서를 바꾸면 여기도 바꾸고 PNG를 다시 만든다.
   글꼴: 제목 도현체(Do Hyeon), 본문 Pretendard. 컴퓨터에 깔려 있어야 한다.
   PNG 다시 만들기 (레포 맨 위 폴더에서, 맥):
     C="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    for n in 1 2 3; do "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-$n.png" "file://$PWD/docs/img/work-method.html#p$n"; done
-  주소 끝 #p1 · #p2 · #p3이 그 장만 보이게 한다. 2340은 휴대폰 화면 비율(9 : 19.5)이다.
+    for n in 1 2 3 4; do "$C" --headless=new --hide-scrollbars --force-device-scale-factor=1 --user-data-dir=/tmp/gg-shot --window-size=1080,2340 --screenshot="$PWD/docs/img/work-method-$n.png" "file://$PWD/docs/img/work-method.html#p$n"; done
+  한 번에 다시 만들려면: bash docs/img/render.sh work-method
+  주소 끝 #p1 ~ #p4가 그 장만 보이게 한다. 2340은 휴대폰 화면 비율(9 : 19.5)이다.
   글이 길어져 아래 줄(자세한 문서 · 질문)이 잘리면 .page의 height와 창 높이를 함께 늘린다.
 -->
 <style>
@@ -108,6 +109,7 @@ td.dist{color:var(--orange);font-weight:700}
 .card h3{font-family:"Do Hyeon",sans-serif;font-weight:400;font-size:36px;margin:2px 0 6px;line-height:1.15}
 .card p{margin:0;font-size:25px;line-height:1.38}
 
+.draft{display:inline-block;background:var(--orange-l);color:var(--orange);font-weight:700;font-size:23px;border-radius:10px;padding:3px 11px;margin-right:8px}
 .foot{margin-top:auto;font-size:24px;color:var(--muted);border-top:2px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;gap:20px}
 </style>
 </head>
@@ -116,7 +118,7 @@ td.dist{color:var(--orange);font-weight:700}
 <!-- ===================== 1장: 2일 주기 ===================== -->
 <section class="page" id="p1">
   <div>
-    <div class="label">TEAM GG · 우리가 일하는 방식 · 1/3</div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 1/4</div>
     <h1>이틀 실험하고,<br>배분일에 나눠요</h1>
     <div class="sub">11/7(토) ~ 11/17(화) · 엔진 실험은 2일 주기</div>
   </div>
@@ -124,7 +126,7 @@ td.dist{color:var(--orange);font-weight:700}
   <div class="sum">
     <div class="row"><div class="num">1</div><div><b>원본은 GitHub 이슈 · PR.</b> 일은 이슈로 받고, 보고는 그 이슈의 댓글로 해요. 디스코드와 GG비서는 「봐 달라」는 신호만 보내요.</div></div>
     <div class="row"><div class="num">2</div><div><b>이틀 실험 → 배분일.</b> 이틀 동안 가설 하나를 실험하고, 사흘째 아침(배분일)에 결과를 모아 채택 · 버림을 정하고 다음 일을 나눠요.</div></div>
-    <div class="row"><div class="num">3</div><div><b>못 끝내면 PM 쪽이 이어받아요.</b> 배분일 아침에 동규와 동규의 Claude 세션이 마저 돌려요. 벌이 아니라 주기를 지키는 장치예요.</div></div>
+    <div class="row"><div class="num">3</div><div><b>못 끝내면 다음 주기에 이어 가요.</b> 3주기부터는 PM 쪽이 이어받지 않아요. 끝 보고에 어디까지 했는지와 이어받을 메모를 남겨요.</div></div>
   </div>
 
   <h2>한 주기 = 이틀</h2>
@@ -136,15 +138,15 @@ td.dist{color:var(--orange);font-weight:700}
       <div class="term"><b>1주기만 11/8(일) 21시까지.</b> 11/7은 특화교육과 19시 회의 뒤에 시작해서요.</div></div></div>
     <div class="step g"><div><span class="chip">둘째 날 20시</span></div><div class="txt">GG비서가 「오늘 마감」을 알려요.</div></div>
     <div class="step g"><div><span class="chip">둘째 날 24시<br>= 마감</span></div><div class="txt"><b>끝 보고</b>: 결과 표 · 의견 · 배운 점. <b>다 못 했어도, 버림 · 보류여도</b> 달아요. 일찍 끝났으면 예비 하나를 가져가요(3장).</div></div>
-    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">아침에 결과 모으기(배운 점 모음부터) <span class="arrow">→</span> 못 끝낸 실험 마저 돌리기 <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 채택된 스위치를 <b>릴리스 판</b>에 모아 다시 재기(3장) <span class="arrow">→</span> 다음 배분안(가설 제안 · 남은 예비도 후보) <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
+    <div class="step o"><div><span class="chip">배분일<br>(PM 쪽)</span></div><div class="txt">결과 모으기(배운 점 모음부터) <span class="arrow">→</span> 채택 · 버림 <span class="arrow">→</span> 채택된 스위치를 <b>릴리스 판</b>에 모아 다시 재기(3장) <span class="arrow">→</span> 다음 배분안(가설 제안 · 남은 예비도 후보) <span class="arrow">→</span> 동규 승인 <span class="arrow">→</span> 이슈 게시. 이날이 다음 주기의 첫날이에요.</div></div>
   </div>
 
   <h2>주기 달력</h2>
   <table>
     <tr><th>주기</th><th>실험 (첫날 · 둘째 날 24:00 마감)</th><th>배분일</th></tr>
-    <tr><td class="cy">1<span class="tag t">탐색</span></td><td>11/7(토) · 11/8(일)</td><td class="dist">11/9(월)</td></tr>
-    <tr><td class="cy">2<span class="tag t">탐색</span></td><td>11/9(월) · 11/10(화)</td><td class="dist">11/11(수)</td></tr>
-    <tr><td class="cy">3<span class="tag t">탐색</span></td><td>11/11(수) · 11/12(목)</td><td class="dist">11/13(금) 19:00 정기회의</td></tr>
+    <tr><td class="cy">1<span class="tag t">탐색</span></td><td>11/7(토) · 11/8(일)</td><td class="dist">11/10(화) 새벽 (하루 늦음)</td></tr>
+    <tr><td class="cy">2<span class="tag t">탐색</span></td><td>11/10(화) 하루</td><td class="dist">11/11(수)</td></tr>
+    <tr><td class="cy">3<span class="tag t">탐색</span></td><td>11/11(수) · 11/12(목)</td><td class="dist">11/13(금) 낮에 글로</td></tr>
     <tr><td class="cy">4<span class="tag v">수렴</span></td><td>11/13(금) · 11/14(토)</td><td class="dist">11/15(일)</td></tr>
     <tr><td class="cy">5<span class="tag v">수렴</span></td><td>11/15(일) · 11/16(월)</td><td class="dist">11/17(화) 동결 판단</td></tr>
   </table>
@@ -155,9 +157,10 @@ td.dist{color:var(--orange);font-weight:700}
   <div class="after">
     <div class="d">11/17(화)부터</div><div>동결: <b>그때의 릴리스 판이 동결 판</b>.<br>새 실험 없이 버그만 고쳐요(동규 승인)</div>
     <div class="d">11/18(수)</div><div>holdout 한 번 · 동결 판을 채점 서버(#31)에 올려요<span class="gl">holdout = 마지막 확인용 문제(174문항). 팀원은 재지 않아요</span></div>
-    <div class="d">11/19(목)</div><div>리허설 · 채점 API 가동</div>
+    <div class="d">11/19(목)</div><div>리허설 · 채점 API 가동 · <b>업스테이지 사전 점검</b></div>
     <div class="d">11/22(일) 24:00</div><div>최종 제출</div>
   </div>
+  <div class="note">3주기부터 끈 판은 새 흐름 7판이에요. 11/15 뒤 일정은 동규 안이 있어 11/13 회의에서 논의해요(4장).</div>
 
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
 </section>
@@ -165,7 +168,7 @@ td.dist{color:var(--orange);font-weight:700}
 <!-- ===================== 2장: 실험 하나 ===================== -->
 <section class="page" id="p2">
   <div>
-    <div class="label">TEAM GG · 우리가 일하는 방식 · 2/3</div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 2/4</div>
     <h1>실험 하나는 이렇게 해요</h1>
   </div>
 
@@ -177,7 +180,7 @@ td.dist{color:var(--orange);font-weight:700}
     <div class="s"><span class="n">3</span><div>사람이 확인하고 <b>「마감까지」</b>를 정해 주면, AI가 <b>시작 보고</b>를 이슈에 올리고 <b>바로 시작</b>해요. 승인을 기다리지 않아요.</div></div>
     <div class="s"><span class="n">4</span><div>PM 쪽(1주기는 동규의 Claude 세션)이 나중에 읽고, 다르면 이슈 댓글로 바로잡아요.</div></div>
   </div>
-  <div class="note">같은 이슈를 다음 세션에서 이어 갈 때는 시작 보고 없이 그 브랜치에서 이어 가요.</div>
+  <div class="note">같은 이슈를 다음 세션에서 이어 갈 때는 시작 보고 없이 그 브랜치에서 이어 가요. 엔진 · 평가 · 답 글을 고치기 전에는 받은 채점 규칙(docs/engine/scoring-rules.md)을 읽어요.</div>
 
   <h2>보고는 이슈 댓글로</h2>
   <div class="cmt">
@@ -207,10 +210,10 @@ td.dist{color:var(--orange);font-weight:700}
 
   <h2>점수는 이렇게 봐요</h2>
   <div class="boxes">
-    <div class="box"><span class="k">dev 전체로, 켠 판 · 끈 판을 각각 두 번 이상</span> 재서 리더보드에 남겨요(100문항은 빠른 확인용).
+    <div class="box"><span class="k">dev와 극한 세트로, 켠 판 · 끈 판을 각각 두 번</span> 재요(100문항은 빠른 확인용). 3주기부터 끈 판은 새 흐름 7판이에요.
       <div class="term"><b>dev</b> = 개발용 문제(693문항). 점수는 회색지대를 뺀 661문항으로 재요. <b>리더보드</b> = 실험마다 켠 판 · 끈 판 점수를 한 줄씩 모은 표.</div></div>
-    <div class="box"><span class="k">채택 기준:</span> 가중 점수가 흔들림 폭의 두 배 넘게 오르고, 함정 정답률이 1점 넘게 떨어지지 않을 때. 정하는 사람은 배분일의 동규예요.
-      <div class="term"><b>흔들림 폭</b> = 아무것도 안 바꿔도 돌릴 때마다 생기는 차이. 출발 판을 dev 전체로 네 번 돌리니 <span class="nb">67.1 · 68.2 · 68.1 · 68.1점,</span> 폭 1.1점이라 2.2점 넘게 올라야 채택해요.</div></div>
+    <div class="box"><span class="k">채택 기준(3주기부터):</span> dev 가중이 1.0점 넘게 오르고, 두 번 다 맞던 함정이 두 번 다 틀리지 않고, 과잉 포기가 1점 넘게 늘지 않고, 오류 · 시간 초과가 0일 때. 배분일에 동규가 정해요.
+      <div class="term"><b>흔들림 폭</b> = 아무것도 안 바꿔도 돌릴 때마다 생기는 차이. 새 흐름 판은 두 번 잰 차이의 가운데값이 0.5점이라 그 두 배인 1.0점이 기준이에요.</div></div>
   </div>
 
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
@@ -219,7 +222,7 @@ td.dist{color:var(--orange);font-weight:700}
 <!-- ===================== 3장: 가설에서 제출할 판까지 ===================== -->
 <section class="page" id="p3">
   <div>
-    <div class="label">TEAM GG · 우리가 일하는 방식 · 3/3</div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 3/4</div>
     <h1>가설에서 제출할 판까지</h1>
   </div>
 
@@ -231,11 +234,11 @@ td.dist{color:var(--orange);font-weight:700}
   <h2>예비 실험과 일찍 끝나면</h2>
   <div class="flow">
     <div class="step o"><div><span class="chip">배분일</span></div><div class="txt">예비 실험 몇 개를 미리 세워요. 라벨 <b>「예비」</b>, 담당은 비우고, 맨 위에 「가져갈 수 있는 조건」. 동규 승인은 배정과 함께.</div></div>
-    <div class="step b"><div><span class="chip">끝 보고 뒤</span></div><div class="txt">끝 보고(결과 표 · 의견 · 배운 점까지)를 올린 사람만, <b>번호가 작은 것부터 하나</b>. 「가져감」 댓글 + 자기를 담당으로. 남이 진행 중인 파일은 건드리지 않아요.</div></div>
+    <div class="step b"><div><span class="chip">끝 보고 뒤</span></div><div class="txt">끝 보고(결과 표 · 의견 · 배운 점까지)를 올린 사람만, <b>번호가 작은 것부터 하나</b>. 「가져감」 댓글을 달면 서버가 담당으로 지정해요(한 사람이 하나씩). 남이 진행 중인 파일은 건드리지 않아요.</div></div>
     <div class="step g"><div><span class="chip">그 주기 마감</span></div><div class="txt">가져간 실험도 둘째 날 24:00까지 끝 보고. 결과는 다음 배분일에 다른 실험과 같이 판단해요.</div></div>
     <div class="step v2"><div><span class="chip">남으면</span></div><div class="txt">아무도 안 가져간 예비는 다음 주기 배정 후보로 넘겨요.</div></div>
   </div>
-  <div class="note">가져갈 예비가 없으면: 평가셋 검수 · 비교 문서 · 배운 점 다듬기 · 흔들림 확인용 추가 측정 가운데 하나.</div>
+  <div class="note">가져갈 예비가 없으면: 비교 문서 · 배운 점 다듬기 · 흔들림 확인용 추가 측정 가운데 하나.</div>
 
   <h2>채택된 것은 어디로 가나</h2>
   <div class="box">배분일에 채택된 실험(스위치)을 모아 <b>릴리스 판</b>(rc-c1, rc-c2 …)을 만들어요 <span class="arrow">→</span> 합친 판을 dev 전체로 다시 재고, API(<code>POST /ask</code>, 네 칸 JSON)로 끝까지 도는지 확인 <span class="arrow">→</span> <code>docs/engine/releases.md</code>에 남겨요 <span class="arrow">→</span> 실험이 마무리되면 채점 서버(#31)로.
@@ -257,6 +260,49 @@ td.dist{color:var(--orange);font-weight:700}
   </div>
 
   <div class="foot"><span>자세한 문서: docs/work-method.md</span><span>질문은 맡은 이슈 댓글로 PM에게</span></div>
+</section>
+
+<!-- ===================== 4장: 11/22 제출까지 (동규 안) ===================== -->
+<section class="page" id="p4">
+  <div>
+    <div class="label">TEAM GG · 우리가 일하는 방식 · 4/4</div>
+    <h1>11/22 제출까지</h1>
+    <div class="sub"><span class="draft">동규 안 · 11/13 회의에서 논의</span> 아직 정한 것이 아니에요. 회의에서 함께 정해요.</div>
+  </div>
+
+  <div class="sum">
+    <div class="row"><div class="num">1</div><div><b>팀 전체가 엔진에 집중하는 기간은 이번 주(11/14 토)까지.</b> 그 뒤로는 새 엔진 실험을 열지 않고, 잃지 않기 위한 일만 해요.</div></div>
+    <div class="row"><div class="num">2</div><div><b>다음 주 한 주(11/16~)는 서비스를 실제로 만드는 데 집중해요.</b> 대회 100점 가운데 발표와 서비스로 받는 공통 점수가 80점이에요.</div></div>
+  </div>
+
+  <h2>큰 흐름</h2>
+  <div class="flow">
+    <div class="step b"><div><span class="chip">이번 주<br>~ 11/14(토)</span></div><div class="txt"><b>엔진.</b> 3주기(11/11~12) → 4주기(11/13~14). 받은 채점 규칙에 맞는지 보면서 실험해요.</div></div>
+    <div class="step o"><div><span class="chip">다음 주<br>11/16(월) ~</span></div><div class="txt"><b>서비스를 실제로 만들어요.</b> PRD대로 돌아가는 서비스 화면, 엔진 연결, 시연영상, 발표자료, 실행 설명서. 엔진 쪽은 잃지 않기 위한 일만 해요: 받은 답대로 「확인 불가」 줄이기, 같은 문의에 같은 답 내기, 채점 서버 조건(2문항 동시 · 접속 10초 · 90초). 낼 판을 정해 채점 서버에 올려요(날짜는 회의에서).</div></div>
+    <div class="step v2"><div><span class="chip">11/19(목)</span></div><div class="txt"><b>사전 점검.</b> 업스테이지가 공개 예시 문항으로 우리 채점 API를 불러요. 주소는 <code>/ask</code>까지 넣어서 내요.</div></div>
+    <div class="step g"><div><span class="chip">11/22(일)<br>24:00</span></div><div class="txt"><b>최종 제출.</b> 발표자료 · 시연영상 링크 · 채점 API 주소 · 저장소. <b>발표자료는 이 뒤로 못 고쳐요.</b></div></div>
+    <div class="step g"><div><span class="chip">11/25(수)<br>16:00</span></div><div class="txt"><b>본선 발표(부여).</b> 낸 파일과 운영진 PC로 해요. 발표 15분 + 질의응답 7분. 그 전 11/23~24는 발표 연습.</div></div>
+  </div>
+
+  <h2>일의 구조</h2>
+  <table>
+    <tr><th>일</th><th>누가 (사람은 회의에서 정해요)</th></tr>
+    <tr><td class="cy">통합</td><td>PM 쪽. 엔진 + 서비스 화면 + 제출 형태를 하나로 묶어요</td></tr>
+    <tr><td class="cy">엔진 실험</td><td>팀원. PM은 아이디어와 가이드라인을 줘요(새 실험은 11/14까지 열어요)</td></tr>
+    <tr><td class="cy">서버 · 배포</td><td>한 명. 채점 서버와 사전 점검</td></tr>
+    <tr><td class="cy">현장 조사 · 사용자 평가</td><td>두 명</td></tr>
+    <tr><td class="cy">시연영상 · 발표자료 · 실행 설명서</td><td>PM</td></tr>
+  </table>
+  <div class="box"><span class="k">「실제로 돌아가는 서비스」</span> = 현장에 바로 적용할 수 있는 것. 데이터는 가상 문의를 써도 되고(가상이라고 밝혀요), 공개 게시판의 실제 문의를 뼈대로 섞어요.</div>
+
+  <h2>받은 답으로 정해진 것 (11/11)</h2>
+  <div class="boxes">
+    <div class="box"><span class="k">시연의 중심은 미리 찍은 영상.</span> 발표는 낸 파일과 운영진 PC로 하고, 발표자료는 11/22 뒤에 고칠 수 없어요. 영상은 유튜브 일부 공개 링크로 내도 돼요.</div>
+    <div class="box"><span class="k">저장소는 발표 · 시연 시간에만 공개.</span> 수상 후보는 저장소로 재현성 검증을 받으니 README에 실행 방법과 환경 변수 이름을 적어요(키 값은 올리지 않아요).</div>
+    <div class="box"><span class="k">채점.</span> 한 팀에 2문항씩 동시에 오고, 접속이 10초 안에 안 되면 오류예요. 90초는 요청을 보낸 때부터 응답을 다 받을 때까지.</div>
+  </div>
+
+  <div class="foot"><span>자세한 문서: docs/schedule.md 「계획 변경 안」</span><span>물을 것은 디스코드에</span></div>
 </section>
 
 </body>
