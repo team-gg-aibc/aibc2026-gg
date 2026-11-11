@@ -255,16 +255,27 @@ def _ask(st, cfg, step, user):
     """모델 호출 하나(시스템 프롬프트 · JSON 칸은 판이 고른다) → 읽어 들인 JSON."""
     _, system, schema = prompts.SETS[cfg["flow2_version"]][step]
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
 
-    def one(s):
-        return guarded(s, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
+
+# ---- 스위치 flow2_votes · flow2_memo의 들머리 (11-11) ----
+# 위 _ask는 한 글자도 고치지 않았다(#81이 고치는 함수라서). 같은 이름으로 한 겹 싸서, 두 스위치가 다 꺼져 있으면(기본) 위 _ask를 그대로 부른다.
+_ask_one = _ask
+
+
+def _ask(st, cfg, step, user):      # noqa: F811
+    """스위치가 켜져 있으면 같은 호출을 여러 번 불러 다수결(flow2_votes) · 같은 글에는 적어 둔 출력(flow2_memo). 꺼져 있으면 _ask_one 그대로."""
     n = (cfg["flow2_votes"] or {}).get(step, 1)
+
+    def run():
+        return _ask_one(st, cfg, step, user) if n <= 1 else _voted(st, cfg, step, lambda s: _ask_one(s, cfg, step, user), n)
     if not cfg["flow2_memo"]:
-        return one(st) if n <= 1 else _voted(st, cfg, step, one, n)     # 스위치가 꺼져 있으면(기본) 7판 그대로 한 번만 부른다
-    key = config.digest([cfg["chat_model"], step, n, messages], 32)      # 프롬프트 글 · 보낸 글 · 표 수가 하나라도 바뀌면 다른 열쇠
+        return run()
+    # 열쇠: 설정 전체 · 단계 · 그 판의 프롬프트 글 · 보낸 글. 하나라도 바뀌면 새로 부른다
+    key = config.digest([config.digest(cfg, 32), step, prompts.SETS[cfg["flow2_version"]][step][1], user], 32)
     out = _memo_get(cfg, key)
     if out is None:
-        out = one(st) if n <= 1 else _voted(st, cfg, step, one, n)
+        out = run()
         _memo_put(cfg, key, out)
     else:                                    # 부르지 않았다는 것을 호출 기록에 남긴다(토큰 0)
         st["calls"].append({"kind": "memo", "model": cfg["chat_model"], "in": 0, "cached": 0, "out": 0, "sec": 0.0,
@@ -273,9 +284,9 @@ def _ask(st, cfg, step, user):
 
 
 # ---- 같은 글에는 같은 출력 (스위치 flow2_memo, 11-11) ----
-# 모델은 같은 글을 보내도 다른 출력을 낸다(아래 「흔들림 줄이기」). 그래서 모델 호출의 출력을 「모델 · 단계 · 표 수 · 보낸 글 전체」의 지문별로
+# 모델은 같은 글을 보내도 다른 출력을 낸다(아래 「흔들림 줄이기」). 그래서 모델 호출의 출력을 「설정 전체 · 단계 · 프롬프트 글 · 보낸 글」의 지문별로
 # 적어 두고, 같은 글을 다시 보내야 할 때는 부르지 않고 적어 둔 출력을 쓴다. 같은 문의가 다시 오면 ① → ④ → ⑥이 차례로 같은 글을 받으므로
-# 답 · 근거가 글자까지 같다. 조례 원문 · 프롬프트 · 판이 바뀌면 보낸 글이 달라져 저절로 새로 부른다. 오류 · 시간 초과로 끝난 호출은 적지 않는다.
+# 답 · 근거가 글자까지 같다. 조례 원문 · 프롬프트 · 설정이 하나라도 바뀌면 지문이 달라져 저절로 새로 부른다. 오류 · 시간 초과로 끝난 호출은 적지 않는다.
 # 값은 파일 경로(레포 맨 위 기준)다. 서버를 다시 띄워도 남는다. ":memory:"면 파일 없이 프로세스 안에만 둔다.
 # ponytail: 같은 문의 둘이 동시에 처음 오면 둘 다 부르고 나중 것이 남는다. 파일은 줄만 덧붙인다(지우기 · 크기 상한 없음) — 문의가 수만 건이 되면 손본다.
 _MEMO, _MEMO_LOCK = {}, threading.Lock()
