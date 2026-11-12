@@ -18,12 +18,13 @@ build_index · verify · contract · upstage)은 고치지 않고 부르기만 �
 import contextvars
 import json
 import re
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from concurrent.futures import TimeoutError as FutureTimeout
 
 from .. import answer as answer_step
-from .. import contract, pipeline, retrieve, upstage
+from .. import config, contract, pipeline, retrieve, upstage
 from . import annex, lawmap, prompts
 
 QUOTE_FAIL = "구절 불일치"     # ⑤ 고른 조항의 구절이 그 조항 글에 글자 그대로 없다
@@ -205,7 +206,7 @@ def _f2(st):
 # 연결 오류: 4판 dev 두 번째 실행(15:50쯤 네트워크가 끊김)에서 102문항이 검색 단계의 APIConnectionError로 끝났다. upstage.py는
 # 15.5초 동안 여섯 번 부르고 그만둔다(마감 75초까지 59초가 남는데도). 그래서 마감까지 20초 넘게 남았으면 한 바퀴 더 부른다.
 # 팀원 파일 upstage.py는 고치지 않는다. 문항 마감(timeout_sec)은 그대로 upstage 예산이 시도마다 본다.
-_POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="flow2")
+_POOL = ThreadPoolExecutor(max_workers=64, thread_name_prefix="flow2")   # 16 → 64(11-11): 다수결(flow2_votes)을 켜면 호출이 세 배다
 TRIES = 3   # 한 단계에 많아야 세 번(늦어서 하나 더 · JSON이 깨져서 다시, 합쳐서)
 RETRY_LEFT_SEC = 20   # 연결 오류 · 5xx · 429로 끝난 호출은 문항 마감까지 이보다 많이 남았을 때만 다시 부른다
 
@@ -257,6 +258,224 @@ def _ask(st, cfg, step, user):
     return guarded(st, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), step)
 
 
+# ---- 스위치 flow2_votes · flow2_memo의 들머리 (11-11) ----
+# 위 _ask는 한 글자도 고치지 않았다(#81이 고치는 함수라서). 같은 이름으로 한 겹 싸서, 두 스위치가 다 꺼져 있으면(기본) 위 _ask를 그대로 부른다.
+_ask_one = _ask
+
+
+def _ask(st, cfg, step, user):      # noqa: F811
+    """스위치가 켜져 있으면 같은 호출을 여러 번 불러 다수결(flow2_votes) · 같은 글에는 적어 둔 출력(flow2_memo). 꺼져 있으면 _ask_one 그대로."""
+    n = (cfg["flow2_votes"] or {}).get(step, 1)
+
+    def run():
+        return _ask_one(st, cfg, step, user) if n <= 1 else _voted(st, cfg, step, lambda s: _ask_one(s, cfg, step, user), n)
+    if not cfg["flow2_memo"]:
+        return run()
+    return _memoed(st, cfg, [step, prompts.SETS[cfg["flow2_version"]][step][1], user], run)   # 열쇠: 단계 · 그 판의 프롬프트 글 · 보낸 글
+
+
+# ---- 같은 글에는 같은 출력 (스위치 flow2_memo, 11-11) ----
+# 모델은 같은 글을 보내도 다른 출력을 낸다(아래 「흔들림 줄이기」). 그래서 모델 호출의 출력을 「설정 전체 · 단계 · 프롬프트 글 · 보낸 글」의 지문별로
+# 적어 두고, 같은 글을 다시 보내야 할 때는 부르지 않고 적어 둔 출력을 쓴다. 검색 결과도 질문별로 적어 둔다: 임베딩 호출도 같은 질문에 조금씩
+# 다른 벡터를 돌려줘서(7판 dev 두 실행: 같은 조각의 의미 점수가 657문항 중 333문항에서 다르고 후보 묶음이 18문항에서 다름) ③이 다른 조례를 고를 수 있다.
+# 같은 문의가 다시 오면 ① → ④ → ⑥이 차례로 같은 글을 받으므로
+# 답 · 근거가 글자까지 같다. 조례 원문 · 프롬프트 · 설정이 하나라도 바뀌면 지문이 달라져 저절로 새로 부른다. 오류 · 시간 초과로 끝난 호출은 적지 않는다.
+# 값은 파일 경로(레포 맨 위 기준)다. 서버를 다시 띄워도 남는다. ":memory:"면 파일 없이 프로세스 안에만 둔다.
+# 같은 열쇠를 다른 스레드가 부르는 중이면 끝나기를 기다렸다가 그 값을 쓴다(같은 문의가 동시에 와도 한 번만 부른다. 문의 세트 확인 11-11에서
+# 되풀이가 첫 실행이 끝나기 전에 시작돼 한 문항의 답이 갈렸다).
+# ponytail: 파일은 줄만 덧붙인다(지우기 · 크기 상한 없음, 검색 결과는 문의 하나에 조각 20개의 글) — 문의가 수만 건이 되면 손본다.
+_MEMO, _BUSY, _MEMO_LOCK = {}, {}, threading.Lock()
+
+
+def _memoed(st, cfg, parts, run):
+    """열쇠(설정 전체 + parts)에 적어 둔 값이 있으면 그것을, 없으면 run()을 부르고 적는다."""
+    key = config.digest([config.digest(cfg, 32)] + parts, 32)
+    with _MEMO_LOCK:
+        mine = key not in _BUSY
+        busy = _BUSY.setdefault(key, threading.Event())
+    if not mine:
+        busy.wait(timeout=_left())               # 먼저 부른 쪽을 문항 마감 전까지 기다린다
+    try:
+        out = _memo_get(cfg, key)
+        if out is None:
+            out = run()
+            _memo_put(cfg, key, out)
+            return out
+    finally:
+        if mine:
+            with _MEMO_LOCK:
+                _BUSY.pop(key, None)
+            busy.set()
+    st["calls"].append({"kind": "memo", "model": cfg["chat_model"], "in": 0, "cached": 0, "out": 0, "sec": 0.0,     # 안 불렀다는 기록(토큰 0)
+                        "sent": key, "output": json.dumps(out, ensure_ascii=False, default=float)[:2000]})
+    return out
+
+
+def _memo_table(cfg):
+    path = cfg["flow2_memo"]
+    with _MEMO_LOCK:
+        if path not in _MEMO:
+            _MEMO[path] = {}
+            f = config.ROOT / path
+            if path != ":memory:" and f.is_file():
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    try:
+                        k, v = json.loads(line)
+                        _MEMO[path][k] = v
+                    except ValueError:          # 쓰다 끊긴 줄은 건너뛴다
+                        pass
+    return _MEMO[path]
+
+
+def _memo_get(cfg, key):
+    out = _memo_table(cfg).get(key)
+    return None if out is None else json.loads(json.dumps(out))      # 사본(단계들이 받은 출력에 칸을 더한다)
+
+
+def _memo_put(cfg, key, out):
+    table, path = _memo_table(cfg), cfg["flow2_memo"]
+    with _MEMO_LOCK:
+        table[key] = json.loads(json.dumps(out, default=float))      # default=float: 검색 점수가 numpy 수일 수 있다
+        if path != ":memory:":
+            try:
+                with open(config.ROOT / path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps([key, table[key]], ensure_ascii=False) + "\n")
+            except OSError:                     # 적지 못해도 답은 낸다
+                pass
+
+
+# ---- 흔들림 줄이기 (스위치 flow2_votes, 11-11): 같은 호출을 여러 번 불러 다수결 ----
+# 7판 dev 두 실행(11-10)을 견주니 ④는 보낸 글이 글자까지 같은 648문항 중 643문항의 출력이 달랐고 284문항은 근거 조항 묶음까지
+# 달랐다(temperature 0, seed · top_p를 보내도 같다 — 11-11 작은 시험 8문항 × 4번). 모델이 같은 입력에 다른 출력을 내는 것은 못 막으니,
+# 같은 호출을 n번 나란히 부르고 「결정」만 다수결로 정한다. 글(답 문장 · 구절)은 다수 쪽 출력 하나를 그대로 쓴다(섞어 짓지 않는다).
+# - ① analyze: 조례 고르기에 쓰는 칸(이름 든 조례 · 관할 · 관할 낱말 · 가까운 조례)이 가장 많이 겹치는 출력.
+# - ④ read: found는 과반. 근거 조항은 과반이 든 조항만(조항 이름은 ⑤와 같은 방법으로 원문 조각에 맞춘다). 구절은 그 조항을 든 출력들의
+#   구절 가운데 원문에 글자 그대로 있는 것. 답 글은 근거 묶음이 다수결 결과와 가장 가까운 출력의 것.
+#   flow2_votes에 "read_all": true를 더하면 과반 대신 「답한 표가 모두 든 조항만」 남긴다. 같은 ④ 입력을 100문항 × 10번 다시 보내
+#   기록으로 견주니(11-11, 흔들림-도구/sim_rules.py) 두 번 넣어 같은 근거가 한 번 76% · 과반(3) 85% · 모두(3) 89%였다. 실행마다 들쭉날쭉한 것은
+#   주로 「덧붙는 조항」이라서다. 대신 셋을 다 기다리고, 근거가 여럿 필요한 질문에서 하나를 잃을 수 있다.
+# - ⑥ check: 과반이 notGrounded일 때만 거절.
+# 온 표만으로 결과가 정해지면(예: 세 번 중 먼저 온 둘이 같다) 나머지는 기다리지 않는다. 결과는 다 기다린 것과 같다.
+# 기다리지 않은 호출의 토큰은 기록(calls)에 안 잡힌다. 몇 표를 불렀고 몇 표를 썼는지는 flow2.vote에 남긴다.
+_VOTE = ThreadPoolExecutor(max_workers=48, thread_name_prefix="flow2-vote")   # 안에서 guarded가 _POOL을 쓰므로 풀을 나눈다
+_ROUTE_KEYS = ("named_rule", "jurisdiction", "jurisdiction_word", "law_guess")
+
+
+def _dump(o):
+    return json.dumps(o, ensure_ascii=False, sort_keys=True)
+
+
+def _verdict(out):
+    """⑥ 출력 하나의 판정(check와 같은 셈): 물음 하나라도 grounded면 grounded, 모두 notGrounded면 notGrounded."""
+    if "asks" not in out:                 # 1판(c1)은 verdict 칸 하나
+        return out.get("verdict")
+    vs = [a.get("verdict") for a in out.get("asks") or []]
+    return "grounded" if "grounded" in vs else "notGrounded" if vs and set(vs) == {"notGrounded"} else "notSure"
+
+
+def _ev_label(ev, v, body, cfg):
+    """④ 출력의 근거 하나 → 원문 조각 이름(⑤ gate와 같은 방법). 목록에 없는 조항이면 None."""
+    lab = ev.get("label", "").replace("[조항]", "").strip()
+    found = label_ids([lab], v) or by_quote(lab, ev.get("quote", "").replace(DELEG_MARK, ""), v, body)
+    return v[found[0] - 1]["label"] if found else None
+
+
+def pick_slots(outs, left, need):
+    """① 다수결. 남은 표(left)가 와도 안 바뀌면 고른 출력, 아니면 None."""
+    key = lambda o: tuple(_norm(str(o.get(k, ""))) for k in _ROUTE_KEYS)
+    count = {}
+    for o in outs:
+        count[key(o)] = count.get(key(o), 0) + 1
+    top = max(count.values())
+    if top < need and left:
+        return None
+    if top >= need or top > 1:
+        k = max(count, key=lambda x: (count[x], x))
+        return min((o for o in outs if key(o) == k), key=_dump)
+    # 모두 다르면: 칸마다 다수 값과 가장 많이 겹치는 출력
+    cols = list(zip(*map(key, outs)))
+    score = lambda o: sum(cols[i].count(x) for i, x in enumerate(key(o)))
+    return max(outs, key=lambda o: (score(o), _dump(o)))
+
+
+def pick_read(outs, left, need, v, cfg):
+    """④ 다수결. 남은 표가 와도 found와 근거 조항 묶음이 안 바뀌면 합친 출력, 아니면 None."""
+    yes = [o for o in outs if o.get("found")]
+    no = [o for o in outs if not o.get("found")]
+    if left and len(yes) < need and len(no) < need:
+        return None
+    if len(no) >= need or (not left and len(yes) <= len(no)):       # 과반이 「답할 수 없다」(반반이면 답하지 않는 쪽)
+        return dict(min(no, key=_dump), _vote={"found": [bool(o.get("found")) for o in outs]})
+    body = {}
+    for c in v:
+        body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
+    sets = [[lab for lab in dict.fromkeys(_ev_label(ev, v, body, cfg) for ev in o.get("evidence") or []) if lab] for o in yes]
+    count = {}
+    for labs in sets:
+        for lab in labs:
+            count[lab] = count.get(lab, 0) + 1
+    every = (cfg["flow2_votes"] or {}).get("read_all")     # True면 「답한 표가 모두 든 조항만」(다 올 때까지 기다린다). 없으면 과반
+    if left and (every or any(n < need <= n + left for n in count.values())) or left >= need:   # 아직 결과가 바뀔 수 있다
+        return None
+    need_now = need if left or len(outs) >= 2 * need - 1 else len(outs) // 2 + 1     # 표가 모자라게 끝났으면 온 표의 과반
+    need_now = len(yes) if every else need_now
+    major = [c["label"] for c in v if count.get(c["label"], 0) >= need_now]
+    concl = [o.get("conclusion") for o in yes]
+    order = sorted(range(len(yes)), key=lambda i: (-len(set(sets[i]) & set(major)) / (len(set(sets[i]) | set(major)) or 1),
+                                                   -concl.count(concl[i]), _dump(yes[i])))
+    rep = yes[order[0]]                                              # 근거 묶음이 다수결 결과와 가장 가까운 출력(같으면 결론이 다수인 쪽)
+    vote = {"found": [bool(o.get("found")) for o in outs], "sets": sets, "kept": major}
+    if not major:                                                    # 과반이 든 조항이 하나도 없으면 그 출력의 근거를 그대로 쓴다
+        return dict(rep, _vote=vote)
+    paren, evidence = cfg["flow2_version"] >= 3, []
+    for lab in major:
+        quotes = sorted({ev.get("quote", "").replace(DELEG_MARK, "") for o, labs in zip(yes, sets) if lab in labs
+                         for ev in o.get("evidence") or [] if _ev_label(ev, v, body, cfg) == lab})
+        ok = [q for q in quotes if quote_in(q, body[lab], paren=paren)]
+        evidence.append({"label": lab, "quote": (ok or quotes)[0]})   # 원문에 있는 구절을 먼저. 하나도 없으면 ⑤가 버린다
+    return dict(rep, evidence=evidence, _vote=vote)
+
+
+def pick_check(outs, left, need):
+    """⑥ 다수결: 과반이 notGrounded일 때만 거절. 남은 표가 와도 안 바뀌면 그쪽 출력, 아니면 None."""
+    bad = [o for o in outs if _verdict(o) == "notGrounded"]
+    good = [o for o in outs if _verdict(o) != "notGrounded"]
+    votes = {"_vote": {"verdicts": [_verdict(o) for o in outs]}}
+    if len(bad) >= need or (not left and len(bad) > len(good)):
+        return dict(min(bad, key=_dump), **votes)
+    if left and len(bad) + left >= need:
+        return None
+    return dict(min(good, key=lambda o: (_verdict(o) != "grounded", _dump(o))), **votes)
+
+
+def _voted(st, cfg, step, one, n):
+    """one(상태) → 출력을 n번 나란히 부르고 다수결로 하나를 돌려준다. 호출 기록 · 더 부른 기록은 온 표의 것만 st에 붙인다."""
+    need = n // 2 + 1
+    pick = {"analyze": lambda o, left: pick_slots(o, left, need),
+            "read": lambda o, left: pick_read(o, left, need, st["_view"], cfg),
+            "check": lambda o, left: pick_check(o, left, need)}[step]
+    boxes = [{"calls": []} for _ in range(n)]
+    pend = {_VOTE.submit(contextvars.copy_context().run, one, b): b for b in boxes}
+    outs, err = [], None
+    while pend:
+        done, _ = wait(pend, timeout=_left(), return_when=FIRST_COMPLETED)
+        if not done:
+            raise upstage.DeadlineExceeded("다수결 호출이 마감 전에 안 끝남")
+        for f in done:
+            box = pend.pop(f)
+            if f.exception() is not None:
+                err = f.exception()
+                continue
+            outs.append(f.result())
+            st["calls"].extend(box["calls"])
+            if box.get("flow2"):
+                _f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
+        out = pick(outs, len(pend)) if outs else None
+        if out is not None:
+            return dict(out, _vote=dict(out.get("_vote") or {}, n=n, used=len(outs)))
+    raise err
+
+
 # ---- 6판: ④ 미리 읽기 ----
 # 3판 dev · 극한 네 실행에서 ③이 검색 점수만으로 조례를 정한 문항(규칙 「고르기」)이 dev 92% · 극한 75%였다. 이때 ④는 ①의 결과가
 # 없어도 같은 조례를 읽는다. 그래서 ①과 ④를 함께 부르고, ③이 다른 조례를 정했거나(분석이 조례를 더함 · 질문이 6종 이름을 듦) 막으면
@@ -285,11 +504,15 @@ def search(st, cfg):
         tmp = {"question": st["question"], "calls": calls, "reason": None}
         pipeline.search(tmp, cfg)
         return tmp
-    st.update({k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")})
+
+    def run():
+        return {k: v for k, v in guarded(st, cfg, fn, "search").items() if k not in ("question", "calls")}
+    st.update(_memoed(st, cfg, ["search", st["question"]], run) if cfg["flow2_memo"] else run())    # 꺼져 있으면(기본) 그대로 부른다
     laws = lawmap.pick_laws(st["_hits"]) if cfg["flow2_version"] >= 6 and not st["reason"] else []
     if laws:
-        box = {"calls": []}
-        user = _read_user(st["question"], view(laws, cfg["chunk_unit"]), cfg)
+        v = view(laws, cfg["chunk_unit"])
+        box = {"calls": [], "_view": v}       # _view: 다수결(flow2_votes)이 조항 이름을 원문 조각에 맞출 때 쓴다
+        user = _read_user(st["question"], v, cfg)
         st["_spec"] = (laws, box, _SPEC.submit(contextvars.copy_context().run, _ask, box, cfg, "read", user))
 
 
@@ -344,6 +567,8 @@ def read(st, cfg):
 def gate(st, cfg):
     """⑤ 구절 관문(코드만): 목록에 있는 조항 · 자치구 아님 · 구절이 그 조항 글에 글자 그대로 있음 → 인용."""
     v, out = st["_view"], st["_read"]
+    if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
+        _f2(st).setdefault("vote", {})["read"] = out["_vote"]
     body = {}
     for c in v:
         body[c["label"]] = body.get(c["label"], "") + "\n" + c["text"]
@@ -411,12 +636,112 @@ def check(st, cfg):
     else:
         st["verdict"] = out.get("verdict")
     _f2(st)["check"] = {"verdict": st["verdict"], "reason": out.get("reason", ""), "targets": marks, "asks": out.get("asks")}
+    if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
+        _f2(st).setdefault("vote", {})["check"] = out["_vote"]
     if st["verdict"] == "notGrounded":
         st["reason"] = pipeline.REJECTED
 
 
+# ---- 맡긴 내용을 묻는 질문의 답 살리기 (스위치 flow2_handed, 11-11) ----
+# 업스테이지 답(11-11): 조문은 있는데 금액 · 세부를 정하지 않은 질문은 「확인 불가」가 아니다. 근거(위임) 조항을 인용하고 「조례에는 정해져 있지
+# 않다」와 어디서 정하는지를 안내해야 하고, 「확인 불가」로 답하면 0점일 수 있다. 7판 ④는 그런 답을 쓰는데 ⑥이 「답이 확인할 수 없다고 적었다」
+# (검사 프롬프트 규칙 5)로 거절한다. 그래서 ⑥이 거절했어도 아래 넷을 다 채우면 판정 전 답을 그대로 낸다(코드만, 모델 호출 수 그대로).
+#  (가) 판정 전 답이 「조례에 정해져 있지 않다」 꼴이다(④ 프롬프트가 시킨 말: 「~는 이 조례에 정해져 있지 않아 …」).
+#  (나) ⑤를 지난 근거 조항의 글에 조례가 스스로 맡기는 구절이 있다.
+#  (다) 답 글도 누가 · 무엇으로 정하는지 말한다(「시장이 따로 정하도록 되어 있습니다」 꼴). 업스테이지 답이 말한 「어디서 확인하는지 안내」다.
+#      (다)가 없던 첫 판은 dev 실측(11-11 11:43)에서 「~는 정해져 있지 않아 확인할 수 없습니다. 다만 제○조는 …」처럼 묻는 것과 다른 일을
+#      맡기는 조항을 끌어온 답 둘을 살렸다(함정 하나 · 0점 답 하나). (다)를 넣으면 dev 12개 · 극한 2개 실행 기록에서 샌 함정 0 · 0점 답 0이다.
+#  (라) 답 글이 6종 밖의 법령 · 조례 · 고시 이름을 「」로 들지 않는다. 들었다면 묻는 내용을 다른 법령으로 넘기는 꼴이고(예: 조례가 대상을
+#      「다른 조례」에 따른 것으로만 적은 경우), 그 꼴의 정답은 업스테이지에 다시 묻는 중이라 7판 동작 그대로 둔다. 극한 실측(11-11 12:31)에서
+#      (라)가 없으면 그 꼴 한 문항이 두 판에서 한 번씩 살아났다. 이름이 6종인지는 lawmap.name_kind로 가린다(별칭 포함).
+# 맡기는 구절은 6종 조례 원문의 글투에서만 뽑았다: 「시장이 따로 정한다」 · 「시장이 별도로 정한다」 · 「시장이 정한다」 · 「구청장이 따로 정할 수 있다」 ·
+# 「위원장이 정한다」 · 「협의하여 별도로 정한다」 · 「규칙으로 정한다」 · 「규칙이 정하는 바에」(528조각 가운데 38조각에 있다).
+# 넣지 않은 것: 상위 법령으로 넘기는 구절(위 DELEG) · 다른 조례로 넘기는 구절(「…조례」로 따로 정한다) · 국가 고시(「…고시를 따른다」) —
+# 이 꼴의 정답은 업스테이지에 다시 묻는 중이라 7판 동작 그대로 둔다. 「예산의 범위에서」도 넣지 않았다(7판 dev 기록 6개에 대어 보니 함정 하나가 샜다).
+# (가)를 빼면 극한 세트 함정 3문항이 샌다(11-10 기록에 대어 봄, 흔들림-도구/replay_handed.py). 평가 문항의 글은 옮기지 않았다.
+NOT_SET = re.compile(r"(?:정해져|정하여져|규정되어|명시되어)\s*있지\s*(?:않|아니)|(?:정하고|규정하고|명시하고)\s*있지\s*(?:않|아니)|정하지\s*(?:않|아니)")
+HANDED = re.compile(r"(?:시장|구청장|위원장)\s*이\s*(?:따로|별도로)?\s*정(?:한다|하는|할\s*수|하여)|(?:따로|별도로)\s*정(?:한다|하는|할\s*수|하여)"
+                    r"|규칙(?:으로|이)\s*정(?:한다|하는|하여)")
+_NAMED = re.compile(r"「([^」]{2,60})」")
+SAYS = re.compile(r"(?:시장|구청장|위원장)\s*이\s*(?:따로|별도로)?\s*정[하한할해합함했]|(?:따로|별도로)\s*정[하한할해합함했]|규칙(?:으로|이|에서)\s*정[하한할해합함했]")
+
+
+# ---- 다른 법령으로 넘기는 꼴 (flow2_handed = "law", 11-11 저녁 업스테이지 2차 답) ----
+# 2차 답: 6종 안에 질문을 다루는 조항이 있고 그 조항이 구체적인 내용을 다른 법령으로 넘기는 경우에도, 그 조항을 인용하고 「세부 내용은 해당
+# 법령에서 정한다」고 안내하는 것이 정답이다(「확인 불가」는 정답이 아님). 그래서 "law"는 위 넷 가운데 (나)(다)(라)를 이렇게 넓힌다.
+#  (나′)(다′) 답 글의 한 문장이 「그 법령 + 정한다 · 따른다 · 규정 · 확인」 꼴이고, 그 법령이 ⑤를 지난 근거 조항의 글에 글자 그대로 있다.
+#        법령은 둘 중 하나로 든 것만 본다: 「」로 든 이름(「○○법」 · 6종이 스스로 드는 다른 서울시 조례) / 조문이 쓰는 줄임말과 조 번호(「법 제○조」 · 「영 제○조」).
+#        6종 원문의 글투다: 「법 제○조」 74조각 · 「영 제○조」 17조각 · 「…법」「…법률」 77조각 · 「…조례」 20조각(521조각 중).
+#        이름도 조 번호도 없이 「관련 법령에서 정합니다」라고만 쓴 답은 살리지 않는다(dev · 극한 기록에 대어 보니 함정 둘이 샜다).
+#        그 문장은 「정해져 있지 않다」고 한 문장이거나 그 뒤 문장이어야 한다(받은 답의 순서: 조례에는 없다 → 그 법령에서 정한다). 앞 문장에서
+#        든 법령은 묻는 것과 다른 일일 수 있다: 순서를 안 보면 dev · 극한 기록 26개에서 함정이 4번 더 샜다(국립공원을 도시공원으로 본 답 등).
+#  (라′)  답이 든 6종 밖 법령은 모두 근거 조항 글에 있어야 한다(없으면 조례가 넘긴 것이 아니라 조례가 안 다루는 일이다).
+#        6종이 들지도 않는 조례(자치구 · 다른 시 · 도의 조례 등, lawmap.name_kind가 「밖」)를 든 답은 살리지 않는다.
+# (가)는 그대로다. 「스스로 맡기는 꼴」(True)의 조건은 바꾸지 않았고, "law"는 그것에 이 길을 더한 것이다.
+_PTR = re.compile(r"(?<![가-힣])(?:법|영)\s*제\d+조(?:의\d+)?")
+_STEM = re.compile(r"정하|정한|정합|정해|정했|따르|따릅|따라|따른|규정|확인|위임")
+_SENT = re.compile(r"[^.?!]+[.?!]?")
+HANDED_MODES = (False, True, "law")
+
+
+def _squash(s):
+    return "".join(s.split())
+
+
+def handed_over(answer, chunks, law=False):
+    """(가)(나)(다)(라)를 다 채우면 (조항 이름, 맡기는 구절), 아니면 None. law=True면 다른 법령으로 넘기는 꼴(위 설명)도 본다."""
+    if not NOT_SET.search(answer or ""):
+        return None
+    kinds = [(n, lawmap.name_kind(n)[0]) for n in _NAMED.findall(answer)]
+    outside = [n for n, k in kinds if k in ("인용", "법령") or n.endswith("고시")]
+    if SAYS.search(answer) and not outside and not any(k == "밖" for _, k in kinds):
+        for c in chunks:
+            for m in HANDED.finditer(c["text"]):
+                if "조례」로" not in c["text"][max(0, m.start() - 8):m.start()]:     # 다른 조례로 넘기는 구절은 뺀다
+                    return c["label"], m.group(0)
+    if not law or any(k == "밖" for _, k in kinds):
+        return None
+    body = [(c["label"], _squash(c["text"])) for c in chunks]
+    if any(not any(_squash(n) in t for _, t in body) for n in outside):
+        return None
+    sents = _SENT.findall(answer)
+    first = next(i for i, x in enumerate(sents) if NOT_SET.search(x)) if any(NOT_SET.search(x) for x in sents) else 0
+    for sent in sents[first:]:               # 「정해져 있지 않다」고 한 문장이거나 그 뒤 문장만(앞 문장의 법령은 다른 일을 말한 것일 수 있다)
+        if not _STEM.search(sent):
+            continue
+        for ref in [n for n in outside if n in sent] + [m.group(0) for m in _PTR.finditer(sent)]:
+            for label, t in body:
+                if _squash(ref) in t:
+                    return label, ref
+    return None
+
+
+# check 본문은 그대로 두고 같은 이름으로 한 겹 싼다(STAGES 줄도 main 그대로). 스위치가 꺼져 있으면(기본) 위 check 그대로다.
+_check_one = check
+
+
+def check(st, cfg):      # noqa: F811
+    """「질문 대조」 단계. ⑥(_check_one)을 그대로 부르고, 스위치 flow2_handed가 켜져 있으면 맡긴 내용을 묻는 질문의 답은 거절을 되돌린다."""
+    _check_one(st, cfg)
+    mode = cfg["flow2_handed"]
+    if mode not in HANDED_MODES:
+        raise ValueError(f"flow2_handed 값 {mode!r}: {HANDED_MODES} 가운데 하나여야 합니다")
+    if mode and st["reason"] == pipeline.REJECTED:
+        kept = set(_f2(st)["gate"]["kept"])
+        hit = handed_over(st["draft"]["answer"], [c for c in st["_view"] if c["label"] in kept], law=mode == "law")
+        if hit:
+            st["reason"] = None
+            _f2(st)["handed"] = {"label": hit[0], "phrase": hit[1]}      # 판정(verdict)은 notGrounded 그대로 남긴다
+
+
 STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
           ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
+
+# ---- PM 실험(11-11): 온톨로지로 근거 묶음 정리(cite.py). 스위치 flow2_cite가 None(기본값)이면 두 단계는 아무 일도 하지 않는다 ----
+# STAGES 줄을 고치지 않고 이름으로 찾아 끼운다(같은 주기의 다른 실험이 그 줄에 단계를 더한다).
+from . import cite  # noqa: E402  (cite는 flow를 함수 안에서만 부른다)
+for _after, _stage in (("구절 관문", ("근거 고르기", cite.start)), ("질문 대조", ("근거 정리", cite.settle))):
+    STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
 
 
 # ---- 스스로 시험 (키 없이) ----
@@ -633,6 +958,147 @@ def selftest():
         assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
         pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
         assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]
+        # 흔들림 줄이기(flow2_votes): 같은 호출 세 번 → 결정만 다수결. 스위치가 꺼져 있으면(기본) 한 번만 부르고 기록도 그대로다
+        other = next(c for c in chunks if c["label"] != target["label"] and len(c["text"]) > 30)
+        oq = other["text"][:15]
+        ok_ev, bad_ev, other_ev = ({"label": target["label"], "quote": quote}, {"label": target["label"], "quote": "원문에 없는 말"},
+                                   {"label": other["label"], "quote": oq})
+        rd = lambda found, ev, ans="네, 감면됩니다.": {"found": found, "check": "", "conclusion": "네", "answer": ans, "evidence": ev}
+        ck = lambda v: {"reason": "", "asks": [{"ask": "경차 할인", "verdict": v}], "done": True}
+        need = 2
+        assert pick_check([ck("notGrounded"), ck("grounded")], 1, need) is None                       # 아직 모름 → 셋째를 기다림
+        assert _verdict(pick_check([ck("grounded"), ck("notSure")], 1, need)) == "grounded"            # 둘이 통과면 셋째를 안 기다림
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded"), ck("notGrounded")], 0, need)) == "notGrounded"
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded"), ck("grounded")], 0, need)) == "grounded"   # 한 번의 거절로는 안 버림
+        assert _verdict(pick_check([ck("notGrounded"), ck("grounded")], 0, 2)) == "grounded"           # 두 번 부르면: 둘 다 거절일 때만 거절
+        v7 = [target, other]
+        assert pick_read([rd(True, [ok_ev]), rd(True, [ok_ev, other_ev])], 1, need, v7, cfg7) is None  # 한쪽만 든 조항이 있다 → 기다림
+        got = pick_read([rd(True, [ok_ev]), rd(True, [ok_ev])], 1, need, v7, cfg7)                      # 둘이 같으면 안 기다림
+        assert [e["label"] for e in got["evidence"]] == [target["label"]]
+        got = pick_read([rd(True, [ok_ev], "답 1"), rd(True, [bad_ev, other_ev], "답 2"), rd(True, [other_ev, ok_ev], "답 3")], 0, need, v7, cfg7)
+        assert got["evidence"] == [ok_ev, other_ev] and got["answer"] == "답 2", got                   # 과반이 든 조항(원문 순서) · 원문에 있는 구절 · 근거가 같은 출력의 답
+        assert pick_read([rd(True, [ok_ev]), rd(False, []), rd(False, [])], 0, need, v7, cfg7)["found"] is False
+        assert pick_read([rd(True, [ok_ev]), rd(False, [])], 1, need, v7, cfg7) is None
+        every = dict(cfg7, flow2_votes={"read": 3, "read_all": True})                                   # 「모두 든 조항만」
+        three = [rd(True, [ok_ev, other_ev]), rd(True, [ok_ev, other_ev]), rd(True, [ok_ev])]
+        assert [e["label"] for e in pick_read(three, 0, need, v7, cfg7)["evidence"]] == [target["label"], other["label"]]
+        assert [e["label"] for e in pick_read(three, 0, need, v7, every)["evidence"]] == [target["label"]]
+        assert pick_read(three[:2], 1, need, v7, every) is None and pick_read(three[:2], 1, need, v7, cfg7) is not None   # 모두: 셋째를 기다림
+        got = pick_read([rd(True, [ok_ev]), rd(True, [other_ev]), rd(False, [])], 0, need, v7, cfg7)    # 과반이 든 조항이 없으면 한 출력의 근거 그대로
+        assert got["found"] and len(got["evidence"]) == 1 and got["_vote"]["kept"] == []
+        sl = lambda **kw: dict(slots, actor="시민", **kw)
+        assert pick_slots([sl(), sl(law_guess="금연")], 1, need) is None
+        assert pick_slots([sl(law_guess="금연"), sl(), sl(targets=["경형자동차"])], 0, need)["law_guess"] == "주차장"
+        import threading
+        seq, lock = {}, threading.Lock()
+
+        def seq_chat(messages, cfg, calls=None, response_format=None):
+            name = response_format["json_schema"]["name"]
+            with lock:
+                out = seq[name].pop(0) if seq.get(name) else plan[name]
+            if calls is not None:
+                calls.append({"model": "fake", "in": 1, "cached": 0, "out": 1, "sec": 0.0})
+            return json.dumps(out, ensure_ascii=False)
+
+        upstage.chat = seq_chat
+        plan.update(question_slots=sl(), law_answer_quotes=rd(True, [ok_ev]), target_check=ck("grounded"))
+        on = dict(cfg7, flow2_votes={"analyze": 3, "read": 3, "check": 3})
+        qv = "경차를 공영주차장에 세우면 할인돼요?"
+        seq.update(law_answer_quotes=[rd(True, [bad_ev, other_ev]), rd(True, [ok_ev]), rd(True, [ok_ev])],
+                   target_check=[ck("notGrounded"), ck("grounded"), ck("grounded")])
+        r, t = pipeline.answer(qv, on)
+        assert r["citation"] == [target["label"]] and t["verdict"] == "grounded", (t["reason"], t["flow2"].get("vote"))
+        assert t["flow2"]["vote"]["read"]["kept"] == [target["label"]] and t["flow2"]["vote"]["check"]["n"] == 3
+        assert t["flow2"]["slots"]["_vote"]["n"] == 3 and len(t["calls"]) >= 6
+        seq.update(law_answer_quotes=[rd(True, [bad_ev, other_ev])], target_check=[ck("notGrounded")])
+        r, t = pipeline.answer(qv, cfg7)                 # 꺼 두면: 첫 출력 하나로 정한다(다른 조항 · 한 번의 거절로 확인 불가)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and t["draft"]["citation"] == [other["label"]]
+        assert "vote" not in t["flow2"] and [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"]
+        seq.clear()
+        seq.update(target_check=[ck("notGrounded"), ck("notGrounded"), ck("grounded")])
+        assert pipeline.answer(qv, on)[1]["reason"] == pipeline.REJECTED          # 과반이 거절이면 거절
+        seq.clear()
+        assert config.DEFAULTS["flow2_votes"] is None
+        # 같은 글에는 같은 출력(flow2_memo): 모델이 두 번째에 다른 출력을 내도 같은 문의에는 같은 답. 꺼 두면(기본) 매번 부른다
+        import os
+        import tempfile
+        memo = os.path.join(tempfile.mkdtemp(), "memo.jsonl")
+        keep = dict(cfg7, flow2_memo=memo)
+        two = lambda: seq.update(law_answer_quotes=[rd(True, [ok_ev], "첫 답"), rd(True, [other_ev], "둘째 답")])
+        two()
+        r1, t1 = pipeline.answer(qv, keep)
+        r2, t2 = pipeline.answer(qv, keep)
+        assert r1 == r2 and r1["answer"] == "첫 답" and [c.get("kind") for c in t2["calls"]] == ["memo"] * 4, (r1, r2)
+        assert [c["stage"] for c in t2["calls"]] == ["검색", "질문 분석", "조례 읽기 · 답 쓰기", "질문 대조"] and upstage.cost_usd(t2["calls"]) == 0
+        _MEMO.clear()                                    # 프로세스를 다시 띄운 것처럼: 파일에서 읽어 같은 답
+        assert pipeline.answer(qv, keep)[0] == r1 and pipeline.answer(qv + " ", keep)[0] != r1   # 글자가 다르면 다른 문의다
+        seq.clear()
+        two()
+        assert pipeline.answer(qv, cfg7)[0]["answer"] == "첫 답" and pipeline.answer(qv, cfg7)[0]["answer"] == "둘째 답"   # 꺼 두면 바뀐다
+        seq.clear()
+        # 같은 문의 둘이 동시에 와도 모델은 한 번씩만 부르고 답이 같다(먼저 부른 쪽을 기다린다)
+        n_call = []
+
+        def slow_chat(messages, cfg, calls=None, response_format=None):
+            n_call.append(response_format["json_schema"]["name"])
+            time.sleep(0.05)
+            return seq_chat(messages, cfg, calls, response_format)
+
+        upstage.chat = slow_chat
+        seq.update(law_answer_quotes=[rd(True, [ok_ev], "한 답"), rd(True, [other_ev], "다른 답")])
+        qc = qv + " 동시에"
+        got = list(ThreadPoolExecutor(2).map(lambda _: pipeline.answer(qc, dict(keep, flow2_memo=":memory:"))[0], range(2)))
+        assert got[0] == got[1] and sorted(n_call) == ["law_answer_quotes", "question_slots", "target_check"], (got, n_call)
+        upstage.chat = seq_chat
+        seq.clear()
+        assert config.DEFAULTS["flow2_memo"] is None
+        # 맡긴 내용을 묻는 질문(flow2_handed): ⑥이 거절해도 답이 「정해져 있지 않다」 꼴이고 근거 조항에 맡기는 구절이 있으면 답을 낸다
+        allc = retrieve.load("paragraph")[0]
+        hand = next(c for c in allc if "시장이 따로 정한다" in c["text"])
+        assert sum(bool(handed_over("정해져 있지 않고 시장이 따로 정합니다", [c])) for c in allc) == 38           # 6종 원문 528조각 가운데 이 꼴이 든 조각(원문이 바뀌면 다시 본다)
+        say = "그 금액은 조례에 정해져 있지 않습니다. 시장이 따로 정하도록 되어 있습니다."
+        assert handed_over(say, [hand]) == (hand["label"], "시장이 따로 정한다")
+        assert handed_over("네, 감면됩니다.", [hand]) is None                                  # (가) 답이 그 꼴이 아니면 안 살린다
+        assert handed_over("그 금액은 조례에 정해져 있지 않아 확인할 수 없습니다. 다만 제3조는 다른 일을 정합니다.", [hand]) is None   # (다) 누가 정하는지 말하지 않는 답
+        assert handed_over(say, [target]) is None and handed_over(say, [ban]) is None          # (나) 맡기는 구절이 없는 조항 · 상위 법령으로 넘기는 조항
+        assert handed_over(say + " 대상은 「서울특별시 출산 및 양육지원에 관한 조례」에 따릅니다.", [hand]) is None       # (라) 답이 6종 밖 조례를 든다
+        assert handed_over(say + " 기준은 「동물보호법」에 있습니다.", [hand]) is None and handed_over(say + " 「주차장 조례」와 「거주자우선주차」 얘기입니다.", [hand])
+        assert handed_over(say, [{"label": "x", "text": "…은 「서울특별시교육청 학교 주차장 관리에 관한 조례」로 따로 정한다."}]) is None   # 다른 조례로
+        assert handed_over(say, [{"label": "x", "text": "세부 기준은 농림축산식품부 고시를 따른다."}]) is None
+        assert handed_over(say, [{"label": "x", "text": "시장은 금연구역으로 지정할 수 있다. 수탁자를 선정한다. 예산의 범위에서 지원할 수 있다."}]) is None
+        hq = hand["text"][hand["text"].index("시장이 따로 정한다") - 12:][:22]
+        plan.update(question_slots=sl(), law_answer_quotes=dict(rd(True, [{"label": hand["label"], "quote": hq}], say), conclusion="정보"),
+                    target_check=ck("notGrounded"))
+        qh = "그 금액은 얼마예요?"
+        plan["question_slots"] = dict(sl(), law_guess=next(k for k in prompts.LAW_KEYS if k in hand["law"]))
+        r, t = pipeline.answer(qh, cfg7)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and "handed" not in t["flow2"], (t["reason"], t["flow2"].get("gate"))
+        r, t = pipeline.answer(qh, dict(cfg7, flow2_handed=True))
+        assert r["citation"] == [hand["label"]] and r["answer"] == say and t["verdict"] == "notGrounded" and t["flow2"]["handed"]["label"] == hand["label"]
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="네, 됩니다.")       # 답이 그 꼴이 아니면 거절 그대로
+        assert pipeline.answer(qh, dict(cfg7, flow2_handed=True))[1]["reason"] == pipeline.REJECTED
+        assert config.DEFAULTS["flow2_handed"] is False
+        # flow2_handed = "law": 다른 법령으로 넘기는 꼴도 살린다(2차 답). True의 동작은 그대로다
+        fine = next(c for c in allc if c["label"].endswith("도시공원 조례 제23조 제1항"))
+        kids = next(c for c in allc if "「서울특별시 출산 및 양육지원에 관한 조례」" in c["text"])
+        up = "과태료 금액은 이 조례에 정해져 있지 않습니다. 제23조제1항은 과태료를 부과하는 기준이 영 제51조제1항 별표 4와 같다고 정합니다."
+        assert handed_over(up, [fine]) is None and handed_over(up, [fine], law=True) == (fine["label"], "영 제51조")
+        other_law = "다자녀의 기준은 이 조례에 정해져 있지 않습니다. 감면 대상은 「서울특별시 출산 및 양육지원에 관한 조례」에 따른 다자녀 가족으로 규정합니다."
+        assert handed_over(other_law, [kids]) is None and handed_over(other_law, [kids], law=True)[0] == kids["label"]
+        assert handed_over(other_law, [fine], law=True) is None                                  # (라′) 답이 든 법령이 근거 조항 글에 없다
+        assert handed_over("그 요금은 이 조례에 정해져 있지 않습니다. 「서울특별시 강남구 주차장 설치 및 관리 조례」에서 정합니다.", [kids, fine], law=True) is None   # 자치구 조례
+        assert handed_over("그 금액은 이 조례에 정해져 있지 않습니다. 관련 법령에서 정합니다.", [fine], law=True) is None       # 이름도 조 번호도 없다
+        assert handed_over("네, 영 제51조제1항 별표 4와 같다고 정합니다.", [fine], law=True) is None                          # (가) 답 꼴이 아니다
+        assert handed_over("기준은 영 제51조제1항 별표 4와 같다고 정합니다. 그런데 주차 요금은 이 조례에 정해져 있지 않습니다.", [fine], law=True) is None   # 법령 문장이 앞에만 있다
+        assert handed_over(say, [hand], law=True) == handed_over(say, [hand])                    # 스스로 맡기는 꼴은 두 값이 같다
+        fq = fine["text"][fine["text"].index("과태료를 부과하는 기준"):][:22]
+        plan.update(question_slots=dict(sl(), law_guess="도시공원"), target_check=ck("notGrounded"),
+                    law_answer_quotes=dict(rd(True, [{"label": fine["label"], "quote": fq}], up), conclusion="정보"))
+        ql = "공원에서 그 일을 하면 과태료가 얼마예요?"
+        assert pipeline.answer(ql, dict(cfg7, flow2_handed=True))[1]["reason"] == pipeline.REJECTED
+        r, t = pipeline.answer(ql, dict(cfg7, flow2_handed="law"))
+        assert r["citation"] == [fine["label"]] and t["flow2"]["handed"] == {"label": fine["label"], "phrase": "영 제51조"}, (t["reason"], t["flow2"].get("gate"))
+        assert pipeline.answer(ql, dict(cfg7, flow2_handed="yes"))[1]["reason"] == pipeline.ERROR      # 모르는 값은 멈춘다
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:

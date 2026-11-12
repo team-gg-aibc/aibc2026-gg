@@ -1,0 +1,12 @@
+{
+  "issue": "",
+  "note": "흔들림 줄이기 + 맡긴 답 살리기를 함께 켠 판(11-11): 7판 + ① · ④ · ⑥ 세 번 다수결(flow2_votes, ④의 근거는 과반) + flow2_handed. 동시 호출 상한 6 → 18(한 문항이 호출을 세 배 띄움). 나머지는 pm-flow2-v7와 같다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_votes": {"analyze": 3, "read": 3, "check": 3},
+    "flow2_handed": true,
+    "max_concurrent_calls": 18
+  }
+}
