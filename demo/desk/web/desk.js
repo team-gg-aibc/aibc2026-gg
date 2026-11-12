@@ -384,10 +384,11 @@ function openSame(id) {
 }
 const mark = (on, word) => (on ? `<span class="chg">${esc(word)}</span>` : '');
 // 「이 위치 기준」은 위치를 실제로 엔진에 넘겨 받은 답에만(시민 접수 · 담당자 바로잡기 + 이름 있는 장소). 처음 47건은 글만 넘겼다
-const here = (q, label) => (q.loc && ['here', 'map', 'staff'].includes(q.loc.how) && q.loc.name ? `${label} · ${W('답변 초안').kv['이 위치 기준']}` : label);
+const here = (q, label) => (q.loc && ['here', 'map', 'chat', 'staff'].includes(q.loc.how) && q.loc.name ? `${label} · ${W('답변 초안').kv['이 위치 기준']}` : label);
 function locRow(q, compact) {
   const C = W('답변 초안').kv, L = q.loc || {}, name = L.name || C['이름 없는 자리'];
   const how = L.how === 'here' ? C['현재 위치'] + (L.demo ? ` · ${C['시연용 자리']}` : '') : L.how === 'map' ? C['지도에서 지정']
+    : L.how === 'chat' ? W('대화로 접수한 문의').kv['대화에서 답함']   // 대화로 문의하기 목업(chat.html)으로 접수: 장소를 대화에서 답했다
     : L.how === 'staff' ? fill(C['바로잡음'], { 장소: (q.loc_from && q.loc_from.name) || C['이름 없는 자리'] }) : L.virtual ? C['시연 문의 가상 자리'] : C['시연 문의 자리'];
   const canFix = !compact && !q.approved && q.kind !== 'making';
   return `<div class="loc"><span class="k">${esc(C['접수 위치'])}</span><b>${esc(name)}</b>
@@ -399,10 +400,10 @@ function sameBtn(q, compact) {   // 「이 장소의 다른 일 n건 보기」(�
   return n ? `<button type="button" class="samebtn" data-act="same-on" data-id="${q.id}">${esc(fill(W('같은 장소, 다른 일').kv['여는 단추'], { n }))}</button>` : '';
 }
 function head(q, compact) {
-  const C = W('답변 초안').kv, k = kindOf(q), t = (q.form || {}).title;
+  const C = W('답변 초안').kv, k = kindOf(q), t = (q.form || {}).title, cs = (q.form || {}).cites || [];   // cs: 대화 문의의 관련 조항 판에서 시민이 함께 보낸 조항(없으면 줄이 없다)
   return `<div class="hd"><div class="meta"><span class="n">${q.no}</span><span>${hhmm(q.received)} · ${esc(srcLabel(q.source))}</span>
       <span class="stt kc k-${k}"><i class="kb"></i>${esc(kindLabel(k))}</span></div>
-    ${t ? `<p class="ttl">${esc(C['문의 제목'])} · ${esc(t)}</p>` : ''}<p class="qq">${esc(q.text)}</p>${locRow(q, compact)}</div>`;
+    ${t ? `<p class="ttl">${esc(C['문의 제목'])} · ${esc(t)}</p>` : ''}<p class="qq">${esc(q.text)}</p>${cs.length ? `<p class="ttl">${esc(W('대화로 접수한 문의').kv['붙은 조항'])} · ${esc(cs.join(' · '))}</p>` : ''}${locRow(q, compact)}</div>`;
 }
 // 세 줄(근거 조항 · 소관 부서 · 처리 기관)에 붙일 표시: cmp = 견줄 문의(또는 바로잡기 전), word = 「바뀜」 · 「다름」
 function diffs(q, cmp) {
@@ -592,7 +593,7 @@ function renderFix(q) {
   pop.hidden = !ui.fix || !q || !!q.approved;
   $('map').classList.toggle('picking', ui.picking && !pop.hidden);
   if (pop.hidden) return;
-  const cur = q.loc, orig = q.loc_from || (['here', 'map'].includes(cur.how) ? cur : null), opts = [];
+  const cur = q.loc, orig = q.loc_from || (['here', 'map', 'chat'].includes(cur.how) ? cur : null), opts = [];
   const same = (a, b) => a && b && (a.place ? a.place === b.place : Math.abs(a.lon - b.lon) < 1e-5 && Math.abs(a.lat - b.lat) < 1e-5);
   if (orig) opts.push({ loc: orig, tag: K['시민이 지정한 위치'] });
   if (!orig || !same(orig, cur)) opts.push({ loc: cur, tag: K['지금 위치'] });

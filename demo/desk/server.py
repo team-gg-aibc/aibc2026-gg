@@ -13,7 +13,9 @@
 - 엔진은 글만 받는다. 시민이 지정한 접수 위치가 이름 있는 장소면 글 앞에 「○○에서 」를 붙여 보낸다(「이 공원에서 · 여기서」는 그 자리 이름으로 바꾼다).
 - 화면 문구는 docs/content/의 3판 파일 둘에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
 - 시민 쪽 길(/api/citizen/<번호>)은 승인된 답만 준다. 승인 전 초안은 시민 화면이 받을 수 없다.
-- 대화 문의 목업(/chat.html)의 접수 전 「예상 답」은 따로 난 길(POST /api/preview)이 준다. 장소가 없는 글은 되묻기를 돌려주고(코드 규칙), 응답에 preview: true가 붙는다.
+- 대화 문의 목업(/chat.html)은 따로 난 길 둘을 쓴다. 기본 판은 POST /api/question(되묻기 또는 「질문 초안」: 제목 · 장소를 넣은 글 · 접수 위치),
+  관련 조항 판(?mode=cite)은 POST /api/cite(질문 초안 + 찾은 근거 조항. 접수할 때 고른 조항을 cites로 함께 받는다). 둘 다 결론 · 답 글 · 맡는 곳을 싣지 않는다.
+  되묻기는 코드 규칙이다. 대화로 접수한 문의의 접수 위치는 how: chat.
 - 앞 판(2판) 화면 web/index.html · app.js · style.css는 지우지 않고 쓰지 않는다(이 서버의 /api는 3판 꼴).
 """
 import json
@@ -92,7 +94,7 @@ def make_loc(lon, lat, how, place_id=None):
 
 def engine_text(text, loc):
     """시민 · 담당자가 지정한 위치가 이름 있는 장소면 그 이름을 글에 넣는다(엔진은 글만 받는다). 시연 문의 50건은 기록한 글 그대로."""
-    name = loc and loc.get("how") in ("here", "map", "staff") and loc.get("name")
+    name = loc and loc.get("how") in ("here", "map", "chat", "staff") and loc.get("name")
     if not name:
         return text
     if HERE_WORDS.match(text):
@@ -245,24 +247,39 @@ def add_inquiry(text, form, loc):
     return q
 
 
-# ---- 대화 문의(목업, chat.html): 접수 전 「예상 답」. 문의로 저장하지 않고, 승인 전 답을 주지 않는 시민 쪽 길(/api/citizen/<번호>)과 따로 둔다
+# ---- 대화 문의(목업, chat.html). 기본 판 = 「질문 초안」 · ?mode=cite 판 = 질문 초안 + 「관련 조항」. 둘 다 문의로 저장하지 않고,
+#      시민 쪽 응답에 자동으로 쓴 답(결론 · 답 글)과 맡는 곳을 싣지 않는다(시민용 「예상 답변」은 만들지 않기로 함, 동규 11-12)
 def place_in(text):
     """글에 장소 목록의 이름이 있으면 그 장소(긴 이름 먼저: 「서울숲 주차장」이 「서울숲」보다 앞). 없으면 None → 화면이 장소를 되묻는다."""
     # ponytail: 이름이 글자 그대로 들어 있어야 알아본다(engine_text와 같은 잣대). 띄어쓰기가 다르면 되묻는다 — 잘못 짚는 것보다 되묻는 쪽이 안전
     return next((p for p in sorted(places.values(), key=lambda p: -len(p["name"])) if p["name"] in text), None)
 
 
-def preview(text, place="", live=MODE != "saved"):
-    """→ 되묻기 {"preview", "ask", "choices"} 또는 예상 답 {"preview", "kind", "card", "loc", "engine"}.
-    되묻기는 코드 규칙(모델을 부르지 않음), 답은 접수된 문의와 같은 통로(미리 받은 답 · call_engine)와 같은 카드 자료."""
+def question_draft(text, place=""):
+    """→ 되묻기 {"ask", "choices"} 또는 질문 초안 {"title", "text", "loc"}: 대화로 모은 것으로 접수 칸을 채운다.
+    되묻기는 코드 규칙(모델을 부르지 않음). 엔진도 미리 받은 답도 보지 않는다 — 답은 승인 전에 시민에게 가지 않는다."""
     p = places.get(place) or place_in(place) or place_in(text)   # place: 고른 칩(장소 id)이나 시민이 답한 말
     if not p:
-        return {"preview": True, "ask": "place", "choices": [{"id": s["place"], "name": places[s["place"]]["name"]} for s in scenes.values()]}
-    loc = make_loc(0, 0, "here", p["id"])
-    et = engine_text(text, loc)
-    res = call_engine(et) if live else saved.get(et) or {"response": None, "error": "미리 받은 답 없음"}
-    return {"preview": True, "kind": kind_of(res), "card": card_of(res), "loc": loc,
-            "engine": {"how": "live" if live else "saved", "made_by": res.get("made_by"), "sec": res.get("sec")}}
+        return {"ask": "place", "choices": [{"id": s["place"], "name": places[s["place"]]["name"]} for s in scenes.values()]}
+    loc, pair = make_loc(0, 0, "chat", p["id"]), presets["pair"]
+    # 내용 = 장소를 넣어 다듬은 글(접수하면 엔진에 그대로 간다). 제목 = 시연 장면의 글이면 그 제목, 그 밖은 글의 앞 30글자
+    title = pair["title"] if HERE_WORDS.sub("", text) == HERE_WORDS.sub("", pair["text"]) else text[:30]
+    return {"title": title, "text": engine_text(text, loc), "loc": loc}
+
+
+def cite_draft(text, place="", live=MODE != "saved"):
+    """관련 조항 판: 질문 초안에 찾은 근거 조항만 얹는다(조례 이름 · 조 · 항 · 원문 구절 · 원문 링크). 결론 · 답 글 · 맡는 곳은 주지 않는다.
+    조항으로 답한 것이 아니면(6종 밖 · 못 찾음 · 못 받음) 빈 목록 → 조항 없이 접수된다. 조항은 접수된 문의와 같은 통로(미리 받은 답 · call_engine)에서 온다."""
+    d = question_draft(text, place)
+    if "ask" not in d:
+        res = call_engine(d["text"]) if live else saved.get(d["text"]) or {"response": None, "error": "미리 받은 답 없음"}
+        d["cites"] = [{k: c[k] for k in ("label", "law", "article", "quotes", "url")} for c in card_of(res)["citations"]] if kind_of(res) == "draft" else []
+    return d
+
+
+def clean_cites(v):
+    """시민 글에 붙어 온 관련 조항(관련 조항 판의 접수): 조례 6종의 조항 라벨 꼴만, 열까지 받는다."""
+    return list(dict.fromkeys(c for c in v if isinstance(c, str) and len(c) <= 80 and any(c.startswith(n) for n in LAWS)))[:10] if isinstance(v, list) else []
 
 
 def engine_status():
@@ -380,17 +397,21 @@ class Handler(SimpleHTTPRequestHandler):
             lon, lat = num(lo.get("lon")), num(lo.get("lat"))
             if lon is None or lat is None or not in_seoul(lon, lat):
                 return self.send_json({"error": "서울 안의 민원 장소 필요"}, 400)
-            loc = make_loc(lon, lat, "map" if lo.get("how") == "map" else "here")
+            loc = make_loc(lon, lat, lo.get("how") if lo.get("how") in ("map", "chat") else "here")   # chat = 시민이 대화에서 답한 장소(대화 문의 목업)
             loc["demo"] = lo.get("demo") is True
             form = {"title": title, "region": str_or(b.get("region"), 20), "public": b.get("public") is True,
                     "notify": [str_or(x, 10) for x in b.get("notify")][:4] if isinstance(b.get("notify"), list) else []}
+            cites = clean_cites(b.get("cites"))
+            if cites:                                         # 대화 문의 「관련 조항」 판: 시민 글에 붙어 온 조항. 없으면 칸을 만들지 않는다(다른 문의와 같은 꼴)
+                form["cites"] = cites
             q = add_inquiry(text, form, loc)
             return self.send_json({"id": q["id"], "no": q["no"]})
-        if p == "/api/preview":                               # 대화 문의(목업): 접수 전 예상 답. 응답에 preview: true(정식 답변 아님)
+        chat = {"/api/question": question_draft, "/api/cite": cite_draft}.get(p)
+        if chat:                                              # 대화 문의(목업): 질문 초안(기본 판) · 질문 초안 + 관련 조항(?mode=cite). 답 글은 싣지 않는다
             text = str_or(b.get("text"), 3000)
             if not text:
                 return self.send_json({"error": "빈 내용"}, 400)
-            return self.send_json(preview(text, str_or(b.get("place"), 60)))
+            return self.send_json(chat(text, str_or(b.get("place"), 60)))
         if p == "/api/reset":
             with lock:
                 state.clear()
@@ -500,23 +521,36 @@ def selftest():
     assert tb["error"] is None and set(tb["text"]) == set(TEXT_FILES), tb["error"]
     q = {"no": 1, "text": "t", "received": "x", "card": card_of(ok), "approved": None, "loc": None}
     assert citizen_view(q)["answer"] is None and citizen_view(q)["citations"] == []          # 승인 전 초안은 시민에게 가지 않는다
-    # 대화 문의(목업): 되묻기 규칙(글에 장소 이름이 있나) · 예상 답 응답 꼴 · 예시 글이 두 장면의 미리 받은 답과 글자 그대로 맞는다
+    # 대화 문의(목업): 되묻기 규칙(글에 장소 이름이 있나) · 질문 초안 꼴(답이 없다) · 예시 글이 두 장면의 미리 받은 답과 글자 그대로 맞는다
     chat = tb["text"]["U-02_시민접수-3판"]["sections"]
     ex = dict(r[:2] for r in chat["대화 문의"]["tables"][0]["rows"])["예시 글"]
-    assert {r[0] for r in chat["대화 · 정식 답변이 오면"]["tables"][0]["rows"]} == {"조항으로 답함", "6종 밖", "조항을 찾지 못함"}   # 판정 종류마다 틀 문장
+    assert ex == HERE_WORDS.sub("", pt), ex                                    # 예시 글 = 두 시민 장면의 글에서 장소 말을 뺀 문장
+    assert tb["text"]["A-01_답변창구-3판"]["sections"]["대화로 접수한 문의"]["tables"][0]["rows"][0][0] == "대화에서 답함"   # 담당자 카드의 접수 위치 표기
     assert place_in(ex) is None and place_in("서울숲 주차장에서 " + ex)["id"] == "seoulforest-parking"
-    for s in scenes.values():
-        assert engine_text(ex, make_loc(0, 0, "here", s["place"])) in saved, s
-    a = preview(ex, live=False)                                                # 장소 없는 글 → 되묻기(시연 장면의 두 곳)
-    assert a == {"preview": True, "ask": "place", "choices": [{"id": "seoulforest", "name": "서울숲"}, {"id": "ttukseom-hangang", "name": "뚝섬한강공원"}]}, a
-    assert preview(ex, "달나라", live=False).get("ask") == "place"             # 모르는 장소를 답하면 다시 묻는다
-    d = preview(ex, "seoulforest", live=False)                                 # 칩으로 고름 → 조항 붙은 예상 답
-    assert d["preview"] is True and d["kind"] == "draft" and d["loc"]["name"] == "서울숲" and d["engine"]["how"] == "saved", d
-    assert d["card"]["answer"] and d["card"]["conclusion"] and d["card"]["citations"][0]["quotes"], d["card"]
-    o = preview(ex, "뚝섬한강공원이요", live=False)                            # 말로 답함 → 6종 밖 꼴(답 글 · 조항 없음)
-    assert o["kind"] == "out" and o["loc"]["place"] == "ttukseom-hangang" and o["card"]["answer"] is None and o["card"]["citations"] == [], o
-    assert preview("서울숲에서 " + ex, live=False)["kind"] == "draft"          # 글에 장소가 있으면 되묻지 않는다
-    assert preview("미리 받은 답이 없는 글", "seoulforest", live=False)["kind"] == "failed"
+    ask = {"ask": "place", "choices": [{"id": "seoulforest", "name": "서울숲"}, {"id": "ttukseom-hangang", "name": "뚝섬한강공원"}]}
+    assert question_draft(ex) == ask and question_draft(ex, "달나라") == ask   # 장소 없는 글 · 모르는 장소 → 되묻기(시연 장면의 두 곳)
+    for s in scenes.values():                                                  # 칩으로 고름 → 질문 초안(제목 · 장소를 넣은 글 · 접수 위치뿐, 답은 없다)
+        d = question_draft(ex, s["place"])
+        assert set(d) == {"title", "text", "loc"} and d["title"] == presets["pair"]["title"] and d["loc"]["how"] == "chat", d
+        assert d["text"] == places[s["place"]]["name"] + "에서 " + ex and d["text"] in saved, d
+        assert engine_text(d["text"], d["loc"]) == d["text"]                   # 보인 글 = 접수되는 글 = 엔진에 가는 글
+    assert question_draft(pt, "뚝섬한강공원이요")["text"] == "뚝섬한강공원에서 " + ex   # 말로 답함 · 「이 공원에서」는 그 이름으로
+    d = question_draft("서울숲에서 드론을 날려도 되나요?")                     # 글에 장소가 있으면 되묻지 않는다
+    assert d["text"] == d["title"] == "서울숲에서 드론을 날려도 되나요?" and d["loc"]["place"] == "seoulforest", d
+    assert engine_text("요금이 얼마인가요?", make_loc(0, 0, "chat", "dongjak")) == "동작대교 공영주차장에서 요금이 얼마인가요?"
+    # 관련 조항 판(?mode=cite): 질문 초안에 근거 조항만 얹는다(결론 · 답 글 없음). 6종 밖은 빈 목록. 접수 때는 조례 6종의 라벨 꼴만 받는다
+    assert cite_draft(ex, live=False) == ask
+    c = cite_draft(ex, "seoulforest", live=False)
+    assert set(c) == {"title", "text", "loc", "cites"} and [set(x) for x in c["cites"]] == [{"label", "law", "article", "quotes", "url"}] * 2, c
+    assert [x["article"] for x in c["cites"]] == ["제22조 제1항", "제22조 제2항"] and all(x["quotes"] and x["url"] for x in c["cites"]), c["cites"]
+    assert cite_draft(ex, "ttukseom-hangang", live=False)["cites"] == [] and cite_draft("미리 받은 답이 없는 글", "seoulforest", live=False)["cites"] == []
+    lab = c["cites"][0]["label"]
+    assert clean_cites([lab, lab, "<b>아무 글</b>", 3]) == [lab] and clean_cites(None) == [] and clean_cites("글") == []
+    # 시민 쪽 응답(질문 초안 · 관련 조항)에 답 글 · 결론 · 맡는 곳이 없다(승인 전 답은 시민에게 가지 않는다)
+    hit = saved["서울숲에서 " + ex]
+    for r in (question_draft(ex, "seoulforest"), c):
+        blob = json.dumps(r, ensure_ascii=False)
+        assert hit["response"]["answer"] not in blob and not any(w in blob for w in ("answer", "conclusion", "card", "처리 기관", "소관 부서")), blob
     print("server 스스로 시험 통과")
 
 

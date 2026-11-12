@@ -8,13 +8,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 /* 대화로 문의하는 시민 화면 목업(11-12). 글꼴 · 색 · 폼 칸 꼴은 citizen.html을 따랐다(자주 · 파랑 · 남색). 기관 이름 · 로고는 쓰지 않는다.
-   「예상 답변」 카드와 「정식 답변」 카드는 색만이 아니라 꼴로 가른다: 예상 = 점선 테두리 · 옅은 노랑 바탕 · 꽉 찬 띠의 큰 글씨 · 왼쪽 세로 띠(글자 되풀이) · 꼬리 줄,
-   정식 = 실선 테두리 · 흰 바탕 · 남색 띠 · 「담당자 확인」 표시. 글자는 /api/text에서만 */
-:root { --p: #b14487; --th: #f5f8fc; --ln: #e5e5e5; --in: #b9bec9; --tx: #222; --tx2: #4a4a4a; --tx3: #5f5f5f; --blue: #3a5bb8; --navy: #3f55ad; --pv: #7c4a03; }
+   기본 판 = 「질문 초안」 카드, ?mode=cite 판 = 그 카드에 「관련 조항」 칸(AI가 채운 참고 칸: 점선 테두리 · 옅은 노랑 바탕 · 「AI 참고」 표시).
+   자동으로 쓴 답은 보이지 않는다. 「정식 답변」 카드는 실선 테두리 · 남색 띠 · 「담당자 확인」 표시. 글자는 /api/text에서만 */
+:root { --p: #b14487; --th: #f5f8fc; --ln: #e5e5e5; --in: #b9bec9; --tx: #222; --tx2: #4a4a4a; --tx3: #5f5f5f; --blue: #3a5bb8; --navy: #3f55ad; --ai: #7c4a03; }
 * { box-sizing: border-box; }
 body { margin: 0; background: #e9ebef; color: var(--tx); font: 14.5px/1.55 "Pretendard Variable", Pretendard, -apple-system, sans-serif; word-break: keep-all; }
 .phone { max-width: 460px; height: 100vh; height: 100dvh; margin: 0 auto; background: #fff; box-shadow: 0 0 0 1px #d9dce2; display: flex; flex-direction: column; }
-button, input { font: inherit; color: inherit; }
+button, input, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .demo { background: #222; color: #fff; font-size: 12px; text-align: center; padding: 6px 10px; margin: 0; }
 .gnb { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--ln); }
@@ -26,7 +26,7 @@ button, input { font: inherit; color: inherit; }
 .msg.bot { background: #fff; border: 1px solid var(--ln); border-top-left-radius: 4px; }
 .msg.me { align-self: flex-end; background: var(--navy); color: #fff; border-top-right-radius: 4px; }
 .msg.plain { align-self: center; padding: 0; border: 0; background: none; }
-.msg p { margin: 0 0 6px; } .msg h3 { margin: 12px 0 4px; font-size: 13.5px; }
+.msg p { margin: 0 0 6px; }
 .dots { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 4px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: #7d828c; animation: blink 1.2s infinite both; }
 .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
@@ -35,24 +35,43 @@ button, input { font: inherit; color: inherit; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .chip { padding: 7px 14px; border-radius: 99px; border: 1px solid var(--navy); background: #fff; color: var(--navy); font-weight: 700; cursor: pointer; }
 .chip:disabled { opacity: .5; cursor: default; }
-.cnt, .note { font-size: 12.5px; color: var(--tx3); } .cnt { margin-top: 6px; }
-/* 예상 답변 카드 */
-.msg.pv { position: relative; max-width: 100%; width: 100%; padding: 0 0 0 22px; border: 2px dashed var(--pv); border-radius: 6px; background: #fffaf0; overflow: hidden; }
-.pv .side { position: absolute; left: 0; top: 0; bottom: 0; width: 22px; overflow: hidden; background: var(--pv); color: #fff; font-size: 11px; font-weight: 700; line-height: 22px; letter-spacing: .1em; writing-mode: vertical-rl; white-space: nowrap; }
-.pv .band { background: var(--pv); color: #fff; padding: 9px 12px 11px; }
-.pv .band b { display: block; font-size: 25px; line-height: 1.25; letter-spacing: -.02em; } .pv .band span { font-size: 13px; }
-.pvin { padding: 10px 12px 12px; }
-.pv h3 { color: var(--pv); }
-.pv .where { font-size: 12.5px; color: var(--tx3); }
-.pv .concl { margin: 2px 0 6px; font-size: 17px; font-weight: 700; }
-.cites { margin: 0; padding: 0; list-style: none; } .cites li { margin-bottom: 8px; }
+.cnt { margin-top: 6px; font-size: 12.5px; color: var(--tx3); }
 .law { color: var(--navy); font-weight: 600; text-decoration: underline; }
-blockquote { margin: 4px 0 0; padding: 6px 9px; border-left: 3px solid var(--pv); background: #fff; font-size: 13px; color: #323232; }
-.next { margin-top: 12px; padding: 9px 11px; border: 1px solid #d8b680; border-radius: 4px; background: #fff; }
-.next h3 { margin: 0 0 4px; color: var(--tx); font-size: 14.5px; }
-.next ol { margin: 0; padding-left: 18px; } .next li { margin-bottom: 3px; font-size: 13.5px; }
-.src { margin: 10px 0 0 !important; font-size: 11.5px; color: var(--tx3); }
-.tail { margin: 10px 0 0 !important; padding: 5px 8px; border: 1px dashed var(--pv); border-radius: 3px; color: var(--pv); font-size: 12.5px; font-weight: 700; text-align: center; }
+/* 질문 초안 카드(citizen.html의 폼 칸 꼴): 대화로 모은 값으로 채운 접수 칸 */
+.msg.qd { max-width: 100%; width: 100%; padding: 0; border: 1px solid var(--in); border-radius: 6px; background: #fff; overflow: hidden; }
+.qhead { padding: 10px 12px; background: var(--th); border-bottom: 1px solid var(--ln); }
+.qhead b { display: block; font-size: 18px; letter-spacing: -.02em; } .qhead span { color: var(--tx2); font-size: 13px; }
+.qin { padding: 0 12px 12px; }
+.from { display: inline-block; margin-top: 5px; padding: 1px 8px; border: 1px solid var(--navy); border-radius: 99px; color: var(--navy); font-size: 11.5px; font-weight: 700; }
+.form { border-top: 1px solid #000; margin-top: 8px; }
+.tr { display: flex; border-bottom: 1px solid var(--ln); min-height: 44px; }
+.th { flex: 0 0 27%; background: var(--th); padding: 10px 8px; font-weight: 500; font-size: 13.5px; display: flex; align-items: center; }
+.th em { color: var(--p); font-style: normal; font-weight: 700; margin-left: 2px; }
+.td { flex: 1; padding: 8px; font-size: 13.5px; min-width: 0; }
+.in { width: 100%; min-height: 38px; border: 1px solid var(--in); border-radius: 3px; padding: 7px 9px; background: #fff; }
+.in.ro { background: #f6f6f8; color: var(--tx2); display: flex; align-items: center; }
+textarea.in { display: block; height: 84px; resize: vertical; line-height: 1.55; }
+/* 관련 조항 칸(?mode=cite): AI가 채운 참고 칸임이 보이게 — 점선 테두리 · 옅은 노랑 바탕 · 「AI 참고」 표시. 조항마다 체크로 빼고, 구절은 접어 둔다 */
+.tr.wide { flex-direction: column; } .tr.wide .th { flex: none; }
+.rc { padding: 8px 10px; border: 1.5px dashed var(--ai); border-radius: 4px; background: #fffaf0; }
+.rcnote { color: var(--ai); font-size: 12.5px; font-weight: 600; }
+.ai { display: inline-block; margin-right: 6px; padding: 0 7px; border-radius: 3px; background: var(--ai); color: #fff; font-size: 11.5px; font-weight: 700; }
+.rc fieldset { margin: 0; padding: 0; border: 0; min-width: 0; } .rc fieldset:disabled { opacity: .45; }
+.ci { padding: 6px 0; border-top: 1px solid #ead9b8; }
+.ci .law, .ci details { margin: 2px 0 0 22px; font-size: 12.5px; } .ci .law { display: inline-block; } .ci summary { cursor: pointer; color: var(--tx2); }
+blockquote { margin: 4px 0 0; padding: 6px 9px; border-left: 3px solid var(--ai); background: #fff; font-size: 13px; color: #323232; }
+.agree { margin-top: 10px; padding: 10px; border: 1px solid var(--in); border-radius: 3px; font-size: 12.5px; color: var(--tx2); }
+.agree p { margin: 0 0 3px; }
+.chk { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13.5px; color: var(--tx2); cursor: pointer; }
+.chk input { accent-color: var(--p); width: 16px; height: 16px; margin: 0; }
+.ci .chk { margin-top: 0; align-items: flex-start; color: var(--tx); } .ci .chk input { flex: none; margin-top: 3px; }
+.chk.all { padding-top: 8px; border-top: 1px solid #ead9b8; color: var(--tx); font-weight: 600; }
+.err { margin: 6px 0 0 !important; padding: 8px 10px; border-radius: 3px; background: #fff4f4; border: 1px solid #f0b9b9; color: #a8221a; font-size: 13px; }
+.err:empty { display: none; }
+.btns { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+.btn { min-width: 92px; padding: 11px 14px; border-radius: 4px; border: 1px solid var(--in); background: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
+.btn.go { background: var(--p); border-color: var(--p); color: #fff; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 /* 정식 답변 카드 */
 .msg.fm { max-width: 100%; width: 100%; padding: 0; border: 2px solid var(--navy); border-radius: 6px; background: #fff; overflow: hidden; }
 .fm .band { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--navy); color: #fff; padding: 9px 12px; }
@@ -61,29 +80,6 @@ blockquote { margin: 4px 0 0; padding: 6px 9px; border-left: 3px solid var(--pv)
 .kv { display: grid; grid-template-columns: 26% 1fr; margin: 0; }
 .kv dt, .kv dd { margin: 0; padding: 9px 8px; border-bottom: 1px solid var(--ln); font-size: 13.5px; min-width: 0; }
 .kv dt { background: var(--th); }
-.cmp { margin: 0 !important; padding: 9px 12px; font-weight: 700; font-size: 13.5px; }
-.cmp span { display: block; margin-top: 2px; font-weight: 400; font-size: 12px; }
-.cmp.same { background: #e8f5ec; color: #1b6b3c; } .cmp.diff { background: #fff2d6; color: #7c4a03; } .cmp.none { background: #eceef2; color: #374151; }
-/* 접수 내용 확인(citizen.html의 폼 칸 꼴) */
-.msg.cf { max-width: 100%; width: 100%; padding: 12px; border: 1px solid var(--in); border-radius: 6px; background: #fff; }
-.cf h3 { margin: 0 0 2px; font-size: 16px; } .lead { color: var(--tx2); font-size: 13px; }
-.form { border-top: 1px solid #000; margin-top: 8px; }
-.tr { display: flex; border-bottom: 1px solid var(--ln); min-height: 44px; }
-.th { flex: 0 0 27%; background: var(--th); padding: 10px 8px; font-weight: 500; font-size: 13.5px; display: flex; align-items: center; }
-.th em { color: var(--p); font-style: normal; font-weight: 700; margin-left: 2px; }
-.td { flex: 1; padding: 8px; font-size: 13.5px; min-width: 0; }
-.in { width: 100%; min-height: 38px; border: 1px solid var(--in); border-radius: 3px; padding: 7px 9px; background: #fff; }
-.in.ro { background: #f6f6f8; color: var(--tx2); display: flex; align-items: center; }
-.agree { margin-top: 10px; padding: 10px; border: 1px solid var(--in); border-radius: 3px; font-size: 12.5px; color: var(--tx2); }
-.agree p { margin: 0 0 3px; }
-.chk { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13.5px; color: var(--tx2); cursor: pointer; }
-.chk input { accent-color: var(--p); width: 16px; height: 16px; margin: 0; }
-.err { margin: 6px 0 0 !important; padding: 8px 10px; border-radius: 3px; background: #fff4f4; border: 1px solid #f0b9b9; color: #a8221a; font-size: 13px; }
-.err:empty { display: none; }
-.btns { display: flex; gap: 6px; justify-content: center; margin-top: 10px; } .btns.col { flex-direction: column; }
-.btn { min-width: 92px; padding: 11px 14px; border-radius: 4px; border: 1px solid var(--in); background: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
-.btn.go { background: var(--p); border-color: var(--p); color: #fff; }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
 /* 입력 줄 */
 .bar { border-top: 1px solid var(--ln); padding: 8px 12px 10px; background: #fff; }
 .bar .row { display: flex; gap: 6px; margin-top: 6px; } .bar .in { flex: 1; min-width: 0; }
@@ -104,12 +100,17 @@ blockquote { margin: 4px 0 0; padding: 6px 9px; border-left: 3px solid var(--pv)
 <script src="common.js"></script>
 <script>
 'use strict';
-// 대화로 문의하기(목업). 한 줄 → 장소 되묻기 → 찾는 중 → 「예상 답변」 카드 → 접수 내용 확인 → 접수(/api/inquiries) → 「정식 답변」 카드(/api/citizen/<번호>, 승인된 답만).
-// 되묻기 규칙과 예상 답은 서버(POST /api/preview)가 준다. 글자는 /api/text에서만: 새 글은 U-02_시민접수-3판.md의 「대화 …」 절, 이미 있는 칸 이름 · 초안의 출처는 그 절 그대로.
+// 대화로 문의하기(목업). 판이 둘이다(동규가 견줘 보고 정함):
+//   기본 판(질문 초안)    한 줄 → 장소 되묻기 → 「질문 초안」 카드(제목 · 장소를 넣은 글 · 민원 장소 · 구, 제목 · 내용은 고칠 수 있다) → 접수 → 「정식 답변」 카드
+//   ?mode=cite(관련 조항) 같은 흐름이고 「질문 초안」 카드에 「관련 조항」 칸이 더 있다(조례 이름 · 조항 · 원문 열기 · 접힌 구절). 고른 조항을 함께 접수한다
+// 시민 화면은 자동으로 쓴 답(결론 · 답 글)과 맡는 곳을 보이지도 받지도 않는다(접수 전 「예상 답변」은 만들지 않는다). 답은 담당자가 승인한 뒤 기존 /api/citizen/<번호>로만 온다.
+// 되묻기 규칙과 질문 초안은 서버(POST /api/question, 관련 조항 판은 /api/cite)가 준다. 접수는 기존 /api/inquiries.
+// 글자는 /api/text에서만: 새 글은 U-02_시민접수-3판.md의 「대화 …」 절, 이미 있는 칸 이름은 그 절 그대로.
 // ponytail: 핵심 흐름 한 번만(새로고침하면 대화가 사라진다 · 문구 파일을 고치면 새로고침해야 바뀐다). 대화 입구를 쓰기로 정하면 그때 더한다
-let U = null, A = null, S0 = null, AG = null, phase = 'ask';
-const st = { text: '', pv: null, asked: 0 };   // 이 대화에서 모은 값: 시민이 쓴 한 줄 · 예상 답(장소 포함) · 되물은 횟수
-const K = () => U('대화 문의').kv, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const CITE = new URLSearchParams(location.search).get('mode') === 'cite';
+let U = null, phase = 'ask';
+const st = { text: '', q: null, asked: 0 };   // 이 대화에서 모은 값: 시민이 쓴 한 줄 · 질문 초안 {title, text, loc, cites(관련 조항 판만)} · 되물은 횟수
+const K = () => U('대화 문의').kv;
 const DOTS = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>';
 const paras = (t) => String(t || '').split(/\n+|(?<=다\.)\s+/).filter(Boolean);
 function say(html, cls = 'bot') {
@@ -121,89 +122,53 @@ function setPhase(p) {   // ask = 한 줄 쓰기 · place = 장소를 되물은 
   $('bar').hidden = !on; $('b-example').hidden = p !== 'ask'; $('msg').placeholder = K()[p === 'place' ? '장소 입력 칸' : '입력 칸'];
   if (on) $('msg').focus();
 }
-const again = () => say(`<div class="btns"><button type="button" class="btn" data-do="new">${esc(U('대화 문의').btn(1)[0])}</button></div>`, 'plain');
 
-// ---- 맡는 곳(처리 기관): 담당자 화면 desk.js의 galOf · agencyOf와 같은 셈(인용한 첫 조 · 항 → 갈래 → 처리 기관, 공원 · 주차장은 장소로 한 번 더 좁힘. 6종 밖 장소는 장소 목록의 「6종 밖」 줄)
-// ponytail: 같은 셈이 desk.js와 여기 두 곳에 있다(담당자 화면을 건드리지 않으려고). 대화 입구를 쓰기로 정하면 common.js로 옮겨 한 벌로
-function agencyOf(pv) {   // → {name, sure(이름이 정해진 기관인가), law(6종 밖 조례)} 또는 null(확인 전)
-  const p = S0.places[pv.loc.place] || {};
-  if (pv.kind === 'out') { const i = p['6종 밖']; return i ? { name: i['처리 기관'], law: i['조례'], sure: true } : null; }
-  const c = pv.kind === 'draft' && pv.card.citations[0], L = c && AG && AG['조례'][c.law];
-  if (!L) return null;
-  const a = c.article.replace(/\s+/g, ' ').trim(), m = /^(제\d+조(?:의\d+)?)(?: (제\d+항))?/.exec(a), b = /^별표 ?(\d+)/.exec(a);
-  const keys = m ? [m[2] ? `${m[1]} ${m[2]}` : '', m[1]] : b ? [`별표 ${b[1]}`, '별표'] : [a];
-  const id = keys.filter(Boolean).map((k) => L['조항→갈래'][k]).find(Boolean), g = id && L['갈래'].find((x) => x.id === id);
-  if (!g || !g['처리 기관']) return null;
-  const place = g['장소에 따라'] && p['처리 장소'] ? L['장소별 처리 기관'].find((e) => e['장소'] === p['처리 장소']) : null;
-  const name = place ? place['처리 기관'] : g['처리 기관'];
-  return (place ? /^자치구/.test(name) : g['자치구가 처리'] === '예') ? { name: A('답변 초안').kv['자치구가 처리'], sure: false } : { name, sure: true };
-}
-function srcLine(pv) {   // 담당자 카드 아래 「초안의 출처」 줄과 같은 글(미리 받은 답인지 · 어느 판이 만든 답인지)
-  const none = pv.kind !== 'draft', O = A('초안의 출처'), [b, s0] = O.plain()[(pv.engine.how === 'live' ? 0 : 1) + (none ? 2 : 0)] || ['', ''], made = O.tab('만든 판');
-  const key = `${pv.engine.made_by}${none ? ' · 초안 없음' : ''}`;
-  return `<p class="src">${esc(b)} · ${esc(pv.engine.made_by && Object.prototype.hasOwnProperty.call(made, key) ? made[key] : s0)}</p>`;
-}
-
-// ---- 한 줄 → (장소 되묻기) → 찾는 중 → 예상 답변
+// ---- 한 줄 → (장소 되묻기) → 질문 초안
 async function ask(place) {
   setPhase('wait'); document.querySelectorAll('.chip').forEach((x) => { x.disabled = true; });
-  const k = K(), w = say(DOTS), t0 = Date.now(), finding = () => { w.innerHTML = `${DOTS}${esc(k['찾는 중'])}`; }, tm = setTimeout(finding, 400);
+  const k = K(), w = say(DOTS), tm = CITE && setTimeout(() => { w.innerHTML = `${DOTS}${esc(U('대화 · 관련 조항').kv['찾는 중'])}`; }, 400);   // 관련 조항을 그때 찾으면 몇 초 걸린다
   let r;
-  try { r = await api('/api/preview', { text: st.text, place }); } catch { w.remove(); say(esc(k['연결 안 됨'])); return setPhase(st.asked ? 'place' : 'ask'); } finally { clearTimeout(tm); }
-  if (r.ask) {   // 글에 장소가 없다(서버의 코드 규칙) → 되묻고 칩을 보인다. 장소 이름을 적어 답해도 된다
-    w.innerHTML = `${esc(k[st.asked++ ? '장소 못 찾음' : '장소 되묻기'])}<div class="chips">${r.choices.map((c) => `<button type="button" class="chip" data-place="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div><div class="cnt">${esc(k['칩 작은 글'])}</div>`;
+  try { r = await api(CITE ? '/api/cite' : '/api/question', { text: st.text, place }); } catch { w.remove(); say(esc(k['연결 안 됨'])); return setPhase(st.asked ? 'place' : 'ask'); } finally { clearTimeout(tm); }
+  if (r.ask) {   // 글에 장소가 없다(서버의 코드 규칙) → 까닭과 함께 되묻고 칩을 보인다. 장소 이름을 적어 답해도 된다
+    const first = !st.asked++;
+    w.innerHTML = `${esc(k[first ? '장소 되묻기' : '장소 못 찾음'])}${first ? `<div class="cnt">${esc(k['되묻는 까닭'])}</div>` : ''}<div class="chips">${r.choices.map((c) => `<button type="button" class="chip" data-place="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div><div class="cnt">${esc(k['칩 작은 글'])}</div>`;
     return setPhase('place');
   }
-  finding();
-  await sleep(Math.max(0, 1300 - (Date.now() - t0)));   // 미리 받은 답은 바로 오므로 「찾는 중」이 보이게 잠깐 둔다(목업)
-  w.remove(); showPreview(r);
-}
-function showPreview(r) {
-  st.pv = r; setPhase('card');
-  if (r.kind === 'failed') { say(esc(K()[r.engine.how === 'saved' ? '미리 받은 답 없음' : '못 받음'])); return again(); }   // 접수해도 담당자가 답을 쓸 수 없는 상태라 접수로 이끌지 않는다
-  const P = U('대화 · 예상 답변'), k = P.kv, N = U('대화 · 정식 답변이 오면'), C = A('답변 초안'), c = r.card, ag = agencyOf(r), [bFile, bEnd] = P.btn();
-  // 「정식 답변이 오면」: 판정 종류마다 문구 파일의 틀 문장, 채우는 칸은 맡는 곳 이름뿐(지어내지 않는다)
-  const next = fill(N.tab('판정')[{ draft: '조항으로 답함', out: '6종 밖', notfound: '조항을 찾지 못함' }[r.kind]],
-    { 다음: fill(N.tab('다음 행동')[ag && ag.sure ? '맡는 곳 있음' : '맡는 곳 모름'], { '처리 기관': ag && ag.name }) }).split(' / ');
-  let h = `<p class="where">${esc(fill(k['문의 장소'], { 장소: r.loc.name }))}</p>`;
-  if (r.kind === 'draft') {
-    if (c.conclusion) h += `<p class="concl">${esc(fill(k['결론'], { 판정: C.tab('초안의 결론')[c.conclusion] }))}</p>`;
-    h += paras(c.answer).map((p) => `<p>${esc(p)}</p>`).join('');
-    h += `<h3>${esc(k['근거 조항'])}</h3><ul class="cites">${c.citations.map((x) => `<li>${x.url ? `<a class="law" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(k['원문 보기'])}">${esc(x.label)}</a>` : `<b>${esc(x.label)}</b>`}${x.quotes.map((q) => `<blockquote>${esc(q)}</blockquote>`).join('')}</li>`).join('')}</ul>`;
-  } else {
-    h += `<p class="concl">${esc(k[r.kind === 'out' ? '6종 밖' : '못 찾음'])}</p>`;
-    h += r.kind === 'out' ? (ag && ag.law ? `<p>${esc(fill(k['6종 밖 조례'], { 조례: ag.law }))}</p>` : '') : `<p class="note">${esc(k['못 찾음 작은 글'])}</p>`;
-  }
-  if (r.kind !== 'notfound') h += `<h3>${esc(k['맡는 곳'])}</h3><p><b>${esc(ag ? ag.name : C.kv['처리 기관 확인 전'])}</b></p><p class="note">${esc(k['맡는 곳 뜻'])}</p>`;
-  h += `<section class="next"><h3>${esc(N.lead)}</h3><ol>${next.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></section>${srcLine(r)}<p class="tail">${esc(k['꼬리'])}</p>
-    <div class="btns col"><button type="button" class="btn go" data-do="file">${esc(bFile)}</button><button type="button" class="btn" data-do="end">${esc(bEnd)}</button></div>`;
-  say(`<div class="side" aria-hidden="true">${esc(`${k['세로 띠']} · `.repeat(40))}</div><header class="band"><b>${esc(k['띠'])}</b><span>${esc(P.lead)}</span></header><div class="pvin">${h}</div>`, 'pv');
+  w.remove(); st.q = r; showDraft();
 }
 
-// ---- 접수 내용 확인 → 접수 → 정식 답변
-function showConfirm() {   // 대화로 모은 값을 기존 접수 칸(/api/inquiries가 받는 칸) 꼴로 채워 보인다. 제목만 고칠 수 있다
-  const F = U('대화 · 접수 내용 확인'), B = U('민원내용').kv, G = U('개인정보 수집·이용 동의').kv, L = st.pv.loc;
-  const title = (st.text === K()['예시 글'] ? S0.pair.title : st.text).slice(0, 30);   // 예시 글은 시연 장면의 제목, 그 밖은 글의 앞 30글자
-  const ro = (name, v) => `<div class="tr"><div class="th">${esc(name)}</div><div class="td"><div class="in ro">${esc(v)}</div></div></div>`;
-  say(`<h3>${esc(F.kv['머리'])}</h3><p class="lead">${esc(F.lead)}</p><div class="form">
-    <div class="tr"><label class="th" for="f-title">${esc(B['제목'])}<em>*</em></label><div class="td"><input class="in" id="f-title" maxlength="30" value="${esc(title)}"></div></div>
-    ${ro(B['내용'], st.text)}${ro(B['민원 장소'], fill(B['부근'], { 장소: L.name }))}${ro(B['민원발생지역'], L.gu || '—')}</div>
+// ---- 질문 초안 → 접수 → 정식 답변
+function showDraft() {   // 대화로 모은 값으로 접수 칸(/api/inquiries가 받는 칸)을 채운 카드. 제목 · 내용은 고칠 수 있고, 보이는 글이 그대로 접수된다
+  setPhase('card');
+  const F = U('대화 · 질문 초안'), B = U('민원내용').kv, G = U('개인정보 수집·이용 동의').kv, q = st.q, from = `<span class="from">${esc(F.kv['대화에서 확인'])}</span>`;
+  const ro = (name, v, mark) => `<div class="tr"><div class="th">${esc(name)}</div><div class="td"><div class="in ro">${esc(v)}</div>${mark ? from : ''}</div></div>`;
+  // 관련 조항 칸(?mode=cite): 조례 이름 · 조항 · 원문 열기만, 구절은 접어 둔다. 조항마다 체크로 빼고, 「함께 보냅니다」를 끄면 조항 없이 접수된다
+  const R = U('대화 · 관련 조항'), rk = R.kv, cs = q.cites || [];
+  const cite = !CITE ? '' : `<div class="tr wide"><div class="th">${esc(rk['칸 이름'])}</div><div class="td"><div class="rc"><p class="rcnote"><span class="ai">${esc(rk['표시'])}</span>${esc(cs.length ? R.lead : rk['없음'])}</p>${cs.length ? `
+      <fieldset id="f-citeset">${cs.map((c) => `<div class="ci"><label class="chk"><input type="checkbox" class="f-cite" value="${esc(c.label)}" checked> <span><b>${esc(c.law)}</b> ${esc(c.article)}</span></label>
+        ${c.url ? `<a class="law" href="${esc(c.url)}" target="_blank" rel="noopener" title="${esc(rk['원문 열기 설명'])}">${esc(rk['원문 열기'])}</a>` : ''}${c.quotes.length ? `<details><summary>${esc(rk['구절 보기'])}</summary>${c.quotes.map((x) => `<blockquote>${esc(x)}</blockquote>`).join('')}</details>` : ''}</div>`).join('')}</fieldset>
+      <label class="chk all"><input type="checkbox" id="f-withcites" checked> ${esc(rk['함께 보냄'])}</label>` : ''}</div></div></div>`;
+  say(`<header class="qhead"><b>${esc(F.kv['머리'])}</b><span>${esc(F.lead)}</span></header><div class="qin"><div class="form">
+    <div class="tr"><label class="th" for="f-title">${esc(B['제목'])}<em>*</em></label><div class="td"><input class="in" id="f-title" maxlength="30" value="${esc(q.title)}"></div></div>
+    <div class="tr"><label class="th" for="f-text">${esc(B['내용'])}<em>*</em></label><div class="td"><textarea class="in" id="f-text" maxlength="3000">${esc(q.text)}</textarea></div></div>
+    ${ro(B['민원 장소'], fill(B['부근'], { 장소: q.loc.name }), true)}${ro(B['민원발생지역'], q.loc.gu || '—', !!q.loc.gu)}${cite}</div>
     <div class="agree">${G['동의 글'].split(' / ').map((x) => `<p>${esc(x)}</p>`).join('')}</div>
     <label class="chk"><input type="checkbox" id="f-agree"> ${esc(G['동의'])}</label>
     <p class="err" id="f-err" role="alert"></p>
-    <div class="btns"><button type="button" class="btn go" data-do="send">${esc(F.btn()[0])}</button></div>`, 'cf');
+    <div class="btns"><button type="button" class="btn go" data-do="send">${esc(F.btn()[0])}</button></div></div>`, 'qd');
 }
 async function send(b) {
-  const s = U('상황별 안내').tab('상황'), F = U('대화 · 접수 내용 확인'), f = F.kv, err = $('f-err'), title = $('f-title').value.trim(), L = st.pv.loc;
-  const miss = !title ? [s['제목 없음'], 'f-title'] : !$('f-agree').checked ? [s['동의 안 함'], 'f-agree'] : null;
+  const s = U('상황별 안내').tab('상황'), F = U('대화 · 질문 초안'), f = F.kv, rk = U('대화 · 관련 조항').kv, err = $('f-err'), title = $('f-title').value.trim(), text = $('f-text').value.trim(), L = st.q.loc;
+  const miss = !title ? [s['제목 없음'], 'f-title'] : !text ? [s['내용 없음'], 'f-text'] : !$('f-agree').checked ? [s['동의 안 함'], 'f-agree'] : null;
   if (miss) { err.textContent = miss[0]; $(miss[1]).focus(); return; }
   err.textContent = ''; b.disabled = true; b.textContent = f['접수하는 중'];
+  const body = { title, text, agree: true, region: L.gu, public: false, notify: [], loc: { lon: L.lon, lat: L.lat, how: 'chat' } };   // how: 'chat' = 시민이 대화에서 답한 장소(담당자 카드에 「시민이 대화에서 답함」)
+  if (CITE) body.cites = $('f-withcites') && $('f-withcites').checked ? [...document.querySelectorAll('.f-cite:checked')].map((x) => x.value) : [];   // 체크가 남은 조항만(「함께 보냅니다」를 끄면 없음)
   let r;
-  try {   // 기존 접수 길 그대로. how: 'map' = 시민이 장소를 직접 고름(대화에서 고른 것이라 담당자 카드에는 「지도에서 직접 지정」으로 보인다)
-    r = await api('/api/inquiries', { title, text: st.text, agree: true, region: L.gu, public: false, notify: [], loc: { lon: L.lon, lat: L.lat, how: 'map' } });
-  } catch { err.textContent = f['접수하지 못함']; b.disabled = false; b.textContent = F.btn()[0]; return; }
-  b.textContent = F.btn()[0]; $('f-title').disabled = $('f-agree').disabled = true;
-  say(esc(fill(f['접수함'], { 번호: r.no })));
+  try { r = await api('/api/inquiries', body); }   // 기존 접수 길 그대로
+  catch { err.textContent = f['접수하지 못함']; b.disabled = false; b.textContent = F.btn()[0]; return; }
+  b.textContent = F.btn()[0]; document.querySelectorAll('.qd input, .qd textarea').forEach((x) => { x.disabled = true; });
+  say(esc(fill(f['접수함'], { 번호: r.no }) + (CITE ? ` ${body.cites.length ? fill(rk['조항 함께 보냄'], { n: body.cites.length }) : rk['조항 없이 보냄']}` : '')));
   const w = say(`${DOTS}${esc(f['기다리는 중'])}`);
   const tm = setInterval(async () => {   // 기존 시민 화면과 같은 길: 승인 전에는 answer가 비어 온다
     let c; try { c = await api(`/api/citizen/${r.id}`); } catch { return; }
@@ -211,19 +176,15 @@ async function send(b) {
     clearInterval(tm); w.remove(); showFormal(c);
   }, 1500);
 }
-function showFormal(c) {
+function showFormal(c) {   // 담당자가 승인한 답. 줄 이름 · 「처리담당자(시연)」 표기는 기존 시민 화면의 「받은 답」 그대로
   const F = U('대화 · 정식 답변'), k = F.kv, a = U('받은 답').kv;
-  // 예상 답변의 근거 조항 ↔ 정식 답변의 관련법령(승인된 초안에만 붙는다)을 견준다
-  const mine = st.pv.card.citations.map((x) => x.label), theirs = c.citations.map((x) => x.label), list = (v) => v.join(' · ') || k['조항 없음'];
-  const key = !mine.length && !theirs.length ? '근거 없음' : mine.length === theirs.length && mine.every((x) => theirs.includes(x)) ? '근거 같음' : '근거 다름';
   say(esc(k['도착']));
   say(`<header class="band"><b>${esc(F.lead)}</b><span class="ok">&#10003; ${esc(k['확인 표시'])}</span></header><dl class="kv">
     <dt>${esc(a['담당부서'])}</dt><dd>${esc(a['담당'])}</dd>
     <dt>${esc(a['내용'])}</dt><dd><p>1. ${esc(a['인사'])}</p>${paras(c.answer).map((p, i) => `<p>${i + 2}. ${esc(p)}</p>`).join('')}</dd>
     ${c.citations.length ? `<dt>${esc(a['관련법령'])}</dt><dd>${c.citations.map((x) => (x.url ? `<a class="law" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(a['원문 링크'])}">${esc(x.label)}</a>` : `<span>${esc(x.label)}</span>`)).join('<br>')}<div class="cnt">${esc(a['기준'])}</div></dd>` : ''}
-    <dt>${esc(a['처리 일시'])}</dt><dd>${esc(ymd(c.approved_at))} ${esc(hhmm(c.approved_at))}</dd></dl>
-    <p class="cmp ${{ '근거 같음': 'same', '근거 다름': 'diff', '근거 없음': 'none' }[key]}">${esc(k[key])}${key === '근거 다름' ? `<span>${esc(fill(k['근거 견줌'], { 예상: list(mine), 정식: list(theirs) }))}</span>` : ''}</p>`, 'fm');
-  again();
+    <dt>${esc(a['처리 일시'])}</dt><dd>${esc(ymd(c.approved_at))} ${esc(hhmm(c.approved_at))}</dd></dl>`, 'fm');
+  say(`<div class="btns"><button type="button" class="btn" data-do="new">${esc(U('대화 문의').btn(1)[0])}</button></div>`, 'plain');
 }
 
 function bind() {
@@ -235,22 +196,18 @@ function bind() {
     st.text = v; ask('');
   };
   $('b-example').onclick = () => { $('msg').value = K()['예시 글']; $('msg').focus(); };
+  $('log').onchange = (e) => { if (e.target.id === 'f-withcites') $('f-citeset').disabled = !e.target.checked; };   // 「관련 조항을 함께 보냅니다」를 끄면 조항 목록을 흐리게
   $('log').onclick = (e) => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
-    const lock = () => b.closest('.btns').querySelectorAll('button').forEach((x) => { x.disabled = true; });
     if (b.dataset.place) { if (phase === 'place') { say(esc(b.textContent), 'me'); ask(b.dataset.place); } }
-    else if (b.dataset.do === 'file') { lock(); showConfirm(); }
-    else if (b.dataset.do === 'end') { lock(); say(esc(K()['끝냄'])); again(); }
     else if (b.dataset.do === 'send') send(b);
     else if (b.dataset.do === 'new') location.reload();
   };
 }
 
 (async function main() {
-  try {
-    const [t, s, ag] = await Promise.all([api('/api/text'), api('/api/state'), fetch('data/agencies.json').then((r) => r.json()).catch(() => null)]);   // 처리 기관 자료가 없으면 맡는 곳이 「확인 전」으로 보일 뿐 나머지는 돈다
-    U = texts(t.text, 'U-02_시민접수-3판'); A = texts(t.text, 'A-01_답변창구-3판'); S0 = s; AG = ag;
-  } catch { $('log').textContent = '화면을 불러오지 못했습니다. 화면 서버가 켜져 있는지 확인해 주세요.'; return; }   // ponytail: 글자 파일도 못 받은 때만 쓰는 마지막 문장(citizen.html과 같음)
+  try { U = texts((await api('/api/text')).text, 'U-02_시민접수-3판'); }   // 문구만 받는다(문의 목록 · 처리 기관 자료는 받지 않는다)
+  catch { $('log').textContent = '화면을 불러오지 못했습니다. 화면 서버가 켜져 있는지 확인해 주세요.'; return; }   // ponytail: 글자 파일도 못 받은 때만 쓰는 마지막 문장(citizen.html과 같음)
   const k = K(), [bEx, bSend] = U('대화 문의').btn();
   document.title = `${k['화면 이름']} (시연)`;
   $('c-demo').textContent = k['시연']; $('c-gnb').textContent = k['화면 이름']; $('c-who').textContent = U('머리').kv['신청인'];
