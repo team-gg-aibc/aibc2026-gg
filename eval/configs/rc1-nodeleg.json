@@ -1,0 +1,13 @@
+{
+  "issue": "",
+  "note": "합친 판 rc1에서 ④ 읽기 r8-deleg(#81 flow2_read_deleg)만 뺀 판(11-13): 새 흐름 7판 + 장소 가리기(#82 flow2_place_scope) + 근거 묶음 정리(flow2_cite \"pick+fill\") + 맡긴 답 살리기(flow2_handed \"law\") + 답 첫머리(#83 flow2_lead \"comma\"). ④ 읽기는 7판 그대로 r7이다. rc1.json과 나란히 재면 r8-deleg의 몫이 갈린다. 끈 판은 pm-flow2-v7.json. flow2_version은 7 그대로다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_cite": "pick+fill",
+    "flow2_handed": "law",
+    "flow2_lead": "comma"
+  }
+}

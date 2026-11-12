@@ -1187,6 +1187,61 @@ def selftest():
         assert led("시장이 자료로 확인합니다. 예전 자료에 나온 조 번호와 다릅니다.", "정보")["answer"].count("자료") == 2       # 다른 「자료」는 그대로
         assert contract.finalize(dict(led("확인 불가", "네"), source_url="", effective_date=""), cfg83) == contract.UNKNOWN
         assert [n for n, _ in STAGES][-2:] == ["답 첫머리", "출력"] and config.DEFAULTS["flow2_lead"] == "off"
+        # ---- 합친 판 rc1(11-13): main(#82) + 다음 판 후보 + #81 r8-deleg + #83을 함께 켠 설정(eval/configs/rc1.json)의 이음매 ----
+        # 단계 순서: 구절 관문 → 근거 고르기 → 질문 대조(⑥이 거절하면 맡긴 답 살리기) → 근거 정리 → 답 첫머리 → 출력.
+        # 맡긴 답 살리기가 근거 정리보다 앞이다: 근거 정리가 살린 답의 조항(flow2.handed.label)을 지키려면 그 기록이 먼저 있어야 한다(cite.py 머리말).
+        rc1, nodeleg, base7 = (config.load(config.ROOT / f"eval/configs/{n}.json") for n in ("rc1", "rc1-nodeleg", "pm-flow2-v7"))
+        diff = lambda c: {k: v for k, v in c.items() if config.DEFAULTS[k] != v}
+        assert diff(rc1) == dict(diff(base7), flow2_place_scope=True, flow2_cite="pick+fill", flow2_handed="law", flow2_read_deleg=True, flow2_lead="comma")
+        assert diff(nodeleg) == {k: v for k, v in diff(rc1).items() if k != "flow2_read_deleg"}
+        names = [n for n, _ in STAGES]
+        assert names == ["검색", "질문 분석", "조례 확정", "조례 읽기 · 답 쓰기", "구절 관문", "근거 고르기", "질문 대조", "근거 정리", "답 첫머리", "출력"]
+
+        def pick_plan(kept, direct, laws):       # 다시 고르기의 가짜 응답: direct만 「직접」, 나머지 후보는 「참고」
+            cands = [c["label"] for c in cite.widen(kept, view(laws, "paragraph"))]
+            plan["evidence_pick"] = {f"c{i}": "직접" if lab in direct else "참고" for i, lab in enumerate(cands, 1)}
+        # (1) 보통 답이 처음부터 끝까지: ④는 r8-deleg, 인용은 짝 채우기가 덧붙이고, 답 앞에 결론 낱말. 끈 판(7판 설정)은 같은 가짜 응답에 7판 그대로다
+        plan.update(question_slots=dict(slots, actor="시민"), target_check=ck("grounded"),
+                    law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
+        pick_plan([target["label"]], [target["label"]], [law])
+        r, t = pipeline.answer(q, rc1)
+        assert t["reason"] is None and list(t["steps"]) == names and t["prompts"]["read"] == "r8-deleg", (t["reason"], t.get("error"))
+        assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조", "근거 정리"]
+        assert r["answer"] == "네, " + ans and r["citation"] == t["flow2"]["cite"]["after"] and contract.guard(r) is r, r
+        assert r["citation"][0] == target["label"] and len(r["citation"]) > 1 and t["flow2"]["gate"]["kept"] == [target["label"]]
+        assert "handed" not in t["flow2"] and t["flow2"]["lead"]["word"] == "네"
+        r7, t7 = pipeline.answer(q, base7)
+        assert r7 == dict(r, answer=ans, citation=[target["label"]]) and t7["prompts"]["read"] == "r7" and len(t7["calls"]) == 3, r7
+        assert not {"cite", "handed", "lead", "vote"} & set(t7["flow2"])
+        # (2) 맡긴 답: ⑥이 거절 → 살리기가 되돌림 → 근거 정리는 그 조항(다시 고르기가 「참고」로 봐도)을 지킴 → 살린 답에도 결론 낱말
+        bike = lawmap.LAWS["자전거"]
+        who, rate = f"{bike} 제12조의3 제2항", f"{bike} 제12조의3 제3항"
+        gave, qg = "감면율은 이 조례에 정해져 있지 않고 시장이 따로 정합니다.", "서울 공공자전거 요금 감면율이 조례에 숫자로 적혀 있나요?"
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거"), target_check=ck("notGrounded"),
+                    law_answer_quotes=dict(rd(True, [{"label": who, "quote": "감면 대상자는 다음 각 호의 기준에 따른다"},
+                                                     {"label": rate, "quote": "감면율 및 운영에 관한 사항은 시장이 따로 정한다"}], gave), conclusion="아니요"))
+        pick_plan([who, rate], [who], [bike])
+        r, t = pipeline.answer(qg, rc1)
+        assert t["verdict"] == "notGrounded" and t["flow2"]["handed"]["label"] == rate == t["flow2"]["cite"]["protect"], (t["reason"], t["flow2"].get("gate"))
+        assert r["citation"][:2] == [who, rate] and r["answer"] == "아니요, " + gave and t["flow2"]["lead"]["word"] == "아니요", r
+        # (3) ④가 그 꼴로 답했고 ⑥이 스스로 통과시켰으면 살리기는 손대지 않는다(기록도 없다). 이때 인용은 보통 규칙대로다:
+        #     다시 고르기가 「따로 정한다」 항을 「참고」로 보면 그 항이 빠질 수 있다(cite.py 스스로 시험의 같은 장면). r8-deleg를 켜면 이 꼴이 늘 수 있어 잰 뒤에 본다
+        plan["target_check"] = ck("grounded")
+        r, t = pipeline.answer(qg, rc1)
+        assert "handed" not in t["flow2"] and "protect" not in t["flow2"]["cite"] and r["answer"] == "아니요, " + gave and r["citation"][0] == who
+        # (4) 「확인 불가」로 끝난 답은 뒤 단계가 건드리지 않는다: ⑥ 거절(맡긴 답 꼴 아님) · ④ found 거짓 · ③ 장소 가리기(6종 밖)
+        plan.update(target_check=ck("notGrounded"), law_answer_quotes=dict(plan["law_answer_quotes"], answer="네, 감면됩니다."))
+        r, t = pipeline.answer(qg, rc1)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and list(t["steps"]) == names[:7], (t["reason"], list(t["steps"]))
+        assert not {"handed", "cite", "lead"} & set(t["flow2"])
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
+        r, t = pipeline.answer(qg, rc1)
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.NOT_FOUND and list(t["steps"]) == names[:4]
+        qp = lawmap.PLACE_CASES[0][0]                      # 한강공원(곳 표): 도시공원 조례만 골라지면 ③에서 끝난다
+        plan["question_slots"] = dict(slots, actor="시민", law_guess="도시공원")
+        r, t = pipeline.answer(qp, rc1)
+        assert r == contract.UNKNOWN and t["reason"] == lawmap.REJECT_NAME and t["flow2"]["route"]["rule"] == lawmap.RULE_PLACE, t["flow2"]["route"]
+        assert list(t["steps"]) == names[:3] and pipeline.answer(qp, base7)[1]["flow2"]["route"]["block"] is None      # 끈 판은 막지 않는다
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:
