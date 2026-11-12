@@ -271,7 +271,7 @@ def _ask(st, cfg, step, user):      # noqa: F811
         return _ask_one(st, cfg, step, user) if n <= 1 else _voted(st, cfg, step, lambda s: _ask_one(s, cfg, step, user), n)
     if not cfg["flow2_memo"]:
         return run()
-    return _memoed(st, cfg, [step, prompts.SETS[cfg["flow2_version"]][step][1], user], run)   # 열쇠: 단계 · 그 판의 프롬프트 글 · 보낸 글
+    return _memoed(st, cfg, [step, prompts.pick(cfg, step)[1], user], run)   # 열쇠: 단계 · 실제로 보내는 프롬프트 글(#81 스위치가 바꾼 것 포함) · 보낸 글
 
 
 # ---- 같은 글에는 같은 출력 (스위치 flow2_memo, 11-11) ----
