@@ -1,0 +1,139 @@
+{
+  "run_id": "20261112-193625-pm-flow2-v7-gray-r1",
+  "group": "20261112-193625-pm-flow2-v7-gray",
+  "repeat": 1,
+  "repeats": 2,
+  "created": "2026-11-12T19:37:11+09:00",
+  "experiment": {
+    "name": "pm-flow2-v7",
+    "issue": "",
+    "note": "PM 별도 실험 flow2 7판: 함정 누수. 6판 + 원문이 내용을 상위 법령으로 넘기기만 하는 구절(「법 제○조 각 호의 행위」 · 「법 제○조 각 목에 해당하는」 · 「영 별표 ○와 같다」, 6종에 네 곳) 뒤에 코드가 「(※ 그 내용은 이 자료에 없다)」 표시를 붙여 ④ · ⑥에 보여 주고, ④ 프롬프트에 그 표시를 설명하는 한 줄을 더했다(r7). ⑥ c8 — c7 끝에 닫는 칸 done(c7은 JSON이 2.2% 깨져 다시 불렀다). 나머지는 pm-flow2-v6와 같다. 3주기부터 팀 실험의 끈 판이라 name · cycle 칸을 두지 않는다: 실행 이름은 파일 이름에서, 주기는 실행한 시각에서 정해져 복사한 설정에 2주기 값이 따라가지 않는다(2주기에 잰 실행의 요약에는 주기 2가 저장돼 있다)",
+    "cycle": 3,
+    "file": "eval/configs/pm-flow2-v7.json",
+    "file_sha": "c094e7c458cb"
+  },
+  "conclusion": "#81 PM 가이드 끈 판(새 흐름 7판) 회색지대 32문항, main 합친 커밋 79ac2c0",
+  "lesson": [],
+  "args": {
+    "config": "eval/configs/pm-flow2-v7.json",
+    "split": "gray",
+    "sample": null,
+    "seed": 0,
+    "mode": "full",
+    "url": null,
+    "workers": 4
+  },
+  "settings": {
+    "chat_model": "solar-pro4",
+    "embed_passage": "solar-embedding-2-passage",
+    "embed_query": "solar-embedding-2-query",
+    "temperature": 0.0,
+    "reasoning_effort": null,
+    "chunk_unit": "paragraph",
+    "top_k": 20,
+    "hybrid_cos_weight": 0.7,
+    "use_embedding": true,
+    "use_verify": true,
+    "min_score": 0.25,
+    "answer_prompt": "v2",
+    "verify_prompt": "v1",
+    "timeout_sec": 75,
+    "explore": false,
+    "exit_check": true,
+    "max_citations": 4,
+    "retry_budget": true,
+    "max_concurrent_calls": 6,
+    "on_deadline": "unknown",
+    "select_mode": "prefilter",
+    "prefilter_keep": 8,
+    "prefilter_empty_abstain": true,
+    "max_per_article": 0,
+    "group_by_article": true,
+    "gate": "off",
+    "question_fence": false,
+    "flow2_place_scope": false,
+    "flow": "flow2",
+    "flow2_ontology": true,
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_asks": false,
+    "flow2_read_deleg": false
+  },
+  "settings_hash": "2a9b391827c9",
+  "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10
+  },
+  "env": {
+    "code_commit": "79ac2c0",
+    "code_hash": "8bdd30c5a043",
+    "eval_code_hash": "df36ecc5fd59",
+    "code_dirty": false,
+    "eval_commit": "84e66d4",
+    "questions_hash": "5856436c6658",
+    "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+    "retrieval_used": [
+      "hybrid"
+    ],
+    "key_present": true,
+    "server": null,
+    "python": "3.12.14",
+    "packages": {
+      "numpy": "2.2.6",
+      "openai": "3.39.0",
+      "requests": "2.34.2"
+    },
+    "platform": "macOS-26.6"
+  },
+  "metrics": {
+    "n": 32,
+    "n_gold": 32,
+    "n_trap": 0,
+    "weighted": null,
+    "by_type": {
+      "단순": 15.6
+    },
+    "trap": null,
+    "before": {
+      "n": 0,
+      "weighted": null,
+      "by_type": {}
+    },
+    "by_law": {
+      "animal": 14.3,
+      "bicycle": 20.0,
+      "park": 33.3,
+      "parking": 25.0,
+      "smoking": 0.0,
+      "youth": 10.0
+    },
+    "over_abstain": 84.4,
+    "citations_per_answer": 2.0,
+    "retrieval_hit": 100.0,
+    "format_errors": 0,
+    "late": 0,
+    "over_90s": 0,
+    "timeouts": 0,
+    "errors": 0,
+    "latency_p50": 4.425,
+    "latency_p95": 9.375,
+    "latency_max": 9.488,
+    "causes": {
+      "답이 있는데 확인 불가 (found 거짓)": 17,
+      "판정이 맞는 답을 거절": 10
+    }
+  },
+  "cost_usd": 0.0825,
+  "tokens": {
+    "in": 477315,
+    "cached": 308992,
+    "out": 11525
+  },
+  "calls": 111,
+  "wall_sec": 45.3,
+  "hashes": {
+    "retrieval": "5900c43ec2e6",
+    "answers": "985ebdb3c428"
+  }
+}
