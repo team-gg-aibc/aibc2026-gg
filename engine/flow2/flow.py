@@ -301,7 +301,8 @@ def analyze(st, cfg):
 def route(st, cfg):
     """③ 조례 확정(코드만, 호출 0). 규칙과 근거 조항은 lawmap.py."""
     r = lawmap.route(st["question"], _f2(st).get("slots") or {}, st["_hits"], use_onto=cfg["flow2_ontology"],
-                     mixed_ok=cfg["flow2_version"] >= 2, sentences=cfg["flow2_version"] >= 3)
+                     mixed_ok=cfg["flow2_version"] >= 2, sentences=cfg["flow2_version"] >= 3,
+                     place=cfg["flow2_place_scope"])
     _f2(st)["route"] = r
     _f2(st)["ontology"] = lawmap.ontology.VERSION if cfg["flow2_ontology"] else "끔"
     if r["block"]:

@@ -10,10 +10,11 @@
 import re
 from functools import lru_cache
 
-from . import ontology
+from . import ontology, places as place_table
 
 REJECT_NAME = "6종 밖 조례"   # 질문이 이름을 든 조례가 6종이 아니고 6종이 드는 조례도 아니다
 REJECT_SCOPE = "관할 밖"     # 질문이 자치구 · 다른 시도가 스스로 정한 것을 묻는다
+RULE_PLACE = "C 6종 밖 조례의 곳"   # #82: 판단 기록 flow2.route.rule. 막는 사유는 REJECT_NAME과 같다
 
 LAWS = ontology.LAW_KEYS     # 분석 칸 law_guess 값 → 조례 이름(색인 조각의 law 칸과 글자까지 같다)
 # 서울특별시 자치구 25곳(출처는 ontology.DISTRICTS). #25 engine/gate.py(동욱, PR #60)와 같은 목록 — 병합 뒤 gate.DISTRICTS로 바꾼다
@@ -185,12 +186,42 @@ def _plain_scope(question, slots):
     return None
 
 
-def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False):
+@lru_cache(maxsize=None)
+def _law_text(law):
+    """그 조례 원문 전체(조 · 항 · 별표 조각을 이은 것)의 띄어쓰기 지운 꼴. 규칙 C가 곳 낱말이 원문에 있는지 볼 때 쓴다."""
+    from .. import retrieve
+    return _n(" ".join(c["text"] for c in retrieve.load("paragraph")[0] if c["law"] == law))
+
+
+def place_block(question, laws):
+    """규칙 C(#82, 6종 밖 조례의 곳): 막으면 (곳 낱말, 까닭 한 줄), 아니면 None.
+
+    질문에 곳 표(places.json)의 낱말이 있고, ③이 고른 조례가 모두 그 곳의 rivals이며, 고른 조례 원문 어디에도 그 낱말이 없으면 막는다.
+    근거: 「서울특별시 한강공원 보전 및 이용에 관한 기본 조례」 제3조 제1호가 한강공원을 따로 정의하고 제17조 제1항이 그 안의
+    금지행위를 직접 정한다. 도시공원 조례의 「공원」은 법 제2조제3호의 도시공원이다(도시공원 조례 제2조 제4호).
+    - 고른 조례 원문에 그 낱말이 있으면 답한다: 금연 조례 제5조 제1항 제11호 「한강공원 내 수영장 및 물놀이장 …」.
+    - rivals가 아닌 조례가 하나라도 끼면 답한다: 동물보호 조례(목줄 등)는 곳을 가리지 않고 정한다. 한강공원 조례 제17조 제1항
+      제5호에도 같은 내용이 있지만 6종이 정한 것이라 6종으로 답할 수 있다(#82 「판단이 갈리는 꼴」).
+    - 표에 없는 곳(여의도공원 · 서울대공원 등)은 지금처럼 답한다."""
+    q = _n(question)
+    for row in place_table.load()["places"]:
+        rivals = {LAWS[k] for k in row["rivals"]}
+        if not laws or not set(laws) <= rivals:
+            continue
+        for p in row["places"]:
+            if _n(p) in q and not any(_n(p) in _law_text(law) for law in laws):
+                return p, f"{p}: {row['law']}가 다스리는 곳(고른 조례 원문에 없음)"
+    return None
+
+
+def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False, place=False):
     """③ 조례 확정. 돌려주는 것: {"laws": [조례 이름], "block": None | 사유, "rule": 정한 규칙, "why": 한 줄}.
     순서(부딪칠 때 앞이 이긴다): A 6종 이름 → A 6종이 드는 조례 → A 6종 밖 조례(막음) → B 관할(막음) → 검색 · 분석으로 고르기.
     use_onto=False(설정 flow2_ontology 끔)면 온톨로지 없이 단순 규칙(_plain_kind · _plain_scope)만 쓴다 — 온톨로지 몫을 재려고.
     mixed_ok=True(2판)면 섞인 질문(mixed)은 A 6종 밖 · B 관할에서 막지 않고 검색 · 분석으로 고른다. sentences=True(3판)는 mixed 참고.
-    섞인 질문이라 막지 않았으면 그 낱말을 "mixed"에 남긴다(4판 ⑥이 그 낱말이 든 지시문 문장을 질문에서 뺀다)."""
+    섞인 질문이라 막지 않았으면 그 낱말을 "mixed"에 남긴다(4판 ⑥이 그 낱말이 든 지시문 문장을 질문에서 뺀다).
+    place=True(설정 flow2_place_scope, #82)면 조례를 고른 뒤 규칙 C(place_block)를 댄다. 섞인 질문 예외(mixed)는 쓰지 않는다:
+    「…노점이 보여요. 서울시 조례로는 어떻게 되나요?」처럼 뒷물음이 서울을 들어도 같은 곳을 묻기 때문이다."""
     named = (slots.get("named_rule") or "").strip()
     forced, rule, why, skipped = [], "고르기", "", []
     if named and _n(named) and _n(named) in _n(question):        # 분석이 질문에 없는 이름을 지어내면 보지 않는다
@@ -219,6 +250,10 @@ def route(question, slots, hits, use_onto=True, mixed_ok=False, sentences=False)
         if guess and guess not in laws:
             laws = laws[:1] + [guess]
             rule, why = "고르기 + 분석", slots.get("law_guess")
+    if place:
+        c = place_block(question, laws[:MAX_LAWS])
+        if c:
+            return {"laws": [], "block": REJECT_NAME, "rule": RULE_PLACE, "why": c[1]}
     out = {"laws": laws[:MAX_LAWS], "block": None, "rule": rule, "why": why}
     if skipped:
         out["mixed"] = list(dict.fromkeys(skipped))
@@ -314,4 +349,49 @@ def selftest():
         r3 = route(q, {**base, **over}, hits, mixed_ok=True, sentences=True)
         assert r3["block"] == block3 and (block3 or r3["mixed"]), q                           # 막지 않으면 그 낱말을 남김
     assert not mixed("대구시 공원 1.5km 산책길도 서울 공원처럼 금연이에요?", "대구시", sentences=True)   # 소수점에서 안 나눔
-    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개 · 3판 지시문 문장 4개)")
+    n_place = place_selftest(base)
+    print(f"lawmap 스스로 시험: 통과 (부딪치는 경우 {len(CONFLICTS)}개 · 온톨로지 끔 비교 4개 · 섞인 질문 4개 · 3판 지시문 문장 4개"
+          f" · #82 곳 {n_place}개)")
+
+
+# ---- #82 규칙 C: 막을 꼴 · 막지 않을 꼴. 질문 글은 한강공원 조례 · 도시공원 조례 · 금연 조례 원문을 보고 새로 쓴 것이다 ----
+# (질문, 검색이 고른 조례 열쇠들, 분석이 고른 조례 열쇠, 켰을 때 막나, 까닭)
+PLACE_CASES = [
+    ("한강공원 둔치에서 허가 없이 물건을 팔면 어떻게 되나요?", ["도시공원"], "도시공원", True,
+     "막음: 한강공원 조례 제17조 제1항 제4호(거리가게 무단 상행위)가 정하는 곳"),
+    ("뚝섬 한강 공원에서 텐트를 치고 고기를 구워 먹어도 되나요?", ["도시공원"], "도시공원", True,
+     "막음: 같은 조 제6호(지정 장소 밖 야영 · 취사). 띄어 써도 같은 곳"),
+    ("한강공원 안 매점 말고 길가에서 음료를 파는 사람이 있어요. 서울시 조례로는 어떻게 되나요?", ["도시공원"], "도시공원", True,
+     "막음: 지시문 꼴 문장이 붙어도"),
+    ("광화문광장에서 공연을 하려면 공원 사용 허가를 받아야 하나요?", ["도시공원"], "도시공원", True,
+     "막음: 광화문광장 조례 제2조가 광장을 따로 정의하고 사용허가를 정한다(광장은 도시공원이 아니다)"),
+    ("광화문광장 주변 공영주차장 요금은 얼마예요?", ["주차장", "도시공원"], "주차장", False,
+     "막지 않음: rivals 아닌 주차장 조례가 함께 골라졌다"),
+    ("여의도공원 안에서 음료를 파는 노점이 보여요", ["도시공원"], "도시공원", False,
+     "막지 않음: 곳 표에 없는 공원은 도시공원 조례로 답한다"),
+    ("서울대공원 안에서 물건을 팔려면 허가가 필요한가요?", ["도시공원"], "도시공원", False,
+     "막지 않음: 서울대공원은 도시공원 조례 별표에 적혀 있다"),
+    ("한강공원 물놀이장 경계에서 몇 미터까지 금연인가요?", ["금연"], "금연", False,
+     "막지 않음: 금연 조례 제5조 제1항 제11호가 한강공원을 직접 적는다"),
+    ("한강공원 수영장 옆에서 담배를 피우면 과태료가 있나요?", ["금연", "도시공원"], "금연", False,
+     "막지 않음: rivals 아닌 금연 조례가 함께 골라졌다"),
+    ("한강공원에서 반려견 목줄을 안 하면 과태료가 있나요?", ["동물보호"], "동물보호", False,
+     "판단이 갈리는 꼴 → 막지 않음: 동물보호 조례는 곳을 가리지 않고 정한다"),
+    ("한강공원에서 개 목줄을 안 채우면 공원 규정 위반인가요?", ["동물보호", "도시공원"], "동물보호", False,
+     "판단이 갈리는 꼴 → 막지 않음: rivals 아닌 조례가 끼면 답한다"),
+]
+
+
+def place_selftest(base):
+    """규칙 C를 켜면 PLACE_CASES대로, 끄면(기본값 = 7판) 아무것도 막지 않는다."""
+    if not place_table.load()["places"]:
+        raise AssertionError("places.json이 없다: LAW_OC=<열쇠> python -m engine.flow2.places --build")
+    assert not place_table.check(), place_table.check()
+    for q, keys, guess, block, note in PLACE_CASES:
+        hits = [{"law": LAWS[k], "score": 1.0 - 0.05 * i} for i, k in enumerate(keys)]
+        slots = {**base, "law_guess": guess}
+        on = route(q, slots, hits, mixed_ok=True, sentences=True, place=True)
+        off = route(q, slots, hits, mixed_ok=True, sentences=True)
+        assert bool(on["block"]) == block and (not block or on["rule"] == RULE_PLACE), (note, q, on)
+        assert off["block"] is None, (note, q, off)
+    return len(PLACE_CASES)
