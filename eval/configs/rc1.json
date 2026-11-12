@@ -1,0 +1,14 @@
+{
+  "issue": "",
+  "note": "합친 판 rc1(11-13, 「낼 엔진 판」 후보): 새 흐름 7판 + 3주기 실험 스위치를 함께 켬. 장소 가리기(#82 flow2_place_scope) + 근거 묶음 정리(flow2_cite \"pick+fill\") + 맡긴 답 살리기(flow2_handed \"law\") + ④ 읽기 r8-deleg(#81 flow2_read_deleg: 조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 그 조항으로 답함) + 답 첫머리(#83 flow2_lead \"comma\"). 다수결(flow2_votes) · 출력 저장(flow2_memo) · 물음마다 근거 들기(flow2_read_asks, r8-81)는 끔. 단계 순서: 구절 관문 → 근거 고르기 → 질문 대조(거절이면 맡긴 답 살리기) → 근거 정리 → 답 첫머리 → 출력. 끈 판은 pm-flow2-v7.json, r8-deleg만 뺀 판은 rc1-nodeleg.json. flow2_version은 7 그대로다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_cite": "pick+fill",
+    "flow2_handed": "law",
+    "flow2_read_deleg": true,
+    "flow2_lead": "comma"
+  }
+}

@@ -1,0 +1,163 @@
+{
+ "run_id": "20261113-024111-rc1-dev",
+ "group": "20261113-024111-rc1-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-13T03:00:21+09:00",
+ "experiment": {
+  "name": "rc1",
+  "issue": "",
+  "note": "합친 판 rc1(11-13, 「낼 엔진 판」 후보): 새 흐름 7판 + 3주기 실험 스위치를 함께 켬. 장소 가리기(#82 flow2_place_scope) + 근거 묶음 정리(flow2_cite \"pick+fill\") + 맡긴 답 살리기(flow2_handed \"law\") + ④ 읽기 r8-deleg(#81 flow2_read_deleg: 조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 그 조항으로 답함) + 답 첫머리(#83 flow2_lead \"comma\"). 다수결(flow2_votes) · 출력 저장(flow2_memo) · 물음마다 근거 들기(flow2_read_asks, r8-81)는 끔. 단계 순서: 구절 관문 → 근거 고르기 → 질문 대조(거절이면 맡긴 답 살리기) → 근거 정리 → 답 첫머리 → 출력. 끈 판은 pm-flow2-v7.json, r8-deleg만 뺀 판은 rc1-nodeleg.json. flow2_version은 7 그대로다",
+  "cycle": 4,
+  "file": "eval/configs/rc1.json",
+  "file_sha": "bfbe98080f73"
+ },
+ "conclusion": "버림 — dev 가중 평균은 7판보다 +1.6(94.6 대 93.0)이지만, 엔진을 고칠 때 보지 않은 문항 70개에서 7판보다 낮고(94.5 · 95.4 대 94.8 · 98.0) 함정 한 문항을 두 번 다 놓쳤다. 극한 세트에서도 함정을 더 놓쳤다(91.5 · 95.7 대 95.7 · 97.9). 그 결과를 보기 전에 적어 둔 규칙(처음 보는 문항에서 나빠지지 않을 것 · 7판이 막던 함정을 놓치지 않을 것)에 걸린다",
+ "lesson": [
+  "dev에서 오른 몫은 거의 r8-deleg(회색지대 32문항 22 → 50%)인데, 같은 스위치가 함정에 답하는 쪽으로도 민다. dev 한 세트의 +1.6은 본 적 없는 문항에서 다시 나오지 않았다"
+ ],
+ "args": {
+  "config": "eval/configs/rc1.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "gate": "off",
+  "question_fence": false,
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_votes": null,
+  "flow2_memo": null,
+  "flow2_handed": "law",
+  "flow2_cite": "pick+fill",
+  "flow2_read_asks": false,
+  "flow2_read_deleg": true
+ },
+ "settings_hash": "ed9da2cf6b1c",
+ "switches": {
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_handed": "law",
+  "flow2_cite": "pick+fill",
+  "flow2_read_deleg": true
+ },
+ "env": {
+  "code_commit": "3088562",
+  "code_hash": "345df2144271",
+  "eval_code_hash": "df36ecc5fd59",
+  "code_dirty": false,
+  "eval_commit": "84e66d4",
+  "questions_hash": "eae34e0aadd4",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2.1"
+ },
+ "metrics": {
+  "n": 693,
+  "n_gold": 653,
+  "n_trap": 40,
+  "weighted": 95.0,
+  "by_type": {
+   "단순": 91.3,
+   "조건": 95.1,
+   "결합": 95.1,
+   "함정": 100.0
+  },
+  "trap": 100.0,
+  "before": {
+   "n": 661,
+   "weighted": 96.6,
+   "by_type": {
+    "단순": 97.4,
+    "조건": 95.1,
+    "결합": 95.1,
+    "함정": 100.0
+   }
+  },
+  "by_law": {
+   "animal": 92.0,
+   "bicycle": 96.0,
+   "common": 64.3,
+   "park": 94.9,
+   "parking": 96.0,
+   "smoking": 93.8,
+   "youth": 90.3
+  },
+  "over_abstain": 4.6,
+  "citations_per_answer": 1.78,
+  "retrieval_hit": 99.5,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 6.535,
+  "latency_p95": 9.915,
+  "latency_max": 17.062,
+  "causes": {
+   "후보에 있는데 잘못 고름": 26,
+   "판정이 맞는 답을 거절": 19,
+   "답이 있는데 확인 불가 (found 거짓)": 6,
+   "정답이 후보에 없음": 4,
+   "답이 있는데 확인 불가 (구절 불일치)": 2
+  }
+ },
+ "cost_usd": 1.6935,
+ "tokens": {
+  "in": 11756827,
+  "cached": 9332864,
+  "out": 346812
+ },
+ "calls": 3297,
+ "wall_sec": 1150.3,
+ "hashes": {
+  "retrieval": "f23b4123d5bd",
+  "answers": "b28134961414"
+ }
+}

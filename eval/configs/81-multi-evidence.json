@@ -1,0 +1,10 @@
+{
+  "issue": "#81",
+  "note": "#81 결합 질문의 근거를 빠짐없이: 새 흐름 7판 + ④ 읽기를 r8-81로(답 · 근거 전에 물음마다 조항 이름을 적는 칸 asks). 나머지는 pm-flow2-v7과 같다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_asks": true
+  }
+}

@@ -345,3 +345,63 @@ SETS = {
     7: {"analyze": (ANALYZE2_V, ANALYZE2, ANALYZE2_SCHEMA), "read": (READ7_V, READ7, READ4_SCHEMA),
         "check": (CHECK8_V, CHECK8, CHECK8_SCHEMA)},
 }
+
+# ---- #81 결합 질문의 근거를 빠짐없이 (종희, 3주기 11-11) ----
+# 7판 dev 두 실행에서 결합 문항 114개 중 ④가 정답 조항을 들지 않은 것이 15 · 17개였다(두 번 다 14개: 물음 하나의 근거만 듦 4 ·
+# 다른 조항을 대신 듦 4 · 같은 조의 다른 항을 빠뜨림 4 · 별표를 빠뜨림 2). r8-81은 r7에 한 규칙을 더하고, 답 · 근거를 쓰기 전에
+# 물음마다 조항 이름을 적는 칸 asks를 둔다(칸 순서가 생성 순서다). 호출 수는 그대로다. 설정 flow2_read_asks가 켜질 때만 쓴다.
+READ81_V = "r8-81"
+_EVID = "- 답의 문장마다 그 내용이 실제로 적힌 조항을 찾아 evidence에 모두 넣는다."
+READ81 = READ7.replace(_EVID, (
+    "- asks에는 답을 쓰기 전에 질문이 묻는 것을 물음 하나씩 나눠 적고(ask), 물음마다 그 답이 실제로 적힌 조항 이름을 labels에 모두 적는다. "
+    "한 물음의 답이 여러 조항에 나뉘어 있으면(원칙과 예외 · 단서, 조문과 그 조문이 가리키는 별표, 같은 조의 다른 항, 절차의 앞 단계와 다음 단계) "
+    "그 조항을 다 적는다. [근거]가 답하지 않는 물음은 labels를 비운다.\n"
+    "- evidence에는 asks의 labels에 적은 조항을 하나도 빠뜨리지 않고 넣는다.\n") + _EVID)
+assert READ81.count("\n") == READ7.count("\n") + 2 and "asks" in READ81
+_R4 = READ4_SCHEMA["json_schema"]["schema"]["properties"]
+READ81_SCHEMA = _schema("law_answer_asks", {
+    "found": _R4["found"], "check": _R4["check"],
+    "asks": {"type": "array", "items": {"type": "object", "properties": {
+        "ask": {"type": "string"}, "labels": {"type": "array", "items": {"type": "string"}}},
+        "required": ["ask", "labels"], "additionalProperties": False}},
+    **{k: v for k, v in _R4.items() if k not in ("found", "check")},
+})
+
+
+# ---- #81 PM 가이드: 조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문 (종희, 3주기 11-11) ----
+# 11-11 받은 답(docs/engine/scoring-rules.md 1절): 6종 조례에 그 일을 다루는 조항이 있으면 금액 · 세부가 없거나 다른 법령 · 시장 · 규칙에
+# 넘겼어도 「확인 불가」가 아니라 그 조항을 인용하고 「조례에는 정해져 있지 않다 / ○○에서 정한다」고 답한다. 7판 r7은 위임 구절 표시가
+# 붙은 곳을 물으면 found 거짓으로 하라고 적었고, 값이 없는 지원 · 요금 조항도 ④가 「없음」으로 봤다(PM 쪽 측정, 회색지대 32문항 중 19 · 19).
+# r8-deleg: r7의 위임 표시 줄에서 「found를 false로 한다」를 「그 조항으로 답한다」로 바꾸고, 값이 없는 조항을 어떻게 답하는지 한 줄을 더한다.
+# 함정 쪽(그 일 자체를 다루는 조항이 없음)은 그대로 found 거짓이다. 설정 flow2_read_deleg가 켜질 때만 쓴다.
+READ_DELEG_V = "r8-deleg"
+_DELEG_OLD = "질문이 그 넘겨진 내용을 물으면 found를 false로 한다."
+_DELEG_NEW = ("질문이 그 넘겨진 내용을 물으면 그 조항을 evidence에 넣고(found는 true), 그 내용은 조례에 없고 조문이 가리키는 법령"
+              "(○○법 시행령 별표 등, 조문에 적힌 이름 그대로)에서 정한다고 답한다.")
+_VALUE_LESS = (
+    "- 질문이 묻는 그 일(지원 · 요금 · 감면 · 과태료 · 기준 · 규격 · 절차)을 정한 조항이 [근거]에 있는데, 그 조항이 금액 · 비율 · 시각 · 규격 같은 "
+    "값이나 세부를 적지 않았거나 시장 · 규칙 · 다른 법령이 정하도록 넘겼으면, 「정하지 않은 것」이 아니다. found를 true로 하고 그 조항을 "
+    "evidence에 넣는다. 답에는 그 조항이 정한 것(누가 무엇을 할 수 있는지 · 해야 하는지)과 「그 값은 조례에 정해져 있지 않습니다」, 그리고 "
+    "누가 · 어디서 정하는지(조문에 적힌 대로: 시장이 따로 정함, 규칙으로 정함, ○○법에서 정함)를 쓴다. 이때 「확인할 수 없습니다」라고 쓰지 않고, "
+    "값을 지어내지 않는다. 그 일 자체를 정한 조항은 없고 비슷한 주제의 다른 조항만 있으면(예: 어떤 의무를 정한 조항은 있어도 그 의무를 "
+    "어겼을 때의 벌칙은 없음) 이 규칙이 아니라 위 규칙대로 found를 false로 한다.\n")
+
+
+def _deleg(text):
+    out = text.replace(_DELEG_OLD, _DELEG_NEW).replace(_NO_DIRECT, _NO_DIRECT + _VALUE_LESS)
+    assert out.count("\n") == text.count("\n") + 1 and _DELEG_OLD not in out and _VALUE_LESS in out
+    return out
+
+
+READ_DELEG = _deleg(READ7)
+
+
+def pick(cfg, step):
+    """단계의 (판 이름, 프롬프트, JSON 칸). 판(flow2_version)이 고른 것을 실험 스위치가 바꿀 때만 바꾼다."""
+    if step == "read" and cfg.get("flow2_read_deleg"):
+        if cfg.get("flow2_read_asks"):
+            return READ81_V + "-deleg", _deleg(READ81), READ81_SCHEMA
+        return READ_DELEG_V, READ_DELEG, READ4_SCHEMA
+    if step == "read" and cfg.get("flow2_read_asks"):
+        return READ81_V, READ81, READ81_SCHEMA
+    return SETS[cfg["flow2_version"]][step]

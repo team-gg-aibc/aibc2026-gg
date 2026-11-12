@@ -1,0 +1,163 @@
+{
+ "run_id": "20261113-022003-rc1-nodeleg-dev",
+ "group": "20261113-022003-rc1-nodeleg-dev",
+ "repeat": 1,
+ "repeats": 1,
+ "created": "2026-11-13T02:40:04+09:00",
+ "experiment": {
+  "name": "rc1-nodeleg",
+  "issue": "",
+  "note": "합친 판 rc1에서 ④ 읽기 r8-deleg(#81 flow2_read_deleg)만 뺀 판(11-13): 새 흐름 7판 + 장소 가리기(#82 flow2_place_scope) + 근거 묶음 정리(flow2_cite \"pick+fill\") + 맡긴 답 살리기(flow2_handed \"law\") + 답 첫머리(#83 flow2_lead \"comma\"). ④ 읽기는 7판 그대로 r7이다. rc1.json과 나란히 재면 r8-deleg의 몫이 갈린다. 끈 판은 pm-flow2-v7.json. flow2_version은 7 그대로다",
+  "cycle": 4,
+  "file": "eval/configs/rc1-nodeleg.json",
+  "file_sha": "74b5cddb63f7"
+ },
+ "conclusion": "버림 — dev 가중 평균 차이가 +0.45(93.45 대 93.0)로 1점에 못 미친다(같은 판도 실행마다 0.4~0.9 흔들린다). 처음 보는 문항 70개에서는 나쁘지 않았다(98.2 · 98.0 대 94.8 · 98.0, 함정 100 · 100). 차이가 1점 안쪽이면 단순한 판을 쓴다는 규칙대로 7판을 둔다",
+ "lesson": [
+  "두 번 넣어 같은 근거를 대는 문항은 72 → 84%로 늘었다(근거 묶음 정리). 점수로는 안 보이는 몫이라, 답 첫머리 · 장소 가리기와 함께 따로 켤지는 동규가 정한다"
+ ],
+ "args": {
+  "config": "eval/configs/rc1-nodeleg.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "gate": "off",
+  "question_fence": false,
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_votes": null,
+  "flow2_memo": null,
+  "flow2_handed": "law",
+  "flow2_cite": "pick+fill",
+  "flow2_read_asks": false,
+  "flow2_read_deleg": false
+ },
+ "settings_hash": "4a0943396503",
+ "switches": {
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_handed": "law",
+  "flow2_cite": "pick+fill"
+ },
+ "env": {
+  "code_commit": "3088562",
+  "code_hash": "345df2144271",
+  "eval_code_hash": "df36ecc5fd59",
+  "code_dirty": false,
+  "eval_commit": "84e66d4",
+  "questions_hash": "eae34e0aadd4",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2.1"
+ },
+ "metrics": {
+  "n": 693,
+  "n_gold": 653,
+  "n_trap": 40,
+  "weighted": 93.9,
+  "by_type": {
+   "단순": 88.3,
+   "조건": 95.8,
+   "결합": 93.4,
+   "함정": 100.0
+  },
+  "trap": 100.0,
+  "before": {
+   "n": 661,
+   "weighted": 96.4,
+   "by_type": {
+    "단순": 97.4,
+    "조건": 96.1,
+    "결합": 93.4,
+    "함정": 100.0
+   }
+  },
+  "by_law": {
+   "animal": 93.1,
+   "bicycle": 93.5,
+   "common": 57.1,
+   "park": 95.3,
+   "parking": 91.8,
+   "smoking": 91.8,
+   "youth": 89.4
+  },
+  "over_abstain": 6.1,
+  "citations_per_answer": 1.74,
+  "retrieval_hit": 99.6,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 6.708,
+  "latency_p95": 10.67,
+  "latency_max": 18.411,
+  "causes": {
+   "후보에 있는데 잘못 고름": 26,
+   "답이 있는데 확인 불가 (found 거짓)": 22,
+   "판정이 맞는 답을 거절": 13,
+   "정답이 후보에 없음": 3,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 2,
+   "답이 있는데 확인 불가 (구절 불일치)": 1
+  }
+ },
+ "cost_usd": 1.6828,
+ "tokens": {
+  "in": 11561569,
+  "cached": 9092416,
+  "out": 338593
+ },
+ "calls": 3264,
+ "wall_sec": 1201.0,
+ "hashes": {
+  "retrieval": "139079e33e8b",
+  "answers": "c2666cb94f01"
+ }
+}
