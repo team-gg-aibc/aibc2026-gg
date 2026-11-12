@@ -9,6 +9,7 @@
   python3 eval/release.py --selftest
 
 - 채택 실험 = 실행 요약(eval/runs/*.json)의 conclusion이 「채택」으로 시작하는 실행(주기 ≤ --cycle). 합친 판에서 빼려면 그 conclusion을 바꾼다.
+  「채택 의견 …」으로 시작하는 것은 담당의 의견이라 넣지 않는다(넣으려면 --adopt로 그 설정 파일을 준다).
 - 탐색 모드 칸(explore, 탐색 실험의 timeout_sec 300)은 넣지 않는다. 릴리스는 늘 대회 조건(75초에 확인 불가, 90초 넘으면 0점)으로 잰다.
 - 같은 스위치를 서로 다른 값으로 켠 채택 실험이 있으면 멈춘다(동규가 하나를 고른다).
 - 채점 서버는 ENGINE_CONFIG=eval/configs/release.json으로 이 판을 읽는다. 릴리스 설정 · 기록 · 문서는 손으로 고치지 않는다.
@@ -65,7 +66,8 @@ def adopted(cycle, extra=(), gs=None):
         e["from"].append(source)
 
     for g in board.groups(board.local_runs()) if gs is None else gs:
-        if g["conclusion"].startswith("채택") and g["cycle"] <= cycle and not g["name"].startswith("release-"):
+        c = g["conclusion"]     # 「채택 의견 — …」 · 「채택 의견 아님 — …」은 담당의 의견이지 채택이 아니다(넣으려면 --adopt)
+        if c.startswith("채택") and not c.startswith("채택 의견") and g["cycle"] <= cycle and not g["name"].startswith("release-"):
             add(g["issue"], g["name"], g["cycle"], g["group"], strip_mode(g["switches"], g["explore"]))
     for path in extra:
         raw = json.loads((R.ROOT / path).read_text(encoding="utf-8"))
@@ -438,6 +440,8 @@ def selftest():
           grp("24-top20-b", "#24", 1, "채택 — 한 번 더", {"explore": True, "timeout_sec": 300, "top_k": 20}, True),
           grp("23-chunks", "#23", 1, "버림 — 그대로", {"chunk_unit": "x"}),
           grp("22-contract", "#22", 2, "채택", {"timeout_sec": 60}),
+          grp("82-place", "#82", 1, "채택 의견 — 문턱 통과", {"flow2_place_scope": True}),          # 담당 의견은 채택이 아니다
+          grp("81-deleg", "#81", 1, "채택 의견 아님 — 기준에 모자람", {"flow2_read_deleg": True}),
           grp("release-c1", "", 1, "채택", {"top_k": 20}), grp("baseline", "#21", 0, "출발 판", {})]
     assert strip_mode({"explore": True, "timeout_sec": 300, "top_k": 20}, True) == {"top_k": 20}
     assert strip_mode({"timeout_sec": 60}, False) == {"timeout_sec": 60}       # 수렴 주기 실험의 시간 예산은 넣는다
