@@ -415,8 +415,43 @@ def check(st, cfg):
         st["reason"] = pipeline.REJECTED
 
 
+# ---- #83 답 첫머리에 결론 붙이기 (출력 직전, 코드만. 스위치 flow2_lead, 기본값 "off" = 7판과 같은 동작) ----
+# 7판 dev 두 실행(11-10)에서 정답 열쇠가 「네 · 아니요」로 시작하는 문항의 답 가운데 그렇게 시작한 것은 66.7 · 68.3%였다(프롬프트로는
+# 이미 시키고 있다). ④가 답과 함께 낸 결론 칸(read.conclusion)을 코드가 답 앞에 붙인다. 붙이지 않는 답은 셋이다.
+# - 이미 「네 · 예 · 아니요 · 아니오」로 시작하는 답, 결론 칸이 「정보」이거나 빈 답.
+# - 첫 물음(「?」로 끝나는 첫 문장, 없으면 질문 전체)에 묻는 말(몇 · 얼마 · 누가 …)이 있는 질문의 답. ④는 「몇 세부터 몇 세까지인가요?」 꼴
+#   질문에도 결론 칸에 「네 · 아니요」를 적는다(같은 두 실행에서 결론 칸은 있는데 정답 열쇠가 「네 · 아니요」가 아닌 답이 58 · 51개).
+#   그대로 붙이면 「네, 19세부터 39세까지입니다」 · 「아니요, 19세부터 …」 같은 답이 나간다. 묻는 말이 든 다른 낱말(「며칠씩」)의 질문도
+#   안 붙이는 쪽으로 간다(7판과 같은 답). 재는 법: python3 eval/answer_stats.py <실행> --config <켠 판 설정>
+# - 「확인 불가」로 시작하는 답. 글자 하나도 건드리지 않는다(앞에 낱말이 붙으면 출구 검사가 확인 불가 꼴로 맞추지 못한다).
+LEAD = re.compile(r"(?:네|예|아니요|아니오)(?=[\s,.!]|$)")          # 답이 이미 결론 낱말로 시작한다(「예약」 · 「네트워크」는 아니다)
+LEAD_JOIN = {"comma": ", ", "period": ". "}                          # 「네, …」로 잇기 · 「네. …」로 끊기
+ASK_WORD = re.compile(r"몇|며칠|얼마|누가|누구|언제|어디|어떻게|어떤|어느|무엇|뭐|뭘|무슨|왜")
+# 답 글에 샌 안쪽 말 「이 자료」(④에 보여 준 원문을 가리킨다)를 시민에게 보일 말로 바꾼다. 낱말만 바꾸고 뜻은 그대로 둔다.
+# 조사가 그대로 이어지는 꼴만 바꾼다: 「이 자료에 · 에서 · 만으로」와 「이 자료로」(→ 「6종으로」). 그 밖의 꼴은 그대로 두고 재는 틀이 센다.
+INNER = re.compile(r"(?<![가-힣])이 자료(?:(?=에|만)|(로))")     # 앞이 한글이면 「시장이 자료로」 같은 다른 말이다
+INNER_TO = "서울시 조례 6종"
+
+
+def lead(st, cfg):
+    """출력 직전(#83): 마지막 검사를 지난 답의 안쪽 말을 바꾸고, 「네 · 아니요」로 답할 물음이면 ④의 결론 낱말을 앞에 붙인다.
+    답 글만 바꾼다(인용 · 링크 · 시행일은 그대로). 판단 기록 flow2.lead에 붙인 낱말 · 안 붙인 까닭 · 바꾸기 전 답을 남긴다."""
+    old = st["draft"]["answer"]
+    if cfg["flow2_lead"] == "off" or old.lstrip().startswith("확인 불가"):
+        return
+    new = INNER.sub(lambda m: INNER_TO + ("으로" if m.group(1) else ""), old)
+    word = (_f2(st).get("read") or {}).get("conclusion")
+    ask = next((p for p in lawmap._SENT.split(st["question"]) if p.rstrip().endswith(("?", "？"))), st["question"])
+    skip = ("이미 결론 낱말로 시작" if LEAD.match(new.lstrip()) else "결론 칸이 네 · 아니요가 아님" if word not in ("네", "아니요")
+            else "첫 물음에 묻는 말이 있음" if ASK_WORD.search(ask) else None)
+    if not skip:
+        new = word + LEAD_JOIN[cfg["flow2_lead"]] + new.lstrip()
+    _f2(st)["lead"] = {"word": None if skip else word, "skip": skip, "before": old if new != old else None}
+    st["draft"] = dict(st["draft"], answer=new)
+
+
 STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", route), ("조례 읽기 · 답 쓰기", read),
-          ("구절 관문", gate), ("질문 대조", check), ("출력", pipeline.output)]
+          ("구절 관문", gate), ("질문 대조", check), ("답 첫머리", lead), ("출력", pipeline.output)]
 
 
 # ---- 스스로 시험 (키 없이) ----
@@ -633,6 +668,42 @@ def selftest():
         assert DELEG_MARK in seen["law_answer_quotes"][-1]["content"] and DELEG_MARK in seen["target_check"][-1]["content"]
         pipeline.answer("서울 도시공원에서 금지되는 행위는 어느 법을 따르나요?", cfg6)
         assert DELEG_MARK not in seen["law_answer_quotes"][-1]["content"]
+        # #83 답 첫머리(flow2_lead): 끄면 7판 그대로, 켜면 답 글만 바뀐다(인용 · 링크 · 시행일은 같다). 문장은 원문을 보고 새로 썼다
+        # (주차장 조례 제7조 경형자동차 100분의 50 · 도시공원 조례 이용료 반환 「사용일 7일 전까지 취소」 · 청년 기본 조례 제3조 19세 이상 39세 이하)
+        q, ans = "경차를 공영주차장에 세우면 할인돼요?", "경형자동차는 주차요금의 100분의 50을 할인받을 수 있습니다."
+        plan.update(question_slots=dict(slots, actor="시민"),
+                    law_answer_quotes={"found": True, "check": "", "conclusion": "네", "answer": ans,
+                                       "evidence": [{"label": target["label"], "quote": quote}]},
+                    target_check={"reason": "", "asks": [{"ask": "경차 할인", "verdict": "grounded"}], "done": True})
+        cfg83 = dict(cfg7, flow2_lead="comma")
+        (r0, t0), (r, t) = pipeline.answer(q, cfg7), pipeline.answer(q, cfg83)
+        assert r0["answer"] == ans and "lead" not in t0["flow2"], r0
+        assert r == dict(r0, answer="네, " + ans) and t["flow2"]["lead"] == {"word": "네", "skip": None, "before": ans}, (r, t["flow2"])
+        assert pipeline.answer(q, dict(cfg83, flow2_lead="period"))[0]["answer"] == "네. " + ans
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)       # 확인 불가로 끝난 문항은 이 단계에 오지 않는다
+        r, t = pipeline.answer(q, cfg83)
+        assert r == contract.UNKNOWN and "lead" not in t["flow2"] and "답 첫머리" not in t["steps"], t["reason"]
+
+        def led(answer, word, question=q, how="comma"):
+            st = {"question": question, "draft": {"answer": answer, "citation": [target["label"]]}, "flow2": {"read": {"conclusion": word}}}
+            lead(st, dict(cfg83, flow2_lead=how))
+            return st["draft"]
+        for same, word in (("확인 불가", "네"), ("확인 불가: 그 내용은 이 자료에 없습니다.", "아니요"),      # 확인 불가 답은 글자 하나도
+                           ("네, 할인받을 수 있습니다.", "네"), ("아니요. 할인 대상이 아닙니다.", "네"), ("예, 할인됩니다.", "아니요"),   # 이미 시작
+                           (ans, "정보"), (ans, None), (ans, "")):                                # 결론 칸이 「정보」 · 빈칸
+            assert led(same, word) == {"answer": same, "citation": [target["label"]]}, (same, word)
+        assert led(ans, "아니요", how="off")["answer"] == ans
+        assert led(ans, "네", "경형자동차는 공영주차장 요금을 얼마나 할인받아요?")["answer"] == ans          # 묻는 말이 있는 물음
+        assert led(ans, "네", "경형자동차도 할인 대상이에요? 할인율은 얼마예요?")["answer"] == "네, " + ans   # 첫 물음만 본다
+        assert led(ans, "네", "제 차는 경형자동차예요. 공영주차장 요금 할인 대상인지 알려 주세요.")["answer"] == "네, " + ans
+        assert led("예약한 날에 취소하면 이용료를 모두 돌려받습니다.", "네", "공원 시설을 예약한 날 바로 취소해도 이용료를 다 돌려받나요?")["answer"] \
+            == "네, 예약한 날에 취소하면 이용료를 모두 돌려받습니다."                                  # 「예약」은 결론 낱말 「예」가 아니다
+        assert led("마흔 살은 39세 이하가 아니라 청년에 들지 않습니다.", "아니요", "마흔 살도 청년 정책 대상인가요?")["answer"].startswith("아니요, 마흔")
+        assert led("할인율은 이 자료에 없습니다. 이 자료만으로는 알 수 없고 이 자료로는 확인할 수 없습니다.", "정보")["answer"] == \
+            "할인율은 서울시 조례 6종에 없습니다. 서울시 조례 6종만으로는 알 수 없고 서울시 조례 6종으로는 확인할 수 없습니다."
+        assert led("시장이 자료로 확인합니다. 예전 자료에 나온 조 번호와 다릅니다.", "정보")["answer"].count("자료") == 2       # 다른 「자료」는 그대로
+        assert contract.finalize(dict(led("확인 불가", "네"), source_url="", effective_date=""), cfg83) == contract.UNKNOWN
+        assert [n for n, _ in STAGES][-2:] == ["답 첫머리", "출력"] and config.DEFAULTS["flow2_lead"] == "off"
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:

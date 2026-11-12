@@ -1,0 +1,10 @@
+{
+  "issue": "83",
+  "note": "#83 답 첫머리에 결론 붙이기: 새 흐름 7판 + 출력 직전 단계 「답 첫머리」(flow2_lead, engine/flow2/flow.py lead). 마지막 검사를 지난 답이 「네 · 아니요」로 시작하지 않고 ④의 결론 칸이 네 · 아니요이며 첫 물음에 묻는 말(몇 · 얼마 · 누가 …)이 없으면 결론 낱말을 「네, …」 꼴로 붙인다. 답 글의 안쪽 말 「이 자료」는 「서울시 조례 6종」으로 바꾼다. 「확인 불가」 답과 인용 · 링크 · 시행일은 건드리지 않는다. 모델 호출은 7판과 같다. 나머지는 pm-flow2-v7.json과 같다. 기록에 대어 보기: python3 eval/answer_stats.py <7판 실행> --config eval/configs/83-answer-lead.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_lead": "comma"
+  }
+}
