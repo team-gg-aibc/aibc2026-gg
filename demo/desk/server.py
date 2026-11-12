@@ -13,7 +13,7 @@
 - 엔진은 글만 받는다. 시민이 지정한 접수 위치가 이름 있는 장소면 글 앞에 「○○에서 」를 붙여 보낸다(「이 공원에서 · 여기서」는 그 자리 이름으로 바꾼다).
 - 화면 문구는 docs/content/의 3판 파일 둘에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
 - 시민 쪽 길(/api/citizen/<번호>)은 승인된 답만 준다. 승인 전 초안은 시민 화면이 받을 수 없다.
-- 대화 문의 목업(/chat.html)은 따로 난 길 둘을 쓴다. 기본 판은 POST /api/question(되묻기 또는 「질문 초안」: 제목 · 장소를 넣은 글 · 접수 위치),
+- 대화 문의 목업(/chat.html)은 따로 난 길 둘을 쓴다. 기본 판은 POST /api/question(되묻기 또는 「질문 초안」: 제목 · 시민이 쓴 글 · 접수 위치),
   관련 조항 판(?mode=cite)은 POST /api/cite(질문 초안 + 찾은 근거 조항. 접수할 때 고른 조항을 cites로 함께 받는다). 둘 다 결론 · 답 글 · 맡는 곳을 싣지 않는다.
   되묻기는 코드 규칙이다. 대화로 접수한 문의의 접수 위치는 how: chat.
 - 앞 판(2판) 화면 web/index.html · app.js · style.css는 지우지 않고 쓰지 않는다(이 서버의 /api는 3판 꼴).
@@ -256,15 +256,16 @@ def place_in(text):
 
 
 def question_draft(text, place=""):
-    """→ 되묻기 {"ask", "choices"} 또는 질문 초안 {"title", "text", "loc"}: 대화로 모은 것으로 접수 칸을 채운다.
+    """→ 되묻기 {"ask", "choices"} 또는 질문 초안 {"title", "text"(시민이 쓴 글 그대로), "loc"}: 대화로 모은 것으로 접수 칸을 채운다.
     되묻기는 코드 규칙(모델을 부르지 않음). 엔진도 미리 받은 답도 보지 않는다 — 답은 승인 전에 시민에게 가지 않는다."""
     p = places.get(place) or place_in(place) or place_in(text)   # place: 고른 칩(장소 id)이나 시민이 답한 말
     if not p:
         return {"ask": "place", "choices": [{"id": s["place"], "name": places[s["place"]]["name"]} for s in scenes.values()]}
     loc, pair = make_loc(0, 0, "chat", p["id"]), presets["pair"]
-    # 내용 = 장소를 넣어 다듬은 글(접수하면 엔진에 그대로 간다). 제목 = 시연 장면의 글이면 그 제목, 그 밖은 글의 앞 30글자
+    # 내용 = 시민이 쓴 글 그대로, 장소는 접수 위치에만(엔진에는 접수할 때 engine_text가 장소를 붙여 보낸다. 그래서 같은 글을 다른 장소에서
+    # 접수한 두 문의의 글이 같고, 담당자 화면에 「같은 글 나란히 보기」가 뜬다). 제목 = 시연 장면의 글이면 그 제목, 그 밖은 글의 앞 30글자
     title = pair["title"] if HERE_WORDS.sub("", text) == HERE_WORDS.sub("", pair["text"]) else text[:30]
-    return {"title": title, "text": engine_text(text, loc), "loc": loc}
+    return {"title": title, "text": text, "loc": loc}
 
 
 def cite_draft(text, place="", live=MODE != "saved"):
@@ -272,7 +273,8 @@ def cite_draft(text, place="", live=MODE != "saved"):
     조항으로 답한 것이 아니면(6종 밖 · 못 찾음 · 못 받음) 빈 목록 → 조항 없이 접수된다. 조항은 접수된 문의와 같은 통로(미리 받은 답 · call_engine)에서 온다."""
     d = question_draft(text, place)
     if "ask" not in d:
-        res = call_engine(d["text"]) if live else saved.get(d["text"]) or {"response": None, "error": "미리 받은 답 없음"}
+        et = engine_text(d["text"], d["loc"])               # 접수하면 엔진에 갈 글(장소를 붙인 글)
+        res = call_engine(et) if live else saved.get(et) or {"response": None, "error": "미리 받은 답 없음"}
         d["cites"] = [{k: c[k] for k in ("label", "law", "article", "quotes", "url")} for c in card_of(res)["citations"]] if kind_of(res) == "draft" else []
     return d
 
@@ -529,12 +531,14 @@ def selftest():
     assert place_in(ex) is None and place_in("서울숲 주차장에서 " + ex)["id"] == "seoulforest-parking"
     ask = {"ask": "place", "choices": [{"id": "seoulforest", "name": "서울숲"}, {"id": "ttukseom-hangang", "name": "뚝섬한강공원"}]}
     assert question_draft(ex) == ask and question_draft(ex, "달나라") == ask   # 장소 없는 글 · 모르는 장소 → 되묻기(시연 장면의 두 곳)
-    for s in scenes.values():                                                  # 칩으로 고름 → 질문 초안(제목 · 장소를 넣은 글 · 접수 위치뿐, 답은 없다)
+    for s in scenes.values():                                                  # 칩으로 고름 → 질문 초안(제목 · 시민이 쓴 글 · 접수 위치뿐, 답은 없다)
         d = question_draft(ex, s["place"])
         assert set(d) == {"title", "text", "loc"} and d["title"] == presets["pair"]["title"] and d["loc"]["how"] == "chat", d
-        assert d["text"] == places[s["place"]]["name"] + "에서 " + ex and d["text"] in saved, d
-        assert engine_text(d["text"], d["loc"]) == d["text"]                   # 보인 글 = 접수되는 글 = 엔진에 가는 글
-    assert question_draft(pt, "뚝섬한강공원이요")["text"] == "뚝섬한강공원에서 " + ex   # 말로 답함 · 「이 공원에서」는 그 이름으로
+        assert d["text"] == ex                                                 # 내용 = 시민이 쓴 글 그대로(장소는 접수 위치에만)
+        assert engine_text(d["text"], d["loc"]) == places[s["place"]]["name"] + "에서 " + ex and engine_text(d["text"], d["loc"]) in saved, d   # 엔진에는 장소를 붙여 간다
+    assert len({question_draft(ex, s["place"])["text"] for s in scenes.values()}) == 1   # 대화로 접수한 두 문의의 글이 같다 → 「같은 글 나란히 보기」
+    d = question_draft(pt, "뚝섬한강공원이요")                                 # 말로 답함. 「이 공원에서」는 엔진에 갈 때만 그 이름으로 바뀐다
+    assert d["text"] == pt and engine_text(d["text"], d["loc"]) == "뚝섬한강공원에서 " + ex, d
     d = question_draft("서울숲에서 드론을 날려도 되나요?")                     # 글에 장소가 있으면 되묻지 않는다
     assert d["text"] == d["title"] == "서울숲에서 드론을 날려도 되나요?" and d["loc"]["place"] == "seoulforest", d
     assert engine_text("요금이 얼마인가요?", make_loc(0, 0, "chat", "dongjak")) == "동작대교 공영주차장에서 요금이 얼마인가요?"
