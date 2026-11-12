@@ -13,6 +13,7 @@
 - 엔진은 글만 받는다. 시민이 지정한 접수 위치가 이름 있는 장소면 글 앞에 「○○에서 」를 붙여 보낸다(「이 공원에서 · 여기서」는 그 자리 이름으로 바꾼다).
 - 화면 문구는 docs/content/의 3판 파일 둘에서 읽는다(요청마다 다시 읽어서, 파일을 고치면 화면이 바로 바뀐다). 이 서버는 낱말을 만들지 않는다.
 - 시민 쪽 길(/api/citizen/<번호>)은 승인된 답만 준다. 승인 전 초안은 시민 화면이 받을 수 없다.
+- 대화 문의 목업(/chat.html)의 접수 전 「예상 답」은 따로 난 길(POST /api/preview)이 준다. 장소가 없는 글은 되묻기를 돌려주고(코드 규칙), 응답에 preview: true가 붙는다.
 - 앞 판(2판) 화면 web/index.html · app.js · style.css는 지우지 않고 쓰지 않는다(이 서버의 /api는 3판 꼴).
 """
 import json
@@ -244,6 +245,26 @@ def add_inquiry(text, form, loc):
     return q
 
 
+# ---- 대화 문의(목업, chat.html): 접수 전 「예상 답」. 문의로 저장하지 않고, 승인 전 답을 주지 않는 시민 쪽 길(/api/citizen/<번호>)과 따로 둔다
+def place_in(text):
+    """글에 장소 목록의 이름이 있으면 그 장소(긴 이름 먼저: 「서울숲 주차장」이 「서울숲」보다 앞). 없으면 None → 화면이 장소를 되묻는다."""
+    # ponytail: 이름이 글자 그대로 들어 있어야 알아본다(engine_text와 같은 잣대). 띄어쓰기가 다르면 되묻는다 — 잘못 짚는 것보다 되묻는 쪽이 안전
+    return next((p for p in sorted(places.values(), key=lambda p: -len(p["name"])) if p["name"] in text), None)
+
+
+def preview(text, place="", live=MODE != "saved"):
+    """→ 되묻기 {"preview", "ask", "choices"} 또는 예상 답 {"preview", "kind", "card", "loc", "engine"}.
+    되묻기는 코드 규칙(모델을 부르지 않음), 답은 접수된 문의와 같은 통로(미리 받은 답 · call_engine)와 같은 카드 자료."""
+    p = places.get(place) or place_in(place) or place_in(text)   # place: 고른 칩(장소 id)이나 시민이 답한 말
+    if not p:
+        return {"preview": True, "ask": "place", "choices": [{"id": s["place"], "name": places[s["place"]]["name"]} for s in scenes.values()]}
+    loc = make_loc(0, 0, "here", p["id"])
+    et = engine_text(text, loc)
+    res = call_engine(et) if live else saved.get(et) or {"response": None, "error": "미리 받은 답 없음"}
+    return {"preview": True, "kind": kind_of(res), "card": card_of(res), "loc": loc,
+            "engine": {"how": "live" if live else "saved", "made_by": res.get("made_by"), "sec": res.get("sec")}}
+
+
 def engine_status():
     if MODE == "saved":
         return "saved"
@@ -365,6 +386,11 @@ class Handler(SimpleHTTPRequestHandler):
                     "notify": [str_or(x, 10) for x in b.get("notify")][:4] if isinstance(b.get("notify"), list) else []}
             q = add_inquiry(text, form, loc)
             return self.send_json({"id": q["id"], "no": q["no"]})
+        if p == "/api/preview":                               # 대화 문의(목업): 접수 전 예상 답. 응답에 preview: true(정식 답변 아님)
+            text = str_or(b.get("text"), 3000)
+            if not text:
+                return self.send_json({"error": "빈 내용"}, 400)
+            return self.send_json(preview(text, str_or(b.get("place"), 60)))
         if p == "/api/reset":
             with lock:
                 state.clear()
@@ -474,6 +500,23 @@ def selftest():
     assert tb["error"] is None and set(tb["text"]) == set(TEXT_FILES), tb["error"]
     q = {"no": 1, "text": "t", "received": "x", "card": card_of(ok), "approved": None, "loc": None}
     assert citizen_view(q)["answer"] is None and citizen_view(q)["citations"] == []          # 승인 전 초안은 시민에게 가지 않는다
+    # 대화 문의(목업): 되묻기 규칙(글에 장소 이름이 있나) · 예상 답 응답 꼴 · 예시 글이 두 장면의 미리 받은 답과 글자 그대로 맞는다
+    chat = tb["text"]["U-02_시민접수-3판"]["sections"]
+    ex = dict(r[:2] for r in chat["대화 문의"]["tables"][0]["rows"])["예시 글"]
+    assert {r[0] for r in chat["대화 · 정식 답변이 오면"]["tables"][0]["rows"]} == {"조항으로 답함", "6종 밖", "조항을 찾지 못함"}   # 판정 종류마다 틀 문장
+    assert place_in(ex) is None and place_in("서울숲 주차장에서 " + ex)["id"] == "seoulforest-parking"
+    for s in scenes.values():
+        assert engine_text(ex, make_loc(0, 0, "here", s["place"])) in saved, s
+    a = preview(ex, live=False)                                                # 장소 없는 글 → 되묻기(시연 장면의 두 곳)
+    assert a == {"preview": True, "ask": "place", "choices": [{"id": "seoulforest", "name": "서울숲"}, {"id": "ttukseom-hangang", "name": "뚝섬한강공원"}]}, a
+    assert preview(ex, "달나라", live=False).get("ask") == "place"             # 모르는 장소를 답하면 다시 묻는다
+    d = preview(ex, "seoulforest", live=False)                                 # 칩으로 고름 → 조항 붙은 예상 답
+    assert d["preview"] is True and d["kind"] == "draft" and d["loc"]["name"] == "서울숲" and d["engine"]["how"] == "saved", d
+    assert d["card"]["answer"] and d["card"]["conclusion"] and d["card"]["citations"][0]["quotes"], d["card"]
+    o = preview(ex, "뚝섬한강공원이요", live=False)                            # 말로 답함 → 6종 밖 꼴(답 글 · 조항 없음)
+    assert o["kind"] == "out" and o["loc"]["place"] == "ttukseom-hangang" and o["card"]["answer"] is None and o["card"]["citations"] == [], o
+    assert preview("서울숲에서 " + ex, live=False)["kind"] == "draft"          # 글에 장소가 있으면 되묻지 않는다
+    assert preview("미리 받은 답이 없는 글", "seoulforest", live=False)["kind"] == "failed"
     print("server 스스로 시험 통과")
 
 
