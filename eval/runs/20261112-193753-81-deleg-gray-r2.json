@@ -1,0 +1,142 @@
+{
+  "run_id": "20261112-193753-81-deleg-gray-r2",
+  "group": "20261112-193753-81-deleg-gray",
+  "repeat": 2,
+  "repeats": 2,
+  "created": "2026-11-12T19:39:31+09:00",
+  "experiment": {
+    "name": "81-deleg",
+    "issue": "#81",
+    "note": "#81 PM 가이드(11-11 받은 답): 새 흐름 7판 + ④ 읽기를 r8-deleg로(조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 「확인 불가」 대신 그 조항으로 답함). 나머지는 pm-flow2-v7과 같다",
+    "cycle": 3,
+    "file": "eval/configs/81-deleg.json",
+    "file_sha": "eaf60f9763a0"
+  },
+  "conclusion": "회색지대 32문항 켠 판(r8-deleg): 단순 18.8 · 25.0 vs 끈 판 15.6 · 18.8. dev 661과 합친 받은 규칙 dev 693 가중 94.0 vs 93.05(+0.95)",
+  "lesson": [
+    "④는 값 없는 조항을 근거로 찾지만 ⑥이 대부분 거절해 과잉 포기가 75 · 81%로 남는다. ⑥ 판정 고침(PM 할 일 ②) 위에서 다시 잰다"
+  ],
+  "args": {
+    "config": "eval/configs/81-deleg.json",
+    "split": "gray",
+    "sample": null,
+    "seed": 0,
+    "mode": "full",
+    "url": null,
+    "workers": 4
+  },
+  "settings": {
+    "chat_model": "solar-pro4",
+    "embed_passage": "solar-embedding-2-passage",
+    "embed_query": "solar-embedding-2-query",
+    "temperature": 0.0,
+    "reasoning_effort": null,
+    "chunk_unit": "paragraph",
+    "top_k": 20,
+    "hybrid_cos_weight": 0.7,
+    "use_embedding": true,
+    "use_verify": true,
+    "min_score": 0.25,
+    "answer_prompt": "v2",
+    "verify_prompt": "v1",
+    "timeout_sec": 75,
+    "explore": false,
+    "exit_check": true,
+    "max_citations": 4,
+    "retry_budget": true,
+    "max_concurrent_calls": 6,
+    "on_deadline": "unknown",
+    "select_mode": "prefilter",
+    "prefilter_keep": 8,
+    "prefilter_empty_abstain": true,
+    "max_per_article": 0,
+    "group_by_article": true,
+    "gate": "off",
+    "question_fence": false,
+    "flow2_place_scope": false,
+    "flow": "flow2",
+    "flow2_ontology": true,
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_asks": false,
+    "flow2_read_deleg": true
+  },
+  "settings_hash": "e0dab2ef1753",
+  "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_read_deleg": true
+  },
+  "env": {
+    "code_commit": "79ac2c0",
+    "code_hash": "8bdd30c5a043",
+    "eval_code_hash": "df36ecc5fd59",
+    "code_dirty": false,
+    "eval_commit": "84e66d4",
+    "questions_hash": "5856436c6658",
+    "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+    "retrieval_used": [
+      "hybrid"
+    ],
+    "key_present": true,
+    "server": null,
+    "python": "3.12.14",
+    "packages": {
+      "numpy": "2.2.6",
+      "openai": "3.39.0",
+      "requests": "2.34.2"
+    },
+    "platform": "macOS-26.6"
+  },
+  "metrics": {
+    "n": 32,
+    "n_gold": 32,
+    "n_trap": 0,
+    "weighted": null,
+    "by_type": {
+      "단순": 25.0
+    },
+    "trap": null,
+    "before": {
+      "n": 0,
+      "weighted": null,
+      "by_type": {}
+    },
+    "by_law": {
+      "animal": 14.3,
+      "bicycle": 20.0,
+      "park": 0.0,
+      "parking": 25.0,
+      "smoking": 66.7,
+      "youth": 30.0
+    },
+    "over_abstain": 75.0,
+    "citations_per_answer": 1.62,
+    "retrieval_hit": 100.0,
+    "format_errors": 0,
+    "late": 0,
+    "over_90s": 0,
+    "timeouts": 0,
+    "errors": 0,
+    "latency_p50": 5.438,
+    "latency_p95": 10.361,
+    "latency_max": 10.425,
+    "causes": {
+      "판정이 맞는 답을 거절": 20,
+      "답이 있는데 확인 불가 (found 거짓)": 4
+    }
+  },
+  "cost_usd": 0.0702,
+  "tokens": {
+    "in": 497988,
+    "cached": 396032,
+    "out": 13511
+  },
+  "calls": 124,
+  "wall_sec": 48.7,
+  "hashes": {
+    "retrieval": "5900c43ec2e6",
+    "answers": "8ad4845eff3e"
+  }
+}
