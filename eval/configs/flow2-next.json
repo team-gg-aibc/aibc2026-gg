@@ -1,0 +1,11 @@
+{
+  "issue": "",
+  "note": "다음 판 후보(11-11, 동규 「다음판에는 온톨로지로 가자」): 7판 + 온톨로지로 근거 묶음 정리(flow2_cite \"pick+fill\") + 맡긴 답 살리기(flow2_handed \"law\"). ⑥이 거절했어도 답이 「조례에 정해져 있지 않다 + 누가 · 어느 법령이 정한다」 꼴이고 근거 조항에 그 구절이 있으면 답을 내고, ⑥을 지난 답의 인용 묶음을 조항 짝 표와 다시 고르기로 정리한다. 「맡긴 답」이 기대는 조항은 덜어 내지 않는다. 다수결(flow2_votes) · 출력 저장(flow2_memo)은 끔. 온톨로지만 켠 판은 flow2-onto-pick-fill.json, 끈 판은 pm-flow2-v7.json. flow2_version은 7 그대로다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_cite": "pick+fill",
+    "flow2_handed": "law"
+  }
+}
