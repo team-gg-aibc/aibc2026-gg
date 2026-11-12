@@ -23,11 +23,13 @@
 | 위치 | 무엇 |
 |---|---|
 | `docs/decisions.md` | 정한 것과 이유 (한 줄씩) |
+| `docs/evaluation.md` | 평가 기준: 대회 100점이 어떻게 나뉘고 누가 무엇을 보고 매기나 |
 | `docs/work-method.md` | 일하는 방식: 이슈 · 보고 · 검수 · 이어받기 |
 | `docs/meetings/` | 회의 자료와 회의 요약 (안건 · 정한 것 · 할 일 · 일정) |
 | `docs/education/` | 특화교육 정리 |
+| `docs/research/field/` | 현장 조사와 사용자 평가 준비물(누구에게 물을지 · 질문지 · 기록지 · 한 주 일정) |
 | `docs/schedule.md` | 일정과 불참 |
-| `docs/` | 문제 정의, PRD, 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
+| `docs/` | 문제 정의, PRD(원본 `PRD.md`와 팀원용 5분 요약 `PRD-요약.md`, 함께 고친다 · 6절), 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
 | `engine/` | 엔진 코드. 돌리는 법은 `engine/README.md` |
 | `docs/engine/` | 엔진 계획(`plan.md`), 받은 채점 · 서버 · 제출 규칙(`scoring-rules.md`, 엔진 · 평가 · 답 글을 고치기 전에 읽는다), 새 흐름 한 장(`flow2.md`, 3주기부터 팀 실험의 바탕), 재는 순서와 기록 남기는 법(`reproducibility.md`), 리더보드(`leaderboard.md`) |
 | `eval/` | 평가셋(문제집), 점수 재는 도구, 실험 설정 파일(`eval/configs/`). 평가셋 쓰는 법은 `eval/README.md` |
@@ -57,10 +59,11 @@
 **읽는 순서**
 1. 이 파일(`AGENTS.md`)
 2. `docs/decisions.md`: 정한 것. 어긋나는 일이면 멈추고 PM에게 묻는다
-3. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
-4. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
-5. 엔진 · 평가셋 · 채점 도구 · 답 글 · 채점 서버를 고치는 일이면 `docs/engine/scoring-rules.md`: 11/11에 받은 채점 · 서버 · 제출 규칙이다. 고치기 전에 그 문서 0절의 여섯 물음에 답하고, 끝 보고에 해당 절의 「스스로 확인하는 법」 결과를 붙인다
-6. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
+3. `docs/evaluation.md`: 평가 기준. 대회 100점이 어떻게 나뉘고 누가 무엇을 보고 매기는지다. 무엇을 만들지, 무엇부터 할지 고를 때 본다
+4. `docs/work-method.md`: 2일 주기 · 보고 · 이어받기. 모르는 낱말은 맨 아래 「낱말 풀이」
+5. 맡은 이슈: 「앞뒤 맥락」부터 본문과 댓글 전부. 앞선 작업(보고 · 브랜치 · draft PR)이 있으면 `docs/work-method.md` 6절 순서로 이어받는다
+6. 엔진 · 평가셋 · 채점 도구 · 답 글 · 채점 서버를 고치는 일이면 `docs/engine/scoring-rules.md`: 11/11에 받은 채점 · 서버 · 제출 규칙이다. 고치기 전에 그 문서 0절의 여섯 물음에 답하고, 끝 보고에 해당 절의 「스스로 확인하는 법」 결과를 붙인다
+7. 엔진 일이면 `engine/README.md`(돌리는 법)와 `docs/engine/reproducibility.md`(재는 순서 · 기록 남기는 법). 처음 받은 컴퓨터면 `engine/README.md` 「처음 해 보기」부터 돌린다. 명령은 가상 환경의 파이썬(맥 `.venv/bin/python`, 윈도우 `.venv\Scripts\python`)으로 돌리고, 윈도우는 「윈도우에서 다른 것」을 먼저 본다. 3주기(11/11)부터 팀 실험의 바탕은 새 흐름 7판이라, 새 흐름 위의 실험이면 `docs/engine/flow2.md`도 읽는다
 
 맡은 이슈가 없으면 열린 이슈(`gh issue list`)와 최근 병합된 PR(`gh pr list --state merged --limit 5`)로 지금 어디까지 왔는지 보고 PM에게 묻는다.
 
@@ -73,6 +76,7 @@
 - 실험은 설정 파일의 스위치와 정해진 실행 명령으로만 켜고 잰다. 코드를 손으로 바꿔 가며 잰 숫자는 남이 다시 잴 수 없다.
 - 실험 결과는 리더보드(`docs/engine/leaderboard.md`)에 남긴다. 남기는 법은 `docs/engine/reproducibility.md`.
 - 「됐다」고 말하기 전에 직접 실행하거나 눌러 본 결과를 PR 「검증」에 남긴다.
+- `docs/PRD.md`를 고치면 같은 커밋에서 `docs/PRD-요약.md`의 해당 절도 고친다. 요약의 절마다 붙은 「원본」 줄이 원본의 어느 절에서 왔는지 가리키고, 맨 위 「기준 원본」의 날짜도 바꾼다. 요약에 영향이 없으면 PR 글에 「요약 영향 없음 — 이유」를 적는다. 둘 다 없으면 PR 검사 `pr-check`가 빨갛게 된다.
 
 **끝낼 때 남길 것**
 - 브랜치를 push하고, 맡은 이슈에 「세션 끝」 보고를 단다: 다섯 줄(한 일 / 점수 · 결과 / 막힌 것 / 다음 할 일 / 마감까지) + 「어디에」 + 「이어받을 메모」. 틀은 `docs/work-method.md` 3절. 댓글은 담당 이름으로 달리니 올리기 전에 담당에게 보여 준다.

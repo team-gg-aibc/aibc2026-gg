@@ -1,0 +1,10 @@
+{
+  "issue": "82",
+  "note": "#82 다른 조례가 다스리는 곳 가리기: 새 흐름 7판 + ③ 규칙 C(flow2_place_scope). 질문에 곳 표(engine/flow2/places.json: 한강공원 · 광장 여섯 · 청계천 · 노들섬)의 낱말이 있고, ③이 고른 조례가 모두 그 곳의 rivals(도시공원 조례)이며 고른 조례 원문에 그 낱말이 없으면 「6종 밖 조례」로 끝낸다. 나머지는 pm-flow2-v7.json과 같다",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true
+  }
+}
