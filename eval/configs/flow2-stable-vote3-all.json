@@ -1,7 +1,5 @@
 {
-  "name": "flow2-stable-vote3-all",
   "issue": "",
-  "cycle": 3,
   "note": "흔들림 줄이기(지시서 14, 11-11): flow2-stable-vote3와 같되 ④의 근거는 과반 대신 「답한 표가 모두 든 조항만」(read_all). 같은 ④ 입력 100문항 × 10번 기록 어림에서 두 번 넣어 같은 근거가 과반 85% · 모두 89%였다. 동시 호출 상한 18",
   "engine": {
     "flow": "flow2",
