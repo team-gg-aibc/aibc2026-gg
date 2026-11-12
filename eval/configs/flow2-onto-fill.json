@@ -1,0 +1,10 @@
+{
+  "issue": "",
+  "note": "PM 실험 「온톨로지로 조항 고르기」(11-11): 7판 + flow2_cite \"fill\"(코드만, 모델 호출 수 그대로). ⑥을 지난 답의 근거 조항이 원문에서 번호로 가리키는 같은 조례의 조항(조항 짝 표 ontology_links.json)을 합쳐 3개까지 덧붙인다. 답 글과 답함 · 확인 불가는 7판과 같다. 끈 판은 pm-flow2-v7.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_cite": "fill"
+  }
+}
