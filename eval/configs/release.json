@@ -1,10 +1,51 @@
 {
- "name": "release-c1",
+ "name": "release-c3",
  "issue": "",
- "cycle": 1,
- "tag": "rc-c1",
+ "cycle": 3,
+ "tag": "rc-c3",
  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
  "experiments": [
+  {
+   "issue": "",
+   "name": "pm-flow2-v7",
+   "cycle": null,
+   "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10
+   },
+   "from": [
+    "eval/configs/pm-flow2-v7.json"
+   ]
+  },
+  {
+   "issue": "82",
+   "name": "82-place-scope",
+   "cycle": null,
+   "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true
+   },
+   "from": [
+    "eval/configs/82-place-scope.json"
+   ]
+  },
+  {
+   "issue": "83",
+   "name": "83-answer-lead",
+   "cycle": null,
+   "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_lead": "comma"
+   },
+   "from": [
+    "eval/configs/83-answer-lead.json"
+   ]
+  },
   {
    "issue": "#22",
    "name": "22-contract",
@@ -38,6 +79,11 @@
  "engine": {
   "answer_prompt": "v2",
   "exit_check": true,
+  "flow": "flow2",
+  "flow2_hedge_sec": 10,
+  "flow2_lead": "comma",
+  "flow2_place_scope": true,
+  "flow2_version": 7,
   "group_by_article": true,
   "max_citations": 4,
   "max_concurrent_calls": 6,
