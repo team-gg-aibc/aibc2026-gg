@@ -1,0 +1,159 @@
+{
+ "run_id": "20261113-144813-release-c3-dev-r2",
+ "group": "20261113-144813-release-c3-dev",
+ "repeat": 2,
+ "repeats": 2,
+ "created": "2026-11-13T15:36:30+09:00",
+ "experiment": {
+  "name": "release-c3",
+  "issue": "",
+  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
+  "cycle": 3,
+  "file": "eval/configs/release.json",
+  "file_sha": "5479c7ded613"
+ },
+ "conclusion": "릴리스 rc-c3 — ✅ 통과(docs/engine/releases.md)",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/release.json",
+  "split": "dev",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "gate": "off",
+  "question_fence": false,
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_votes": null,
+  "flow2_memo": null,
+  "flow2_handed": false,
+  "flow2_cite": null,
+  "flow2_read_asks": false,
+  "flow2_read_deleg": false
+ },
+ "settings_hash": "cf513b028459",
+ "switches": {
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10
+ },
+ "env": {
+  "code_commit": "25494f8",
+  "code_hash": "345df2144271",
+  "eval_code_hash": "df36ecc5fd59",
+  "code_dirty": false,
+  "eval_commit": "84e66d4",
+  "questions_hash": "eae34e0aadd4",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2.1"
+ },
+ "metrics": {
+  "n": 693,
+  "n_gold": 653,
+  "n_trap": 40,
+  "weighted": 92.7,
+  "by_type": {
+   "단순": 85.2,
+   "조건": 95.8,
+   "결합": 92.4,
+   "함정": 100.0
+  },
+  "trap": 100.0,
+  "before": {
+   "n": 661,
+   "weighted": 95.7,
+   "by_type": {
+    "단순": 95.6,
+    "조건": 96.1,
+    "결합": 92.4,
+    "함정": 100.0
+   }
+  },
+  "by_law": {
+   "animal": 91.2,
+   "bicycle": 93.0,
+   "common": 64.3,
+   "park": 90.9,
+   "parking": 91.7,
+   "smoking": 93.8,
+   "youth": 86.3
+  },
+  "over_abstain": 7.4,
+  "citations_per_answer": 1.63,
+  "retrieval_hit": 99.6,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 7.642,
+  "latency_p95": 12.668,
+  "latency_max": 19.506,
+  "causes": {
+   "후보에 있는데 잘못 고름": 31,
+   "답이 있는데 확인 불가 (found 거짓)": 20,
+   "판정이 맞는 답을 거절": 19,
+   "답이 있는데 확인 불가 (근거 번호 없음)": 3,
+   "정답이 후보에 없음": 3,
+   "답이 있는데 확인 불가 (구절 불일치)": 3
+  }
+ },
+ "cost_usd": 1.4552,
+ "tokens": {
+  "in": 10909699,
+  "cached": 9095680,
+  "out": 312529
+ },
+ "calls": 2700,
+ "wall_sec": 1383.8,
+ "hashes": {
+  "retrieval": "7221989796df",
+  "answers": "ebb1e0be80cc"
+ }
+}
