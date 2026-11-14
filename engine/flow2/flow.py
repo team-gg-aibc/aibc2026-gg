@@ -678,6 +678,8 @@ PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징
 
 ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
 CAN_GRAY = "해도 되는지 묻는 질문에 첫 문장부터 「조례에 없다」로 답함(코드, 11-14)"
+NONANSWER = "첫 문장이 「확인할 수 없다」인 답(코드, 11-14)"
+NO_ANSWER = re.compile(r"확인할 수 없|알 수 없|확인이 어렵|판단할 수 없")   # 작은 묶음 b5~b8에서 첫 문장이 이 꼴인 답 2개는 모두 샌 함정(공원 드론 · 강동구 비둘기)
 PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 조항을 든 「조례에 없다」 답(코드, 11-14)"
 
 
@@ -699,6 +701,8 @@ def code_verdict(st, cfg, used):
     first = (_SENT.findall(answer) or [""])[0]
     if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or "") and plain.GRAY.search(first) and not plain.LEAD.match(answer):
         return "notGrounded", CAN_GRAY
+    if NO_ANSWER.search(first) and (_f2(st).get("slots") or {}).get("type") != "결합":
+        return "notGrounded", NONANSWER      # 첫 문장이 「확인할 수 없다」인 답(결합 질문은 프롬프트가 답 못 하는 물음에 그 문장을 쓰게 해서 뺀다)
     tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
     if gray and PENALTY_ASK.search(st["question"]) and any(PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
         return "grounded", PENALTY_DELEG
@@ -1421,6 +1425,11 @@ def selftest():
         assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == CAN_GRAY
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="아니요, 그 행위는 금지됩니다. 과태료 금액은 조례에 정해져 있지 않습니다.")
         assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] != CAN_GRAY    # 네 · 아니요로 답했으면 그 규칙이 아니다
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 행위가 과태료 대상인지는 조례만으로는 확인할 수 없습니다. 과태료 기준은 조례에 정해져 있지 않고 시행령에 있습니다.")
+        plan["question_slots"] = dict(plan["question_slots"], asks="과태료 금액")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == NONANSWER   # 첫 문장이 「확인할 수 없다」 → 거절
+        plan["question_slots"] = dict(plan["question_slots"], type="결합")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] != NONANSWER   # 결합 질문은 그 규칙이 아니다
         plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
         plan["law_answer_quotes"] = gray_read
         # (4) ⑥이 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
