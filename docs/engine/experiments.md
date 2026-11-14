@@ -120,8 +120,8 @@
 
 | 날짜 | 이슈 | main · 평가셋 커밋 | 켠 스위치 | 묶음(문항) | 단순 | 조건 | 결합 | 함정 | 가중 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 결론 | 배운 점 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · dev 전체 · 693문항 · 2회 평균 | 95.2 | 97.7 | 92.1 | 97.5 | 95.5 | 2.0 | 1.64 | 8.7초 | $3.13 | 버림 — 함정 막기 첫 판(낱말 목록 규칙: 넘김 말 · 과태료 물음 + 다른 조례 과태료 조항, c10). 낱말 목록이 과적합이라 설계 「엔진-함정-설계.md」의 같은 조례 검사 + c11-gray로 바꿈. 낼 판이 아니다(11-15) |  |
-| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · stress 전체 · 283문항 · 2회 평균 | 86.2 | 87.0 | 90.8 | 93.6 | 89.0 | 10.8 | 1.66 | 10.9초 | $1.27 | 버림 — 함정 막기 첫 판(낱말 목록 규칙: 넘김 말 · 과태료 물음 + 다른 조례 과태료 조항, c10). 낱말 목록이 과적합이라 설계 「엔진-함정-설계.md」의 같은 조례 검사 + c11-gray로 바꿈. 낼 판이 아니다(11-15) |  |
+| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · dev 전체 · 693문항 · 2회 평균 | 95.2 | 97.7 | 92.1 | 97.5 | 95.5 | 2.0 | 1.64 | 8.7초 | $3.13 | 릴리스 rc-c5 — ✅ 통과(docs/engine/releases.md) |  |
+| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · stress 전체 · 283문항 · 2회 평균 | 86.2 | 87.0 | 90.8 | 93.6 | 89.0 | 10.8 | 1.66 | 10.9초 | $1.27 |  |  |
 
 ## 배운 점 모음 (버림 · 보류 실험)
 
@@ -226,13 +226,3 @@
 
 - 결론: 버림 — dev 가중 평균은 7판보다 +1.6(94.6 대 93.0)이지만, 엔진을 고칠 때 보지 않은 문항 70개에서 7판보다 낮고(94.5 · 95.4 대 94.8 · 98.0) 함정 한 문항을 두 번 다 놓쳤다. 극한 세트에서도 함정을 더 놓쳤다(91.5 · 95.7 대 95.7 · 97.9). 그 결과를 보기 전에 적어 둔 규칙(처음 보는 문항에서 나빠지지 않을 것 · 7판이 막던 함정을 놓치지 않을 것)에 걸린다
 - dev에서 오른 몫은 거의 r8-deleg(회색지대 32문항 22 → 50%)인데, 같은 스위치가 함정에 답하는 쪽으로도 민다. dev 한 세트의 +1.6은 본 적 없는 문항에서 다시 나오지 않았다
-
-### release-c5  · 5주기 · dev 전체 · 693문항
-
-- 결론: 버림 — 함정 막기 첫 판(낱말 목록 규칙: 넘김 말 · 과태료 물음 + 다른 조례 과태료 조항, c10). 낱말 목록이 과적합이라 설계 「엔진-함정-설계.md」의 같은 조례 검사 + c11-gray로 바꿈. 낼 판이 아니다(11-15)
-- 배운 점: 아직 없음(실행 요약의 `lesson`에 세 줄을 적는다)
-
-### release-c5  · 5주기 · stress 전체 · 283문항
-
-- 결론: 버림 — 함정 막기 첫 판(낱말 목록 규칙: 넘김 말 · 과태료 물음 + 다른 조례 과태료 조항, c10). 낱말 목록이 과적합이라 설계 「엔진-함정-설계.md」의 같은 조례 검사 + c11-gray로 바꿈. 낼 판이 아니다(11-15)
-- 배운 점: 아직 없음(실행 요약의 `lesson`에 세 줄을 적는다)

@@ -512,16 +512,6 @@ CHECK10 = CHECK9.replace(_C9_RULE3, """  3. basis가 thing과 다른 것을 정�
      thing 「○○ 놀이터 이용료」, basis 「○○ 놀이터의 설치 및 운영에 필요한 사항은 시장이 따로 정한다」 → 없음""")
 assert CHECK10 != CHECK9 and "(가) thing이 고유한 이름" in CHECK10 and _C9_RULE3 not in CHECK10
 
-# c11-gray(설정 flow2_check_gray = "c11", 함정 설계 11-15 「엔진-함정-설계.md」 2절): c10의 규칙 4 한 줄만 바꿨다. 4번 줄이 벌칙 낱말에 묶여
-# 「몇 %부터 걸려요」 같은 단속 기준 물음을 못 잡았다. 업스테이지 기준의 「아닌 것」(조례가 의무 · 금지만 정했고 어겼을 때의 결과 · 기준은
-# 어디에도 넘기지 않았으면 다른 법령만 정하는 내용) 그대로 적었다. 의무 조항이 스스로 정한 내용을 묻는 것은 4가 아니다.
-CHECK11_V = "c11-gray"
-_C10_RULE4 = "  4. 물음이 과태료 · 벌금 · 징역 같은 벌칙을 묻는데, [근거]에 벌칙(부과 · 기준 · 금액)을 정한 조항이 없다. 의무 · 금지 · 설치 기준만 정하고 벌칙이 없으면 4다."
-CHECK11 = CHECK10.replace(_C10_RULE4, "  4. 물음이 어겼을 때의 결과나 그 기준(과태료 · 벌금 · 처벌 · 단속 기준)을 묻는데, [근거]에는 그 결과를 매기는 조항이 없다. "
-                                      "[근거]가 해야 할 일 · 하면 안 되는 일(의무 · 금지)이나 설치 기준, 홍보 · 권장만 정했으면 4다. "
-                                      "의무 · 금지 조항이 스스로 정한 내용(무엇을 · 언제 · 얼마나 해야 하는지)을 묻는 것은 4가 아니다.")
-assert CHECK11 != CHECK10 and "어겼을 때의 결과" in CHECK11 and _C10_RULE4 not in CHECK11
-
 # w8(설정 flow2_plain = "two_lead", 설계 고침 5, 11-15): w7(두 문장)의 첫 낱말 규칙을 바꿨다. w5 · w7의 「[결론]이 네 · 아니요면 첫 낱말을 그것으로」와
 # 「네, …」 예시뿐이라 [결론]이 「정보」여도 「네,」로 시작했고, 「네, …. 다만 ~은 어렵습니다」를 「네, 다만 ~ 어렵습니다」 한 문장으로 줄여 거꾸로 보이게 했다.
 PLAIN3_V = "w8"
@@ -537,8 +527,7 @@ assert PLAIN3 != PLAIN2 and _W7_LEAD not in PLAIN3 and "첫 낱말은 [초안]�
 def pick(cfg, step):
     """단계의 (판 이름, 프롬프트, JSON 칸). 판(flow2_version)이 고른 것을 실험 스위치가 바꿀 때만 바꾼다."""
     if step == "check_gray":                 # flow.check가 flow2_check_gray일 때 「정해져 있지 않다」 꼴 답에만 고른다
-        return {"c10": (CHECK10_V, CHECK10, CHECK9_SCHEMA), "c11": (CHECK11_V, CHECK11, CHECK9_SCHEMA)}.get(
-            cfg.get("flow2_check_gray"), (CHECK9_V, CHECK9, CHECK9_SCHEMA))
+        return (CHECK10_V, CHECK10, CHECK9_SCHEMA) if cfg.get("flow2_check_gray") == "c10" else (CHECK9_V, CHECK9, CHECK9_SCHEMA)
     if step == "plain":
         return {"two": (PLAIN2_V, PLAIN2, PLAIN_SCHEMA), "two_lead": (PLAIN3_V, PLAIN3, PLAIN_SCHEMA)}.get(cfg.get("flow2_plain"), (PLAIN_V, PLAIN, PLAIN_SCHEMA))
     if step == "read" and cfg.get("flow2_read_deleg") == "topic":     # 11-14: r8-deleg + found 앞 칸 topic(flow2_read_asks와는 함께 쓰지 않는다)

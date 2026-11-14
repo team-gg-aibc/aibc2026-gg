@@ -12,7 +12,7 @@
   "file": "eval/configs/release.json",
   "file_sha": "0240846b2c86"
  },
- "conclusion": "버림 — 함정 막기 첫 판(낱말 목록 규칙: 넘김 말 · 과태료 물음 + 다른 조례 과태료 조항, c10). 낱말 목록이 과적합이라 설계 「엔진-함정-설계.md」의 같은 조례 검사 + c11-gray로 바꿈. 낼 판이 아니다(11-15)",
+ "conclusion": "",
  "lesson": [],
  "args": {
   "config": "eval/configs/release.json",

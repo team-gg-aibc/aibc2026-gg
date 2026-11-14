@@ -20,7 +20,7 @@
   },
   {
    "issue": "",
-   "name": "upstage-trap2",
+   "name": "upstage-trap",
    "cycle": null,
    "switches": {
     "flow": "flow2",
@@ -29,7 +29,7 @@
     "flow2_place_scope": true,
     "flow2_lead": "comma",
     "flow2_read_deleg": "topic",
-    "flow2_check_gray": "c11",
+    "flow2_check_gray": "c10",
     "flow2_plain": "two",
     "unknown_guide": true,
     "flow2_check_admit": true,
@@ -37,7 +37,7 @@
     "flow2_trap_guard": true
    },
    "from": [
-    "eval/configs/upstage-trap2.json"
+    "eval/configs/upstage-trap.json"
    ]
   },
   {
@@ -104,7 +104,7 @@
   "flow": "flow2",
   "flow2_annex_quote": true,
   "flow2_check_admit": true,
-  "flow2_check_gray": "c11",
+  "flow2_check_gray": "c10",
   "flow2_hedge_sec": 10,
   "flow2_lead": "comma",
   "flow2_place_scope": true,
