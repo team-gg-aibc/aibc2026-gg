@@ -721,7 +721,9 @@ def admits(answer):
 # 대어 보아 정답 있는 답은 하나도 막지 않고 샌 함정 여덟 번을 막는 것을 확인했다(고침/trap_rules.py). 업스테이지 규칙: 조례가 그 일을 다루는
 # 조항을 두고 금액 · 세부를 맡겼으면 답하고, 그 일을 다루는 조항 없이 다른 법령만 정하면 「확인 불가」.
 TRAP_PEN_ASK = re.compile(r"과태료|범칙금|벌금(?!형)")                  # 「벌금형을 받았는데 위원이 될 수 있나」는 아니다
-TRAP_PEN_HOW = re.compile(r"얼마|나와|나오|내야|내요|물어|불어나|있어요|있나요|돼요|되나요")   # 금액 · 나오는지를 묻는 말(「사무는 누가 맡나」는 아님)
+# 과태료가 얼마인지 · 나오는지를 묻는 말: 과태료 낱말 뒤 같은 문장 40자 안에서만 본다. 「과태료를 3번 체납했는데 주차를 거부해도 되나요?」 ·
+# 「과태료 체납자도 이용할 수 있나요?」(주차장 조례 제9조로 답할 질문) · 「과태료 부과·징수 사무는 누가 맡나요?」는 아니다(GG비서 리뷰, 11-15)
+TRAP_PEN_HOW = re.compile(r"(?:과태료|범칙금|벌금(?!형))[^.?!]{0,40}?(?:얼마|나와|나오|내야|내요|물어|불어나|(?<!수 )있어요|(?<!수 )있나요|부과돼|부과되)")
 PEN_ART = re.compile(r"^\[[^\]]*\([^)]*과태료[^)]*\)\]")                 # 조 제목에 「과태료」: 6종에 도시공원 제23조 · 금연 제10조 · 주차장 제30조뿐
 GRAY_IF = re.compile(r"^(?:으면|다면|는다면|는 경우)")                      # 「기간이 정해져 있지 않으면 3년 이내」는 회색지대 꼴이 아니다
 HANDOVER = re.compile(                                                     # 값을 맡기거나 넘기는 말 · 그 일을 하는 근거 말
@@ -750,7 +752,7 @@ def trap_guard(question, answer, used, tops, typ):
     H  첫 문장이 「정해져 있지 않다」인데 인용 조항 어디에도 맡기거나 넘기는 말 · 그 일의 근거 말이 없음(「자전거 음주운전 혈중알코올 몇 %」)."""
     pen = [c for c in used if PEN_ART.search(c["text"])]
     if TRAP_PEN_ASK.search(question):
-        if not pen and TRAP_PEN_HOW.search(question) and question.count("?") <= 1 and typ != "결합":
+        if not pen and TRAP_PEN_HOW.search(question) and question.count("?") <= 1 and typ != "결합":   # TRAP_PEN_HOW가 과태료 낱말을 함께 본다
             return TRAP_P1
         if pen and tops and plain.GRAY.search(answer or "") and not ({_law(c["label"]) for c in pen} & {_law(t) for t in tops}):
             return TRAP_P3
@@ -1600,6 +1602,9 @@ def selftest():
         assert trap_guard("경차 할인은? 그리고 헬멧 안 쓰면 과태료 있어요?", "경차는 50% 할인됩니다.", L(f"{PK} 제7조 제1항"), [], "결합") is None
         assert trap_guard("흡연 과태료 부과·징수 사무는 누가 맡나요?", "보조기관에 위임됩니다.", L(f"{SM} 제11조"), [], "단순") is None
         assert trap_guard("1년 전에 벌금형을 받았는데 위원이 될 수 있나요?", "아니요, 될 수 없습니다.", L(f"{AN} 제5조 제11항"), [], "단순") is None
+        for q9 in ("주차위반 과태료를 3번 체납했는데 공영주차장에서 주차를 거부해도 되나요?", "과태료 체납자도 공영주차장을 이용할 수 있나요?"):   # 주차장 제9조로 답할 질문
+            assert trap_guard(q9, "네, 주차위반 과태료를 3회 이상 체납하면 거부할 수 있습니다.", L(f"{PK} 제9조"), [f"{PK} 제9조"], "조건") is None, q9
+        assert TRAP_PEN_HOW.search("과태료 있나요?") and TRAP_PEN_HOW.search("주차위반 과태료를 납부 기한 넘겨 안 내면, 공영주차장 가산금처럼 4배로 불어나요?")
         saved = dict(plan)                                              # 흐름에 붙었는지: 켜면 ⑥을 부르지 않고 확인 불가, 끄면 그대로
         bkey = next(k for k, v in lawmap.LAWS.items() if v == BI)
         plan["question_slots"] = dict(slots, actor="시민", named_rule=BI, targets=["음주운전"], law_guess=bkey, asks="혈중알코올농도 기준")
