@@ -1,6 +1,6 @@
 # 실험 기록
 
-> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 132개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
+> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 136개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
 
 - 실험마다 켠 판과 끈 판을 **같은 main 커밋 · 같은 문항**으로 같은 날 잰다(계획 5-2절). 「켠 스위치」는 출발 판(`engine/config.py` DEFAULTS)과 다른 설정이다.
 - **재는 법 기본값**: 채택 판단은 **dev 전체**로 하고, 켠 판 · 끈 판을 **각각 두 번 이상** 잰다(`python3 eval/run.py --config <설정> --split dev --repeat 2`). 100문항 표본은 빠른 확인용으로만 쓴다(흔들림이 2.5~4.9점이라 채택 판단에 쓰지 않는다). dev 전체 한 판은 약 10분, 기록 비용 약 $0.38이다. 실제 콘솔 차감은 그 6할쯤이라 한 판 약 $0.2다(11-06 기준).
@@ -115,6 +115,13 @@
 | 2026-11-14 |  | dde164b · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray=true, flow2_plain=true, unknown_guide=true | release-c4 · dev 전체 · 693문항 · 2회 평균 | 94.0 | 96.4 | 91.8 | 98.8 | 94.9 | 3.1 | 1.62 | 12.7초 | $3.60 | 릴리스 rc-c4 — ✅ 통과(docs/engine/releases.md) |  |
 | 2026-11-15 |  | 7ad2625 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, unknown_guide=true | release-c4 · dev 전체 · 693문항 · 2회 평균 | 95.5 | 97.0 | 91.8 | 95.0 | 94.8 | 2.0 | 1.63 | 10.8초 | $3.14 | 릴리스 rc-c4 — ✅ 통과(docs/engine/releases.md) |  |
 | 2026-11-15 |  | 7ad2625 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, unknown_guide=true | release-c4 · stress 전체 · 283문항 · 2회 평균 | 89.3 | 87.8 | 95.2 | 91.5 | 90.9 | 8.7 | 1.67 | 12.0초 | $1.29 |  |  |
+
+## 5주기 · 수렴 (11/15~11/16)
+
+| 날짜 | 이슈 | main · 평가셋 커밋 | 켠 스위치 | 묶음(문항) | 단순 | 조건 | 결합 | 함정 | 가중 | 과잉 포기 | 인용 수 | 지연 95% | 비용 | 결론 | 배운 점 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · dev 전체 · 693문항 · 2회 평균 | 95.2 | 97.7 | 92.1 | 97.5 | 95.5 | 2.0 | 1.64 | 8.7초 | $3.13 | 릴리스 rc-c5 — ✅ 통과(docs/engine/releases.md) |  |
+| 2026-11-15 |  | 68320f0 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray="c10", flow2_plain="two", flow2_check_admit=true, flow2_annex_quote=true, flow2_trap_guard=true, unknown_guide=true | release-c5 · stress 전체 · 283문항 · 2회 평균 | 86.2 | 87.0 | 90.8 | 93.6 | 89.0 | 10.8 | 1.66 | 10.9초 | $1.27 |  |  |
 
 ## 배운 점 모음 (버림 · 보류 실험)
 
