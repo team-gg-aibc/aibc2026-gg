@@ -646,9 +646,10 @@ def check(st, cfg):
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
     if step == "check_gray":                 # c9-gray는 verdict를 받지 않는다: rule이 「없음」이고 basis가 [근거] 글에 있으면 grounded
+        fine = not PENALTY_ASK.search(st["question"]) or PENALTY_RULE.search(texts)     # 벌칙을 물으면 근거 조항이 벌칙을 매겨야 한다(c9 규칙 4를 코드로도)
         for a in out.get("asks") or []:
-            a["verdict"] = "grounded" if a.get("rule") == "없음" and quote_in((a.get("basis") or "").replace(DELEG_MARK, ""), texts, paren=True) \
-                else "notGrounded"
+            a["verdict"] = "grounded" if fine and a.get("rule") == "없음" \
+                and quote_in((a.get("basis") or "").replace(DELEG_MARK, ""), texts, paren=True) else "notGrounded"
     marks = []
     for i, t in enumerate(targets if "targets" in out else []):   # 5판(c7)은 targets 칸이 없다(기록만 하던 칸)
         q = (got[i].get("quote") if i < len(got) else "") or ""
@@ -665,6 +666,13 @@ def check(st, cfg):
         _f2(st).setdefault("vote", {})["check"] = out["_vote"]
     if st["verdict"] == "notGrounded":
         st["reason"] = pipeline.REJECTED
+
+
+# 벌칙을 묻는 질문(c9 규칙 4의 코드 몫): 질문에 이 낱말이 있으면 인용한 조항 글이 벌칙을 매기거나 그 기준을 정해야 c9-gray를 통과한다.
+# dev 함정에 「설치 기준 · 등록 의무만 있는 조항으로 과태료를 묻는」 꼴이 많다(장애인 · 전기차 전용구획, 동물등록). 주차장 조례 제9조처럼
+# 「과태료를 3회 이상 체납한 경우」만 든 조항은 매기는 조항이 아니다. 낱말은 6종 원문의 벌칙 조항 글투다(「과태료를 부과」 · 「부과하는 기준」).
+PENALTY_ASK = re.compile(r"과태료|벌금|징역|처벌|벌칙|범칙금")
+PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징수)하는\s*기준|벌금|징역")
 
 
 def gray_check(st, cfg, used):
@@ -1324,6 +1332,11 @@ def selftest():
         assert t["flow2"]["check"]["prompt"] == "c9-gray" and seen["target_check"][0]["content"] == prompts.CHECK9, t["flow2"]["check"]
         assert t["flow2"]["read"]["topic"] == rate and t["flow2"]["check"]["asks"][0]["verdict"] == "grounded"
         assert r["citation"] == [rate] and r["answer"] == "아니요, " + easy and contract.guard(r) is r, r
+        assert PENALTY_RULE.search("① 시장이 법 제56조에 따라 과태료를 부과하는 기준은 영 제51조제1항 별표 4와 같다.")
+        assert PENALTY_RULE.search("10만원의 과태료를 부과한다") and not PENALTY_RULE.search("주차위반 과태료를 3회 이상 체납한 경우")
+        plan["law_answer_quotes"] = dict(gray_read)                        # 과태료를 묻는데 근거 조항이 과태료를 매기지 않으면 c9가 「없음」이어도 거절
+        r, t = pipeline.answer(qg.replace("감면율이", "미납 과태료가"), up)
+        assert t["reason"] == pipeline.REJECTED and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["check"]
         lab13 = rate.rsplit(" 제", 1)[0]                                # 조 이름만 적은 topic(「…제12조의3(제목)」 꼴)도 그 조의 항에 맞춘다
         assert topic_labels(lab13 + "(공공자전거 요금 감면)", view([bike], "paragraph"))[:3] == [f"{lab13} 제1항", who, rate] and topic_labels("", []) == []
         plan["law_answer_quotes"] = dict(gray_read, found=False, topic=lab13 + "(공공자전거)")   # found 거짓 + topic 조항을 근거로 + 「정해져 있지 않다」 → 넘김
