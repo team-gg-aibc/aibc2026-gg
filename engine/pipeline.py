@@ -134,7 +134,10 @@ def final(st, cfg):
         resp = contract.unknown()
     else:
         resp = st["response"]
-    return contract.finalize(resp, cfg) if cfg["exit_check"] else resp
+    resp = contract.finalize(resp, cfg) if cfg["exit_check"] else resp
+    if cfg["unknown_guide"] and contract.is_unknown(resp):     # 11-14: 확인 불가 뒤에 어디에 물으면 되는지 한 줄(정해 둔 글만)
+        resp = contract.unknown("default")
+    return resp
 
 
 if __name__ == "__main__":   # 한 문항 돌려 보기: python3 -m engine.pipeline "질문" [설정 파일]

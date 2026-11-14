@@ -1,0 +1,166 @@
+{
+ "run_id": "20261114-210237-upstage-form-stress-r1",
+ "group": "20261114-210237-upstage-form-stress",
+ "repeat": 1,
+ "repeats": 2,
+ "created": "2026-11-14T21:13:10+09:00",
+ "experiment": {
+  "name": "upstage-form",
+  "issue": "",
+  "note": "업스테이지 기준 맞추기(PM, 11-14 엔진 다시 엶): 낼 판(rc-c3 = 7판 + 장소 가리기 + 답 첫머리) 위에 넷을 켬. ① ④ 읽기 r9-topic(flow2_read_deleg \"topic\" = r8-deleg + found 앞에 「묻는 일을 정한 조항」 칸: 조항은 있는데 값 · 세부가 조례에 없으면 그 조항으로 답함) ② ⑥이 「조례에 정해져 있지 않다」 꼴 답에만 c9-gray(flow2_check_gray) ③ ⑥을 지난 답 글을 짧고 쉬운 말로 한 번 더 씀(flow2_plain, w4, 인용은 그대로) ④ 확인 불가 뒤 안내 한 줄(unknown_guide). 근거 묶음 정리 · 맡긴 답 살리기(flow2_cite · flow2_handed)는 끔. 끈 판은 release.json(rc-c3)",
+  "cycle": 4,
+  "file": "eval/configs/upstage-form.json",
+  "file_sha": "a018fcf4b54b"
+ },
+ "conclusion": "",
+ "lesson": [],
+ "args": {
+  "config": "eval/configs/upstage-form.json",
+  "split": "stress",
+  "sample": null,
+  "seed": 0,
+  "mode": "full",
+  "url": null,
+  "workers": 4
+ },
+ "settings": {
+  "chat_model": "solar-pro4",
+  "embed_passage": "solar-embedding-2-passage",
+  "embed_query": "solar-embedding-2-query",
+  "temperature": 0.0,
+  "reasoning_effort": null,
+  "chunk_unit": "paragraph",
+  "top_k": 20,
+  "hybrid_cos_weight": 0.7,
+  "use_embedding": true,
+  "use_verify": true,
+  "min_score": 0.25,
+  "answer_prompt": "v2",
+  "verify_prompt": "v1",
+  "timeout_sec": 75,
+  "explore": false,
+  "exit_check": true,
+  "max_citations": 4,
+  "retry_budget": true,
+  "max_concurrent_calls": 6,
+  "on_deadline": "unknown",
+  "select_mode": "prefilter",
+  "prefilter_keep": 8,
+  "prefilter_empty_abstain": true,
+  "max_per_article": 0,
+  "group_by_article": true,
+  "gate": "off",
+  "question_fence": false,
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_ontology": true,
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_votes": null,
+  "flow2_memo": null,
+  "flow2_handed": false,
+  "flow2_cite": null,
+  "flow2_read_asks": false,
+  "flow2_read_deleg": "topic",
+  "flow2_check_gray": true,
+  "flow2_plain": true,
+  "unknown_guide": true
+ },
+ "settings_hash": "92a53a0a01b2",
+ "switches": {
+  "flow2_place_scope": true,
+  "flow2_lead": "comma",
+  "flow": "flow2",
+  "flow2_version": 7,
+  "flow2_hedge_sec": 10,
+  "flow2_read_deleg": "topic",
+  "flow2_check_gray": true,
+  "flow2_plain": true,
+  "unknown_guide": true
+ },
+ "env": {
+  "code_commit": "9687514",
+  "code_hash": "494c8cbb5dec",
+  "eval_code_hash": "df36ecc5fd59",
+  "code_dirty": false,
+  "eval_commit": "84e66d4",
+  "questions_hash": "d1320c77c102",
+  "index": "chunks:a5a3688e91c1 vectors:00ff52015c26",
+  "retrieval_used": [
+   "hybrid"
+  ],
+  "key_present": true,
+  "server": null,
+  "python": "3.10.9",
+  "packages": {
+   "numpy": "2.2.6",
+   "openai": "3.39.0",
+   "requests": "2.34.2"
+  },
+  "platform": "macOS-27.2.1"
+ },
+ "metrics": {
+  "n": 283,
+  "n_gold": 236,
+  "n_trap": 47,
+  "weighted": 88.0,
+  "by_type": {
+   "단순": 85.7,
+   "조건": 88.5,
+   "결합": 84.8,
+   "함정": 95.7
+  },
+  "trap": 95.7,
+  "before": {
+   "n": 283,
+   "weighted": 88.7,
+   "by_type": {
+    "단순": 88.8,
+    "조건": 90.0,
+    "결합": 84.8,
+    "함정": 92.5
+   }
+  },
+  "by_law": {
+   "animal": 84.1,
+   "bicycle": 86.3,
+   "common": 85.0,
+   "park": 82.9,
+   "parking": 84.5,
+   "smoking": 89.6,
+   "youth": 96.8
+  },
+  "over_abstain": 11.4,
+  "citations_per_answer": 1.68,
+  "retrieval_hit": 98.7,
+  "format_errors": 0,
+  "late": 0,
+  "over_90s": 0,
+  "timeouts": 0,
+  "errors": 0,
+  "latency_p50": 8.88,
+  "latency_p95": 14.64,
+  "latency_max": 26.734,
+  "causes": {
+   "판정이 맞는 답을 거절": 14,
+   "후보에 있는데 잘못 고름": 13,
+   "답이 있는데 확인 불가 (found 거짓)": 8,
+   "정답이 후보에 없음": 3,
+   "답이 있는데 확인 불가 (구절 불일치)": 2,
+   "함정에 답함": 2
+  }
+ },
+ "cost_usd": 0.71,
+ "tokens": {
+  "in": 4543042,
+  "cached": 3469632,
+  "out": 153919
+ },
+ "calls": 1278,
+ "wall_sec": 633.5,
+ "hashes": {
+  "retrieval": "6871d0c07f64",
+  "answers": "8a24a637374f"
+ }
+}

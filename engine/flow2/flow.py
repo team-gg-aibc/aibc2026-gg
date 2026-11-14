@@ -105,6 +105,22 @@ def quote_in(quote, text, paren=False):
     return bool(parts) and all(p in t for p in parts)
 
 
+# 설계 고침 4(스위치 flow2_annex_quote, 11-15): 별표(요금표) 구절은 ⑤가 자주 버렸다(dev 별표 62문항에서 실행마다 28 · 22개). 원문의 「m²」 · 「$m^{2}$」를
+# 모델은 「㎡」 한 글자로 옮기고, 표의 칸을 제 기호(「 · 」 「 / 」 「>」)로 이어 붙인다. 단위를 같은 글자로 맞추고, 칸마다(2글자 이상) 그 별표 글에 있으면 인정한다.
+# 조각 이름은 그대로 실제 별표다(칸을 섞어 옮긴 구절도 통과한다).
+_UNIT = re.compile(r"\$\s*m\^\{?2\}?\s*\$|m\s*²|m2(?![0-9])")
+_CELL = re.compile(r"\s[·>/]\s|◦|\n|\s-\s")
+
+
+def annex_quote_in(quote, text):
+    """별표에서 옮긴 구절: 단위 글자를 맞춘 뒤 통째로, 아니면 칸마다 그 별표 글에 글자 그대로 있으면 참."""
+    q, t = _UNIT.sub("㎡", quote or ""), _UNIT.sub("㎡", text or "")
+    if quote_in(q, t, paren=True):
+        return True
+    cells = [c for c in _CELL.split(q) if len(_nq(_PAREN.sub("", c))) >= 2]
+    return bool(cells) and all(quote_in(c, t, paren=True) for c in cells)
+
+
 def by_quote(label, quote, chunks, body):
     """조 이름만 적고(「제5조(제목)」) 한 항의 구절을 옮긴 경우: 그 조의 항 가운데 구절이 글자 그대로 있는 첫 항(원문 글자로만 고른다).
     본 측정 11-10에서 두 번째 실행이 이 꼴로 14문항을 「목록에 없는 조항」으로 잃었다."""
@@ -562,6 +578,15 @@ def read(st, cfg):
         _f2(st)["read"]["check"] = out["check"]
     if "asks" in out:                        # #81(r8-81): 물음마다 든 조항 이름
         _f2(st)["read"]["asks"] = out["asks"]
+    if "topic" in out:                       # 11-14(r9-topic): found 앞에 적은 「묻는 일을 정한 조항」
+        _f2(st)["read"]["topic"] = out["topic"]
+        # found를 거짓으로 냈어도 topic 조항을 근거로 들고 답 글이 「정해져 있지 않다」 꼴이면 답으로 넘긴다(⑤ · ⑥ c9-gray가 그대로 본다).
+        # 작은 묶음(11-14)에서 r9-topic이 topic · 근거 · 답을 다 적고도 found만 거짓으로 낸 일이 있었다(청년 월세 예시 두 번 중 한 번).
+        ev = label_ids([e.get("label", "").replace("[조항]", "").strip() for e in out.get("evidence") or []], v)
+        if not out.get("found") and cfg["flow2_check_gray"] and plain.GRAY.search(out.get("answer") or "") \
+                and {v[i - 1]["label"] for i in ev} & set(topic_labels(out["topic"], v)):
+            out = st["_read"] = dict(out, found=True)
+            _f2(st)["read"].update(found=True, rescued="found 거짓이지만 topic 조항으로 「정해져 있지 않다」 답을 씀")
     if not out.get("found"):
         st["reason"] = pipeline.NOT_FOUND
 
@@ -589,7 +614,8 @@ def gate(st, cfg):
         c = v[found[0] - 1]
         if answer_step.DISTRICT.search(c["label"]):
             dropped.append({"label": c["label"], "why": "자치구"})
-        elif not quote_in(ev.get("quote", ""), body[c["label"]], paren=v3):
+        elif not quote_in(ev.get("quote", ""), body[c["label"]], paren=v3) and not (
+                cfg["flow2_annex_quote"] and "별표" in c["label"] and annex_quote_in(ev.get("quote", ""), body[c["label"]])):
             dropped.append({"label": c["label"], "why": "구절이 원문에 없음", "quote": ev.get("quote", "")})
         elif c["label"] not in {k["label"] for k in kept}:
             kept.append(c)
@@ -608,6 +634,13 @@ def check(st, cfg):
     (같은 실행 기록으로 다시 매김). 구절을 못 댄 대상은 실패 고리에서 「시민 말 ↔ 조례 말」 빈칸 후보로 쓴다(failures.py)."""
     kept = set(_f2(st)["gate"]["kept"])
     used = [c for c in st["_view"] if c["label"] in kept]
+    decided = code_verdict(st, cfg, used)
+    if decided:                              # 11-14(flow2_check_gray): 코드로 정해지는 꼴은 ⑥을 부르지 않는다
+        st["verdict"] = decided[0]
+        _f2(st)["check"] = {"verdict": decided[0], "reason": decided[1], "targets": [], "asks": None}
+        if decided[0] == "notGrounded":
+            st["reason"] = pipeline.REJECTED
+        return
     s = _f2(st).get("slots") or {}
     targets = [t.strip() for t in s.get("targets") or [] if t and t.strip()][:3]
     cited = lawmap.cited_laws(dict.fromkeys(c["law"] for c in used)) if cfg["flow2_ontology"] else []
@@ -625,23 +658,128 @@ def check(st, cfg):
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used, cfg['flow2_version'] >= 7)}\n\n"
             f"[답변]\n{st['draft']['answer']}")
-    out = _ask(st, cfg, "check", user)
+    step, out = "check", _ask(st, cfg, "check", user)
+    if verdict_of(out, cfg) == "notGrounded" and gray_check(st, cfg, used):
+        # 11-14(flow2_check_gray): ⑥은 c8을 먼저 하고, c8이 거절한 「정해져 있지 않다」 답만 c9-gray로 한 번 더 본다. c9-gray를 먼저 맡겼던 판(release-c4
+        # 첫 측정)은 「다만 …정해져 있지 않다」 한 문장이 든 보통 답까지 맡아 거절해 결합 문항이 내렸다(회색지대 밖 165문항, 두 실행 합 −14점).
+        _f2(st)["check_c8"] = {"reason": out.get("reason", ""), "asks": out.get("asks")}
+        step, out = "check_gray", _ask(st, cfg, "check_gray", user)
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
+    if step == "check_gray":                 # c9-gray는 verdict를 받지 않는다: rule이 「없음」이고 basis가 [근거] 글에 있으면 grounded
+        fine = not PENALTY_ASK.search(st["question"]) or PENALTY_RULE.search(texts)     # 벌칙을 물으면 근거 조항이 벌칙을 매겨야 한다(c9 규칙 4를 코드로도)
+        for a in out.get("asks") or []:
+            a["verdict"] = "grounded" if fine and a.get("rule") == "없음" \
+                and quote_in((a.get("basis") or "").replace(DELEG_MARK, ""), texts, paren=True) else "notGrounded"
     marks = []
     for i, t in enumerate(targets if "targets" in out else []):   # 5판(c7)은 targets 칸이 없다(기록만 하던 칸)
         q = (got[i].get("quote") if i < len(got) else "") or ""
         marks.append({"asked": t, "quote": q, "ok": quote_in(q, texts)})
-    if cfg["flow2_version"] >= 2:      # c3 · c4: 물음마다 판정 → 하나라도 grounded면 통과(답할 물음은 답하고 나머지는 범위 밖이라고 적었다)
-        vs = [a.get("verdict") for a in out.get("asks") or []]
-        st["verdict"] = "grounded" if "grounded" in vs else "notGrounded" if vs and set(vs) == {"notGrounded"} else "notSure"
-    else:
-        st["verdict"] = out.get("verdict")
+    st["verdict"] = verdict_of(out, cfg)
+    if step == "check_gray" and st["verdict"] != "grounded":
+        st["verdict"] = "notGrounded"        # c9-gray가 물음을 비워 내도(notSure) c8의 거절을 그대로 둔다(GG비서 리뷰 P1 11-14)
     _f2(st)["check"] = {"verdict": st["verdict"], "reason": out.get("reason", ""), "targets": marks, "asks": out.get("asks")}
+    if step != "check":
+        _f2(st)["check"]["prompt"] = prompts.pick(cfg, step)[0]
     if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
         _f2(st).setdefault("vote", {})["check"] = out["_vote"]
     if st["verdict"] == "notGrounded":
         st["reason"] = pipeline.REJECTED
+
+
+# 벌칙을 묻는 질문(c9 규칙 4의 코드 몫): 질문에 이 낱말이 있으면 인용한 조항 글이 벌칙을 매기거나 그 기준을 정해야 c9-gray를 통과한다.
+# dev 함정에 「설치 기준 · 등록 의무만 있는 조항으로 과태료를 묻는」 꼴이 많다(장애인 · 전기차 전용구획, 동물등록). 주차장 조례 제9조처럼
+# 「과태료를 3회 이상 체납한 경우」만 든 조항은 매기는 조항이 아니다. 낱말은 6종 원문의 벌칙 조항 글투다(「과태료를 부과」 · 「부과하는 기준」).
+PENALTY_ASK = re.compile(r"과태료|벌금|징역|처벌|벌칙|범칙금")
+PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징수)하는\s*기준|벌금|징역")
+
+
+ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
+NONANSWER = "첫 문장이 「확인할 수 없다」인 답(코드, 11-14)"
+NO_ANSWER = re.compile(r"확인할 수 없|알 수 없(?![는을])|확인이 어렵|판단할 수 없")   # 「소유자를 알 수 없는 경우」(조문 글)는 아니다(설계 고침 2, 11-15)   # 작은 묶음 b5~b8에서 첫 문장이 이 꼴인 답 2개는 모두 샌 함정(공원 드론 · 강동구 비둘기)
+PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
+
+
+# 설계 고침 1(스위치 flow2_check_admit, 11-15): ④가 쓴 답 글이 스스로 「모른다 · 조례에 없다 · 정해져 있지 않다 · 따로 확인하라」고 말하지 않으면 c8을 부르지
+# 않고 통과시킨다. c8은 「조문의 범위에 안 든다」(맞는 「아니요」 답)를 「근거가 질문을 다루지 않는다」로 잘못 읽어 거절했다(「차 3대 주차장도 융자?」 →
+# 「5대 이상이어야 해서 안 됩니다」 등). ⑥까지 온 함정의 답 글에는 기록상 거의 모두 이 말들이 들어 있다(기록 8개에 대어 봄: 맞는 답 25개가 살고 함정 1개가 샘,
+# 엔진-점검-1114/엔진-안정화-설계.md 고침 1). 낱말 목록은 넓게 잡을수록 지금 동작에 가깝다(안전한 쪽).
+ADMIT = re.compile(
+    r"확인할 수 없|확인하기 어렵|확인이 어렵|판단할 수 없|판단하기 어렵|단정할 수 없|단정하기 어렵|알 수 없습니다|알기 어렵"
+    r"|(?:조례|조문|자료|6종|규정|조항|근거)[^.?!]{0,30}없(?:습니다|으며|고|어|다|는)"
+    r"|(?:정해|정하여|규정되어|규정돼|명시되어|명시돼|적혀|담겨|나와|마련되어|두고|정해 두) ?(?:져 )?있지는? (?:않|아니)"
+    r"|(?:정하|규정하|명시하|다루|두)지는? (?:않|아니)|정해 두지 (?:않|아니)|따로 확인|별도로 확인|확인이 필요|확인해야|확인하셔야|문의")
+NO_ADMIT = "답 글에 「모른다 · 조례에 없다」는 말이 없음 → c8을 부르지 않고 통과(코드, 11-15)"
+
+
+def admits(answer):
+    """답 글이 스스로 모른다 · 조례에 없다 · 따로 확인하라고 말하나."""
+    return bool(plain.GRAY.search(answer or "") or ADMIT.search(answer or ""))
+
+
+def code_verdict(st, cfg, used):
+    """⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None.
+    flow2_check_gray(11-14):
+    - 첫 문장이 「확인할 수 없다 · 알 수 없다」인 답 → 거절(결합 질문은 뺀다: ④ 프롬프트가 답 못 하는 물음에 그 문장을 쓰게 한다). 작은 묶음에서
+      이 꼴의 답은 모두 샌 함정이었다(공원 드론 · 강동구 비둘기).
+    - 「조례에 없다」 답이 벌칙을 묻고, ④의 topic 조항이 벌칙 기준을 다른 법령으로 넘기는 조항(DELEG이면서 벌칙을 매김, 6종에 한 곳)이다 → 통과.
+      업스테이지 2차 답의 예(「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이다. 자치구 이름을 든 질문은 뺀다.
+    넣었다가 뺀 규칙(11-14 극한 세트 두 번으로 확인): 넘기는 조항만 든 답이 「조례에 없다」 꼴이 아니면 거절 · 해도 되는지 묻는 질문에 첫 문장부터
+    「정해져 있지 않다」면 거절 — 답할 수 있는 문항을 13번 막았다(「횡단보도 앞 5m는 금연구역으로 정해져 있지 않습니다」 같은 맞는 「아니요」 답).
+    자치구 이름 · ① 관할 칸으로 거절하는 규칙도 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다.
+    flow2_check_admit(11-15): 위 둘에 안 걸리고 답 글에 「모른다 · 조례에 없다」는 말(admits)이 없으면 → 통과(c8을 부르지 않음)."""
+    if not used:
+        return None
+    answer = st["draft"]["answer"].strip()
+    if cfg["flow2_check_gray"]:
+        if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
+            return "notGrounded", NONANSWER
+        tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
+        if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) and "공원" in st["question"] \
+                and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
+            return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10).
+            # 벌칙 기준을 넘기는 조항은 6종에 도시공원 조례 제23조 제1항 하나라 질문이 공원 일이어야 한다(「산책하다 개똥 안 치우면 과태료?」 함정이 샘, 11-15 s1)
+    if cfg["flow2_check_admit"] and not admits(answer):
+        return "grounded", NO_ADMIT          # c8 호출 없음. 판단 기록 check.reason에 이 글이 남는다
+    return None
+
+
+def verdict_of(out, cfg):
+    """⑥ 출력 → 판정. 2판부터(c3 · c4 …) 물음마다 판정하고 하나라도 grounded면 통과(답할 물음은 답하고 나머지는 범위 밖이라고 적었다)."""
+    if cfg["flow2_version"] < 2:
+        return out.get("verdict")
+    vs = [a.get("verdict") for a in out.get("asks") or []]
+    return "grounded" if "grounded" in vs else "notGrounded" if vs and set(vs) == {"notGrounded"} else "notSure"
+
+
+def gray_check(st, cfg, used):
+    """11-14(flow2_check_gray): c8이 거절한 답을 c9-gray로 한 번 더 볼지. 넷을 다 채울 때만이고, 아니면 c8의 거절 그대로다.
+    - 답 글이 「조례에 정해져 있지 않다 · 조례에 없다」 꼴이다(plain.GRAY).
+    - ④가 found 앞에 적은 「묻는 일을 정한 조항」(r9-topic의 topic)이 인용에 들어 있다. 작은 묶음(11-14)에서 이 조건이 없을 때 「강아지랑 식당」 ·
+      「공원 실효」 함정이 값을 묻지 않는데도 「정해져 있지 않다」 꼴로 답해 c9-gray로 갔다.
+    - 질문이 자치구 이름을 들지 않는다. 「강서구 금연거리」 함정이 「다만 …확인할 수 없습니다」 한 문장 때문에 c9-gray로 가서 샜다(자치구가 정한 것인지는 c8 규칙 2가 가린다)."""
+    if not (cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"])) or all(DELEG.search(c["text"]) for c in used):
+        return False                         # 넘기기만 하는 조항만 든 답은 c8(7판처럼). 작은 묶음에서 「공원 드론」 · 「남산공원 개발」 함정이 c9-gray로 샜다
+    if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or ""):
+        return False                         # 해도 되는지 묻는 질문은 c8. 값을 묻지 않으니 회색지대가 아니다(dev 회색지대 32문항에 「가능 여부」 0, 함정은 6번 왔고 2번 샘)
+    return bool(topic_labels((_f2(st).get("read") or {}).get("topic"), used)) and not names_district(st["question"])
+
+
+def names_district(question):
+    """질문이 서울 자치구 이름(「강동구」 등 25곳)을 드는가."""
+    return any(d + "구" in question for d in lawmap.DISTRICTS)
+
+
+def topic_labels(topic, chunks):
+    """④ topic 칸(r9-topic, 조나 항의 이름) → chunks 가운데 그 조항에 드는 조각 이름. 조 이름(「…제13조(제목)」)이면 그 조의 항이 모두 든다."""
+    bare = re.sub(r"\([^()]*\)", "", (topic or "").replace("[조항]", ""))       # 조 제목 괄호를 먼저 지운다(제목 안에 「ㆍ」가 있다)
+    ks = [_norm(x) for x in re.split(r"[\[\],·ㆍ\n]|\s및\s(?=제|별표)", bare) if _norm(x)]   # 여러 조항(「[…제6조 제1항] […별표 1]」 · 「제20조 및 별표 2」). 조례 이름 안의 「및」은 안 자른다
+    out = []
+    for c in chunks:
+        keys = (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", ""))))
+        if any(key == k or (key.startswith(k) and key[len(k):len(k) + 1] == "제") for k in ks for key in keys):
+            out.append(c["label"])
+    return out
 
 
 # ---- 맡긴 내용을 묻는 질문의 답 살리기 (스위치 flow2_handed, 11-11) ----
@@ -762,7 +900,8 @@ def lead(st, cfg):
     word = (_f2(st).get("read") or {}).get("conclusion")
     ask = next((p for p in lawmap._SENT.split(st["question"]) if p.rstrip().endswith(("?", "？"))), st["question"])
     skip = ("이미 결론 낱말로 시작" if LEAD.match(new.lstrip()) else "결론 칸이 네 · 아니요가 아님" if word not in ("네", "아니요")
-            else "첫 물음에 묻는 말이 있음" if ASK_WORD.search(ask) else None)
+            else "첫 물음에 묻는 말이 있음" if ASK_WORD.search(ask)
+            else "본문과 거꾸로라 쉬운 말 단계가 뺌" if (_f2(st).get("plain") or {}).get("no_lead") else None)
     if not skip:
         new = word + LEAD_JOIN[cfg["flow2_lead"]] + new.lstrip()
     _f2(st)["lead"] = {"word": None if skip else word, "skip": skip, "before": old if new != old else None}
@@ -776,6 +915,12 @@ STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", rout
 # STAGES 줄을 고치지 않고 이름으로 찾아 끼운다(같은 주기의 다른 실험이 그 줄에 단계를 더한다).
 from . import cite  # noqa: E402  (cite는 flow를 함수 안에서만 부른다)
 for _after, _stage in (("구절 관문", ("근거 고르기", cite.start)), ("질문 대조", ("근거 정리", cite.settle))):
+    STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
+
+# ---- PM(11-14): 쉬운 말로 다듬기(plain.py). 스위치 flow2_plain이 False(기본값)면 두 단계는 아무 일도 하지 않는다 ----
+# 다듬기 호출은 ⑥과 나란히 미리 부르고(「근거 고르기」 뒤), 「근거 정리」 뒤에 받아 답 글만 바꾼다. 답 첫머리(lead)는 그다음이다.
+from . import plain  # noqa: E402  (plain은 flow를 함수 안에서만 부른다. check가 plain.GRAY를 쓴다)
+for _after, _stage in (("근거 고르기", ("쉬운 말 미리 부르기", plain.start)), ("근거 정리", ("쉬운 말", plain.settle))):
     STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
 
 
@@ -1195,7 +1340,8 @@ def selftest():
         assert diff(rc1) == dict(diff(base7), flow2_place_scope=True, flow2_cite="pick+fill", flow2_handed="law", flow2_read_deleg=True, flow2_lead="comma")
         assert diff(nodeleg) == {k: v for k, v in diff(rc1).items() if k != "flow2_read_deleg"}
         names = [n for n, _ in STAGES]
-        assert names == ["검색", "질문 분석", "조례 확정", "조례 읽기 · 답 쓰기", "구절 관문", "근거 고르기", "질문 대조", "근거 정리", "답 첫머리", "출력"]
+        assert names == ["검색", "질문 분석", "조례 확정", "조례 읽기 · 답 쓰기", "구절 관문", "근거 고르기", "쉬운 말 미리 부르기", "질문 대조",
+                         "근거 정리", "쉬운 말", "답 첫머리", "출력"]
 
         def pick_plan(kept, direct, laws):       # 다시 고르기의 가짜 응답: direct만 「직접」, 나머지 후보는 「참고」
             cands = [c["label"] for c in cite.widen(kept, view(laws, "paragraph"))]
@@ -1232,7 +1378,7 @@ def selftest():
         # (4) 「확인 불가」로 끝난 답은 뒤 단계가 건드리지 않는다: ⑥ 거절(맡긴 답 꼴 아님) · ④ found 거짓 · ③ 장소 가리기(6종 밖)
         plan.update(target_check=ck("notGrounded"), law_answer_quotes=dict(plan["law_answer_quotes"], answer="네, 감면됩니다."))
         r, t = pipeline.answer(qg, rc1)
-        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and list(t["steps"]) == names[:7], (t["reason"], list(t["steps"]))
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and list(t["steps"]) == names[:names.index("질문 대조") + 1], (t["reason"], list(t["steps"]))
         assert not {"handed", "cite", "lead"} & set(t["flow2"])
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
         r, t = pipeline.answer(qg, rc1)
@@ -1242,6 +1388,157 @@ def selftest():
         r, t = pipeline.answer(qp, rc1)
         assert r == contract.UNKNOWN and t["reason"] == lawmap.REJECT_NAME and t["flow2"]["route"]["rule"] == lawmap.RULE_PLACE, t["flow2"]["route"]
         assert list(t["steps"]) == names[:3] and pipeline.answer(qp, base7)[1]["flow2"]["route"]["block"] is None      # 끈 판은 막지 않는다
+        # ---- 업스테이지 기준 맞추기(11-14): ⑥ c9-gray(flow2_check_gray) · 쉬운 말 w1(flow2_plain) · 확인 불가 안내(unknown_guide) ----
+        upstage.chat = fake_chat                                     # 보낸 시스템 프롬프트를 seen에 남기는 가짜
+        up = dict(base7, flow2_read_deleg="topic", flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
+        assert prompts.pick(up, "read")[:2] == ("r9-topic", prompts.READ9) and "차임" in prompts.READ9 and prompts.pick(up, "plain")[0] == prompts.PLAIN_V
+        assert prompts.pick(dict(up, flow2_plain="two"), "plain")[:2] == ("w7", prompts.PLAIN2)
+        assert not any(config.DEFAULTS[k] for k in ("flow2_check_gray", "flow2_plain", "unknown_guide"))
+        # (1) 보통 답: ⑥은 c8 그대로, 쉬운 말이 답 글만 바꾸고(인용 · 링크 · 시행일 그대로) 답 첫머리가 결론 낱말을 붙인다. 끈 판에는 기록도 없다
+        short = "경차는 주차요금이 50% 할인됩니다."
+        plan.update(question_slots=dict(slots, actor="시민"), target_check=ck("grounded"), plain_answer={"answer": short},
+                    law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
+        (r, t), (r7, t7) = pipeline.answer(q, up), pipeline.answer(q, base7)
+        assert r == dict(r7, answer="네, " + short) and t["flow2"]["plain"]["drop"] is None and t["flow2"]["plain"]["before"] == ans, (r, t["flow2"].get("plain"))
+        assert t["flow2"]["plain"]["prompt"] == prompts.PLAIN_V and pipeline.answer(q, dict(up, flow2_plain="two"))[1]["flow2"]["plain"]["prompt"] == prompts.PLAIN2_V   # 기록은 실제로 부른 판
+        assert seen["target_check"][0]["content"] == prompts.CHECK8 and "prompt" not in t["flow2"]["check"] and list(t["steps"]) == names
+        assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조", "쉬운 말"] and "plain" not in t7["flow2"]
+        # (2) 새 답이 없던 숫자를 쓰면 버리고 원래 답(첫머리는 붙는다)
+        plan["plain_answer"] = {"answer": "경차는 주차요금이 90% 할인됩니다."}
+        r, t = pipeline.answer(q, up)
+        assert r["answer"] == "네, " + ans and t["flow2"]["plain"]["drop"] == "없던 숫자 ['90']", t["flow2"]["plain"]
+        # (2-1) 다듬기가 읽은 본문의 결론(body_says)이 나갈 첫 낱말과 거꾸로면 첫 낱말을 빼고 답 첫머리도 안 붙인다. 같으면 그대로
+        plan["plain_answer"] = {"answer": short, "body_says": "아니요"}
+        r, t = pipeline.answer(q, up)
+        assert r["answer"] == short and t["flow2"]["plain"]["no_lead"] and t["flow2"]["lead"]["skip"] == "본문과 거꾸로라 쉬운 말 단계가 뺌", (r, t["flow2"])
+        plan["plain_answer"] = {"answer": "네, " + short, "body_says": "아니요"}
+        assert pipeline.answer(q, up)[0]["answer"] == short
+        plan["plain_answer"] = {"answer": "경차는 주차요금이 90% 할인됩니다.", "body_says": "아니요"}      # 다듬은 답을 버려도 원래 답의 첫 낱말을 본다
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], "네, " + ans)
+        assert pipeline.answer(q, up)[0]["answer"] == ans
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], ans)
+        for said in ("네", "정보", None):
+            plan["plain_answer"] = {"answer": short, "body_says": said} if said else {"answer": short}
+            assert pipeline.answer(q, up)[0]["answer"] == "네, " + short, said
+        # (3) ⑥은 c8을 먼저 한다. c8이 거절한 「조례에 정해져 있지 않다」 답이고 ④가 적은 topic 조항이 인용에 있으면 c9-gray로 한 번 더 본다.
+        #     c9-gray 판정은 코드: rule 「없음」 + basis가 근거 글에 있으면 통과 → 쉬운 말 · 첫머리를 거쳐 그 조항을 인용해 나간다
+        easy = "감면율은 조례에 정해져 있지 않고 시장이 따로 정합니다. 서울시 공고나 120다산콜에서 확인할 수 있습니다."
+        basis = "감면율 및 운영에 관한 사항은 시장이 따로 정한다"
+        g9 = lambda rule, b=basis: {"reason": "", "asks": [{"ask": "감면율", "thing": "공공자전거 요금 감면", "basis": b, "rule": rule}], "done": True}
+        gray_read = dict(rd(True, [{"label": rate, "quote": basis}], gave), conclusion="아니요", topic=rate)
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율"), target_check=ck("grounded"),
+                    gray_check=g9("3"), law_answer_quotes=gray_read, plain_answer={"answer": easy})
+        r, t = pipeline.answer(qg, up)                                  # c8이 통과시키면 c9-gray는 부르지 않는다
+        assert "prompt" not in t["flow2"]["check"] and "check_c8" not in t["flow2"] and r["citation"] == [rate], t["flow2"]["check"]
+        assert [c["stage"] for c in t["calls"]].count("질문 대조") == 1
+        plan.update(target_check=ck("notGrounded"), gray_check=g9("없음"))
+        r, t = pipeline.answer(qg, up)
+        assert t["flow2"]["check"]["prompt"] == "c9-gray" and seen["gray_check"][0]["content"] == prompts.CHECK9, t["flow2"]["check"]
+        assert t["flow2"]["check_c8"]["asks"][0]["verdict"] == "notGrounded" and [c["stage"] for c in t["calls"]].count("질문 대조") == 2
+        assert t["flow2"]["read"]["topic"] == rate and t["flow2"]["check"]["asks"][0]["verdict"] == "grounded"
+        assert r["citation"] == [rate] and r["answer"] == "아니요, " + easy and contract.guard(r) is r, r
+        assert PENALTY_RULE.search("① 시장이 법 제56조에 따라 과태료를 부과하는 기준은 영 제51조제1항 별표 4와 같다.")
+        assert PENALTY_RULE.search("10만원의 과태료를 부과한다") and not PENALTY_RULE.search("주차위반 과태료를 3회 이상 체납한 경우")
+        plan["law_answer_quotes"] = dict(gray_read)                        # 과태료를 묻는데 근거 조항이 과태료를 매기지 않으면 c9가 「없음」이어도 거절
+        r, t = pipeline.answer(qg.replace("감면율이", "미납 과태료가"), up)
+        assert t["reason"] == pipeline.REJECTED and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["check"]
+        lab13 = rate.rsplit(" 제", 1)[0]                                # 조 이름만 적은 topic(「…제12조의3(제목)」 꼴)도 그 조의 항에 맞춘다
+        assert topic_labels(lab13 + "(공공자전거 요금 감면)", view([bike], "paragraph"))[:3] == [f"{lab13} 제1항", who, rate] and topic_labels("", []) == []
+        assert topic_labels(f"[{who}] [{rate}]", view([bike], "paragraph")) == [who, rate]           # 여러 조항을 적은 topic
+        pk = view([lawmap.LAWS["주차장"]], "paragraph")                                           # 조례 이름 안의 「및」 · 줄바꿈 · 「및 별표」
+        p6, pa = "서울특별시 주차장 설치 및 관리 조례 제6조 제1항", "서울특별시 주차장 설치 및 관리 조례 별표 1"
+        assert topic_labels(f"[조항] {p6}\n[조항] {pa}", pk) == [p6, pa]
+        assert {p6, pa} <= set(topic_labels(f"{p6.removesuffix(' 제1항')}(요금) 및 별표 1(요금표)", pk))
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="가능 여부"), law_answer_quotes=gray_read)
+        assert "prompt" not in pipeline.answer(qg, up)[1]["flow2"]["check"]                     # 해도 되는지 묻는 질문은 c8
+        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
+        plan["law_answer_quotes"] = dict(gray_read, found=False, topic=lab13 + "(공공자전거)")   # found 거짓 + topic 조항을 근거로 + 「정해져 있지 않다」 → 넘김
+        r, t = pipeline.answer(qg, up)
+        assert r["citation"] == [rate] and t["flow2"]["read"]["rescued"] and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["read"]
+        for rd3 in (dict(gray_read, found=False, answer="네, 감면됩니다."), dict(gray_read, found=False, topic=who)):   # 답 꼴 · topic이 다르면 그대로 확인 불가
+            plan["law_answer_quotes"] = rd3
+            assert pipeline.answer(qg, up)[1]["reason"] == pipeline.NOT_FOUND
+        plan["law_answer_quotes"] = gray_read
+        for bad in (g9("3"), g9("4"), g9("없음", "원문에 없는 지어낸 구절이다"), g9("없음", ""),     # 거절 규칙 · 원문에 없는 구절 · 빈 구절 ·
+                    {"reason": "", "asks": [], "done": True}, {"reason": "", "done": True}):     # 물음을 비우거나 칸이 없으면 c8 거절 그대로
+            plan["gray_check"] = bad
+            r, t = pipeline.answer(qg, up)
+            assert r == contract.unknown("default") and t["reason"] == pipeline.REJECTED and "plain" not in t["flow2"], (bad, t["flow2"]["check"])
+        plan["gray_check"] = g9("없음")
+        for q2, rd2 in (("강서구 " + qg, gray_read), (qg, dict(gray_read, topic="")), (qg, dict(gray_read, topic=who))):
+            plan["law_answer_quotes"] = rd2                                 # 자치구 이름 · topic 빈칸 · topic이 인용에 없음 → c8
+            r, t = pipeline.answer(q2, up)
+            assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, (q2, t["flow2"]["check"])
+        deleg = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]))
+        dq = DELEG.search(deleg["text"]).group(0)
+        plan.update(gray_check={"reason": "", "asks": [{"ask": "그 행위", "thing": "그 행위", "basis": dq, "rule": "없음"}], "done": True},
+                    plain_answer={"answer": "네, 금지됩니다."},
+                    law_answer_quotes=dict(rd(True, [{"label": deleg["label"], "quote": dq}], "네, 그 행위는 금지됩니다."), conclusion="네", topic=deleg["label"]))
+        dkey = next(k for k, v in lawmap.LAWS.items() if v == deleg["law"])
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=deleg["law"], targets=["그 행위"], law_guess=dkey, asks="금지 행위")
+        qd = f"{deleg['law']}에서 그 행위는 금지인가요?"
+        for ans_d in ("네, 그 행위는 금지됩니다.", "그 내용은 조례에 정해져 있지 않고 상위 법령에서 정합니다."):   # 넘기는 조항만 든 답은 꼴과 상관없이 c8(7판처럼)
+            plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer=ans_d)
+            r, t = pipeline.answer(qd, up)
+            assert "prompt" not in t["flow2"]["check"] and "check_c8" not in t["flow2"] and t["reason"] == pipeline.REJECTED, t["flow2"]["check"]
+        fine = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]))
+        fkey = next(k for k, v in lawmap.LAWS.items() if v == fine["law"])
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey, asks="과태료 금액")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": fine["label"], "quote": DELEG.search(fine["text"]).group(0)}],
+                                            "그 과태료 금액은 조례에 정해져 있지 않고 시행령 별표에서 정합니다."), conclusion="정보", topic=fine["label"])
+        qf = f"{fine['law']}에서 그 행위를 하면 과태료가 얼마예요?"
+        r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
+        assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        assert pipeline.answer("강동구에서 " + qf, up)[1]["flow2"]["check"].get("reason") != PENALTY_DELEG     # 자치구 이름을 들면 코드 통과 없음
+        assert pipeline.answer(qf.replace(fine["law"] + "에서", "길에서"), up)[1]["flow2"]["check"].get("reason") != PENALTY_DELEG   # 공원 일이 아니면 코드 통과 없음
+        smoke = next(c for c in retrieve.load("paragraph")[0] if PENALTY_RULE.search(c["text"]) and not DELEG.search(c["text"]))
+        skey = next(k for k, v in lawmap.LAWS.items() if v == smoke["law"])     # 넘기지 않는 벌칙 조항(금액이 조문에 있음)은 코드 통과가 아니다
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=smoke["law"], targets=["그 행위"], law_guess=skey, asks="과태료 금액")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": smoke["label"], "quote": smoke["text"].split("\n", 1)[1][2:30]}],
+                                            "그 경우의 과태료 면제는 조례에 정해져 있지 않습니다."), conclusion="정보", topic=smoke["label"])
+        r, t = pipeline.answer(f"{smoke['law']}에서 그 행위를 하면 과태료가 얼마예요?", up)
+        assert t["flow2"]["check"].get("reason") != PENALTY_DELEG, t["flow2"]["check"]
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey, asks="과태료 금액")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": fine["label"], "quote": DELEG.search(fine["text"]).group(0)}],
+                                            "그 과태료 금액은 조례에 정해져 있지 않고 시행령 별표에서 정합니다."), conclusion="정보", topic=fine["label"])
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 행위가 과태료 대상인지는 조례만으로는 확인할 수 없습니다. 과태료 기준은 조례에 정해져 있지 않고 시행령에 있습니다.")
+        plan["question_slots"] = dict(plan["question_slots"], asks="과태료 금액")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == NONANSWER   # 첫 문장이 「확인할 수 없다」 → 거절
+        plan["question_slots"] = dict(plan["question_slots"], type="결합")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] != NONANSWER   # 결합 질문은 그 규칙이 아니다
+        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
+        plan["law_answer_quotes"] = gray_read
+        # (4) ⑥이 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
+        plan["gray_check"] = g9("3")
+        r, t = pipeline.answer(qg, up)
+        assert r == contract.unknown("default") and r["answer"].startswith("확인 불가. ") and t["reason"] == pipeline.REJECTED and "plain" not in t["flow2"]
+        assert pipeline.answer(qg, dict(up, unknown_guide=False))[0] == contract.UNKNOWN
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
+        assert pipeline.answer(qg, up)[0] == contract.unknown("default")
+        # ---- 엔진 안정화(11-15 설계 검토): 고침 1 · 2 · 3 · 4 · 5 ----
+        assert admits("그 금액은 조례에 정해져 있지 않습니다.") and admits("이 조례만으로는 확인할 수 없습니다.") and admits("구청에 문의해 주세요.")
+        assert not admits("자기 땅에 3대를 세울 주차장은 융자 대상이 아닙니다. 5대 이상이어야 합니다.")
+        assert not NO_ANSWER.search("구청장은 소유자를 알 수 없는 경우 기증 또는 분양할 수 있습니다.") and NO_ANSWER.search("그 금액은 알 수 없습니다.")
+        st9 = dict(up, flow2_check_admit=True)
+        plan.update(question_slots=dict(slots, actor="시민"), target_check=ck("notGrounded"), plain_answer={"answer": short},
+                    law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
+        r, t = pipeline.answer(q, st9)                                  # (고침 1) 「모른다」는 말이 없는 답 → c8을 부르지 않고 통과
+        assert t["reason"] is None and t["flow2"]["check"]["reason"] == NO_ADMIT and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        assert pipeline.answer(q, up)[1]["reason"] == pipeline.REJECTED                     # 끄면 c8 거절 그대로
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], "할인율은 조례에 정해져 있지 않습니다.")
+        r, t = pipeline.answer(q, st9)                                  # 「조례에 정해져 있지 않다」가 있으면 c8을 부른다
+        assert t["flow2"]["check"].get("reason") != NO_ADMIT and "질문 대조" in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        # (고침 4) 별표 구절: 단위 글자 · 칸마다 대조
+        ax = "구분: 업무시설 · 설치기준: 시설면적 122m²당 1대\n구분: 판매시설 · 설치기준: 시설면적 150m²당 1대"
+        assert annex_quote_in("업무시설 · 시설면적 122㎡당 1대", ax) and annex_quote_in("시설면적 $m^{2}$", "시설면적 $m^{2}$")
+        assert not annex_quote_in("업무시설 · 시설면적 100㎡당 1대", ax) and not quote_in("시설면적 122㎡당", ax)
+        # (고침 3 · 5) 판 고르기
+        assert prompts.pick(dict(up, flow2_check_gray="c10"), "check_gray")[0] == "c10-gray" and prompts.pick(up, "check_gray")[0] == "c9-gray"
+        assert prompts.pick(dict(up, flow2_plain="two_lead"), "plain")[0] == "w8"
+        assert not any(config.DEFAULTS[k] for k in ("flow2_check_admit", "flow2_annex_quote"))
+        # (5) 어떤 까닭으로 끝나도 같은 안내 한 줄(③ 관할 밖 · 6종 밖 조례 · 마감)
+        for why in (lawmap.REJECT_SCOPE, lawmap.REJECT_NAME, pipeline.TIMEOUT):
+            assert pipeline.final({"reason": why, "draft": None, "response": None}, up) == contract.unknown("default"), why
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:

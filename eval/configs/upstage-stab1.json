@@ -1,0 +1,16 @@
+{
+  "issue": "",
+  "note": "엔진 안정화(PM, 11-15 설계 검토 「엔진-안정화-설계.md」) — upstage-form-two.json 위에 고침 1+2: 답 글에 「모른다 · 조례에 없다」는 말이 없으면 c8 없이 통과(flow2_check_admit) + 「알 수 없」 코드 규칙 좁힘. 끈 판은 upstage-form-two.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": true,
+    "flow2_plain": "two",
+    "unknown_guide": true,
+    "flow2_check_admit": true
+  }
+}
