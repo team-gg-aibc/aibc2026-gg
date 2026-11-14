@@ -1,6 +1,6 @@
 {
   "issue": "",
-  "note": "업스테이지 기준 맞추기(PM, 11-14 엔진 다시 엶): 낼 판(rc-c3 = 7판 + 장소 가리기 + 답 첫머리) 위에 넷을 켬. ① ④ 읽기 r9-topic(flow2_read_deleg \"topic\" = r8-deleg + found 앞에 「묻는 일을 정한 조항」 칸: 조항은 있는데 값 · 세부가 조례에 없으면 그 조항으로 답함) ② ⑥이 「조례에 정해져 있지 않다」 꼴 답에만 c9-gray(flow2_check_gray) ③ ⑥을 지난 답 글을 짧고 쉬운 말로 한 번 더 씀(flow2_plain, w4, 인용은 그대로) ④ 확인 불가 뒤 안내 한 줄(unknown_guide). 근거 묶음 정리 · 맡긴 답 살리기(flow2_cite · flow2_handed)는 끔. 끈 판은 release.json(rc-c3)",
+  "note": "업스테이지 기준 맞추기(PM, 11-14 엔진 다시 엶): 낼 판(rc-c3 = 7판 + 장소 가리기 + 답 첫머리) 위에 넷을 켬. ① ④ 읽기 r9-topic(flow2_read_deleg \"topic\" = r8-deleg + found 앞에 「묻는 일을 정한 조항」 칸: 조항은 있는데 값 · 세부가 조례에 없으면 그 조항으로 답함) ② ⑥은 c8을 먼저 하고, c8이 거절한 「조례에 정해져 있지 않다」 꼴 답만 c9-gray로 한 번 더(flow2_check_gray) ③ ⑥을 지난 답 글을 짧고 쉬운 말로 한 번 더 씀(flow2_plain, w5, 인용은 그대로) ④ 확인 불가 뒤 안내 한 줄(unknown_guide). 근거 묶음 정리 · 맡긴 답 살리기(flow2_cite · flow2_handed)는 끔. 끈 판은 release.json(rc-c3)",
   "engine": {
     "flow": "flow2",
     "flow2_version": 7,

@@ -468,7 +468,7 @@ def selftest():
     labels = {a, "서울특별시 주차장 설치 및 관리 조례 별표 1"}
     ok = {"answer": "네", "citation": [a], "source_url": "https://www.law.go.kr/x", "effective_date": "2026-10-01"}
     assert violations(ok, labels) == [] and violations(contract.unknown(), labels) == []
-    assert violations(contract.unknown("default"), labels) == [] == violations(contract.unknown("scope"), labels)
+    assert violations(contract.unknown("default"), labels) == []
     cases = {"네 칸이 아님": {"answer": "네", "citation": [a]}, "칸 자료형": dict(ok, citation=[7]),
              "확인 불가 꼴이 다름": dict(contract.unknown(), citation=[a]), "인용 없이 답함": dict(ok, citation=[]),
              "색인에 없는 인용": dict(ok, citation=["서울특별시 주차장 설치 및 관리 조례 제99조"]),

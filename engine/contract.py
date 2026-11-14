@@ -18,9 +18,9 @@ FIELDS = tuple(UNKNOWN)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # 11-14(설정 unknown_guide): 「확인 불가」 뒤에 붙이는 안내 한 줄. 11-11 받은 답: 「확인 불가」로 시작하고 인용이 비면 뒤에 안내를 붙여도
 # 정답이고 답변 품질에 도움이 된다. 모델이 쓴 글은 붙지 않는다: 확인 불가 꼴로 인정하는 답 글은 아래 고정 글뿐이다(guard).
-# 「scope」는 자치구 · 다른 시도가 스스로 정한 것을 물어 ③에서 끝난 문항, 「default」는 나머지다(pipeline.final이 고른다).
-GUIDES = {"scope": "자치구나 다른 시·도가 정한 내용은 서울시 조례 6종에 없습니다. 해당 구청이나 시·도에 문의해 주세요.",
-          "default": "서울시 조례 6종에는 이 질문을 다루는 조항이 없습니다. 서울시 120다산콜에 문의해 주세요."}
+# 한 줄로 둔다: 120다산콜은 서울시 · 25개 자치구 · 유관기관 문의를 받는다(docs/PRD.md 출처 표). 까닭별로 나눈 첫 판은 ①이 나라 법령 일(그린벨트)도
+# 「다른 시도」로 적어 「자치구나 다른 시·도」 안내가 맞지 않게 붙었다.
+GUIDES = {"default": "서울시 조례 6종에는 이 질문을 다루는 조항이 없습니다. 다른 법령이나 자치구가 정하는 일일 수 있으니 서울시 120다산콜에 문의해 주세요."}
 UNKNOWN_ANSWERS = {UNKNOWN["answer"], *(f"{UNKNOWN['answer']}. {g}" for g in GUIDES.values())}
 
 
@@ -111,7 +111,7 @@ def selftest():
                 dict(ok, source_url="law.go.kr"), dict(ok, effective_date="2026.10.01"), dict(ok, citation=[]),
                 dict(ok, answer=""), dict(ok, answer="확인 불가: 조례에 없음"), dict(unknown(), citation=[a]),
                 dict(unknown(), answer="확인 불가. 이 내용은 모델이 지어낸 법에서 정합니다."), dict(unknown("default"), citation=[a]),
-                dict(unknown("scope"), source_url=url)):
+                dict(unknown("default"), source_url=url)):
         assert guard(bad) == UNKNOWN, bad
     # 11-14: 정해 둔 안내를 붙인 확인 불가는 그대로 나간다(킷 채점: 「확인 불가」로 시작 + 빈 인용)
     for key in GUIDES:
