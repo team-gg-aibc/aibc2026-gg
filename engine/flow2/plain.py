@@ -118,7 +118,7 @@ def settle(st, cfg):
     from . import flow
     word, texts, box, fut = st.pop("_plain")
     old = st["draft"]["answer"]
-    rec = flow._f2(st)["plain"] = {"prompt": prompts.PLAIN_V, "word": word, "before": old}
+    rec = flow._f2(st)["plain"] = {"prompt": prompts.pick(cfg, "plain")[0], "word": word, "before": old}
     try:
         left = flow._left()
         new, says = fut.result(timeout=WAIT if left is None else max(0.0, min(WAIT, left - 2)))

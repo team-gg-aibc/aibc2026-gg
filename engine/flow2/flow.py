@@ -1400,6 +1400,7 @@ def selftest():
                     law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
         (r, t), (r7, t7) = pipeline.answer(q, up), pipeline.answer(q, base7)
         assert r == dict(r7, answer="네, " + short) and t["flow2"]["plain"]["drop"] is None and t["flow2"]["plain"]["before"] == ans, (r, t["flow2"].get("plain"))
+        assert t["flow2"]["plain"]["prompt"] == prompts.PLAIN_V and pipeline.answer(q, dict(up, flow2_plain="two"))[1]["flow2"]["plain"]["prompt"] == prompts.PLAIN2_V   # 기록은 실제로 부른 판
         assert seen["target_check"][0]["content"] == prompts.CHECK8 and "prompt" not in t["flow2"]["check"] and list(t["steps"]) == names
         assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조", "쉬운 말"] and "plain" not in t7["flow2"]
         # (2) 새 답이 없던 숫자를 쓰면 버리고 원래 답(첫머리는 붙는다)
