@@ -721,7 +721,7 @@ def gray_check(st, cfg, used):
 def topic_labels(topic, chunks):
     """④ topic 칸(r9-topic, 조나 항의 이름) → chunks 가운데 그 조항에 드는 조각 이름. 조 이름(「…제13조(제목)」)이면 그 조의 항이 모두 든다."""
     bare = re.sub(r"\([^()]*\)", "", (topic or "").replace("[조항]", ""))       # 조 제목 괄호를 먼저 지운다(제목 안에 「ㆍ」가 있다)
-    ks = [_norm(x) for x in re.split(r"[\[\],·ㆍ]|\s및\s", bare) if _norm(x)]     # 여러 조항을 적기도 한다(「[…제6조 제1항] […별표 1]」 · 「제20조 및 별표 2」)
+    ks = [_norm(x) for x in re.split(r"[\[\],·ㆍ\n]|\s및\s(?=제|별표)", bare) if _norm(x)]   # 여러 조항(「[…제6조 제1항] […별표 1]」 · 「제20조 및 별표 2」). 조례 이름 안의 「및」은 안 자른다
     out = []
     for c in chunks:
         keys = (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", ""))))
@@ -1372,6 +1372,10 @@ def selftest():
         lab13 = rate.rsplit(" 제", 1)[0]                                # 조 이름만 적은 topic(「…제12조의3(제목)」 꼴)도 그 조의 항에 맞춘다
         assert topic_labels(lab13 + "(공공자전거 요금 감면)", view([bike], "paragraph"))[:3] == [f"{lab13} 제1항", who, rate] and topic_labels("", []) == []
         assert topic_labels(f"[{who}] [{rate}]", view([bike], "paragraph")) == [who, rate]           # 여러 조항을 적은 topic
+        pk = view([lawmap.LAWS["주차장"]], "paragraph")                                           # 조례 이름 안의 「및」 · 줄바꿈 · 「및 별표」
+        p6, pa = "서울특별시 주차장 설치 및 관리 조례 제6조 제1항", "서울특별시 주차장 설치 및 관리 조례 별표 1"
+        assert topic_labels(f"[조항] {p6}\n[조항] {pa}", pk) == [p6, pa]
+        assert {p6, pa} <= set(topic_labels(f"{p6.removesuffix(' 제1항')}(요금) 및 별표 1(요금표)", pk))
         plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="가능 여부"), law_answer_quotes=gray_read)
         assert "prompt" not in pipeline.answer(qg, up)[1]["flow2"]["check"]                     # 해도 되는지 묻는 질문은 c8
         plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
