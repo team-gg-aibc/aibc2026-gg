@@ -1,6 +1,6 @@
 {
   "issue": "",
-  "note": "함정 막기(PM, 11-15 동규 「엔진에서 함정을 더 막아야」) — upstage-stab3.json 위에 flow2_trap_guard: ⑥ 전에 코드로 과태료 조항 없이 과태료를 답한 것 · 다른 조례의 과태료 조항을 든 「정해져 있지 않다」 답 · 넘김 말 없는 「정해져 있지 않다」 답을 확인 불가로. 끈 판은 upstage-stab3.json",
+  "note": "함정 막기(PM, 11-15, 설계 「엔진-함정-설계.md」 S1) — upstage-stab3.json 위에 flow2_trap_guard: 「정해져 있지 않다」 답이 기대는 벌칙 · 위임 조항이나 c10이 든 구절이 ④의 주제 조항과 다른 조례면 확인 불가, 벌칙 코드 통과는 주제 조항이 한 조례일 때만. 끈 판은 upstage-stab3.json",
   "engine": {
     "flow": "flow2",
     "flow2_version": 7,

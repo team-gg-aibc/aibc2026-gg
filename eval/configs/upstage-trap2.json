@@ -1,0 +1,18 @@
+{
+  "issue": "",
+  "note": "함정 막기 2(PM, 11-15, 설계 「엔진-함정-설계.md」 규칙 4) — upstage-trap.json 위에 두 번째 검사를 c11-gray로(규칙 4: 어겼을 때의 결과 · 기준을 묻는데 근거가 의무 · 금지 · 홍보만 정했으면 거절). 끈 판은 upstage-trap.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": "c11",
+    "flow2_plain": "two",
+    "unknown_guide": true,
+    "flow2_check_admit": true,
+    "flow2_annex_quote": true,
+    "flow2_trap_guard": true
+  }
+}

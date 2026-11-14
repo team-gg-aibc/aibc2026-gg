@@ -81,7 +81,7 @@ DEFAULTS = {
     # ---- 엔진 안정화 (PM, 11-15 설계 검토 「엔진-안정화-설계.md」) ----
     "flow2_check_admit": False,      # flow2만: True면 ④ 답 글에 「모른다 · 조례에 없다 · 따로 확인하라」는 말(flow.ADMIT · plain.GRAY)이 없을 때 ⑥ c8을 부르지 않고 통과(c8이 맞는 「아니요」 답을 거절하던 것). False = 7판과 같은 동작
     "flow2_annex_quote": False,      # flow2만: True면 ⑤가 별표 구절을 단위 글자(m² → ㎡)를 맞춰 보고, 안 되면 칸마다 대조한다(flow.annex_quote_in). False = 7판과 같은 동작
-    "flow2_trap_guard": False,       # flow2만: True면 ⑥ 전에 코드로 함정 셋을 「확인 불가」로(flow.trap_guard: 과태료 조항 없는 과태료 답 · 다른 조례의 과태료 조항 · 넘김 말 없는 「정해져 있지 않다」 답). False = 7판과 같은 동작
+    "flow2_trap_guard": False,       # flow2만: True면 「정해져 있지 않다」 답이 기대는 벌칙 · 위임 조항이나 c10이 든 구절이 ④의 주제 조항과 다른 조례일 때 확인 불가(flow.split_law), 벌칙 코드 통과는 주제 조항이 한 조례일 때만. False = 7판과 같은 동작
     "unknown_guide": False,          # True면 「확인 불가」 답 뒤에 어디에 물으면 되는지 한 줄을 붙인다(contract.GUIDES, 11-11 받은 답: 확인 불가로 시작 + 빈 인용이면 정답). False = 킷 꼴 「확인 불가」 네 글자
 }
 
