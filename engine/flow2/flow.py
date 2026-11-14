@@ -676,6 +676,7 @@ PENALTY_ASK = re.compile(r"과태료|벌금|징역|처벌|벌칙|범칙금")
 PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징수)하는\s*기준|벌금|징역")
 
 
+ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
 SCOPE_GRAY = "자치구 · 다른 시도를 묻는 질문에 「조례에 없다」 답(코드, 11-14)"
 PENALTY_DELEG = "벌칙을 묻고 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
 
@@ -693,8 +694,10 @@ def code_verdict(st, cfg, used):
     gray, deleg_only = plain.GRAY.search(st["draft"]["answer"]), all(DELEG.search(c["text"]) for c in used)
     if deleg_only and not gray:
         return "notGrounded", DELEG_ONLY
-    if gray and (_f2(st).get("slots") or {}).get("jurisdiction") in ("자치구", "다른 시도"):
-        return "notGrounded", SCOPE_GRAY
+    s = _f2(st).get("slots") or {}
+    word = s.get("jurisdiction_word") or ""
+    if gray and word and word in st["question"] and (s.get("jurisdiction") == "다른 시도" or (s.get("jurisdiction") == "자치구" and lawmap._district(word))):
+        return "notGrounded", SCOPE_GRAY     # ①의 관할 칸만으로는 안 된다: 「구청 청사 주차장」 · 「공원 흡연구역」도 자치구로 적는다(회색지대 4번)
     if gray and deleg_only and PENALTY_ASK.search(st["question"]) and PENALTY_RULE.search("\n".join(c["text"] for c in used)) \
             and topic_labels((_f2(st).get("read") or {}).get("topic"), used):
         return "grounded", PENALTY_DELEG
@@ -709,18 +712,19 @@ def gray_check(st, cfg, used):
     - 질문이 자치구 이름을 들지 않는다. 「강서구 금연거리」 함정이 「다만 …확인할 수 없습니다」 한 문장 때문에 c9-gray로 가서 샜다(자치구가 정한 것인지는 c8 규칙 2가 가린다)."""
     if not (cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"])) or all(DELEG.search(c["text"]) for c in used):
         return False                         # 넘기기만 하는 조항만 든 답은 c8(7판처럼). 작은 묶음에서 「공원 드론」 · 「남산공원 개발」 함정이 c9-gray로 샜다
+    if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or ""):
+        return False                         # 해도 되는지 묻는 질문은 c8. 값을 묻지 않으니 회색지대가 아니다(dev 회색지대 32문항에 「가능 여부」 0, 함정은 6번 왔고 2번 샘)
     return bool(topic_labels((_f2(st).get("read") or {}).get("topic"), used)) and not any(d + "구" in st["question"] for d in lawmap.DISTRICTS)
 
 
 def topic_labels(topic, chunks):
     """④ topic 칸(r9-topic, 조나 항의 이름) → chunks 가운데 그 조항에 드는 조각 이름. 조 이름(「…제13조(제목)」)이면 그 조의 항이 모두 든다."""
-    k = _norm((topic or "").replace("[조항]", ""))
+    ks = [_norm(x) for x in re.split(r"\]\s*\[|[\[\]]|,|·|ㆍ", (topic or "").replace("[조항]", "")) if _norm(x)]   # 여러 조항을 적기도 한다(「[…제6조 제1항] […별표 1]」)
     out = []
-    for c in chunks if k else []:
-        for key in (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", "")))):
-            if key == k or (key.startswith(k) and key[len(k):len(k) + 1] == "제"):
-                out.append(c["label"])
-                break
+    for c in chunks:
+        keys = (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", ""))))
+        if any(key == k or (key.startswith(k) and key[len(k):len(k) + 1] == "제") for k in ks for key in keys):
+            out.append(c["label"])
     return out
 
 
@@ -1352,7 +1356,7 @@ def selftest():
         basis = "감면율 및 운영에 관한 사항은 시장이 따로 정한다"
         g9 = lambda rule, b=basis: {"reason": "", "asks": [{"ask": "감면율", "thing": "공공자전거 요금 감면", "basis": b, "rule": rule}], "done": True}
         gray_read = dict(rd(True, [{"label": rate, "quote": basis}], gave), conclusion="아니요", topic=rate)
-        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거"), target_check=g9("없음"),
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율"), target_check=g9("없음"),
                     law_answer_quotes=gray_read, plain_answer={"answer": easy})
         r, t = pipeline.answer(qg, up)
         assert t["flow2"]["check"]["prompt"] == "c9-gray" and seen["target_check"][0]["content"] == prompts.CHECK9, t["flow2"]["check"]
@@ -1365,6 +1369,10 @@ def selftest():
         assert t["reason"] == pipeline.REJECTED and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["check"]
         lab13 = rate.rsplit(" 제", 1)[0]                                # 조 이름만 적은 topic(「…제12조의3(제목)」 꼴)도 그 조의 항에 맞춘다
         assert topic_labels(lab13 + "(공공자전거 요금 감면)", view([bike], "paragraph"))[:3] == [f"{lab13} 제1항", who, rate] and topic_labels("", []) == []
+        assert topic_labels(f"[{who}] [{rate}]", view([bike], "paragraph")) == [who, rate]           # 여러 조항을 적은 topic
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="가능 여부"), law_answer_quotes=gray_read)
+        assert "prompt" not in pipeline.answer(qg, up)[1]["flow2"]["check"]                     # 해도 되는지 묻는 질문은 c8
+        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
         plan["law_answer_quotes"] = dict(gray_read, found=False, topic=lab13 + "(공공자전거)")   # found 거짓 + topic 조항을 근거로 + 「정해져 있지 않다」 → 넘김
         r, t = pipeline.answer(qg, up)
         assert r["citation"] == [rate] and t["flow2"]["read"]["rescued"] and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["read"]
@@ -1404,8 +1412,11 @@ def selftest():
         r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
         assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
         plan["question_slots"] = dict(plan["question_slots"], jurisdiction="자치구", jurisdiction_word="강서구")
-        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == SCOPE_GRAY          # ①이 자치구 일로 본 「조례에 없다」 답은 거절
-        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거")
+        assert pipeline.answer("강서구 " + qf, up)[1]["flow2"]["check"]["reason"] == SCOPE_GRAY   # 자치구 이름을 든 질문의 「조례에 없다」 답은 거절
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == PENALTY_DELEG          # 관할 낱말이 질문에 없으면(① 칸만) 거절하지 않는다
+        plan["question_slots"] = dict(plan["question_slots"], jurisdiction="자치구", jurisdiction_word="구청")
+        assert pipeline.answer("구청 " + qf, up)[1]["flow2"]["check"]["reason"] == PENALTY_DELEG     # 「구청」은 자치구 이름이 아니다
+        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
         plan["law_answer_quotes"] = gray_read
         # (4) ⑥이 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
         plan["target_check"] = g9("3")
