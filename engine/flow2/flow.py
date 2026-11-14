@@ -729,7 +729,8 @@ GRAY_IF = re.compile(r"^(?:으면|다면|는다면|는 경우)")                
 HANDOVER = re.compile(                                                     # 값을 맡기거나 넘기는 말 · 그 일을 하는 근거 말
     r"할\s*수\s*있다|(?:으)?로\s*한다|(?:법령|법률|법|영|규칙|고시)」?\s*에\s*따라|정한다|정하는|정하여야|따른다|[와과]\s*같다|위임|고시|"
     r"지원하여야|수립[ㆍ·]?\s*시행|시행하여야|예산의\s*범위|부담한다|부담으로|부담하여야")
-# ponytail: 낱말 목록이라 「하여야 한다」(의무)만 적은 근거 조항은 못 알아본다. 그런 회색지대 문항이 나오면 c10 칸(넘김 · 근거 여부)으로 옮긴다
+# ponytail: 낱말 목록이라 「하여야 한다」(의무)만 적은 근거 조항은 못 알아본다(「계획 수립 및 시행」도 못 봄). 그런 회색지대 문항이 나오면 c10 칸(넘김 · 근거 여부)으로 옮긴다
+ASKS_ARTICLE = re.compile(r"제\s*\d+\s*조")
 TRAP_P1 = "과태료 금액 · 여부를 묻는데 6종의 과태료 조항을 인용하지 않은 답 → 확인 불가(코드, 11-15)"
 TRAP_P3 = "「정해져 있지 않다」 꼴 과태료 답인데 과태료 조항이 ④가 고른 주제 조항과 다른 조례 → 확인 불가(코드, 11-15)"
 TRAP_H = "첫 문장이 「정해져 있지 않다」인데 인용 조항에 값을 맡기거나 넘기는 말 · 그 일의 근거 말이 없음 → 확인 불가(코드, 11-15)"
@@ -756,7 +757,8 @@ def trap_guard(question, answer, used, tops, typ):
             return TRAP_P1
         if pen and tops and plain.GRAY.search(answer or "") and not ({_law(c["label"]) for c in pen} & {_law(t) for t in tops}):
             return TRAP_P3
-    if first_gray(answer) and not any(DELEG.search(c["text"]) or HANDOVER.search(re.sub(r"^\[[^\]]*\]\s*", "", c["text"])) for c in used):
+    if first_gray(answer) and not any(DELEG.search(c["text"]) or HANDOVER.search(re.sub(r"^\[[^\]]*\]\s*", "", c["text"])) for c in used) \
+            and not ASKS_ARTICLE.search(question):     # 질문이 조 번호를 짚으면 「그 조항엔 없다」는 바로잡기다(극한 「제23조 제3항 보면 과태료 얼마?」, 11-15 측정)
         return TRAP_H
     return None
 
@@ -1604,6 +1606,9 @@ def selftest():
         assert trap_guard("1년 전에 벌금형을 받았는데 위원이 될 수 있나요?", "아니요, 될 수 없습니다.", L(f"{AN} 제5조 제11항"), [], "단순") is None
         for q9 in ("주차위반 과태료를 3번 체납했는데 공영주차장에서 주차를 거부해도 되나요?", "과태료 체납자도 공영주차장을 이용할 수 있나요?"):   # 주차장 제9조로 답할 질문
             assert trap_guard(q9, "네, 주차위반 과태료를 3회 이상 체납하면 거부할 수 있습니다.", L(f"{PK} 제9조"), [f"{PK} 제9조"], "조건") is None, q9
+        x38 = "제23조제3항은 이의제기 절차를 정한 조항으로, 과태료 금액은 그 조항에 나와 있지 않습니다. 금주구역 과태료는 제23조제4항에 따라 10만원입니다."
+        assert trap_guard("도시공원 조례 제23조 제3항 보면 공원 금주구역에서 술 마시면 과태료가 얼마라고 나와요?", x38, L(f"{PA} 제23조 제4항"), [f"{PA} 제23조 제4항"], "단순") is None
+        assert trap_guard("어린이대공원 동물원 입장료 얼마예요?", "어린이대공원 동물원 입장료는 조례에 정해져 있지 않습니다. 서울대공원은 어른 5,000원입니다.", bic, [], "단순") == TRAP_H   # 다른 시설 값을 들어도 막는다
         assert TRAP_PEN_HOW.search("과태료 있나요?") and TRAP_PEN_HOW.search("주차위반 과태료를 납부 기한 넘겨 안 내면, 공영주차장 가산금처럼 4배로 불어나요?")
         saved = dict(plan)                                              # 흐름에 붙었는지: 켜면 ⑥을 부르지 않고 확인 불가, 끄면 그대로
         bkey = next(k for k, v in lawmap.LAWS.items() if v == BI)
