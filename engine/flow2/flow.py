@@ -700,9 +700,9 @@ def code_verdict(st, cfg, used):
     if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
         return "notGrounded", NONANSWER
     tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
-    if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) \
+    if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) \
             and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
-        return "grounded", PENALTY_DELEG
+        return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10)
     return None
 
 
@@ -724,7 +724,12 @@ def gray_check(st, cfg, used):
         return False                         # 넘기기만 하는 조항만 든 답은 c8(7판처럼). 작은 묶음에서 「공원 드론」 · 「남산공원 개발」 함정이 c9-gray로 샜다
     if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or ""):
         return False                         # 해도 되는지 묻는 질문은 c8. 값을 묻지 않으니 회색지대가 아니다(dev 회색지대 32문항에 「가능 여부」 0, 함정은 6번 왔고 2번 샘)
-    return bool(topic_labels((_f2(st).get("read") or {}).get("topic"), used)) and not any(d + "구" in st["question"] for d in lawmap.DISTRICTS)
+    return bool(topic_labels((_f2(st).get("read") or {}).get("topic"), used)) and not names_district(st["question"])
+
+
+def names_district(question):
+    """질문이 서울 자치구 이름(「강동구」 등 25곳)을 드는가."""
+    return any(d + "구" in question for d in lawmap.DISTRICTS)
 
 
 def topic_labels(topic, chunks):
@@ -1444,6 +1449,7 @@ def selftest():
         qf = f"{fine['law']}에서 그 행위를 하면 과태료가 얼마예요?"
         r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
         assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        assert pipeline.answer("강동구에서 " + qf, up)[1]["flow2"]["check"].get("reason") != PENALTY_DELEG     # 자치구 이름을 들면 코드 통과 없음
         smoke = next(c for c in retrieve.load("paragraph")[0] if PENALTY_RULE.search(c["text"]) and not DELEG.search(c["text"]))
         skey = next(k for k, v in lawmap.LAWS.items() if v == smoke["law"])     # 넘기지 않는 벌칙 조항(금액이 조문에 있음)은 코드 통과가 아니다
         plan["question_slots"] = dict(slots, actor="시민", named_rule=smoke["law"], targets=["그 행위"], law_guess=skey, asks="과태료 금액")
