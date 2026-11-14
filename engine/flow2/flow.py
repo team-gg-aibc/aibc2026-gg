@@ -717,6 +717,48 @@ def admits(answer):
     return bool(plain.GRAY.search(answer or "") or ADMIT.search(answer or ""))
 
 
+# 함정 막기(11-15, 설정 flow2_trap_guard): ⑥보다 먼저 코드로 「확인 불가」로 돌리는 셋. 저장된 실행 12번(dev 여섯 · 극한 여섯)과 작은 묶음에
+# 대어 보아 정답 있는 답은 하나도 막지 않고 샌 함정 여덟 번을 막는 것을 확인했다(고침/trap_rules.py). 업스테이지 규칙: 조례가 그 일을 다루는
+# 조항을 두고 금액 · 세부를 맡겼으면 답하고, 그 일을 다루는 조항 없이 다른 법령만 정하면 「확인 불가」.
+TRAP_PEN_ASK = re.compile(r"과태료|범칙금|벌금(?!형)")                  # 「벌금형을 받았는데 위원이 될 수 있나」는 아니다
+TRAP_PEN_HOW = re.compile(r"얼마|나와|나오|내야|내요|물어|불어나|있어요|있나요|돼요|되나요")   # 금액 · 나오는지를 묻는 말(「사무는 누가 맡나」는 아님)
+PEN_ART = re.compile(r"^\[[^\]]*\([^)]*과태료[^)]*\)\]")                 # 조 제목에 「과태료」: 6종에 도시공원 제23조 · 금연 제10조 · 주차장 제30조뿐
+GRAY_IF = re.compile(r"^(?:으면|다면|는다면|는 경우)")                      # 「기간이 정해져 있지 않으면 3년 이내」는 회색지대 꼴이 아니다
+HANDOVER = re.compile(                                                     # 값을 맡기거나 넘기는 말 · 그 일을 하는 근거 말
+    r"할\s*수\s*있다|(?:으)?로\s*한다|(?:법령|법률|법|영|규칙|고시)」?\s*에\s*따라|정한다|정하는|정하여야|따른다|[와과]\s*같다|위임|고시|"
+    r"지원하여야|수립[ㆍ·]?\s*시행|시행하여야|예산의\s*범위|부담한다|부담으로|부담하여야")
+# ponytail: 낱말 목록이라 「하여야 한다」(의무)만 적은 근거 조항은 못 알아본다. 그런 회색지대 문항이 나오면 c10 칸(넘김 · 근거 여부)으로 옮긴다
+TRAP_P1 = "과태료 금액 · 여부를 묻는데 6종의 과태료 조항을 인용하지 않은 답 → 확인 불가(코드, 11-15)"
+TRAP_P3 = "「정해져 있지 않다」 꼴 과태료 답인데 과태료 조항이 ④가 고른 주제 조항과 다른 조례 → 확인 불가(코드, 11-15)"
+TRAP_H = "첫 문장이 「정해져 있지 않다」인데 인용 조항에 값을 맡기거나 넘기는 말 · 그 일의 근거 말이 없음 → 확인 불가(코드, 11-15)"
+
+
+def _law(label):
+    return label.split(" 제")[0].split(" 별표")[0]
+
+
+def first_gray(answer):
+    """첫 문장이 「조례에 정해져 있지 않다」 꼴인가(「정해져 있지 않으면 …」 같은 조건은 아니다)."""
+    first = (_SENT.findall(answer or "") or [answer or ""])[0]
+    return any(not GRAY_IF.match(first[m.end():]) for m in plain.GRAY.finditer(first))
+
+
+def trap_guard(question, answer, used, tops, typ):
+    """함정 막기 셋 가운데 걸린 것의 까닭, 아니면 None. used = 인용할 근거 조각들, tops = ④의 topic 조항 라벨, typ = ① 질문 유형.
+    P1 물음 하나로 과태료가 얼마인지 · 나오는지를 묻는데 6종의 과태료 조항을 인용하지 않음(「주차위반 과태료도 4배로 불어나요?」).
+    P3 「정해져 있지 않다」 꼴 과태료 답인데 그 과태료 조항이 topic 조항과 다른 조례(「산책하다 개똥 안 치우면」에 도시공원 과태료 조항).
+    H  첫 문장이 「정해져 있지 않다」인데 인용 조항 어디에도 맡기거나 넘기는 말 · 그 일의 근거 말이 없음(「자전거 음주운전 혈중알코올 몇 %」)."""
+    pen = [c for c in used if PEN_ART.search(c["text"])]
+    if TRAP_PEN_ASK.search(question):
+        if not pen and TRAP_PEN_HOW.search(question) and question.count("?") <= 1 and typ != "결합":
+            return TRAP_P1
+        if pen and tops and plain.GRAY.search(answer or "") and not ({_law(c["label"]) for c in pen} & {_law(t) for t in tops}):
+            return TRAP_P3
+    if first_gray(answer) and not any(DELEG.search(c["text"]) or HANDOVER.search(re.sub(r"^\[[^\]]*\]\s*", "", c["text"])) for c in used):
+        return TRAP_H
+    return None
+
+
 def code_verdict(st, cfg, used):
     """⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None.
     flow2_check_gray(11-14):
@@ -731,6 +773,11 @@ def code_verdict(st, cfg, used):
     if not used:
         return None
     answer = st["draft"]["answer"].strip()
+    if cfg["flow2_trap_guard"]:
+        why = trap_guard(st["question"], answer, used, topic_labels((_f2(st).get("read") or {}).get("topic"), used),
+                         (_f2(st).get("slots") or {}).get("type"))
+        if why:
+            return "notGrounded", why
     if cfg["flow2_check_gray"]:
         if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
             return "notGrounded", NONANSWER
@@ -1535,7 +1582,34 @@ def selftest():
         # (고침 3 · 5) 판 고르기
         assert prompts.pick(dict(up, flow2_check_gray="c10"), "check_gray")[0] == "c10-gray" and prompts.pick(up, "check_gray")[0] == "c9-gray"
         assert prompts.pick(dict(up, flow2_plain="two_lead"), "plain")[0] == "w8"
-        assert not any(config.DEFAULTS[k] for k in ("flow2_check_admit", "flow2_annex_quote"))
+        assert not any(config.DEFAULTS[k] for k in ("flow2_check_admit", "flow2_annex_quote", "flow2_trap_guard"))
+        # (함정 막기 11-15) 코드 셋: 샌 함정의 꼴은 막고, 회색지대 · 과태료 조항을 든 답 · 조건 「않으면」 · 결합 · 「누가 맡나」는 막지 않는다
+        C = {c["label"]: c for c in retrieve.load("paragraph")[0]}
+        L = lambda *ls: [C[x] for x in ls]   # noqa: E731
+        BI, PK, PA = "서울특별시 자전거이용 활성화에 관한 조례", "서울특별시 주차장 설치 및 관리 조례", "서울특별시 도시공원 조례"
+        SM, YO, AN = "서울특별시 금연환경 조성 및 간접흡연 피해방지조례", "서울특별시 청년 기본 조례", "서울특별시 동물보호 조례"
+        bic = L(f"{BI} 제3조 제4항", f"{BI} 제4조 제5항")
+        g = "그 기준은 조례에 정해져 있지 않습니다. 서울시 공고에서 확인할 수 있습니다."
+        assert trap_guard("자전거 음주운전은 혈중알코올농도 몇 %부터 걸려요?", g, bic, [b["label"] for b in bic], "단순") == TRAP_H
+        assert trap_guard("주차위반 과태료를 안 내면 4배로 불어나요?", "아니요, 4배로 불어나지 않습니다.", L(f"{PK} 제6조 제2항"), [f"{PK} 제6조 제2항"], "단순") == TRAP_P1
+        assert trap_guard("산책하다 개똥 안 치우면 과태료 얼마 나와?", g, L(f"{AN} 제7조 제3항", f"{PA} 제23조 제1항"), [f"{AN} 제7조 제3항"], "단순") == TRAP_P3
+        assert trap_guard("서울시 청년 월세 지원금은 한 달에 얼마?", g, L(f"{YO} 제13조 제1항"), [f"{YO} 제13조 제1항"], "단순") is None
+        assert trap_guard("서울 공원에서 나무를 꺾으면 과태료가 얼마예요?", g, L(f"{PA} 제23조 제1항"), [f"{PA} 제23조 제1항"], "단순") is None
+        assert trap_guard("금연구역에서 담배 피우면 과태료가 얼마예요?", "10만원의 과태료가 부과됩니다.", L(f"{SM} 제10조 제1항"), [], "단순") is None
+        assert trap_guard("허가 기간이 없으면 몇 년?", "기간이 정해져 있지 않으면 3년 이내로 합니다.", bic, [], "단순") is None
+        assert trap_guard("경차 할인은? 그리고 헬멧 안 쓰면 과태료 있어요?", "경차는 50% 할인됩니다.", L(f"{PK} 제7조 제1항"), [], "결합") is None
+        assert trap_guard("흡연 과태료 부과·징수 사무는 누가 맡나요?", "보조기관에 위임됩니다.", L(f"{SM} 제11조"), [], "단순") is None
+        assert trap_guard("1년 전에 벌금형을 받았는데 위원이 될 수 있나요?", "아니요, 될 수 없습니다.", L(f"{AN} 제5조 제11항"), [], "단순") is None
+        saved = dict(plan)                                              # 흐름에 붙었는지: 켜면 ⑥을 부르지 않고 확인 불가, 끄면 그대로
+        bkey = next(k for k, v in lawmap.LAWS.items() if v == BI)
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=BI, targets=["음주운전"], law_guess=bkey, asks="혈중알코올농도 기준")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": bic[0]["label"], "quote": "음주 및 약물의 영향으로"}], g), conclusion="정보", topic=bic[0]["label"])
+        qb = f"{BI}에서 자전거 음주운전은 혈중알코올농도 몇 %부터 걸려요?"
+        r, t = pipeline.answer(qb, dict(up, flow2_trap_guard=True))
+        assert t["reason"] == pipeline.REJECTED and t["flow2"]["check"]["reason"] == TRAP_H and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        assert pipeline.answer(qb, up)[1]["flow2"]["check"].get("reason") != TRAP_H
+        plan.clear()
+        plan.update(saved)
         # (5) 어떤 까닭으로 끝나도 같은 안내 한 줄(③ 관할 밖 · 6종 밖 조례 · 마감)
         for why in (lawmap.REJECT_SCOPE, lawmap.REJECT_NAME, pipeline.TIMEOUT):
             assert pipeline.final({"reason": why, "draft": None, "response": None}, up) == contract.unknown("default"), why
