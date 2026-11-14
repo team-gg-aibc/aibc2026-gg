@@ -735,9 +735,10 @@ def code_verdict(st, cfg, used):
         if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
             return "notGrounded", NONANSWER
         tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
-        if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) \
+        if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) and "공원" in st["question"] \
                 and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
-            return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10)
+            return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10).
+            # 벌칙 기준을 넘기는 조항은 6종에 도시공원 조례 제23조 제1항 하나라 질문이 공원 일이어야 한다(「산책하다 개똥 안 치우면 과태료?」 함정이 샘, 11-15 s1)
     if cfg["flow2_check_admit"] and not admits(answer):
         return "grounded", NO_ADMIT          # c8 호출 없음. 판단 기록 check.reason에 이 글이 남는다
     return None
@@ -1488,6 +1489,7 @@ def selftest():
         r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
         assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
         assert pipeline.answer("강동구에서 " + qf, up)[1]["flow2"]["check"].get("reason") != PENALTY_DELEG     # 자치구 이름을 들면 코드 통과 없음
+        assert pipeline.answer(qf.replace(fine["law"] + "에서", "길에서"), up)[1]["flow2"]["check"].get("reason") != PENALTY_DELEG   # 공원 일이 아니면 코드 통과 없음
         smoke = next(c for c in retrieve.load("paragraph")[0] if PENALTY_RULE.search(c["text"]) and not DELEG.search(c["text"]))
         skey = next(k for k, v in lawmap.LAWS.items() if v == smoke["law"])     # 넘기지 않는 벌칙 조항(금액이 조문에 있음)은 코드 통과가 아니다
         plan["question_slots"] = dict(slots, actor="시민", named_rule=smoke["law"], targets=["그 행위"], law_guess=skey, asks="과태료 금액")
