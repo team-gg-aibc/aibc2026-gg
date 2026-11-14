@@ -187,7 +187,6 @@ def view(laws, unit):
 DELEG = re.compile(r"(?:법|영|시행령|시행규칙)\s*제\d+조(?:의\d+)?(?:제\d+항)?(?:제\d+호)?(?:\s*(?:및|ㆍ|·)\s*제\d+항)?\s*"
                    r"(?:각\s*호의\s*(?:행위|사항)|각\s*목에\s*해당하는|별표\s*\d+\s*와\s*같다)")
 DELEG_MARK = "(※ 그 내용은 이 자료에 없다)"
-DELEG_ONLY = "넘기기만 하는 조항만 들고 「조례에 없다」 안내가 없는 답(코드, 11-14)"
 
 
 def context(chunks, mark=False):
@@ -677,34 +676,30 @@ PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징
 
 
 ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
-CAN_GRAY = "해도 되는지 묻는 질문에 첫 문장부터 「조례에 없다」로 답함(코드, 11-14)"
 NONANSWER = "첫 문장이 「확인할 수 없다」인 답(코드, 11-14)"
 NO_ANSWER = re.compile(r"확인할 수 없|알 수 없|확인이 어렵|판단할 수 없")   # 작은 묶음 b5~b8에서 첫 문장이 이 꼴인 답 2개는 모두 샌 함정(공원 드론 · 강동구 비둘기)
-PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 조항을 든 「조례에 없다」 답(코드, 11-14)"
+PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
 
 
 def code_verdict(st, cfg, used):
-    """11-14(flow2_check_gray): ⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None. 작은 묶음(dev 회색지대 · 함정 · 업스테이지 예시)에서 고른 셋이다.
-    - 넘기기만 하는 조항(DELEG, 6종에 네 곳)만 든 답이 「조례에 없다」 꼴이 아니다 → 거절. 받은 2차 답의 정답 꼴은 「그 내용은 조례에 없고 ○○법에서
-      정한다」다. 아니면 넘겨진 내용을 아는 지식으로 채운 답이다(r8-deleg가 7판의 found 거짓을 푼 자리).
-    - 해도 되는지 묻는 질문(① asks)에 네 · 아니요 없이 첫 문장부터 「조례에 정해져 있지 않다」로 답했다 → 거절. 묻는 일을 다루는 조항이 없다는 뜻이다
-      (회색지대 32문항에 이 꼴 0. 「강아지랑 식당」 함정이 이 꼴로 c8을 두 번 지나갔다).
-    - 「조례에 없다」 답이 벌칙을 묻고, ④의 topic 조항이 인용에 있으며 그 조항 글이 벌칙을 매기거나 기준을 정한다 → 통과. 업스테이지 2차 답의 예
-      (「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가 조문에 없다며 거절하곤 했다.
-    (자치구 이름 · ① 관할 칸으로 거절하는 규칙은 넣었다가 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다.)"""
+    """11-14(flow2_check_gray): ⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None.
+    - 첫 문장이 「확인할 수 없다 · 알 수 없다」인 답 → 거절(결합 질문은 뺀다: ④ 프롬프트가 답 못 하는 물음에 그 문장을 쓰게 한다). 작은 묶음에서
+      이 꼴의 답은 모두 샌 함정이었다(공원 드론 · 강동구 비둘기).
+    - 「조례에 없다」 답이 벌칙을 묻고, ④의 topic 조항이 벌칙 기준을 다른 법령으로 넘기는 조항(DELEG이면서 벌칙을 매김, 6종에 한 곳)이다 → 통과.
+      업스테이지 2차 답의 예(「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가
+      조문에 없다며 거절하곤 했다.
+    넣었다가 뺀 규칙(11-14 극한 세트 두 번으로 확인): 넘기는 조항만 든 답이 「조례에 없다」 꼴이 아니면 거절 · 해도 되는지 묻는 질문에 첫 문장부터
+    「정해져 있지 않다」면 거절 — 답할 수 있는 문항을 13번 막았다(「횡단보도 앞 5m는 금연구역으로 정해져 있지 않습니다」 같은 맞는 「아니요」 답).
+    벌칙 통과를 넘기는 조항으로 좁히기 전에는 「금연교육 들으면 과태료 면제?」 · 「개똥 안 치우면 과태료?」 함정이 통과했다.
+    자치구 이름 · ① 관할 칸으로 거절하는 규칙도 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다."""
     if not (cfg["flow2_check_gray"] and used):
         return None
-    gray, deleg_only = plain.GRAY.search(st["draft"]["answer"]), all(DELEG.search(c["text"]) for c in used)
-    if deleg_only and not gray:
-        return "notGrounded", DELEG_ONLY
     answer = st["draft"]["answer"].strip()
-    first = (_SENT.findall(answer) or [""])[0]
-    if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or "") and plain.GRAY.search(first) and not plain.LEAD.match(answer):
-        return "notGrounded", CAN_GRAY
-    if NO_ANSWER.search(first) and (_f2(st).get("slots") or {}).get("type") != "결합":
-        return "notGrounded", NONANSWER      # 첫 문장이 「확인할 수 없다」인 답(결합 질문은 프롬프트가 답 못 하는 물음에 그 문장을 쓰게 해서 뺀다)
+    if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
+        return "notGrounded", NONANSWER
     tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
-    if gray and PENALTY_ASK.search(st["question"]) and any(PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
+    if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) \
+            and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
         return "grounded", PENALTY_DELEG
     return None
 
@@ -1407,12 +1402,10 @@ def selftest():
         dkey = next(k for k, v in lawmap.LAWS.items() if v == deleg["law"])
         plan["question_slots"] = dict(slots, actor="시민", named_rule=deleg["law"], targets=["그 행위"], law_guess=dkey, asks="금지 행위")
         qd = f"{deleg['law']}에서 그 행위는 금지인가요?"
-        r, t = pipeline.answer(qd, up)                                  # 넘기는 조항만 들고 「조례에 없다」가 없으면 부르지 않고 거절
-        assert r == contract.unknown("default") and t["flow2"]["check"]["reason"] == DELEG_ONLY and [c["stage"] for c in t["calls"]].count("질문 대조") == 0
-        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 내용은 조례에 정해져 있지 않고 상위 법령에서 정합니다.")
-        r, t = pipeline.answer(qd, up)                                  # 「조례에 없다」 꼴이면 c8(7판처럼)
-        assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, t["flow2"]["check"]
-        assert pipeline.answer(qd, dict(up, flow2_check_gray=False))[1]["flow2"]["check"]["reason"] != DELEG_ONLY
+        for ans_d in ("네, 그 행위는 금지됩니다.", "그 내용은 조례에 정해져 있지 않고 상위 법령에서 정합니다."):   # 넘기는 조항만 든 답은 꼴과 상관없이 c8(7판처럼)
+            plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer=ans_d)
+            r, t = pipeline.answer(qd, up)
+            assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, t["flow2"]["check"]
         fine = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]))
         fkey = next(k for k, v in lawmap.LAWS.items() if v == fine["law"])
         plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey, asks="과태료 금액")
@@ -1421,10 +1414,16 @@ def selftest():
         qf = f"{fine['law']}에서 그 행위를 하면 과태료가 얼마예요?"
         r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
         assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
-        plan["question_slots"] = dict(plan["question_slots"], asks="가능 여부")      # 해도 되는지 묻는데 첫 문장부터 「조례에 없다」 → 거절
-        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == CAN_GRAY
-        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="아니요, 그 행위는 금지됩니다. 과태료 금액은 조례에 정해져 있지 않습니다.")
-        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] != CAN_GRAY    # 네 · 아니요로 답했으면 그 규칙이 아니다
+        smoke = next(c for c in retrieve.load("paragraph")[0] if PENALTY_RULE.search(c["text"]) and not DELEG.search(c["text"]))
+        skey = next(k for k, v in lawmap.LAWS.items() if v == smoke["law"])     # 넘기지 않는 벌칙 조항(금액이 조문에 있음)은 코드 통과가 아니다
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=smoke["law"], targets=["그 행위"], law_guess=skey, asks="과태료 금액")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": smoke["label"], "quote": smoke["text"].split("\n", 1)[1][2:30]}],
+                                            "그 경우의 과태료 면제는 조례에 정해져 있지 않습니다."), conclusion="정보", topic=smoke["label"])
+        r, t = pipeline.answer(f"{smoke['law']}에서 그 행위를 하면 과태료가 얼마예요?", up)
+        assert t["flow2"]["check"].get("reason") != PENALTY_DELEG, t["flow2"]["check"]
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey, asks="과태료 금액")
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": fine["label"], "quote": DELEG.search(fine["text"]).group(0)}],
+                                            "그 과태료 금액은 조례에 정해져 있지 않고 시행령 별표에서 정합니다."), conclusion="정보", topic=fine["label"])
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 행위가 과태료 대상인지는 조례만으로는 확인할 수 없습니다. 과태료 기준은 조례에 정해져 있지 않고 시행령에 있습니다.")
         plan["question_slots"] = dict(plan["question_slots"], asks="과태료 금액")
         assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == NONANSWER   # 첫 문장이 「확인할 수 없다」 → 거절
