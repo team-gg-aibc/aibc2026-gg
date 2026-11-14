@@ -659,6 +659,8 @@ def check(st, cfg):
         q = (got[i].get("quote") if i < len(got) else "") or ""
         marks.append({"asked": t, "quote": q, "ok": quote_in(q, texts)})
     st["verdict"] = verdict_of(out, cfg)
+    if step == "check_gray" and st["verdict"] != "grounded":
+        st["verdict"] = "notGrounded"        # c9-gray가 물음을 비워 내도(notSure) c8의 거절을 그대로 둔다(GG비서 리뷰 P1 11-14)
     _f2(st)["check"] = {"verdict": st["verdict"], "reason": out.get("reason", ""), "targets": marks, "asks": out.get("asks")}
     if step != "check":
         _f2(st)["check"]["prompt"] = prompts.pick(cfg, step)[0]
@@ -1398,7 +1400,8 @@ def selftest():
             plan["law_answer_quotes"] = rd3
             assert pipeline.answer(qg, up)[1]["reason"] == pipeline.NOT_FOUND
         plan["law_answer_quotes"] = gray_read
-        for bad in (g9("3"), g9("4"), g9("없음", "원문에 없는 지어낸 구절이다"), g9("없음", "")):   # 거절 규칙 · 원문에 없는 구절 · 빈 구절은 거절
+        for bad in (g9("3"), g9("4"), g9("없음", "원문에 없는 지어낸 구절이다"), g9("없음", ""),     # 거절 규칙 · 원문에 없는 구절 · 빈 구절 ·
+                    {"reason": "", "asks": [], "done": True}, {"reason": "", "done": True}):     # 물음을 비우거나 칸이 없으면 c8 거절 그대로
             plan["gray_check"] = bad
             r, t = pipeline.answer(qg, up)
             assert r == contract.unknown("default") and t["reason"] == pipeline.REJECTED and "plain" not in t["flow2"], (bad, t["flow2"]["check"])

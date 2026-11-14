@@ -3,7 +3,7 @@
 왜: 11-14 점검에서 낼 판 답이 평균 165자, 조문을 20자 넘게 옮긴 문장 26%, 답 글에 조 번호 36%였다(특강 예시 답은 24~35자).
 어떻게: 「구절 관문」 뒤에 호출 하나(프롬프트 w1)를 ⑥과 나란히 미리 부르고(start), 「근거 정리」 뒤에 받아 답 글만 바꾼다(settle).
 - 인용 · 링크 · 시행일과 답함 / 확인 불가는 건드리지 않는다. ⑥이 거절한 문항은 이 단계에 오지 않는다(미리 부른 호출은 버린다).
-- 새 답이 아래(accept)를 하나라도 어기면 버리고 원래 답을 낸다: 숫자가 원래 답 · 근거 조문에 없음, 결론 낱말(네 · 아니요)이 바뀜,
+- 새 답이 아래(accept)를 하나라도 어기면 버리고 원래 답을 낸다: 숫자가 원래 답 · 근거 조문에 없음, 결론 낱말(네 · 아니요)이 바뀌거나 없던 것이 붙음,
   「조례에 정해져 있지 않다」 안내가 사라짐, 원래 답보다 길어짐(150자까지는 봐줌). 늦거나 깨져도 원래 답을 낸다.
 - 판단 기록 flow2.plain에 판 이름 · 바꾸기 전 답 · 버린 까닭을 남긴다.
 
@@ -72,6 +72,8 @@ def accept(new, old, word, texts):
     a, b = LEAD.match(new), LEAD.match(old)
     if (b and a and _word(a.group(1)) != _word(b.group(1))) or (word in ("네", "아니요") and a and _word(a.group(1)) != word):
         return "결론 낱말이 바뀜"
+    if a and not b and word not in ("네", "아니요"):
+        return "없던 결론 낱말을 붙임"      # ④가 결론을 「정보」로 두었는데 「네, …」로 시작(11-14 dev: 정답 열쇠와 거꾸로인 답 4개가 이 꼴)
     if GRAY.search(old) and not GRAY.search(new):
         return "「정해져 있지 않다」 안내가 빠짐"
     return None
@@ -135,6 +137,10 @@ def selftest():
     assert accept("네, 장애인이 타면 80% 할인됩니다.", old, "네", []) is None
     assert accept("아니요, 할인되지 않습니다.", old, "네", []) == "결론 낱말이 바뀜"
     assert accept("네, 90% 할인됩니다.", old, "네", []) == "없던 숫자 ['90']"
+    plain_old = "초등학생 팀은 어린이 비율이 50% 이상이면 무료입니다."
+    assert accept("네, 초등학생 팀은 50% 이상이면 무료입니다.", plain_old, "정보", []) == "없던 결론 낱말을 붙임"
+    assert accept("초등학생 팀은 50% 이상이면 무료입니다.", plain_old, "정보", []) is None
+    assert accept("네, 50% 이상이면 무료입니다.", plain_old, "네", []) is None          # ④ 결론 칸이 「네」면 첫머리 단계가 어차피 붙인다
     assert accept("확인 불가", old, "네", []) == "확인 불가로 바꿈" and accept(" ", old, "네", []) == "빈 답"
     assert accept("네. " + "가" * 200, old, "네", []) == "더 길어짐"
     assert accept("과태료는 10만 원입니다.", "과태료는 100,000원이다.", "정보", []) is None              # 쉼표 · 「만」을 같은 값으로
