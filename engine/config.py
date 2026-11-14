@@ -74,7 +74,7 @@ DEFAULTS = {
     "flow2_cite": None,              # flow2만: None = 7판 그대로 / "fill" = ⑥을 지난 답의 근거가 원문에서 가리키는 조항을 합쳐 3개까지 덧붙임(코드만) / "pick" = 온톨로지로 넓힌 후보에서 작은 호출 하나가 후보마다 직접 · 참고 · 무관을 골라 같은 조의 곁가지 항을 정리 / "pick+fill" = 둘 다. 답 글과 답함 · 확인 불가는 안 바꾼다
     # ---- #81 결합 질문의 근거를 빠짐없이 (종희) ----
     "flow2_read_asks": False,        # flow2만: True면 ④ 읽기가 r8-81을 쓴다(답 · 근거 전에 물음마다 조항 이름을 적는 칸 asks). False = 판이 고른 프롬프트(7판은 r7)
-    "flow2_read_deleg": False,       # flow2만: True면 ④ 읽기가 r8-deleg를 쓴다(조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 그 조항으로 답함, 11-11 받은 답). "terms"면 r9-terms(r8-deleg + 법률 용어 줄: 월세 → 차임 등, PM 11-14, flow2_read_asks와 함께 쓰지 않음). False = 판이 고른 프롬프트(7판은 r7)
+    "flow2_read_deleg": False,       # flow2만: True면 ④ 읽기가 r8-deleg를 쓴다(조항은 있는데 값 · 세부가 없거나 다른 법령에 넘긴 질문은 그 조항으로 답함, 11-11 받은 답). "topic"이면 r9-topic(r8-deleg + found 앞에 「묻는 일을 정한 조항」 칸 topic, 법률 용어 짝 포함. PM 11-14, flow2_read_asks와 함께 쓰지 않음). False = 판이 고른 프롬프트(7판은 r7)
     # ---- 업스테이지 기준 맞추기 (PM, 11-14 엔진 다시 엶. 점검 보고 「놓친 것」 1 · 2번) ----
     "flow2_check_gray": False,       # flow2만: True면 ⑥이 답 글이 「조례에 정해져 있지 않다 · 조례에 없다」 꼴일 때만 c9-gray를 쓴다(묻는 그 일을 정한 조항이 있고 값만 조례 밖이면 grounded, 그 일 자체가 없으면 거절). 그 밖의 답은 판이 고른 프롬프트(7판은 c8). False = 7판과 같은 동작
     "flow2_plain": False,            # flow2만: True면 ⑥을 지난 답 글을 짧고 쉬운 말로 한 번 더 쓴다(호출 하나를 ⑥과 나란히, 프롬프트 w1, engine/flow2/plain.py). 인용 · 링크 · 시행일은 그대로, 숫자 · 결론이 바뀌면 원래 답. False = 7판과 같은 동작

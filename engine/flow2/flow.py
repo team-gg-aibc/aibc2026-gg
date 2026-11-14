@@ -187,6 +187,7 @@ def view(laws, unit):
 DELEG = re.compile(r"(?:법|영|시행령|시행규칙)\s*제\d+조(?:의\d+)?(?:제\d+항)?(?:제\d+호)?(?:\s*(?:및|ㆍ|·)\s*제\d+항)?\s*"
                    r"(?:각\s*호의\s*(?:행위|사항)|각\s*목에\s*해당하는|별표\s*\d+\s*와\s*같다)")
 DELEG_MARK = "(※ 그 내용은 이 자료에 없다)"
+DELEG_ONLY = "넘기기만 하는 조항만 들고 「조례에 없다」 안내가 없는 답(코드, 11-14)"
 
 
 def context(chunks, mark=False):
@@ -562,6 +563,8 @@ def read(st, cfg):
         _f2(st)["read"]["check"] = out["check"]
     if "asks" in out:                        # #81(r8-81): 물음마다 든 조항 이름
         _f2(st)["read"]["asks"] = out["asks"]
+    if "topic" in out:                       # 11-14(r9-topic): found 앞에 적은 「묻는 일을 정한 조항」
+        _f2(st)["read"]["topic"] = out["topic"]
     if not out.get("found"):
         st["reason"] = pipeline.NOT_FOUND
 
@@ -608,6 +611,12 @@ def check(st, cfg):
     (같은 실행 기록으로 다시 매김). 구절을 못 댄 대상은 실패 고리에서 「시민 말 ↔ 조례 말」 빈칸 후보로 쓴다(failures.py)."""
     kept = set(_f2(st)["gate"]["kept"])
     used = [c for c in st["_view"] if c["label"] in kept]
+    if cfg["flow2_check_gray"] and used and all(DELEG.search(c["text"]) for c in used) and not plain.GRAY.search(st["draft"]["answer"]):
+        # 11-14: 내용을 상위 법령으로 넘기기만 하는 조항(DELEG, 6종에 네 곳)만 든 답은 「그 내용은 조례에 없고 ○○법에서 정한다」 꼴이어야 한다
+        # (받은 2차 답의 정답 꼴). 그 꼴이 아니면 넘겨진 내용을 아는 지식으로 채운 답이라 부르지 않고 거절한다(r8-deleg가 7판의 found 거짓을 푼 자리).
+        st["verdict"], st["reason"] = "notGrounded", pipeline.REJECTED
+        _f2(st)["check"] = {"verdict": "notGrounded", "reason": DELEG_ONLY, "targets": [], "asks": None}
+        return
     s = _f2(st).get("slots") or {}
     targets = [t.strip() for t in s.get("targets") or [] if t and t.strip()][:3]
     cited = lawmap.cited_laws(dict.fromkeys(c["law"] for c in used)) if cfg["flow2_ontology"] else []
@@ -1257,8 +1266,8 @@ def selftest():
         assert list(t["steps"]) == names[:3] and pipeline.answer(qp, base7)[1]["flow2"]["route"]["block"] is None      # 끈 판은 막지 않는다
         # ---- 업스테이지 기준 맞추기(11-14): ⑥ c9-gray(flow2_check_gray) · 쉬운 말 w1(flow2_plain) · 확인 불가 안내(unknown_guide) ----
         upstage.chat = fake_chat                                     # 보낸 시스템 프롬프트를 seen에 남기는 가짜
-        up = dict(base7, flow2_read_deleg="terms", flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
-        assert prompts.pick(up, "read")[:2] == ("r9-terms", prompts.READ9) and "차임" in prompts.READ9 and prompts.pick(up, "plain")[0] == prompts.PLAIN_V
+        up = dict(base7, flow2_read_deleg="topic", flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
+        assert prompts.pick(up, "read")[:2] == ("r9-topic", prompts.READ9) and "차임" in prompts.READ9 and prompts.pick(up, "plain")[0] == prompts.PLAIN_V
         assert lawmap.REJECT_SCOPE == pipeline.SCOPE_REASON and not any(config.DEFAULTS[k] for k in ("flow2_check_gray", "flow2_plain", "unknown_guide"))
         # (1) 보통 답: ⑥은 c8 그대로, 쉬운 말이 답 글만 바꾸고(인용 · 링크 · 시행일 그대로) 답 첫머리가 결론 낱말을 붙인다. 끈 판에는 기록도 없다
         short = "경차는 주차요금이 50% 할인됩니다."
@@ -1282,6 +1291,21 @@ def selftest():
         assert r["citation"] == [rate] and r["answer"] == "아니요, " + easy and contract.guard(r) is r, r
         r, t = pipeline.answer("강서구 " + qg, up)                     # 자치구 이름이 든 질문은 같은 답 꼴이어도 c8
         assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, t["flow2"]["check"]
+        deleg = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]))
+        dq = DELEG.search(deleg["text"]).group(0)
+        plan.update(target_check=ck("grounded"), plain_answer={"answer": "네, 금지됩니다."},
+                    law_answer_quotes=dict(rd(True, [{"label": deleg["label"], "quote": dq}], "네, 그 행위는 금지됩니다."), conclusion="네"))
+        dkey = next(k for k, v in lawmap.LAWS.items() if v == deleg["law"])
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=deleg["law"], targets=["그 행위"], law_guess=dkey)
+        qd = f"{deleg['law']}에서 그 행위는 금지인가요?"
+        r, t = pipeline.answer(qd, up)                                  # 넘기는 조항만 들고 「조례에 없다」가 없으면 부르지 않고 거절
+        assert r == contract.unknown("default") and t["flow2"]["check"]["reason"] == DELEG_ONLY and [c["stage"] for c in t["calls"]].count("질문 대조") == 0
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 내용은 조례에 정해져 있지 않고 상위 법령에서 정합니다.")
+        r, t = pipeline.answer(qd, up)
+        assert r["citation"] == [deleg["label"]] and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["check"]
+        assert pipeline.answer(qd, dict(up, flow2_check_gray=False))[1]["flow2"]["check"]["reason"] != DELEG_ONLY
+        plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거")
+        plan.update(law_answer_quotes=dict(rd(True, [{"label": rate, "quote": "감면율 및 운영에 관한 사항은 시장이 따로 정한다"}], gave), conclusion="아니요"))
         # (4) c9-gray가 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
         plan["target_check"] = ck("notGrounded")
         r, t = pipeline.answer(qg, up)
