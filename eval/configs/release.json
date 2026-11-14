@@ -1,8 +1,8 @@
 {
- "name": "release-c3",
+ "name": "release-c4",
  "issue": "",
- "cycle": 3,
- "tag": "rc-c3",
+ "cycle": 4,
+ "tag": "rc-c4",
  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
  "experiments": [
   {
@@ -16,6 +16,25 @@
    },
    "from": [
     "eval/configs/pm-flow2-v7.json"
+   ]
+  },
+  {
+   "issue": "",
+   "name": "upstage-form",
+   "cycle": null,
+   "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": true,
+    "flow2_plain": true,
+    "unknown_guide": true
+   },
+   "from": [
+    "eval/configs/upstage-form.json"
    ]
   },
   {
@@ -80,9 +99,12 @@
   "answer_prompt": "v2",
   "exit_check": true,
   "flow": "flow2",
+  "flow2_check_gray": true,
   "flow2_hedge_sec": 10,
   "flow2_lead": "comma",
   "flow2_place_scope": true,
+  "flow2_plain": true,
+  "flow2_read_deleg": "topic",
   "flow2_version": 7,
   "group_by_article": true,
   "max_citations": 4,
@@ -90,6 +112,7 @@
   "prefilter_empty_abstain": true,
   "retry_budget": true,
   "select_mode": "prefilter",
-  "top_k": 20
+  "top_k": 20,
+  "unknown_guide": true
  }
 }
