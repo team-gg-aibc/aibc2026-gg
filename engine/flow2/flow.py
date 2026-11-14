@@ -618,11 +618,12 @@ def check(st, cfg):
     (같은 실행 기록으로 다시 매김). 구절을 못 댄 대상은 실패 고리에서 「시민 말 ↔ 조례 말」 빈칸 후보로 쓴다(failures.py)."""
     kept = set(_f2(st)["gate"]["kept"])
     used = [c for c in st["_view"] if c["label"] in kept]
-    if cfg["flow2_check_gray"] and used and all(DELEG.search(c["text"]) for c in used) and not plain.GRAY.search(st["draft"]["answer"]):
-        # 11-14: 내용을 상위 법령으로 넘기기만 하는 조항(DELEG, 6종에 네 곳)만 든 답은 「그 내용은 조례에 없고 ○○법에서 정한다」 꼴이어야 한다
-        # (받은 2차 답의 정답 꼴). 그 꼴이 아니면 넘겨진 내용을 아는 지식으로 채운 답이라 부르지 않고 거절한다(r8-deleg가 7판의 found 거짓을 푼 자리).
-        st["verdict"], st["reason"] = "notGrounded", pipeline.REJECTED
-        _f2(st)["check"] = {"verdict": "notGrounded", "reason": DELEG_ONLY, "targets": [], "asks": None}
+    decided = code_verdict(st, cfg, used)
+    if decided:                              # 11-14(flow2_check_gray): 코드로 정해지는 꼴은 ⑥을 부르지 않는다
+        st["verdict"] = decided[0]
+        _f2(st)["check"] = {"verdict": decided[0], "reason": decided[1], "targets": [], "asks": None}
+        if decided[0] == "notGrounded":
+            st["reason"] = pipeline.REJECTED
         return
     s = _f2(st).get("slots") or {}
     targets = [t.strip() for t in s.get("targets") or [] if t and t.strip()][:3]
@@ -675,14 +676,39 @@ PENALTY_ASK = re.compile(r"과태료|벌금|징역|처벌|벌칙|범칙금")
 PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징수)하는\s*기준|벌금|징역")
 
 
+SCOPE_GRAY = "자치구 · 다른 시도를 묻는 질문에 「조례에 없다」 답(코드, 11-14)"
+PENALTY_DELEG = "벌칙을 묻고 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
+
+
+def code_verdict(st, cfg, used):
+    """11-14(flow2_check_gray): ⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None. 작은 묶음(dev 회색지대 · 함정 · 업스테이지 예시)에서 고른 셋이다.
+    - 넘기기만 하는 조항(DELEG, 6종에 네 곳)만 든 답이 「조례에 없다」 꼴이 아니다 → 거절. 받은 2차 답의 정답 꼴은 「그 내용은 조례에 없고 ○○법에서
+      정한다」다. 아니면 넘겨진 내용을 아는 지식으로 채운 답이다(r8-deleg가 7판의 found 거짓을 푼 자리).
+    - 「조례에 없다」 답인데 ①이 그 질문을 자치구 · 다른 시도가 정하는 일로 봤다 → 거절. 「강서구 금연거리 과태료」 함정이 「금연구역 과태료 10만 원.
+      다만 강서구 금연거리가 지정됐는지는 조례에 없다」로 답해 c8을 지나갔다(두 번 중 두 번).
+    - 「조례에 없다」 답이 벌칙을 묻고, 넘기는 조항만 들었는데 그 조항이 벌칙 기준을 정하며 ④의 topic이다 → 통과. 업스테이지 2차 답의 예
+      (「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가 조문에 없다며 두 번 중 한 번 거절했다."""
+    if not (cfg["flow2_check_gray"] and used):
+        return None
+    gray, deleg_only = plain.GRAY.search(st["draft"]["answer"]), all(DELEG.search(c["text"]) for c in used)
+    if deleg_only and not gray:
+        return "notGrounded", DELEG_ONLY
+    if gray and (_f2(st).get("slots") or {}).get("jurisdiction") in ("자치구", "다른 시도"):
+        return "notGrounded", SCOPE_GRAY
+    if gray and deleg_only and PENALTY_ASK.search(st["question"]) and PENALTY_RULE.search("\n".join(c["text"] for c in used)) \
+            and topic_labels((_f2(st).get("read") or {}).get("topic"), used):
+        return "grounded", PENALTY_DELEG
+    return None
+
+
 def gray_check(st, cfg, used):
-    """11-14(flow2_check_gray): ⑥을 c9-gray로 볼지. 셋을 다 채울 때만이고, 아니면 c8 그대로다.
+    """11-14(flow2_check_gray): ⑥을 c9-gray로 볼지. 넷을 다 채울 때만이고, 아니면 c8 그대로다(넘기기만 하는 조항만 든 답은 c8).
     - 답 글이 「조례에 정해져 있지 않다 · 조례에 없다」 꼴이다(plain.GRAY).
     - ④가 found 앞에 적은 「묻는 일을 정한 조항」(r9-topic의 topic)이 인용에 들어 있다. 작은 묶음(11-14)에서 이 조건이 없을 때 「강아지랑 식당」 ·
       「공원 실효」 함정이 값을 묻지 않는데도 「정해져 있지 않다」 꼴로 답해 c9-gray로 갔다.
     - 질문이 자치구 이름을 들지 않는다. 「강서구 금연거리」 함정이 「다만 …확인할 수 없습니다」 한 문장 때문에 c9-gray로 가서 샜다(자치구가 정한 것인지는 c8 규칙 2가 가린다)."""
-    if not (cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"])):
-        return False
+    if not (cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"])) or all(DELEG.search(c["text"]) for c in used):
+        return False                         # 넘기기만 하는 조항만 든 답은 c8(7판처럼). 작은 묶음에서 「공원 드론」 · 「남산공원 개발」 함정이 c9-gray로 샜다
     return bool(topic_labels((_f2(st).get("read") or {}).get("topic"), used)) and not any(d + "구" in st["question"] for d in lawmap.DISTRICTS)
 
 
@@ -1366,9 +1392,19 @@ def selftest():
         r, t = pipeline.answer(qd, up)                                  # 넘기는 조항만 들고 「조례에 없다」가 없으면 부르지 않고 거절
         assert r == contract.unknown("default") and t["flow2"]["check"]["reason"] == DELEG_ONLY and [c["stage"] for c in t["calls"]].count("질문 대조") == 0
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="그 내용은 조례에 정해져 있지 않고 상위 법령에서 정합니다.")
-        r, t = pipeline.answer(qd, up)
-        assert r["citation"] == [deleg["label"]] and t["flow2"]["check"]["prompt"] == "c9-gray", t["flow2"]["check"]
+        r, t = pipeline.answer(qd, up)                                  # 「조례에 없다」 꼴이면 c8(7판처럼)
+        assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, t["flow2"]["check"]
         assert pipeline.answer(qd, dict(up, flow2_check_gray=False))[1]["flow2"]["check"]["reason"] != DELEG_ONLY
+        fine = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]))
+        fkey = next(k for k, v in lawmap.LAWS.items() if v == fine["law"])
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey)
+        plan["law_answer_quotes"] = dict(rd(True, [{"label": fine["label"], "quote": DELEG.search(fine["text"]).group(0)}],
+                                            "그 과태료 금액은 조례에 정해져 있지 않고 시행령 별표에서 정합니다."), conclusion="정보", topic=fine["label"])
+        qf = f"{fine['law']}에서 그 행위를 하면 과태료가 얼마예요?"
+        r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
+        assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        plan["question_slots"] = dict(plan["question_slots"], jurisdiction="자치구", jurisdiction_word="강서구")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == SCOPE_GRAY          # ①이 자치구 일로 본 「조례에 없다」 답은 거절
         plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거")
         plan["law_answer_quotes"] = gray_read
         # (4) ⑥이 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
