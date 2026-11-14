@@ -5,7 +5,8 @@
 - 인용 · 링크 · 시행일과 답함 / 확인 불가는 건드리지 않는다. ⑥이 거절한 문항은 이 단계에 오지 않는다(미리 부른 호출은 버린다).
 - 새 답이 아래(accept)를 하나라도 어기면 버리고 원래 답을 낸다: 숫자가 원래 답 · 근거 조문에 없음, 결론 낱말(네 · 아니요)이 바뀌거나 없던 것이 붙음,
   「조례에 정해져 있지 않다」 안내가 사라짐, 원래 답보다 길어짐(150자까지는 봐줌). 늦거나 깨져도 원래 답을 낸다.
-- 판단 기록 flow2.plain에 판 이름 · 바꾸기 전 답 · 버린 까닭을 남긴다.
+- 판단 기록 flow2.plain에 판 이름 · 바꾸기 전 답 · 버린 까닭 · 본문이 뜻하는 결론(body_says)을 남긴다.
+- 본문이 뜻하는 결론(body_says, w6)이 나갈 첫 낱말(네 · 아니요)과 거꾸로면 첫 낱말을 뺀다(답 첫머리 단계도 붙이지 않는다, flow2.plain.no_lead).
 
 스스로 시험(키 없이): python -m engine.flow2.plain --selftest
 """
@@ -25,6 +26,7 @@ GRAY = re.compile(r"(?:정해져|정하여져|규정되어|규정돼|명시되�
                   r"|정하지 (?:않|아니)|(?:조례|조문|자료|6종)에는? 없"
                   r"|(?:조례|조문|6종)에는?[^.?!]{0,40}(?:규정|조항|내용|기준|값|금액|비율|수치)[이가은는]? 없")   # 「조례에는 ~을 정한 규정이 없습니다」(11-14 작은 묶음의 함정 답)
 LEAD = re.compile(r"^\s*(네|예|아니요|아니오)(?=[\s,.!]|$)")
+LEAD_STRIP = re.compile(r"^\s*(?:네|예|아니요|아니오)(?=[\s,.!]|$)[\s,.!]*")
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(만|천)?")
 
 
@@ -95,7 +97,7 @@ def _ask(box, cfg, text):
     def run():
         return flow.guarded(box, cfg, lambda calls: json.loads(upstage.chat(messages, cfg, calls, response_format=schema)), "plain")
     out = flow._memoed(box, cfg, ["plain", system, text], run) if cfg.get("flow2_memo") else run()
-    return out.get("answer")
+    return out.get("answer"), out.get("body_says")
 
 
 def start(st, cfg):
@@ -119,17 +121,23 @@ def settle(st, cfg):
     rec = flow._f2(st)["plain"] = {"prompt": prompts.PLAIN_V, "word": word, "before": old}
     try:
         left = flow._left()
-        new = fut.result(timeout=WAIT if left is None else max(0.0, min(WAIT, left - 2)))
+        new, says = fut.result(timeout=WAIT if left is None else max(0.0, min(WAIT, left - 2)))
         st["calls"].extend(box["calls"])
         if box.get("flow2"):
             flow._f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
-        rec["drop"] = accept(new, old, word, texts)
+        rec["drop"], rec["body_says"] = accept(new, old, word, texts), says
     except FutureTimeout:
-        rec["drop"] = "늦음"
+        rec["drop"], new, says = "늦음", None, None
     except Exception as e:  # noqa: BLE001  이 단계의 오류로 답을 잃지 않는다
-        rec["drop"] = type(e).__name__
-    if not rec["drop"]:
-        st["draft"] = dict(st["draft"], answer=new.strip())
+        rec["drop"], new, says = type(e).__name__, None, None
+    text = new.strip() if not rec["drop"] else old
+    lead = LEAD.match(old) or LEAD.match(text)
+    shown = _word(lead.group(1)) if lead else (word if word in ("네", "아니요") else None)    # 나갈 첫 낱말(답 첫머리 단계가 붙일 것 포함)
+    if shown and says in ("네", "아니요") and says != shown:
+        # 본문이 뜻하는 결론과 첫 낱말이 거꾸로다: 틀린 첫 낱말을 내보내느니 뺀다(답 첫머리 단계도 붙이지 않는다). 본문 · 인용은 그대로
+        text, rec["no_lead"] = LEAD_STRIP.sub("", text, count=1), f"첫 낱말 {shown} ↔ 본문 {says}"
+    if text != old:
+        st["draft"] = dict(st["draft"], answer=text)
 
 
 def selftest():

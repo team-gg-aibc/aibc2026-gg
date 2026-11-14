@@ -857,7 +857,8 @@ def lead(st, cfg):
     word = (_f2(st).get("read") or {}).get("conclusion")
     ask = next((p for p in lawmap._SENT.split(st["question"]) if p.rstrip().endswith(("?", "？"))), st["question"])
     skip = ("이미 결론 낱말로 시작" if LEAD.match(new.lstrip()) else "결론 칸이 네 · 아니요가 아님" if word not in ("네", "아니요")
-            else "첫 물음에 묻는 말이 있음" if ASK_WORD.search(ask) else None)
+            else "첫 물음에 묻는 말이 있음" if ASK_WORD.search(ask)
+            else "본문과 거꾸로라 쉬운 말 단계가 뺌" if (_f2(st).get("plain") or {}).get("no_lead") else None)
     if not skip:
         new = word + LEAD_JOIN[cfg["flow2_lead"]] + new.lstrip()
     _f2(st)["lead"] = {"word": None if skip else word, "skip": skip, "before": old if new != old else None}
@@ -1361,6 +1362,19 @@ def selftest():
         plan["plain_answer"] = {"answer": "경차는 주차요금이 90% 할인됩니다."}
         r, t = pipeline.answer(q, up)
         assert r["answer"] == "네, " + ans and t["flow2"]["plain"]["drop"] == "없던 숫자 ['90']", t["flow2"]["plain"]
+        # (2-1) 다듬기가 읽은 본문의 결론(body_says)이 나갈 첫 낱말과 거꾸로면 첫 낱말을 빼고 답 첫머리도 안 붙인다. 같으면 그대로
+        plan["plain_answer"] = {"answer": short, "body_says": "아니요"}
+        r, t = pipeline.answer(q, up)
+        assert r["answer"] == short and t["flow2"]["plain"]["no_lead"] and t["flow2"]["lead"]["skip"] == "본문과 거꾸로라 쉬운 말 단계가 뺌", (r, t["flow2"])
+        plan["plain_answer"] = {"answer": "네, " + short, "body_says": "아니요"}
+        assert pipeline.answer(q, up)[0]["answer"] == short
+        plan["plain_answer"] = {"answer": "경차는 주차요금이 90% 할인됩니다.", "body_says": "아니요"}      # 다듬은 답을 버려도 원래 답의 첫 낱말을 본다
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], "네, " + ans)
+        assert pipeline.answer(q, up)[0]["answer"] == ans
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], ans)
+        for said in ("네", "정보", None):
+            plan["plain_answer"] = {"answer": short, "body_says": said} if said else {"answer": short}
+            assert pipeline.answer(q, up)[0]["answer"] == "네, " + short, said
         # (3) ⑥은 c8을 먼저 한다. c8이 거절한 「조례에 정해져 있지 않다」 답이고 ④가 적은 topic 조항이 인용에 있으면 c9-gray로 한 번 더 본다.
         #     c9-gray 판정은 코드: rule 「없음」 + basis가 근거 글에 있으면 통과 → 쉬운 말 · 첫머리를 거쳐 그 조항을 인용해 나간다
         easy = "감면율은 조례에 정해져 있지 않고 시장이 따로 정합니다. 서울시 공고나 120다산콜에서 확인할 수 있습니다."
