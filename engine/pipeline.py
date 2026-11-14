@@ -134,7 +134,13 @@ def final(st, cfg):
         resp = contract.unknown()
     else:
         resp = st["response"]
-    return contract.finalize(resp, cfg) if cfg["exit_check"] else resp
+    resp = contract.finalize(resp, cfg) if cfg["exit_check"] else resp
+    if cfg["unknown_guide"] and contract.is_unknown(resp):     # 11-14: 확인 불가 뒤에 어디에 물으면 되는지 한 줄(정해 둔 글만)
+        resp = contract.unknown("scope" if st["reason"] == SCOPE_REASON else "default")
+    return resp
+
+
+SCOPE_REASON = "관할 밖"     # engine/flow2/lawmap.REJECT_SCOPE(자치구 · 다른 시도가 스스로 정한 것). 순환 가져오기를 피하려고 글로 둔다
 
 
 if __name__ == "__main__":   # 한 문항 돌려 보기: python3 -m engine.pipeline "질문" [설정 파일]

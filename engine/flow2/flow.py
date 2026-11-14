@@ -625,7 +625,8 @@ def check(st, cfg):
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used, cfg['flow2_version'] >= 7)}\n\n"
             f"[답변]\n{st['draft']['answer']}")
-    out = _ask(st, cfg, "check", user)
+    step = "check_gray" if cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"]) else "check"   # 11-14: 「정해져 있지 않다」 꼴만 c9-gray
+    out = _ask(st, cfg, step, user)
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
     marks = []
@@ -638,6 +639,8 @@ def check(st, cfg):
     else:
         st["verdict"] = out.get("verdict")
     _f2(st)["check"] = {"verdict": st["verdict"], "reason": out.get("reason", ""), "targets": marks, "asks": out.get("asks")}
+    if step != "check":
+        _f2(st)["check"]["prompt"] = prompts.pick(cfg, step)[0]
     if "_vote" in out:                       # 다수결(flow2_votes)을 켰을 때만 있다
         _f2(st).setdefault("vote", {})["check"] = out["_vote"]
     if st["verdict"] == "notGrounded":
@@ -776,6 +779,12 @@ STAGES = [("검색", search), ("질문 분석", analyze), ("조례 확정", rout
 # STAGES 줄을 고치지 않고 이름으로 찾아 끼운다(같은 주기의 다른 실험이 그 줄에 단계를 더한다).
 from . import cite  # noqa: E402  (cite는 flow를 함수 안에서만 부른다)
 for _after, _stage in (("구절 관문", ("근거 고르기", cite.start)), ("질문 대조", ("근거 정리", cite.settle))):
+    STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
+
+# ---- PM(11-14): 쉬운 말로 다듬기(plain.py). 스위치 flow2_plain이 False(기본값)면 두 단계는 아무 일도 하지 않는다 ----
+# 다듬기 호출은 ⑥과 나란히 미리 부르고(「근거 고르기」 뒤), 「근거 정리」 뒤에 받아 답 글만 바꾼다. 답 첫머리(lead)는 그다음이다.
+from . import plain  # noqa: E402  (plain은 flow를 함수 안에서만 부른다. check가 plain.GRAY를 쓴다)
+for _after, _stage in (("근거 고르기", ("쉬운 말 미리 부르기", plain.start)), ("근거 정리", ("쉬운 말", plain.settle))):
     STAGES.insert([n for n, _ in STAGES].index(_after) + 1, _stage)
 
 
@@ -1195,7 +1204,8 @@ def selftest():
         assert diff(rc1) == dict(diff(base7), flow2_place_scope=True, flow2_cite="pick+fill", flow2_handed="law", flow2_read_deleg=True, flow2_lead="comma")
         assert diff(nodeleg) == {k: v for k, v in diff(rc1).items() if k != "flow2_read_deleg"}
         names = [n for n, _ in STAGES]
-        assert names == ["검색", "질문 분석", "조례 확정", "조례 읽기 · 답 쓰기", "구절 관문", "근거 고르기", "질문 대조", "근거 정리", "답 첫머리", "출력"]
+        assert names == ["검색", "질문 분석", "조례 확정", "조례 읽기 · 답 쓰기", "구절 관문", "근거 고르기", "쉬운 말 미리 부르기", "질문 대조",
+                         "근거 정리", "쉬운 말", "답 첫머리", "출력"]
 
         def pick_plan(kept, direct, laws):       # 다시 고르기의 가짜 응답: direct만 「직접」, 나머지 후보는 「참고」
             cands = [c["label"] for c in cite.widen(kept, view(laws, "paragraph"))]
@@ -1232,7 +1242,7 @@ def selftest():
         # (4) 「확인 불가」로 끝난 답은 뒤 단계가 건드리지 않는다: ⑥ 거절(맡긴 답 꼴 아님) · ④ found 거짓 · ③ 장소 가리기(6종 밖)
         plan.update(target_check=ck("notGrounded"), law_answer_quotes=dict(plan["law_answer_quotes"], answer="네, 감면됩니다."))
         r, t = pipeline.answer(qg, rc1)
-        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and list(t["steps"]) == names[:7], (t["reason"], list(t["steps"]))
+        assert r == contract.UNKNOWN and t["reason"] == pipeline.REJECTED and list(t["steps"]) == names[:names.index("질문 대조") + 1], (t["reason"], list(t["steps"]))
         assert not {"handed", "cite", "lead"} & set(t["flow2"])
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
         r, t = pipeline.answer(qg, rc1)
@@ -1242,6 +1252,40 @@ def selftest():
         r, t = pipeline.answer(qp, rc1)
         assert r == contract.UNKNOWN and t["reason"] == lawmap.REJECT_NAME and t["flow2"]["route"]["rule"] == lawmap.RULE_PLACE, t["flow2"]["route"]
         assert list(t["steps"]) == names[:3] and pipeline.answer(qp, base7)[1]["flow2"]["route"]["block"] is None      # 끈 판은 막지 않는다
+        # ---- 업스테이지 기준 맞추기(11-14): ⑥ c9-gray(flow2_check_gray) · 쉬운 말 w1(flow2_plain) · 확인 불가 안내(unknown_guide) ----
+        upstage.chat = fake_chat                                     # 보낸 시스템 프롬프트를 seen에 남기는 가짜
+        up = dict(base7, flow2_read_deleg=True, flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
+        assert lawmap.REJECT_SCOPE == pipeline.SCOPE_REASON and not any(config.DEFAULTS[k] for k in ("flow2_check_gray", "flow2_plain", "unknown_guide"))
+        # (1) 보통 답: ⑥은 c8 그대로, 쉬운 말이 답 글만 바꾸고(인용 · 링크 · 시행일 그대로) 답 첫머리가 결론 낱말을 붙인다. 끈 판에는 기록도 없다
+        short = "경차는 주차요금이 50% 할인됩니다."
+        plan.update(question_slots=dict(slots, actor="시민"), target_check=ck("grounded"), plain_answer={"answer": short},
+                    law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
+        (r, t), (r7, t7) = pipeline.answer(q, up), pipeline.answer(q, base7)
+        assert r == dict(r7, answer="네, " + short) and t["flow2"]["plain"]["drop"] is None and t["flow2"]["plain"]["before"] == ans, (r, t["flow2"].get("plain"))
+        assert seen["target_check"][0]["content"] == prompts.CHECK8 and "prompt" not in t["flow2"]["check"] and list(t["steps"]) == names
+        assert [c["stage"] for c in t["calls"]] == ["질문 분석", "조례 읽기 · 답 쓰기", "질문 대조", "쉬운 말"] and "plain" not in t7["flow2"]
+        # (2) 새 답이 없던 숫자를 쓰면 버리고 원래 답(첫머리는 붙는다)
+        plan["plain_answer"] = {"answer": "경차는 주차요금이 90% 할인됩니다."}
+        r, t = pipeline.answer(q, up)
+        assert r["answer"] == "네, " + ans and t["flow2"]["plain"]["drop"] == "없던 숫자 ['90']", t["flow2"]["plain"]
+        # (3) 「조례에 정해져 있지 않다」 답은 ⑥이 c9-gray로 보고, 통과하면 쉬운 말 · 첫머리를 거쳐 그 조항을 인용해 나간다
+        easy = "감면율은 조례에 정해져 있지 않고 시장이 따로 정합니다. 서울시 공고나 120다산콜에서 확인할 수 있습니다."
+        plan.update(question_slots=dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거"), target_check=ck("grounded"),
+                    law_answer_quotes=dict(rd(True, [{"label": rate, "quote": "감면율 및 운영에 관한 사항은 시장이 따로 정한다"}], gave),
+                                           conclusion="아니요"), plain_answer={"answer": easy})
+        r, t = pipeline.answer(qg, up)
+        assert t["flow2"]["check"]["prompt"] == "c9-gray" and seen["target_check"][0]["content"] == prompts.CHECK9, t["flow2"]["check"]
+        assert r["citation"] == [rate] and r["answer"] == "아니요, " + easy and contract.guard(r) is r, r
+        # (4) c9-gray가 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
+        plan["target_check"] = ck("notGrounded")
+        r, t = pipeline.answer(qg, up)
+        assert r == contract.unknown("default") and r["answer"].startswith("확인 불가. ") and t["reason"] == pipeline.REJECTED and "plain" not in t["flow2"]
+        assert pipeline.answer(qg, dict(up, unknown_guide=False))[0] == contract.UNKNOWN
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
+        assert pipeline.answer(qg, up)[0] == contract.unknown("default")
+        # (5) 자치구 · 다른 시도가 스스로 정한 것을 물어 ③에서 끝나면 구청 · 시도 안내, 그 밖의 까닭은 기본 안내
+        for why, key in ((lawmap.REJECT_SCOPE, "scope"), (lawmap.REJECT_NAME, "default"), (pipeline.TIMEOUT, "default")):
+            assert pipeline.final({"reason": why, "draft": None, "response": None}, up) == contract.unknown(key), why
         # 출발 판(flow 기본값)은 그대로 kit 흐름
         assert config.DEFAULTS["flow"] == "kit" and config.DEFAULTS["flow2_hedge_sec"] is None
     finally:

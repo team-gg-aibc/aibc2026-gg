@@ -16,10 +16,17 @@ from pathlib import Path
 UNKNOWN = {"answer": "확인 불가", "citation": [], "source_url": "", "effective_date": ""}
 FIELDS = tuple(UNKNOWN)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# 11-14(설정 unknown_guide): 「확인 불가」 뒤에 붙이는 안내 한 줄. 11-11 받은 답: 「확인 불가」로 시작하고 인용이 비면 뒤에 안내를 붙여도
+# 정답이고 답변 품질에 도움이 된다. 모델이 쓴 글은 붙지 않는다: 확인 불가 꼴로 인정하는 답 글은 아래 고정 글뿐이다(guard).
+# 「scope」는 자치구 · 다른 시도가 스스로 정한 것을 물어 ③에서 끝난 문항, 「default」는 나머지다(pipeline.final이 고른다).
+GUIDES = {"scope": "자치구나 다른 시·도가 정한 내용은 서울시 조례 6종에 없습니다. 해당 구청이나 시·도에 문의해 주세요.",
+          "default": "서울시 조례 6종에는 이 질문을 다루는 조항이 없습니다. 서울시 120다산콜에 문의해 주세요."}
+UNKNOWN_ANSWERS = {UNKNOWN["answer"], *(f"{UNKNOWN['answer']}. {g}" for g in GUIDES.values())}
 
 
-def unknown():
-    return {**UNKNOWN, "citation": []}     # 인용 목록을 새로 만든다(돌려준 dict를 고쳐도 UNKNOWN이 바뀌지 않게)
+def unknown(guide=None):
+    """확인 불가 응답. guide(GUIDES의 열쇠)를 주면 안내 한 줄을 붙인다. 인용 목록은 새로 만든다(고쳐도 UNKNOWN이 바뀌지 않게)."""
+    return {**UNKNOWN, "answer": f"{UNKNOWN['answer']}. {GUIDES[guide]}" if guide else UNKNOWN["answer"], "citation": []}
 
 
 def build(answer, used):
@@ -31,11 +38,14 @@ def build(answer, used):
 
 
 def is_unknown(resp):
-    return resp == UNKNOWN
+    """킷 꼴 확인 불가, 또는 그 뒤에 GUIDES 안내 한 줄을 붙인 꼴(나머지 세 칸은 킷과 같다)."""
+    return isinstance(resp, dict) and resp.get("answer") in UNKNOWN_ANSWERS and {**resp, "answer": UNKNOWN["answer"]} == UNKNOWN
 
 
 def guard(resp):
-    """꼴만 본다: 맞으면 그대로, 아니면 확인 불가. 확인 불가로 시작하는 답은 정확히 킷의 꼴로 맞춘다."""
+    """꼴만 본다: 맞으면 그대로, 아니면 확인 불가. 확인 불가로 시작하는 답은 킷의 꼴(또는 정해 둔 안내를 붙인 꼴)로 맞춘다."""
+    if is_unknown(resp):
+        return resp
     if not isinstance(resp, dict) or set(resp) != set(FIELDS):
         return unknown()
     a, c, u, d = (resp[k] for k in FIELDS)
@@ -61,6 +71,8 @@ def sources(unit):
 
 def finalize(resp, cfg):
     """마지막 출구 검사(exit_check). 돌려주는 것은 늘 guard를 지나는 꼴이다."""
+    if is_unknown(resp):
+        return resp
     if not isinstance(resp, dict):
         return unknown()
     a, c = resp.get("answer"), resp.get("citation")
@@ -97,8 +109,15 @@ def selftest():
     assert guard(ok) is ok and guard(unknown()) == UNKNOWN
     for bad in (None, [], "확인 불가", {"answer": "네"}, dict(ok, extra=1), dict(ok, citation=a), dict(ok, citation=[1]),
                 dict(ok, source_url="law.go.kr"), dict(ok, effective_date="2026.10.01"), dict(ok, citation=[]),
-                dict(ok, answer=""), dict(ok, answer="확인 불가: 조례에 없음"), dict(unknown(), citation=[a])):
+                dict(ok, answer=""), dict(ok, answer="확인 불가: 조례에 없음"), dict(unknown(), citation=[a]),
+                dict(unknown(), answer="확인 불가. 이 내용은 모델이 지어낸 법에서 정합니다."), dict(unknown("default"), citation=[a]),
+                dict(unknown("scope"), source_url=url)):
         assert guard(bad) == UNKNOWN, bad
+    # 11-14: 정해 둔 안내를 붙인 확인 불가는 그대로 나간다(킷 채점: 「확인 불가」로 시작 + 빈 인용)
+    for key in GUIDES:
+        g = unknown(key)
+        assert guard(g) is g and is_unknown(g) and g["answer"].startswith("확인 불가. ") and g["citation"] == [] and g != UNKNOWN
+    assert is_unknown(UNKNOWN) and not is_unknown(ok) and not is_unknown("확인 불가")
     u = unknown()
     u["citation"].append("x")
     assert UNKNOWN["citation"] == []

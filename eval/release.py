@@ -122,7 +122,7 @@ def violations(resp, labels):
     if not (isinstance(a, str) and isinstance(c, list) and all(isinstance(x, str) for x in c) and isinstance(u, str) and isinstance(d, str)):
         return ["칸 자료형"]
     if a.startswith("확인 불가"):
-        return [] if resp == contract.UNKNOWN else ["확인 불가 꼴이 다름"]
+        return [] if contract.is_unknown(resp) else ["확인 불가 꼴이 다름"]     # 킷 꼴, 또는 정해 둔 안내 한 줄을 붙인 꼴(11-14 unknown_guide)
     if not c:
         return ["인용 없이 답함"]
     out = [p for p, bad in (("인용 꼴(킷 채점식으로 안 읽힘)", any(R.parse(x) is None for x in c)),
@@ -183,7 +183,7 @@ def smoke(cfg, name):
                 text = q["question"]
                 row = {"kind": kind, "id": q["id"], "question": text if len(text) <= 60 else f"{text[:30]}…({len(text):,}자)",
                        "status": status, "sec": sec, "problems": violations(resp, labels) if status == 200 else [f"HTTP {status}"],
-                       "unknown": resp == contract.UNKNOWN,
+                       "unknown": contract.is_unknown(resp),
                        "citations": len(resp["citation"]) if isinstance(resp, dict) and isinstance(resp.get("citation"), list) else None,
                        "score": None, "leak": False}
                 if q["gold"] is not None:
@@ -468,6 +468,7 @@ def selftest():
     labels = {a, "서울특별시 주차장 설치 및 관리 조례 별표 1"}
     ok = {"answer": "네", "citation": [a], "source_url": "https://www.law.go.kr/x", "effective_date": "2026-10-01"}
     assert violations(ok, labels) == [] and violations(contract.unknown(), labels) == []
+    assert violations(contract.unknown("default"), labels) == [] == violations(contract.unknown("scope"), labels)
     cases = {"네 칸이 아님": {"answer": "네", "citation": [a]}, "칸 자료형": dict(ok, citation=[7]),
              "확인 불가 꼴이 다름": dict(contract.unknown(), citation=[a]), "인용 없이 답함": dict(ok, citation=[]),
              "색인에 없는 인용": dict(ok, citation=["서울특별시 주차장 설치 및 관리 조례 제99조"]),
