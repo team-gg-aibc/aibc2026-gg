@@ -677,29 +677,30 @@ PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징
 
 
 ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
-SCOPE_GRAY = "자치구 · 다른 시도를 묻는 질문에 「조례에 없다」 답(코드, 11-14)"
-PENALTY_DELEG = "벌칙을 묻고 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
+CAN_GRAY = "해도 되는지 묻는 질문에 첫 문장부터 「조례에 없다」로 답함(코드, 11-14)"
+PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 조항을 든 「조례에 없다」 답(코드, 11-14)"
 
 
 def code_verdict(st, cfg, used):
     """11-14(flow2_check_gray): ⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None. 작은 묶음(dev 회색지대 · 함정 · 업스테이지 예시)에서 고른 셋이다.
     - 넘기기만 하는 조항(DELEG, 6종에 네 곳)만 든 답이 「조례에 없다」 꼴이 아니다 → 거절. 받은 2차 답의 정답 꼴은 「그 내용은 조례에 없고 ○○법에서
       정한다」다. 아니면 넘겨진 내용을 아는 지식으로 채운 답이다(r8-deleg가 7판의 found 거짓을 푼 자리).
-    - 「조례에 없다」 답인데 ①이 그 질문을 자치구 · 다른 시도가 정하는 일로 봤다 → 거절. 「강서구 금연거리 과태료」 함정이 「금연구역 과태료 10만 원.
-      다만 강서구 금연거리가 지정됐는지는 조례에 없다」로 답해 c8을 지나갔다(두 번 중 두 번).
-    - 「조례에 없다」 답이 벌칙을 묻고, 넘기는 조항만 들었는데 그 조항이 벌칙 기준을 정하며 ④의 topic이다 → 통과. 업스테이지 2차 답의 예
-      (「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가 조문에 없다며 두 번 중 한 번 거절했다."""
+    - 해도 되는지 묻는 질문(① asks)에 네 · 아니요 없이 첫 문장부터 「조례에 정해져 있지 않다」로 답했다 → 거절. 묻는 일을 다루는 조항이 없다는 뜻이다
+      (회색지대 32문항에 이 꼴 0. 「강아지랑 식당」 함정이 이 꼴로 c8을 두 번 지나갔다).
+    - 「조례에 없다」 답이 벌칙을 묻고, ④의 topic 조항이 인용에 있으며 그 조항 글이 벌칙을 매기거나 기준을 정한다 → 통과. 업스테이지 2차 답의 예
+      (「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가 조문에 없다며 거절하곤 했다.
+    (자치구 이름 · ① 관할 칸으로 거절하는 규칙은 넣었다가 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다.)"""
     if not (cfg["flow2_check_gray"] and used):
         return None
     gray, deleg_only = plain.GRAY.search(st["draft"]["answer"]), all(DELEG.search(c["text"]) for c in used)
     if deleg_only and not gray:
         return "notGrounded", DELEG_ONLY
-    s = _f2(st).get("slots") or {}
-    word = s.get("jurisdiction_word") or ""
-    if gray and word and word in st["question"] and (s.get("jurisdiction") == "다른 시도" or (s.get("jurisdiction") == "자치구" and lawmap._district(word))):
-        return "notGrounded", SCOPE_GRAY     # ①의 관할 칸만으로는 안 된다: 「구청 청사 주차장」 · 「공원 흡연구역」도 자치구로 적는다(회색지대 4번)
-    if gray and deleg_only and PENALTY_ASK.search(st["question"]) and PENALTY_RULE.search("\n".join(c["text"] for c in used)) \
-            and topic_labels((_f2(st).get("read") or {}).get("topic"), used):
+    answer = st["draft"]["answer"].strip()
+    first = (_SENT.findall(answer) or [""])[0]
+    if ASK_CAN.search((_f2(st).get("slots") or {}).get("asks") or "") and plain.GRAY.search(first) and not plain.LEAD.match(answer):
+        return "notGrounded", CAN_GRAY
+    tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
+    if gray and PENALTY_ASK.search(st["question"]) and any(PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
         return "grounded", PENALTY_DELEG
     return None
 
@@ -719,7 +720,8 @@ def gray_check(st, cfg, used):
 
 def topic_labels(topic, chunks):
     """④ topic 칸(r9-topic, 조나 항의 이름) → chunks 가운데 그 조항에 드는 조각 이름. 조 이름(「…제13조(제목)」)이면 그 조의 항이 모두 든다."""
-    ks = [_norm(x) for x in re.split(r"\]\s*\[|[\[\]]|,|·|ㆍ", (topic or "").replace("[조항]", "")) if _norm(x)]   # 여러 조항을 적기도 한다(「[…제6조 제1항] […별표 1]」)
+    bare = re.sub(r"\([^()]*\)", "", (topic or "").replace("[조항]", ""))       # 조 제목 괄호를 먼저 지운다(제목 안에 「ㆍ」가 있다)
+    ks = [_norm(x) for x in re.split(r"[\[\],·ㆍ]|\s및\s", bare) if _norm(x)]     # 여러 조항을 적기도 한다(「[…제6조 제1항] […별표 1]」 · 「제20조 및 별표 2」)
     out = []
     for c in chunks:
         keys = (_norm(c["label"]), _norm(c["label"].removeprefix(c.get("law", ""))))
@@ -1395,7 +1397,7 @@ def selftest():
                     plain_answer={"answer": "네, 금지됩니다."},
                     law_answer_quotes=dict(rd(True, [{"label": deleg["label"], "quote": dq}], "네, 그 행위는 금지됩니다."), conclusion="네", topic=deleg["label"]))
         dkey = next(k for k, v in lawmap.LAWS.items() if v == deleg["law"])
-        plan["question_slots"] = dict(slots, actor="시민", named_rule=deleg["law"], targets=["그 행위"], law_guess=dkey)
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=deleg["law"], targets=["그 행위"], law_guess=dkey, asks="금지 행위")
         qd = f"{deleg['law']}에서 그 행위는 금지인가요?"
         r, t = pipeline.answer(qd, up)                                  # 넘기는 조항만 들고 「조례에 없다」가 없으면 부르지 않고 거절
         assert r == contract.unknown("default") and t["flow2"]["check"]["reason"] == DELEG_ONLY and [c["stage"] for c in t["calls"]].count("질문 대조") == 0
@@ -1405,17 +1407,16 @@ def selftest():
         assert pipeline.answer(qd, dict(up, flow2_check_gray=False))[1]["flow2"]["check"]["reason"] != DELEG_ONLY
         fine = next(c for c in retrieve.load("paragraph")[0] if DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]))
         fkey = next(k for k, v in lawmap.LAWS.items() if v == fine["law"])
-        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey)
+        plan["question_slots"] = dict(slots, actor="시민", named_rule=fine["law"], targets=["그 행위"], law_guess=fkey, asks="과태료 금액")
         plan["law_answer_quotes"] = dict(rd(True, [{"label": fine["label"], "quote": DELEG.search(fine["text"]).group(0)}],
                                             "그 과태료 금액은 조례에 정해져 있지 않고 시행령 별표에서 정합니다."), conclusion="정보", topic=fine["label"])
         qf = f"{fine['law']}에서 그 행위를 하면 과태료가 얼마예요?"
         r, t = pipeline.answer(qf, up)                                  # 벌칙을 묻고 벌칙 기준을 넘기는 조항(topic) → 부르지 않고 통과
         assert r["citation"] == [fine["label"]] and t["flow2"]["check"]["reason"] == PENALTY_DELEG and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
-        plan["question_slots"] = dict(plan["question_slots"], jurisdiction="자치구", jurisdiction_word="강서구")
-        assert pipeline.answer("강서구 " + qf, up)[1]["flow2"]["check"]["reason"] == SCOPE_GRAY   # 자치구 이름을 든 질문의 「조례에 없다」 답은 거절
-        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == PENALTY_DELEG          # 관할 낱말이 질문에 없으면(① 칸만) 거절하지 않는다
-        plan["question_slots"] = dict(plan["question_slots"], jurisdiction="자치구", jurisdiction_word="구청")
-        assert pipeline.answer("구청 " + qf, up)[1]["flow2"]["check"]["reason"] == PENALTY_DELEG     # 「구청」은 자치구 이름이 아니다
+        plan["question_slots"] = dict(plan["question_slots"], asks="가능 여부")      # 해도 되는지 묻는데 첫 문장부터 「조례에 없다」 → 거절
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] == CAN_GRAY
+        plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], answer="아니요, 그 행위는 금지됩니다. 과태료 금액은 조례에 정해져 있지 않습니다.")
+        assert pipeline.answer(qf, up)[1]["flow2"]["check"]["reason"] != CAN_GRAY    # 네 · 아니요로 답했으면 그 규칙이 아니다
         plan["question_slots"] = dict(slots, actor="시민", targets=["공공자전거"], law_guess="자전거", asks="감면율")
         plan["law_answer_quotes"] = gray_read
         # (4) ⑥이 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
