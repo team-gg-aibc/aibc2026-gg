@@ -1,6 +1,6 @@
 # 실험 기록
 
-> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 126개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
+> `python3 eval/board.py`가 `eval/runs/`의 실행 요약 128개로 만든다. 손으로 고치지 않는다. 규칙: [재현 규칙](reproducibility.md) · 한눈에 비교: [리더보드](leaderboard.md)
 
 - 실험마다 켠 판과 끈 판을 **같은 main 커밋 · 같은 문항**으로 같은 날 잰다(계획 5-2절). 「켠 스위치」는 출발 판(`engine/config.py` DEFAULTS)과 다른 설정이다.
 - **재는 법 기본값**: 채택 판단은 **dev 전체**로 하고, 켠 판 · 끈 판을 **각각 두 번 이상** 잰다(`python3 eval/run.py --config <설정> --split dev --repeat 2`). 100문항 표본은 빠른 확인용으로만 쓴다(흔들림이 2.5~4.9점이라 채택 판단에 쓰지 않는다). dev 전체 한 판은 약 10분, 기록 비용 약 $0.38이다. 실제 콘솔 차감은 그 6할쯤이라 한 판 약 $0.2다(11-06 기준).
@@ -112,6 +112,7 @@
 | 2026-11-13 |  | 3088562 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_handed="law", flow2_cite="pick+fill", flow2_read_deleg=true | rc1 · stress 전체 · 283문항 | 84.5 | 88.7 | 92.8 | 95.7 | 89.9 | 10.6 | 1.90 | 12.7초 | $0.67 | 버림 — dev 가중 평균은 7판보다 +1.6(94.6 대 93.0)이지만, 엔진을 고칠 때 보지 않은 문항 70개에서 7판보다 낮고(94.5 · 95.4 대 94.8 · 98.0) 함정 한 문항을 두 번 다 놓쳤다. 극한 세트에서도 함정을 더 놓쳤다(91.5 · 95.7 대 95.7 · 97.9). 그 결과를 보기 전에 적어 둔 규칙(처음 보는 문항에서 나빠지지 않을 것 · 7판이 막던 함정을 놓치지 않을 것)에 걸린다 | dev에서 오른 몫은 거의 r8-deleg(회색지대 32문항 22 → 50%)인데, 같은 스위치가 함정에 답하는 쪽으로도 민다. dev 한 세트의 +1.6은 본 적 없는 문항에서 다시 나오지 않았다 |
 | 2026-11-14 |  | 9687514 · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray=true, flow2_plain=true, unknown_guide=true | upstage-form · stress 전체 · 283문항 · 2회 평균 | 84.5 | 85.7 | 86.7 | 93.6 | 87.0 | 12.5 | 1.67 | 14.4초 | $1.42 |  |  |
 | 2026-11-14 |  | 39a446f · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray=true, flow2_plain=true, unknown_guide=true | release-c4 · dev 전체 · 693문항 · 2회 평균 | 91.3 | 95.2 | 87.7 | 98.8 | 92.7 | 5.8 | 1.60 | 12.3초 | $3.54 | 릴리스 rc-c4 — ✅ 통과(docs/engine/releases.md) |  |
+| 2026-11-14 |  | dde164b · 84e66d4 | flow2_place_scope=true, flow2_lead="comma", flow="flow2", flow2_version=7, flow2_hedge_sec=10, flow2_read_deleg="topic", flow2_check_gray=true, flow2_plain=true, unknown_guide=true | release-c4 · dev 전체 · 693문항 · 2회 평균 | 94.0 | 96.4 | 91.8 | 98.8 | 94.9 | 3.1 | 1.62 | 12.7초 | $3.60 | 릴리스 rc-c4 — ✅ 통과(docs/engine/releases.md) |  |
 
 ## 배운 점 모음 (버림 · 보류 실험)
 
