@@ -1,0 +1,15 @@
+{
+  "issue": "",
+  "note": "upstage-form + 두 문장 다듬기(flow2_plain \"two\", 프롬프트 w7: 결론 + 조건 · 확인하는 곳, 「네. …」로 끊음). 한 문장 답이 13.9 · 15.7%라(킷 기준 2~4문장) 가르려고 둔 설정. 끈 판은 upstage-form.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": true,
+    "flow2_plain": "two",
+    "unknown_guide": true
+  }
+}

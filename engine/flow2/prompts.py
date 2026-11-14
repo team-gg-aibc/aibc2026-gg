@@ -483,13 +483,22 @@ PLAIN = """너는 서울시 조례 상담의 답을 다듬는 사람이다. 상�
 결과는 JSON으로 낸다."""
 PLAIN_SCHEMA = _schema("plain_answer", {"body_says": {"type": "string", "enum": ["네", "아니요", "정보"]}, "answer": {"type": "string"}})
 
+# w7(설정 flow2_plain = "two"): w6에서 길이 · 첫 낱말 규칙만 바꿨다. 최종 dev에서 한 문장 답이 13.9 · 15.7%였다(고치기 전 2.8 · 4.1%, 킷 기준은 2~4문장).
+# 그 3분의 1은 「네, …」(쉼표라 한 문장), 나머지는 한 문장 정보 답이다. 슬라이드 예시 답은 「네. 장애인자동차표지를 …」처럼 마침표로 끊는다.
+PLAIN2_V = "w7"
+_W6_LEAD = "결론부터 쓴다. [결론]이 「네」나 「아니요」면 첫 낱말을 그것으로 쓴다(「네, …」)."
+_W6_LEN = "- 한두 문장, 띄어쓰기를 넣어 60자 안쪽으로 쓴다. 꼭 필요할 때만 세 문장 · 100자까지 쓴다."
+PLAIN2 = PLAIN.replace(_W6_LEAD, "결론부터 쓴다. [결론]이 「네」나 「아니요」면 첫 낱말을 그것으로 쓰고 마침표로 끊는다(「네. …」).").replace(
+    _W6_LEN, "- 두 문장으로 쓴다: 결론 한 문장, 그 조건 · 근거나 확인하는 곳 한 문장. 띄어쓰기를 넣어 100자 안쪽이다. 꼭 필요할 때만 세 문장까지 쓴다.")
+assert PLAIN2.count("\n") == PLAIN.count("\n") and "「네. …」" in PLAIN2 and "두 문장으로 쓴다" in PLAIN2 and _W6_LEN not in PLAIN2
+
 
 def pick(cfg, step):
     """단계의 (판 이름, 프롬프트, JSON 칸). 판(flow2_version)이 고른 것을 실험 스위치가 바꿀 때만 바꾼다."""
     if step == "check_gray":                 # flow.check가 flow2_check_gray일 때 「정해져 있지 않다」 꼴 답에만 고른다
         return CHECK9_V, CHECK9, CHECK9_SCHEMA
     if step == "plain":
-        return PLAIN_V, PLAIN, PLAIN_SCHEMA
+        return (PLAIN2_V, PLAIN2, PLAIN_SCHEMA) if cfg.get("flow2_plain") == "two" else (PLAIN_V, PLAIN, PLAIN_SCHEMA)
     if step == "read" and cfg.get("flow2_read_deleg") == "topic":     # 11-14: r8-deleg + found 앞 칸 topic(flow2_read_asks와는 함께 쓰지 않는다)
         return READ9_V, READ9, READ9_SCHEMA
     if step == "read" and cfg.get("flow2_read_deleg"):

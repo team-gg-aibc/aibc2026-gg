@@ -1354,6 +1354,7 @@ def selftest():
         upstage.chat = fake_chat                                     # 보낸 시스템 프롬프트를 seen에 남기는 가짜
         up = dict(base7, flow2_read_deleg="topic", flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
         assert prompts.pick(up, "read")[:2] == ("r9-topic", prompts.READ9) and "차임" in prompts.READ9 and prompts.pick(up, "plain")[0] == prompts.PLAIN_V
+        assert prompts.pick(dict(up, flow2_plain="two"), "plain")[:2] == ("w7", prompts.PLAIN2)
         assert not any(config.DEFAULTS[k] for k in ("flow2_check_gray", "flow2_plain", "unknown_guide"))
         # (1) 보통 답: ⑥은 c8 그대로, 쉬운 말이 답 글만 바꾸고(인용 · 링크 · 시행일 그대로) 답 첫머리가 결론 낱말을 붙인다. 끈 판에는 기록도 없다
         short = "경차는 주차요금이 50% 할인됩니다."
