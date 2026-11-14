@@ -105,6 +105,22 @@ def quote_in(quote, text, paren=False):
     return bool(parts) and all(p in t for p in parts)
 
 
+# 설계 고침 4(스위치 flow2_annex_quote, 11-15): 별표(요금표) 구절은 ⑤가 자주 버렸다(dev 별표 62문항에서 실행마다 28 · 22개). 원문의 「m²」 · 「$m^{2}$」를
+# 모델은 「㎡」 한 글자로 옮기고, 표의 칸을 제 기호(「 · 」 「 / 」 「>」)로 이어 붙인다. 단위를 같은 글자로 맞추고, 칸마다(2글자 이상) 그 별표 글에 있으면 인정한다.
+# 조각 이름은 그대로 실제 별표다(칸을 섞어 옮긴 구절도 통과한다).
+_UNIT = re.compile(r"\$\s*m\^\{?2\}?\s*\$|m\s*²|m2(?![0-9])")
+_CELL = re.compile(r"\s[·>/]\s|◦|\n|\s-\s")
+
+
+def annex_quote_in(quote, text):
+    """별표에서 옮긴 구절: 단위 글자를 맞춘 뒤 통째로, 아니면 칸마다 그 별표 글에 글자 그대로 있으면 참."""
+    q, t = _UNIT.sub("㎡", quote or ""), _UNIT.sub("㎡", text or "")
+    if quote_in(q, t, paren=True):
+        return True
+    cells = [c for c in _CELL.split(q) if len(_nq(_PAREN.sub("", c))) >= 2]
+    return bool(cells) and all(quote_in(c, t, paren=True) for c in cells)
+
+
 def by_quote(label, quote, chunks, body):
     """조 이름만 적고(「제5조(제목)」) 한 항의 구절을 옮긴 경우: 그 조의 항 가운데 구절이 글자 그대로 있는 첫 항(원문 글자로만 고른다).
     본 측정 11-10에서 두 번째 실행이 이 꼴로 14문항을 「목록에 없는 조항」으로 잃었다."""
@@ -598,7 +614,8 @@ def gate(st, cfg):
         c = v[found[0] - 1]
         if answer_step.DISTRICT.search(c["label"]):
             dropped.append({"label": c["label"], "why": "자치구"})
-        elif not quote_in(ev.get("quote", ""), body[c["label"]], paren=v3):
+        elif not quote_in(ev.get("quote", ""), body[c["label"]], paren=v3) and not (
+                cfg["flow2_annex_quote"] and "별표" in c["label"] and annex_quote_in(ev.get("quote", ""), body[c["label"]])):
             dropped.append({"label": c["label"], "why": "구절이 원문에 없음", "quote": ev.get("quote", "")})
         elif c["label"] not in {k["label"] for k in kept}:
             kept.append(c)
@@ -679,30 +696,50 @@ PENALTY_RULE = re.compile(r"과태료[를을]?\s*(?:부과|징수)|(?:부과|징
 
 ASK_CAN = re.compile(r"가능|여부|허용")    # ① 칸 asks(알고 싶은 것)가 해도 되는지 · 되는지 묻는 것
 NONANSWER = "첫 문장이 「확인할 수 없다」인 답(코드, 11-14)"
-NO_ANSWER = re.compile(r"확인할 수 없|알 수 없|확인이 어렵|판단할 수 없")   # 작은 묶음 b5~b8에서 첫 문장이 이 꼴인 답 2개는 모두 샌 함정(공원 드론 · 강동구 비둘기)
+NO_ANSWER = re.compile(r"확인할 수 없|알 수 없(?![는을])|확인이 어렵|판단할 수 없")   # 「소유자를 알 수 없는 경우」(조문 글)는 아니다(설계 고침 2, 11-15)   # 작은 묶음 b5~b8에서 첫 문장이 이 꼴인 답 2개는 모두 샌 함정(공원 드론 · 강동구 비둘기)
 PENALTY_DELEG = "벌칙을 묻고 ④가 고른 벌칙 기준을 넘기는 조항을 든 「조례에 없다」 답(코드, 11-14)"
 
 
+# 설계 고침 1(스위치 flow2_check_admit, 11-15): ④가 쓴 답 글이 스스로 「모른다 · 조례에 없다 · 정해져 있지 않다 · 따로 확인하라」고 말하지 않으면 c8을 부르지
+# 않고 통과시킨다. c8은 「조문의 범위에 안 든다」(맞는 「아니요」 답)를 「근거가 질문을 다루지 않는다」로 잘못 읽어 거절했다(「차 3대 주차장도 융자?」 →
+# 「5대 이상이어야 해서 안 됩니다」 등). ⑥까지 온 함정의 답 글에는 기록상 거의 모두 이 말들이 들어 있다(기록 8개에 대어 봄: 맞는 답 25개가 살고 함정 1개가 샘,
+# 엔진-점검-1114/엔진-안정화-설계.md 고침 1). 낱말 목록은 넓게 잡을수록 지금 동작에 가깝다(안전한 쪽).
+ADMIT = re.compile(
+    r"확인할 수 없|확인하기 어렵|확인이 어렵|판단할 수 없|판단하기 어렵|단정할 수 없|단정하기 어렵|알 수 없습니다|알기 어렵"
+    r"|(?:조례|조문|자료|6종|규정|조항|근거)[^.?!]{0,30}없(?:습니다|으며|고|어|다|는)"
+    r"|(?:정해|정하여|규정되어|규정돼|명시되어|명시돼|적혀|담겨|나와|마련되어|두고|정해 두) ?(?:져 )?있지는? (?:않|아니)"
+    r"|(?:정하|규정하|명시하|다루|두)지는? (?:않|아니)|정해 두지 (?:않|아니)|따로 확인|별도로 확인|확인이 필요|확인해야|확인하셔야|문의")
+NO_ADMIT = "답 글에 「모른다 · 조례에 없다」는 말이 없음 → c8을 부르지 않고 통과(코드, 11-15)"
+
+
+def admits(answer):
+    """답 글이 스스로 모른다 · 조례에 없다 · 따로 확인하라고 말하나."""
+    return bool(plain.GRAY.search(answer or "") or ADMIT.search(answer or ""))
+
+
 def code_verdict(st, cfg, used):
-    """11-14(flow2_check_gray): ⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None.
+    """⑥을 부르지 않고 코드로 정하는 꼴 → (판정, 까닭), 아니면 None.
+    flow2_check_gray(11-14):
     - 첫 문장이 「확인할 수 없다 · 알 수 없다」인 답 → 거절(결합 질문은 뺀다: ④ 프롬프트가 답 못 하는 물음에 그 문장을 쓰게 한다). 작은 묶음에서
       이 꼴의 답은 모두 샌 함정이었다(공원 드론 · 강동구 비둘기).
     - 「조례에 없다」 답이 벌칙을 묻고, ④의 topic 조항이 벌칙 기준을 다른 법령으로 넘기는 조항(DELEG이면서 벌칙을 매김, 6종에 한 곳)이다 → 통과.
-      업스테이지 2차 답의 예(「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이고, c9-gray는 「나무 꺾기」가
-      조문에 없다며 거절하곤 했다.
+      업스테이지 2차 답의 예(「공원 나무를 꺾으면 과태료」 → 과태료 기준을 시행령 별표로 넘기는 조항 인용)가 이 꼴이다. 자치구 이름을 든 질문은 뺀다.
     넣었다가 뺀 규칙(11-14 극한 세트 두 번으로 확인): 넘기는 조항만 든 답이 「조례에 없다」 꼴이 아니면 거절 · 해도 되는지 묻는 질문에 첫 문장부터
     「정해져 있지 않다」면 거절 — 답할 수 있는 문항을 13번 막았다(「횡단보도 앞 5m는 금연구역으로 정해져 있지 않습니다」 같은 맞는 「아니요」 답).
-    벌칙 통과를 넘기는 조항으로 좁히기 전에는 「금연교육 들으면 과태료 면제?」 · 「개똥 안 치우면 과태료?」 함정이 통과했다.
-    자치구 이름 · ① 관할 칸으로 거절하는 규칙도 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다."""
-    if not (cfg["flow2_check_gray"] and used):
+    자치구 이름 · ① 관할 칸으로 거절하는 규칙도 뺐다: 사는 곳 · 「서울대공원」까지 자치구 · 다른 시도로 적어 회색지대를 잃었다.
+    flow2_check_admit(11-15): 위 둘에 안 걸리고 답 글에 「모른다 · 조례에 없다」는 말(admits)이 없으면 → 통과(c8을 부르지 않음)."""
+    if not used:
         return None
     answer = st["draft"]["answer"].strip()
-    if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
-        return "notGrounded", NONANSWER
-    tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
-    if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) \
-            and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
-        return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10)
+    if cfg["flow2_check_gray"]:
+        if NO_ANSWER.search((_SENT.findall(answer) or [""])[0]) and (_f2(st).get("slots") or {}).get("type") != "결합":
+            return "notGrounded", NONANSWER
+        tops = set(topic_labels((_f2(st).get("read") or {}).get("topic"), used))
+        if plain.GRAY.search(answer) and PENALTY_ASK.search(st["question"]) and not names_district(st["question"]) \
+                and any(DELEG.search(c["text"]) and PENALTY_RULE.search(c["text"]) for c in used if c["label"] in tops):
+            return "grounded", PENALTY_DELEG     # 자치구 이름을 든 질문은 통과시키지 않는다(「강동구 비둘기 과태료」 함정이 이 길로 두 번 샘, 11-14 작은 묶음 b10)
+    if cfg["flow2_check_admit"] and not admits(answer):
+        return "grounded", NO_ADMIT          # c8 호출 없음. 판단 기록 check.reason에 이 글이 남는다
     return None
 
 
@@ -1475,6 +1512,27 @@ def selftest():
         assert pipeline.answer(qg, dict(up, unknown_guide=False))[0] == contract.UNKNOWN
         plan["law_answer_quotes"] = dict(plan["law_answer_quotes"], found=False)
         assert pipeline.answer(qg, up)[0] == contract.unknown("default")
+        # ---- 엔진 안정화(11-15 설계 검토): 고침 1 · 2 · 3 · 4 · 5 ----
+        assert admits("그 금액은 조례에 정해져 있지 않습니다.") and admits("이 조례만으로는 확인할 수 없습니다.") and admits("구청에 문의해 주세요.")
+        assert not admits("자기 땅에 3대를 세울 주차장은 융자 대상이 아닙니다. 5대 이상이어야 합니다.")
+        assert not NO_ANSWER.search("구청장은 소유자를 알 수 없는 경우 기증 또는 분양할 수 있습니다.") and NO_ANSWER.search("그 금액은 알 수 없습니다.")
+        st9 = dict(up, flow2_check_admit=True)
+        plan.update(question_slots=dict(slots, actor="시민"), target_check=ck("notGrounded"), plain_answer={"answer": short},
+                    law_answer_quotes=rd(True, [{"label": target["label"], "quote": quote}], ans))
+        r, t = pipeline.answer(q, st9)                                  # (고침 1) 「모른다」는 말이 없는 답 → c8을 부르지 않고 통과
+        assert t["reason"] is None and t["flow2"]["check"]["reason"] == NO_ADMIT and "질문 대조" not in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        assert pipeline.answer(q, up)[1]["reason"] == pipeline.REJECTED                     # 끄면 c8 거절 그대로
+        plan["law_answer_quotes"] = rd(True, [{"label": target["label"], "quote": quote}], "할인율은 조례에 정해져 있지 않습니다.")
+        r, t = pipeline.answer(q, st9)                                  # 「조례에 정해져 있지 않다」가 있으면 c8을 부른다
+        assert t["flow2"]["check"].get("reason") != NO_ADMIT and "질문 대조" in [c["stage"] for c in t["calls"]], t["flow2"]["check"]
+        # (고침 4) 별표 구절: 단위 글자 · 칸마다 대조
+        ax = "구분: 업무시설 · 설치기준: 시설면적 122m²당 1대\n구분: 판매시설 · 설치기준: 시설면적 150m²당 1대"
+        assert annex_quote_in("업무시설 · 시설면적 122㎡당 1대", ax) and annex_quote_in("시설면적 $m^{2}$", "시설면적 $m^{2}$")
+        assert not annex_quote_in("업무시설 · 시설면적 100㎡당 1대", ax) and not quote_in("시설면적 122㎡당", ax)
+        # (고침 3 · 5) 판 고르기
+        assert prompts.pick(dict(up, flow2_check_gray="c10"), "check_gray")[0] == "c10-gray" and prompts.pick(up, "check_gray")[0] == "c9-gray"
+        assert prompts.pick(dict(up, flow2_plain="two_lead"), "plain")[0] == "w8"
+        assert not any(config.DEFAULTS[k] for k in ("flow2_check_admit", "flow2_annex_quote"))
         # (5) 어떤 까닭으로 끝나도 같은 안내 한 줄(③ 관할 밖 · 6종 밖 조례 · 마감)
         for why in (lawmap.REJECT_SCOPE, lawmap.REJECT_NAME, pipeline.TIMEOUT):
             assert pipeline.final({"reason": why, "draft": None, "response": None}, up) == contract.unknown("default"), why

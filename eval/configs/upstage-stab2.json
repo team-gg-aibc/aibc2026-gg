@@ -1,0 +1,16 @@
+{
+  "issue": "",
+  "note": "엔진 안정화(PM, 11-15 설계 검토 「엔진-안정화-설계.md」) — upstage-stab1.json 위에 고침 3: 두 번째 검사 c10-gray(규칙 3을 좁힘). 끈 판은 upstage-stab1.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": "c10",
+    "flow2_plain": "two",
+    "unknown_guide": true,
+    "flow2_check_admit": true
+  }
+}

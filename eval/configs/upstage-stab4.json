@@ -1,0 +1,17 @@
+{
+  "issue": "",
+  "note": "엔진 안정화(PM, 11-15 설계 검토 「엔진-안정화-설계.md」) — upstage-stab3.json 위에 고침 5: 두 문장 다듬기 + 첫 낱말은 ④ 초안을 따름(w8). 끈 판은 upstage-stab3.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": "c10",
+    "flow2_plain": "two_lead",
+    "unknown_guide": true,
+    "flow2_check_admit": true,
+    "flow2_annex_quote": true
+  }
+}

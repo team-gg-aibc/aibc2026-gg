@@ -493,12 +493,43 @@ PLAIN2 = PLAIN.replace(_W6_LEAD, "결론부터 쓴다. [결론]이 「네」나 
 assert PLAIN2.count("\n") == PLAIN.count("\n") and "「네. …」" in PLAIN2 and "두 문장으로 쓴다" in PLAIN2 and _W6_LEN not in PLAIN2
 
 
+# c10-gray(설정 flow2_check_gray = "c10", 설계 고침 3, 11-15): c9-gray의 규칙 3 한 줄만 바꿨다. c9-gray는 스스로 적은 thing과 basis가 같은 말인데도
+# 규칙 3을 골랐다(「자전거 보관소 이용요금」 ↔ 「자전거보관소 … 이용요금 … 시장이 따로 정할 수 있다」 → 3, 슬라이드 문장 청년 월세 → 3). 「3인 때」를 좁게
+# 세고 「3이 아닌 꼴」을 6종 조문의 맡기는 글투로 보였다(예시는 평가 문항의 글이 아니다). 설계 검토가 c9 단계만 저장된 입력으로 다시 불러 본 결과:
+# 3으로 거절됐던 dev 8건 16/16 통과, 함정 6/6 거절, 극한 「자전거 음주운전 혈중알코올농도」 0/2 거절(샘).
+CHECK10_V = "c10-gray"
+_C9_RULE3 = """  3. basis가 thing과 다른 일을 정한다: 다른 시설 · 다른 제도의 요금 · 지원, 다른 행위의 과태료, 또는 정의 · 설치 기준 · 권장 · 홍보만 있다. basis가 thing의 그 제도를 정하는데 값만 없으면 3이 아니다(예: thing 「○○ 지원」, basis 「시장은 예산의 범위에서 ○○을 지원할 수 있다」 → 없음). basis가 그 지원 · 혜택을 하도록 방안 · 대책 · 계획을 세워 시행하라고 정한 구절이어도 같은 일이다(예: thing 「○○ 지원」, basis 「시장은 ○○의 보조 방안 등의 대책을 수립 · 시행하여야 한다」 → 없음)."""
+CHECK10 = CHECK9.replace(_C9_RULE3, """  3. basis가 thing과 다른 것을 정한다. 다음 셋 가운데 하나일 때만 3이다.
+     (가) thing이 고유한 이름을 든 시설 · 장소 · 사업인데, basis에는 그 이름이 없고 다른 이름의 시설 · 사업만 있다(예: thing 「□□식물원 입장료」, basis 「◇◇대공원 식물원 … 입장료」 → 3).
+     (나) thing의 행위와 basis의 행위가 다르다(예: thing 「쓰레기를 버리는 행위의 과태료」, basis 「흡연을 한 사람은 과태료를 부과한다」 → 3).
+     (다) basis에 thing을 가리키는 말이 없다. 비슷한 주제의 다른 지원 · 다른 절차이거나 정의 · 권장 · 홍보만 있다(예: thing 「○○통장 지원」, basis 「△△수당을 지급할 수 있다」 → 3).
+     basis가 thing을 가리키는 말(같은 낱말이나 같은 뜻의 법률 용어)을 담고 있으면 3이 아니다. basis가 금액 · 한도 · 크기 · 비율을 적지 않았거나, 시장 · 규칙 · 다른 조례 · 법령에 맡겼거나, 「할 수 있다」 · 「방안 · 대책을 수립 · 시행한다」고만 정했어도 3이 아니다. 예:
+     thing 「○○보관소 이용요금」, basis 「○○보관소의 이용요금 등은 시장이 따로 정할 수 있다」 → 없음
+     thing 「○○ 주차장 설치 한도」, basis 「○○에 설치하는 주차장의 최고한도는 「△△ 조례」로 따로 정한다」 → 없음
+     thing 「○○단체 지원」, basis 「○○단체에 행정적ㆍ재정적 지원을 할 수 있다」 → 없음
+     thing 「○○ 월세 지원」, basis 「○○의 차임의 보조 방안 등의 대책을 수립ㆍ시행하여야 한다」 → 없음
+     thing 「○○ 안내판의 크기」, basis 「안내표지판의 모양, 크기 … 필요한 사항은 규칙으로 정한다」 → 없음
+     thing 「○○ 놀이터 이용료」, basis 「○○ 놀이터의 설치 및 운영에 필요한 사항은 시장이 따로 정한다」 → 없음""")
+assert CHECK10 != CHECK9 and "(가) thing이 고유한 이름" in CHECK10 and _C9_RULE3 not in CHECK10
+
+# w8(설정 flow2_plain = "two_lead", 설계 고침 5, 11-15): w7(두 문장)의 첫 낱말 규칙을 바꿨다. w5 · w7의 「[결론]이 네 · 아니요면 첫 낱말을 그것으로」와
+# 「네, …」 예시뿐이라 [결론]이 「정보」여도 「네,」로 시작했고, 「네, …. 다만 ~은 어렵습니다」를 「네, 다만 ~ 어렵습니다」 한 문장으로 줄여 거꾸로 보이게 했다.
+PLAIN3_V = "w8"
+_W7_LEAD = next(line + "\n" for line in PLAIN2.split("\n") if line.startswith("- 결론부터 쓴다."))   # w7의 첫 낱말 줄 통째로(「정보」면 … 까지)
+PLAIN3 = PLAIN2.replace(_W7_LEAD, (
+    "- 첫 낱말은 [초안]을 따른다. [초안]이 「네」나 「아니요」로 시작하면 같은 낱말로 시작하고 마침표로 끊는다(「네. …」). [초안]이 그렇게 시작하지 않으면 「네」 · 「아니요」를 새로 붙이지 않고, 묻는 값(금액 · 나이 · 기간 · 대상 · 방법)을 첫 문장에 바로 쓴다.\n"
+    "- 첫 문장은 [질문]의 물음 글자에 그대로 답한다(「내야 해요?」면 「내야 합니다」나 「안 내도 됩니다」, 「문제 되나요?」면 「문제가 됩니다」나 「문제없습니다」). 첫 낱말이 「네」면 첫 문장이 되는 쪽, 「아니요」면 안 되는 쪽이어야 한다.\n"
+    "- [초안]이 「네, …. 다만 ~은 안 됩니다」 꼴이면 두 문장으로 남긴다. 「네, 다만 ~ 어렵습니다」처럼 한 문장으로 줄이지 않는다.\n"
+    "- 예: [결론]이 「정보」이고 초안이 「○○ 시설은 어린이 비율이 50% 이상인 팀이면 이용료를 받지 않습니다. 그 밖에는 이용료를 내야 합니다.」면 → 「어린이가 절반 이상인 팀은 무료입니다. 그 밖에는 이용료를 냅니다.」\n"))
+assert PLAIN3 != PLAIN2 and _W7_LEAD not in PLAIN3 and "첫 낱말은 [초안]을 따른다" in PLAIN3
+
+
 def pick(cfg, step):
     """단계의 (판 이름, 프롬프트, JSON 칸). 판(flow2_version)이 고른 것을 실험 스위치가 바꿀 때만 바꾼다."""
     if step == "check_gray":                 # flow.check가 flow2_check_gray일 때 「정해져 있지 않다」 꼴 답에만 고른다
-        return CHECK9_V, CHECK9, CHECK9_SCHEMA
+        return (CHECK10_V, CHECK10, CHECK9_SCHEMA) if cfg.get("flow2_check_gray") == "c10" else (CHECK9_V, CHECK9, CHECK9_SCHEMA)
     if step == "plain":
-        return (PLAIN2_V, PLAIN2, PLAIN_SCHEMA) if cfg.get("flow2_plain") == "two" else (PLAIN_V, PLAIN, PLAIN_SCHEMA)
+        return {"two": (PLAIN2_V, PLAIN2, PLAIN_SCHEMA), "two_lead": (PLAIN3_V, PLAIN3, PLAIN_SCHEMA)}.get(cfg.get("flow2_plain"), (PLAIN_V, PLAIN, PLAIN_SCHEMA))
     if step == "read" and cfg.get("flow2_read_deleg") == "topic":     # 11-14: r8-deleg + found 앞 칸 topic(flow2_read_asks와는 함께 쓰지 않는다)
         return READ9_V, READ9, READ9_SCHEMA
     if step == "read" and cfg.get("flow2_read_deleg"):

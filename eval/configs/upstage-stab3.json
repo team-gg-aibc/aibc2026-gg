@@ -1,0 +1,17 @@
+{
+  "issue": "",
+  "note": "엔진 안정화(PM, 11-15 설계 검토 「엔진-안정화-설계.md」) — upstage-stab2.json 위에 고침 4: 별표 구절 단위 글자 · 칸마다 대조(flow2_annex_quote). 끈 판은 upstage-stab2.json",
+  "engine": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_place_scope": true,
+    "flow2_lead": "comma",
+    "flow2_read_deleg": "topic",
+    "flow2_check_gray": "c10",
+    "flow2_plain": "two",
+    "unknown_guide": true,
+    "flow2_check_admit": true,
+    "flow2_annex_quote": true
+  }
+}
