@@ -1,8 +1,8 @@
 {
- "name": "release-c4",
+ "name": "release-c5",
  "issue": "",
- "cycle": 4,
- "tag": "rc-c4",
+ "cycle": 5,
+ "tag": "rc-c5",
  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
  "experiments": [
   {
@@ -20,7 +20,7 @@
   },
   {
    "issue": "",
-   "name": "upstage-stab3",
+   "name": "upstage-trap",
    "cycle": null,
    "switches": {
     "flow": "flow2",
@@ -33,10 +33,11 @@
     "flow2_plain": "two",
     "unknown_guide": true,
     "flow2_check_admit": true,
-    "flow2_annex_quote": true
+    "flow2_annex_quote": true,
+    "flow2_trap_guard": true
    },
    "from": [
-    "eval/configs/upstage-stab3.json"
+    "eval/configs/upstage-trap.json"
    ]
   },
   {
@@ -109,6 +110,7 @@
   "flow2_place_scope": true,
   "flow2_plain": "two",
   "flow2_read_deleg": "topic",
+  "flow2_trap_guard": true,
   "flow2_version": 7,
   "group_by_article": true,
   "max_citations": 4,
