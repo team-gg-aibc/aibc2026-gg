@@ -625,7 +625,10 @@ def check(st, cfg):
     user = (f"[질문]\n{question}\n\n[질문 분석]\n대상: {' · '.join(targets) or '없음'}{who}\n\n"
             f"[근거 조례가 드는 법령]\n{' · '.join(cited) or '없음'}\n\n[근거]\n{context(used, cfg['flow2_version'] >= 7)}\n\n"
             f"[답변]\n{st['draft']['answer']}")
-    step = "check_gray" if cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"]) else "check"   # 11-14: 「정해져 있지 않다」 꼴만 c9-gray
+    # 11-14(flow2_check_gray): 「정해져 있지 않다」 꼴 답만 c9-gray. 질문이 자치구 이름을 들면 c8 그대로(작은 묶음에서 「강서구 금연거리」 함정이
+    # 「다만 …확인할 수 없습니다」 한 문장 때문에 c9-gray로 가서 샜다. 자치구가 정한 것인지는 c8의 규칙 2가 가린다)
+    gray = cfg["flow2_check_gray"] and plain.GRAY.search(st["draft"]["answer"]) and not any(d + "구" in st["question"] for d in lawmap.DISTRICTS)
+    step = "check_gray" if gray else "check"
     out = _ask(st, cfg, step, user)
     got = out.get("targets") or []
     texts = "\n".join(c["text"] for c in used)
@@ -1254,7 +1257,8 @@ def selftest():
         assert list(t["steps"]) == names[:3] and pipeline.answer(qp, base7)[1]["flow2"]["route"]["block"] is None      # 끈 판은 막지 않는다
         # ---- 업스테이지 기준 맞추기(11-14): ⑥ c9-gray(flow2_check_gray) · 쉬운 말 w1(flow2_plain) · 확인 불가 안내(unknown_guide) ----
         upstage.chat = fake_chat                                     # 보낸 시스템 프롬프트를 seen에 남기는 가짜
-        up = dict(base7, flow2_read_deleg=True, flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
+        up = dict(base7, flow2_read_deleg="terms", flow2_check_gray=True, flow2_plain=True, unknown_guide=True, flow2_lead="comma")
+        assert prompts.pick(up, "read")[:2] == ("r9-terms", prompts.READ9) and "차임" in prompts.READ9 and prompts.pick(up, "plain")[0] == prompts.PLAIN_V
         assert lawmap.REJECT_SCOPE == pipeline.SCOPE_REASON and not any(config.DEFAULTS[k] for k in ("flow2_check_gray", "flow2_plain", "unknown_guide"))
         # (1) 보통 답: ⑥은 c8 그대로, 쉬운 말이 답 글만 바꾸고(인용 · 링크 · 시행일 그대로) 답 첫머리가 결론 낱말을 붙인다. 끈 판에는 기록도 없다
         short = "경차는 주차요금이 50% 할인됩니다."
@@ -1276,6 +1280,8 @@ def selftest():
         r, t = pipeline.answer(qg, up)
         assert t["flow2"]["check"]["prompt"] == "c9-gray" and seen["target_check"][0]["content"] == prompts.CHECK9, t["flow2"]["check"]
         assert r["citation"] == [rate] and r["answer"] == "아니요, " + easy and contract.guard(r) is r, r
+        r, t = pipeline.answer("강서구 " + qg, up)                     # 자치구 이름이 든 질문은 같은 답 꼴이어도 c8
+        assert "prompt" not in t["flow2"]["check"] and seen["target_check"][0]["content"] == prompts.CHECK8, t["flow2"]["check"]
         # (4) c9-gray가 거절하면 확인 불가 + 안내 한 줄(쉬운 말은 기록도 없다). ④ found 거짓도 같은 안내. 안내를 끄면 킷 꼴 네 글자
         plan["target_check"] = ck("notGrounded")
         r, t = pipeline.answer(qg, up)
