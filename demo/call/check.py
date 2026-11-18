@@ -54,6 +54,7 @@ def check_end(name, view, sizes):
     assert view["done"] and view["confirmed"] and view["question"] is None, f"{name}: 끝나지 않음"
     assert view["size"]["kind"] == e["kind"] and view["radius"] <= e["r"], f"{name}: 찾아갈 수 있을 만큼 좁혀지지 않음 {view['size']}"
     r, s = view["route"], view["summary"]
+    assert not (r["class_name"] and any(r["class_name"] in o["to"] for o in r["others"] if not o["here"])), f"{name}: 같은 일 다른 자리 표에 지금 자리 이름이 다른 줄로 샘 {r['others']}"      # 강변북로 위인데 「강변북로 관리사무소」(11-18)
     assert r["scope"] == e["scope"] and e["to"] in r["hit"]["to"], f"{name}: 갈림 · 넘길 곳이 다름 {r['scope']} {r['hit']['to']}"
     assert all(w in s["where"] for w in e["where"]), f"{name}: 위치 한 줄 {s['where']}"
     assert s["point"] and s["matter"] and e["to"] in s["to"] and s["go"] and view["pin"] and all(k in s["copy"] for k in ("민원을 받은 곳", "처음 접수한 담당자", "찾아가는 말", "번지수", "지도 좌표", "일", "처리할 담당 부서")), f"{name}: 접수 카드 {s}"

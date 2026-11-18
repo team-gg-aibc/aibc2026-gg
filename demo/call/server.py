@@ -753,8 +753,8 @@ def route_of(matter, R):
     """일의 종류 × 장소 종류 → 넘길 곳 한 줄, 조례 6종 안팎, 같은 일이 다른 곳이었다면."""
     t = TYPES[matter["type"]]
     cls, cname = L.place_class(R)
-    d = {"gu": L._area_at(G.gu, R["cx"], R["cy"]) or "관할 구", "park": cname or "공원"}
-    put = lambda s: s.replace("{구}", d["gu"]).replace("{공원}", d["park"])   # noqa: E731
+    gu = L._area_at(G.gu, R["cx"], R["cy"]) or "관할 구"
+    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else "그 공원")   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
     names = {"자동차전용도로": "자동차전용도로 위", "한강공원": "한강공원 안", "시 공원": "서울시가 관리하는 공원 안", "공원": "동네 공원 안", "길": "그 밖의 길"}
@@ -763,11 +763,11 @@ def route_of(matter, R):
         r = next((r for r in t["routes"] if ok(r, c)), None)
         if r and (c, r["to"]) not in seen:
             seen.add((c, r["to"]))
-            others.append({"place": names[c], "to": put(r["to"]), "basis": r["basis"], "here": c == cls})
+            others.append({"place": names[c], "to": put(r["to"], c), "basis": r["basis"], "here": c == cls})
     scope = hit.get("scope", t["scope"])
     return {"type": matter["type"], "name": t["name"], "item": t["item"], "scope": scope, "scope_why": hit.get("scope_why") or (t.get("scope_why") if scope == "out" else None),
             "law": hit.get("law") or t.get("law"), "class": cls, "class_name": cname, "ask_engine": scope == "in" or bool(t.get("ask_engine")),
-            "hit": {"to": put(hit["to"]), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else []}
+            "hit": {"to": put(hit["to"], cls), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else []}
 
 
 # ---- 엔진 (조례 답). 일의 종류와 큰 장소가 정해지면 미리 부르기 시작한다. 엔진에는 통화 글을 그대로 넣지 않고 간추린 물음을 넣는다
