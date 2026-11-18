@@ -352,9 +352,14 @@ PLACE_WORDS = set("""앞 옆 뒤 근처 쪽 건너편 맞은편 사이 안쪽 �
 def told_of(said, short):
     """시민이 무슨 일인지 말했나 → 말한 그대로(짧게) 또는 빈 글. 찾은 지명 · 자리 말 · 인사를 빼고 낱말이 둘 넘게 남으면 일을 말한 것이다(「신림역 4번 출구 쪽 골목이에요」는 아니다)."""
     t = re.sub(r"여보세요|저기요|안녕하세요|수고하십니다", " ", said)
+    t = re.sub(r"(안이|아니)(에|예)요", " ", t) if "anizone" in L.ON else t      # (anizone, 60번) 「공원 아니에요」(받아쓰기가 적은 「공원 안이에요」)를 무슨 일인지 말한 낱말로 세지 않는다: 세면 「그 밖의 일」로 갈린다
     for m in short:
         for x in (m.get("said"), m.get("name")):
             t = t.replace(x, " ") if x and len(x) >= 2 else t
+            if "sttname" in L.ON and x and len(x) >= 2:      # (sttname, 60번) 받아쓰기가 이름을 띄어 적은 꼴(「거울 연못」)도 지운다: 안 지우면 「거울」 · 「연못」이 무슨 일을 말한 낱말로 세져 「그 밖의 일」로 갈린다
+                t = re.sub(r"\s*".join(map(re.escape, x.replace(" ", ""))), " ", t)
+    if "sttjosa" in L.ON:
+        t = re.sub(r"에요\b", "예요", t)                    # (sttjosa, 60번) 받아쓰기의 말끝 「거기에요」 · 「근처에요」(맞춤법은 「예요」)
     words = [w for w in re.findall(r"[가-힣A-Za-z]+", t) if len(gaz.JOSA.sub("", w)) >= 2 and gaz.JOSA.sub("", w) not in PLACE_WORDS]
     if len(words) < 2:
         return ""
@@ -409,7 +414,10 @@ def code_read(said, asked, short, R):
     """모델 없이 읽기: 이름 뒤의 말로 관계를 가리고, 지금 질문의 보기와 맞춰 보고, 무슨 일인지 낱말로 가른다."""
     read = {"clues": [], "matter": {}, "confirm": None, "outside": False, "unfound": unfound_of(said, short)}
     seen_cat, fixed = set(), False
+    zpark = gaz.norm((((asked or {}).get("options") or [{}])[0].get("label") or "").removesuffix(" 안")) if (asked or {}).get("id") == "zone" and "anizone" in L.ON else None
     for m in short:
+        if zpark and "key" in m and m["key"] in (zpark, "공원") and re.match(r"^(은|는|이|가)?아니(에|예)요", m["after"]):
+            continue                                      # (anizone, 60번) 「서울숲 안이신가요, 바깥 길이신가요?」의 답 「서울숲 아니에요」는 받아쓰기가 「서울숲 안이에요」를 적은 꼴일 수 있다: 서울숲을 거두지 않는다(안 · 밖은 아래 보기 고르기가 정한다)
         if "key" in m and (re.match(r"^.{0,3}(였나|이었나|이던가|인가|아닌가)", m["after"]) or UNSAID.match(m["after"])):
             if "notbut" in L.ON:
                 read["clues"] = [c for c in read["clues"] if c.get("k") != m["key"]]      # (notbut · 53번) 같은 말 앞쪽에서 이미 단서로 만든 그 이름도 거둔다(「X 앞이요. 아 잠깐만요, X가 아니라 Y예요」)
@@ -470,6 +478,9 @@ def code_read(said, asked, short, R):
         said = said[fx[-1].end():]                        # 보기를 댔다가 「아 아니다」로 고쳤으면 보기는 뒷말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」, 11-15). 이름을 고친 것(「동호대교였나? 아, 아니다」)은 이름 쪽 규칙이 맡는다
     if q.get("id") == "zone":
         pick = 0 if re.search(r"안이|안에|안쪽|안입|안인|공원 ?안", said) else 1 if re.search(r"밖|바깥|길가|도로|인도|차도", said) else None
+        if pick is None and "anizone" in L.ON and re.search(r"아니(에|예)요", said) and not re.search(r"아니(라|고|구)|말고|길이|거리|골목", said):
+            pick = 0                                      # (anizone, 60번) 「안이에요」와 「아니에요」는 소리가 같아 받아쓰기가 늘 틀린다(56번 9-4에서 20번). 둘 중 고르라는 물음에 「아니에요」만으로는 답이 안 된다: 「안」으로 읽고,
+            # 마지막 확인 문장이 「○○공원 안, …」을 되말하므로 틀렸으면 거기서 시민이 「아니요」라고 한다. 거꾸로 「바깥」으로 잘못 읽으면 확인 문장에 「바깥」이 없어 걸러지지 않는다
     elif q.get("id") == "alive":
         pick = 1 if re.search(ALIVE[0], said) else 0 if re.search(ALIVE[1], said) else None
     elif q.get("id") == "leash":
@@ -498,7 +509,7 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "next" and opts:
         pick = 1 if re.search(r"아직|안 ?나왔|안 ?지났|못 ?미쳤|전이에요|전이요", said) else 0 if re.search(r"지났|지나왔|넘었|통과|벌써", said) else None
     elif q.get("id") == "dist" and opts:                  # 「스무 걸음쯤이요」(33번 2-2)
-        steps = 2 if re.search(r"쉰|오십|[4-8]0 ?m|[4-8]0미터", said) else 1 if re.search(r"스무|이십|[1-3]0 ?m|[1-3]0미터", said) else 3 if re.search(r"멀리|보이기만|백 ?m|100", said) else None
+        steps = 2 if re.search(r"쉰|오십|[4-8]0 ?m|[4-8]0미터" + (r"|[4-8]0 ?걸음" if "numword" in L.ON else ""), said) else 1 if re.search((r"[1-3]0 ?걸음|" if "numword" in L.ON else "") + r"스무|이십|[1-3]0 ?m|[1-3]0미터", said) else 3 if re.search(r"멀리|보이기만|백 ?m|100", said) else None
         close = re.search(r"바로|코앞|앞이에요|앞이요", said) and not re.search(r"(바로 ?앞|코앞)[은는]? ?아니", said)
         pick = steps if steps is not None else 0 if close else 2 if re.search(r"꽤|좀 ?떨어", said) else 1 if re.search(r"몇 ?걸음|조금", said) else 3 if re.search(r"저기", said) else None   # 걸음 수를 댔으면 그것을 먼저(「스무 걸음쯤, 화장실 바로 앞」 · 「바로 앞은 아니고 스무 걸음」)
     elif q.get("id") == "near":

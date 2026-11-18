@@ -158,7 +158,8 @@ def phrases(text):
     ws, out = list(re.finditer(r"[가-힣A-Za-z0-9]+", text or "")), []
     for n, m in enumerate(ws):
         head = norm(ENDS.sub("", m.group()))
-        pair = (n + 1 < len(ws) and NEXT_PART.match(ws[n + 1].group()) and not text[m.end():ws[n + 1].start()].strip() and len(head) >= 2 and head not in STOP
+        pair = (n + 1 < len(ws) and (NEXT_PART.match(ws[n + 1].group()) or ("sttname" in ON and re.match(r"^[가-힣]{0,3}역", ws[n + 1].group())))      # (sttname, 60번) 받아쓰기가 띄어 적은 역 이름(「승실대 입구역」)
+                and not text[m.end():ws[n + 1].start()].strip() and len(head) >= 2 and head not in STOP
                 and not VERB_TAIL.search(m.group()) and not re.search(r"(?<!\d)(이|가|을|를|은|는|에|의)$", m.group()))          # 띄어쓰기로만 떨어진 이름의 뒷부분. 토씨가 붙은 앞 낱말(「노점이 길을」)은 붙이지 않는다(「종로3가 3번 출구」의 3가는 이름). 「저기요, 공원에」 · 「우리 아파트」 · 「깔고 길을」 · 「들어오는 길」은 붙이지 않는다
         for a, b in ([(m.start(), ws[n + 1].end())] if pair else []) + [(m.start(), m.end())]:
             forms = [f for f in dict.fromkeys((norm(ENDS.sub("", text[a:b])), norm(JOSA.sub("", text[a:b])))) if len(f) >= 3]
@@ -378,10 +379,21 @@ class Gazetteer:
                 if refs and self._accept(key, refs, t[i + ln:i + ln + 8]):
                     hit = (key, ln)
                     break
+            if not hit and "sttjosa" in ON:            # (sttjosa, 60번) 이름 바로 뒤에 받아쓰기가 토씨를 넣은 꼴(「사슴 있는 데」 → 「사슴이 있는데」): 토씨 한 글자를 떼면 더 긴 이름이 되는지 본다
+                for k in range(2, 6):
+                    if i + k < len(t) and t[i + k] in "이가을를은는":
+                        u = t[i:i + k] + t[i + k + 1:]
+                        for ln in range(min(self.maxlen, len(u)), k + 1, -1):
+                            refs = self.ix.get(u[:ln])
+                            if refs and not self.shop_only(refs) and self._accept(u[:ln], refs, u[ln:ln + 8]):
+                                hit = (u[:ln], ln + 1)
+                                break
+                    if hit:
+                        break
             if hit:
                 key, ln = hit
                 m = re.search(r"(앞|옆|입구|근처|건너편|맞은편|뒤|사거리)$", key)      # 「GS25앞」이라는 정류장보다 「GS25」 + 「앞」으로 읽는다
-                if m and self.brand_like(key[:m.start()]) and len(self.ix[key]) < 3:
+                if m and self.brand_like(key[:m.start()]) and len(self.ix[key]) < 3 and t[i:i + ln] == key:
                     key, ln = key[:m.start()], ln - len(m.group())
                 out.append(self._mention(key, key, False, t[i + ln:i + ln + 14]))
                 covered.append((i, i + ln))
@@ -391,6 +403,8 @@ class Gazetteer:
         for n, (m, (a, b)) in enumerate(zip(out, covered)):     # 관계 말(「방향」 · 「쪽」 · 「지나서」)은 바로 앞 이름의 것: 다른 이름이 나오기 전까지만(「올림픽대로 잠실 방향」의 방향은 잠실의 것, 11-16). 같은 이름을 되풀이한 것(「성수대교요. 성수대교 지났고」)은 이어 본다
             nxt = next((c[0] for o, c in zip(out[n + 1:], covered[n + 1:]) if o["key"] != m["key"]), len(t))
             m["own"] = m["after"][:max(0, nxt - b)]
+            if "sttjosa" in ON and m["key"] in m["own"]:
+                m["own"] = m["own"].replace(m["key"], "")     # (sttjosa, 60번) 「성수대교예요. 성수대교 지났고」: 되풀이한 같은 이름을 빼고 관계 말을 본다(빼지 않으면 받아쓰기가 「요」를 「예요」로 적기만 해도 「지났고」가 다섯 글자 밖으로 밀려 「근처」로 읽힌다)
         # 그대로는 없지만 장소 꼴인 말은 비슷한 이름을 찾는다(받아 적기 오류 · 틀리게 부른 이름). 띄어 말한 것은 붙여 보고(「복걸로 6길」),
         # 소리 열쇠로 견주고(「롯데케슬」 = 「롯데캐슬」), 숫자는 같아야 한다(「6길」 ≠ 「16길」). 그래도 없으면 몸통이 구 · 동인지 본다(「금천로」 → 금천구)
         used = []
@@ -402,6 +416,8 @@ class Gazetteer:
                     continue
                 need = 0.84 if PLACE_TAIL.search(tok) else 0.87 if len(tok) >= 4 else 2      # 장소 꼴이 아닌 낱말은 더 엄하게, 세 글자는 받지 않는다
                 best = self.near_name(tok)
+                if "sttname" in ON and " " in raw and not NEXT_PART.match(raw.split()[-1]) and best[1] and not any(self.ref_kind(r) in ("역", "역 출구") for r in self.ix[best[1]][:40]):
+                    best = (0, None)                      # (sttname) 띄어 적은 역 이름을 붙여 본 것은 역으로 이을 때만
                 key = best[1] if best[0] >= need else self.tail_swap(tok)
                 if key:
                     out.append(self._mention(key, raw, True, norm(text[a:b])[len(tok):] + norm(text[b:b + 14])))
@@ -415,6 +431,19 @@ class Gazetteer:
         for g in ear_grams(tok):
             for key in self.gram.get(g, ()):
                 cands[key] = cands.get(key, 0) + 1
+        if "sttname" in ON and 3 <= len(tok) <= 8:      # (sttname, 60번) 가운데 글자 하나가 틀린 이름(「뚝성역」 · 「안함역」)은 두 글자 조각이 하나도 안 겹친다: 자리마다 같은 소리인 글자가 하나만 다른 이름도 후보로
+            if not hasattr(self, "_pos"):
+                self._pos = {}
+                for key in {k for ks in self.gram.values() for k in ks}:
+                    for j, ch in enumerate(key):
+                        self._pos.setdefault((len(key), j, _ear1(ch)), set()).add(key)
+            hit = {}
+            for j, ch in enumerate(tok):
+                for key in self._pos.get((len(tok), j, _ear1(ch)), ()):
+                    hit[key] = hit.get(key, 0) + 1
+            for key, c in hit.items():
+                if c >= len(tok) - 1:
+                    cands[key] = max(cands.get(key, 0), max(1, (len(tok) - 1) // 2))
         return max(((similar(tok, key, True), key) for key, c in cands.items() if c >= max(1, (len(tok) - 1) // 2) and abs(len(key) - len(tok)) <= 1 and same_digits(tok, key)), default=(0, None))
 
     def tail_swap(self, tok):
