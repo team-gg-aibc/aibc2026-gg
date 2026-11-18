@@ -304,7 +304,7 @@ def fuzzy_in_range(said, R, found, kinds=None):
             if len(ps) >= 2:
                 o["ps"] = ps[:12]
         return o
-    if "fuzzy2" in L.ON:                                  # (fuzzy2, 기본 끔 · 53번) 띄어 말한 두 낱말 이름(「PC지엥 이대엮점」)은 붙여서 먼저 견준다: 뒷낱말만 떼어 엉뚱한 이름(「이대역(중)」)에 잇지 않게
+    if "fuzzypair" in L.ON:                               # (fuzzypair, 기본 끔 · 53번. fuzzy2에서 떼어 냄: 이름은 맞게 잇지만 그 뒤 흐름에서 틀림+모름 조건의 틀린 확정이 한 칸 늘었다, 씨앗 1114 #100) 띄어 말한 두 낱말 이름(「PC지엥 이대엮점」)은 붙여서 먼저 견준다: 뒷낱말만 떼어 엉뚱한 이름(「이대역(중)」)에 잇지 않게
         ws = list(re.finditer(r"[가-힣A-Za-z0-9]+", said))
         for w1, w2 in zip(ws, ws[1:]):
             tok = gaz.norm(w1.group() + gaz.ENDS.sub("", w2.group()))

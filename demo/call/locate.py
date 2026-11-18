@@ -709,7 +709,7 @@ Q_COST = {"zone": (0.1, 8), "dir": (0.1, 8), "near": (0.1, 8), "seen": (0.1, 8),
           "passed": (0.3, 12), "mark": (0.3, 12), "finer": (0.3, 12), "lampno": (0.7, 20), "from": (0.2, 10), "next": (0.15, 8), "dist": (0.1, 8), "closest": (0.2, 10), "alike": (0.1, 10), "addr": (0.5, 12)}
 OFF = set(filter(None, os.environ.get("CALL_OFF", "").split(",")))   # 견주어 잴 때 끌 것: either,seen,which,ago,min,score (평소에는 비워 둔다)
 SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,sayplace,hasjanha"      # 실제 말투 고침 열하나(11-18, 53번 2-나): 동 이름 없는 시설 · 출구 번호만 · 걸어서 몇 분 · 지금 있는 곳과 본 곳 · 「X가 아니라 Y」 · 건너편 · 「A에서 B 가는 방향」 · 상표와 지점 따로 · 「있잖아요」
-             ",twins,fuzzy2,lamponce2"                    # 같은 이름이 둘레에 또 있으면 한 지점으로 좁히지 않기 + 띄어 말한 이름 붙여 견주기(둘은 묶어서만) + 가로등 번호 「못 봤어요」 뒤 다시 안 묻기(49번)
+             ",twins,fuzzy2,lamponce2"                    # 같은 이름이 둘레에 또 있으면 한 지점으로 좁히지 않기 + 머리만 비슷하게 이은 이름에 뒷말 맞추기(「천호엮 5번 출구」 → 천호역 5번 출구. 둘은 묶어서만) + 가로등 번호 「못 봤어요」 뒤 다시 안 묻기(49번)
              ",addrread,addrline"                         # 주소를 말하면 읽기(묻지는 않는다) + 주소 표에 없는 건물번호를 같은 길의 번호 사이로 어림
              ",fillerlist,finerkeep,choicekeep")          # Solar가 다시 읽을 때 코드 읽기의 규칙 셋이 풀리던 것(실제 호출 길)
 DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
