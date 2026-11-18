@@ -377,19 +377,21 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
   el.innerHTML = h;
 }
 function refBlock() {      // 참고 자료(범용): 일의 종류마다 다르다. 조례 원문의 값(web/refs.json) → 자리 · 상태에 따라 표(서버의 넘길 곳 표) → 처리 기관 한 줄. 보일 것이 없으면 칸이 없다
+  // 사람이 쓴 글(표 머리 · 단위 · 없음 줄 · 갈래 줄)은 문구 파일 「참고 자료」 표에서. refs.json에는 그 항목 이름만 있다(PR #114 리뷰)
   if (!V || !V.matter || !V.matter.type) return '';
-  const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), U = K('접수 카드'), r = V.route, type = V.matter.type;
+  const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), U = K('접수 카드'), R = K('참고 자료'), r = V.route, type = V.matter.type;
   const T = (REFS.types || {})[type] || { routes: [] }, refs = (REFS.refs || {})[type] || [];
   let h = '', place = '', gal = '';
   const laws = new Set();
   for (const x of refs) {
     if (x.law) laws.add(`${x.law}|${x.effective}`);
-    if (x.kind === 'table') h += `<p class="rh">${esc(shortLaw(x.law))} ${esc(x.where)}</p><table class="rt"><colgroup><col class="c0">${x.head.slice(1).map(() => '<col>').join('')}</colgroup><tr>${x.head.map((c) => `<th>${esc(c)}</th>`).join('')}</tr>`
-      + `${x.rows.map((row) => `<tr>${row.map((c, i) => `<td class="${i ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p class="ab">${esc(fill(U['단위'], { 단위: x.unit }) + (x.more ? ' · ' + x.more : ''))}</p>`;
+    if (x.kind === 'table') { const hd = R[x.head].split(' · ');
+      h += `<p class="rh">${esc(shortLaw(x.law))} ${esc(x.where)}</p><table class="rt"><colgroup><col class="c0">${hd.slice(1).map(() => '<col>').join('')}</colgroup><tr>${hd.map((c) => `<th>${esc(c)}</th>`).join('')}</tr>`
+      + `${x.rows.map((row) => `<tr>${row.map((c, i) => `<td class="${i ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p class="ab">${esc(fill(U['단위'], { 단위: R[x.unit] }) + (x.more ? ' · ' + R[x.more] : ''))}</p>`; }
     else if (x.kind === 'quote') h += `<p class="ab">「${esc(x.text.replace(/^(.*?다\.)\s.+$/, '$1 …'))}」 — ${esc(refs.some((y) => y.kind === 'table' && y.law === x.law) ? '' : shortLaw(x.law) + ' ')}${esc(x.where)}</p>`;      // 같은 조례의 표가 위에 있으면 조례 이름은 빼고, 두 문장 넘는 조문은 첫 문장만
     else if (x.kind === 'text') h += `<p class="rh">${esc(shortLaw(x.law))} ${esc(x.where)}</p><blockquote>${esc(x.text)}</blockquote>`;
-    else if (x.kind === 'absent') h += `<p class="ab">${esc(x.text)}</p>`;
-    else if (x.kind === 'gal') gal = `<p class="ab gal">${esc(fill(U['갈래 줄'], { 갈래: x.gal, 기관: x.agency }))}</p>`;
+    else if (x.kind === 'absent') h += `<p class="ab">${esc(R[x.key])}</p>`;
+    else if (x.kind === 'gal') gal = `<p class="ab gal">${esc(fill(U['갈래 줄'], { 갈래: R['갈래 ' + x.code], 기관: R['처리 기관 ' + x.code] }))}</p>`;
   }
   if (r && r.fate && r.fate.length) place = fateTable(r, true);
   else if (r && r.others.length > 1) {      // 같은 일이 다른 자리였다면 + 그 자리의 조례 6종 안팎(넘길 곳 표의 scope · law). 지금 자리와 같은 줄 · 서로 같은 줄은 묶는다

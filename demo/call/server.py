@@ -766,8 +766,9 @@ def route_of(matter, R):
     """일의 종류 × 장소 종류 → 넘길 곳 한 줄, 조례 6종 안팎, 같은 일이 다른 곳이었다면."""
     t = TYPES[matter["type"]]
     cls, cname = L.place_class(R)
-    gu = L._area_at(G.gu, R["cx"], R["cy"]) or "관할 구"
-    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else "그 공원")   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
+    W = tab("일의 종류와 갈림")
+    gu = L._area_at(G.gu, R["cx"], R["cy"]) or W["구 모름"]
+    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
     names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름

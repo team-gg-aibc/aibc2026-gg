@@ -108,7 +108,7 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |
 
-자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 접수 카드 「참고 자료」 칸의 값 `web/refs.json`은 `tools/build_refs.py`가 조례 원문(`engine/data/ordinances.json`) · `data/routes.json`에서 그대로 뽑아 만들고(손으로 고치지 않는다), `check.py`가 원본과 글자로 대조한다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
+자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 접수 카드 「참고 자료」 칸의 값 `web/refs.json`은 `tools/build_refs.py`가 조례 원문(`engine/data/ordinances.json`) · `data/routes.json`에서 그대로 뽑아 만들고(손으로 고치지 않는다), `check.py`가 원본과 글자로 대조한다. 그 칸에 함께 보이는 사람이 쓴 글(표 머리 · 단위 · 「없음」 줄 · 갈래 · 처리 기관 줄)은 문구 파일 A-05의 「참고 자료」 표에 있고, `refs.json`에는 그 항목 이름만 있다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
 
 ## 영상 제작용 도구 (서비스가 아님)
 

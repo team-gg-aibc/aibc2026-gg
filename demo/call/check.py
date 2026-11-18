@@ -195,21 +195,27 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
     sp = lambda s: re.sub(r"\s+", " ", re.sub(r"\s*<(개정|신설)[^>]*>", "", s))      # noqa: E731
     for k, v in d["types"].items():
         assert v["scope"] == types[k]["scope"] and v["routes"] == [{kk: r[kk] for kk in ("class", "scope", "law") if kk in r} for r in types[k]["routes"]], f"참고 자료: {k}의 갈래가 routes.json과 다름(tools/build_refs.py를 다시 돌릴 것)"
-    n = 0
+    rows = lambda sec: {r[0] for t in text["text"]["sections"].get(sec, {"tables": []})["tables"] for r in t["rows"]}      # noqa: E731
+    R = {r[0]: r[1] for t in text["text"]["sections"].get("참고 자료", {"tables": []})["tables"] if t["head"][0] == "항목" for r in t["rows"]}
+    n, words = 0, set()      # words = refs.json이 가리키는 문구 파일 「참고 자료」 항목(사람이 쓴 글은 refs.json이 아니라 문구 파일에, PR #114 리뷰)
     for k, items in d["refs"].items():
         assert k in types and items, f"참고 자료: 표에 없는 일 {k}"
         for x in items:
             n += 1
             if not x.get("law"):
-                assert x["kind"] in ("gal", "absent") and (x.get("gal") or x.get("text")), f"참고 자료: {k} {x}"
+                assert x["kind"] in ("gal", "absent") and set(x) == {"kind", "code" if x["kind"] == "gal" else "key"}, f"참고 자료: {k} {x}(글은 문구 파일에, refs.json에는 이름만)"
+                words |= {f"갈래 {x['code']}", f"처리 기관 {x['code']}"} if x["kind"] == "gal" else {x["key"]}
                 continue
             o = ords[x["law"]]
             whole = sp(" ".join([a["text"] for a in o["articles"]] + [a["text"] for a in o["annexes"]]))
             assert x["effective"] == o["effective_date"] and x["url"] == o["source_url"], f"참고 자료: {k} 시행일 · 주소"
             ok = all(c in whole for row in x["rows"] for c in row) if x["kind"] == "table" else sp(x["text"]) in whole
             assert ok, f"참고 자료: {k} {x['where']}가 조례 원문과 다름"
-    rows = lambda sec: {r[0] for t in text["text"]["sections"][sec]["tables"] for r in t["rows"]}      # noqa: E731
-    need = {"접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거"}, "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳"}}
+            if x["kind"] == "table":      # 표 이름은 원문 별표 제목 · 머리 칸 수는 원문 표의 칸 수와 같아야 한다
+                assert any(x["where"] == a["label"] + " " + re.sub(r"\s*\([^)]*관련\)\s*$", "", a["title"]) for a in o["annexes"]), f"참고 자료: {k} 표 이름 {x['where']}가 별표 제목과 다름"
+                words |= {x["head"], x["unit"]} | ({x["more"]} if x.get("more") else set())
+                assert x["head"] in R and all(len(R[x["head"]].split(" · ")) == len(row) for row in x["rows"]), f"참고 자료: {k} 표 머리 「{R.get(x['head'])}」의 칸 수가 원문 표와 다름"
+    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거"}, "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름"}}
     for sec, keys in need.items():
         assert keys <= rows(sec), f"문구 파일 {sec} 표에 없는 말: {keys - rows(sec)}"
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
