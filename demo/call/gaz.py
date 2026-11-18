@@ -426,6 +426,8 @@ class Gazetteer:
         return None
 
     def _accept(self, key, refs, after):
+        if self.cross0 < self.cross1 and key in ("교차로", "로터리", "네거리", "오거리"):
+            return False                                  # (CALL_CROSS) 표에 없는 교차로 이름의 꼬리(「○○ 앞 교차로 옆이에요」)를 「교차로」라는 가게 이름으로 읽지 않는다(사거리 · 삼거리는 STOP에 이미 있다)
         if key in STOP or key in CATEGORY or GENERIC.match(key) or key.isdigit():      # 숫자뿐인 이름(「8-15」)은 번호를 읽어 준 말과 헷갈려 받지 않는다
             return False
         if self.shop_only(refs) and key not in ALIAS_KEYS:            # 상가정보에만 있는 가게 이름은 바로 뒤에 「앞 · 옆 · 간판 · 보여 …」가 올 때만(「갤러리」 · 「가로등」 같은 흔한 낱말)
