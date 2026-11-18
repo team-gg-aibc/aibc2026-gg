@@ -355,6 +355,8 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 .law .wait2 { margin: 3px 0 0; color: var(--sub); font-size: 12px; font-variant-numeric: tabular-nums; }
 .law .say.open { display: block; -webkit-line-clamp: unset; flex: 1 1 auto; min-height: 0; overflow-y: auto; font-weight: 500; font-size: 12.5px; scrollbar-width: thin; }
 .law .more { align-self: flex-start; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 11.5px; font-weight: 700; flex: none; }
+.lines .ring .no { display: block; margin-top: 2px; color: var(--sub); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#side .sum .sub2 { color: var(--sub); font-weight: 400; font-size: 11px; }
 #side .sum dd.said { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 #side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
 #side .sum .badge { font-size: 10.5px; padding: 0 7px; }

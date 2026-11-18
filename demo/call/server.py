@@ -1073,7 +1073,7 @@ def build(st, extra=None):
     bj = summary["bunji"] and " / ".join(x for x in (summary["bunji"]["text"], summary["bunji"]["road"]) if x)
     rows = [(S["일"], summary["matter"]), (S["번지수"], bj), (S["찾아가는 말"], summary["go"]) if summary["go"] else (S["위치"], summary["where"]), (S["민원인 말"], summary["said"]),      # 받는 사람의 차례: 무슨 일 → 번지수 → 찾아가는 말(57번 5다)
             (S["범위"], summary["size"]), (S["좌표"], summary["point"]), (S["담당 부서"], summary["to"]), (S["근거"], " · ".join(summary["cites"]) or None), (S["말 그대로"], summary["said_place"]),
-            (S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"]), (S["연락처"], S["연락처 값"])]
+            (S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"])]      # 민원인 연락처 · 받은 때 · 진행 상태는 화면이 아는 값이라 화면이 붙인다
     summary["copy"] = "\n".join(f"{k}: {v}" for k, v in rows if v)
     pts, cell = L.heat(R) if R else ([], L.STEP)
     cands = []

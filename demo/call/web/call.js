@@ -34,6 +34,7 @@ function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없�
   return tabs[key];
 }
 const SIT = () => K('상황별 안내', '상황');
+const callerNo = () => { const t = K('발신 번호', '장면'); return ui.scene in t ? t[ui.scene] : ''; };      // 장면마다 정해 둔 가상 번호(문구 파일, 가운데를 가린 꼴). 직접 통화는 없음
 const scenes = () => ((DOC.sections['통화 장면'] || {}).tables || [{ rows: [] }])[0].rows.map(([id, name, desc]) => ({ id, name, desc }));
 
 // ---- 상담 기록: 처리 상태 다섯 칸과 고를 수 있는 차례(서버 NEXT와 같은 표). 넘길 곳 · 조례는 서버가 표에서 채운 값만 보인다
@@ -269,7 +270,7 @@ function renderTalk() {
   let h = '', n = 0;
   if (!CTL() && !(S && S.lines.length) && !ui.typing) {
     const sc = scenes().find((s) => s.id === ui.scene);
-    h += `<li class="ring"><span>${esc(T['전화 옴'])}</span><button type="button" class="primary" data-act="play">${esc(T['받기'])}</button></li>`
+    h += `<li class="ring"><span>${esc(T['전화 옴'])}${callerNo() ? `<small class="no">${esc(callerNo())} ${esc(K('접수 카드')['가상 번호 표시'])}</small>` : ''}</span><button type="button" class="primary" data-act="play">${esc(T['받기'])}</button></li>`
       + `<li class="ring-note">${esc(T['받기 안내'])}${sc ? ` ${esc(sc.name)}` : ''}</li>`;      // 누르면 무슨 일이 생기는지(57번 1)
   }
   for (const l of (S ? S.lines : [])) {   // 시민의 말 아래에 그 말에서 뽑힌 단서를 칩으로 붙인다
@@ -468,7 +469,7 @@ function renderSide() {   // 접수 카드 = 넘길 것. 덩어리 차례 · 높
     + `<dt>${esc(U['민원인 말'])}</dt>${s.said ? `<dd class="said" title="${esc(s.said)}">「${esc(s.said)}」</dd>` : none}`      // 민원인이 위치를 처음 말한 문장 그대로(57번 5가): 현장이 못 찾으면 이 말로 다시 묻는다
     + (V && V.pin && V.pin.exact ? '' : `<dt>${esc(U['범위'])}</dt>${dd(s.size)}`)      // 지도 좌표는 복사 글에만(화면에는 지도의 핀). 두 줄을 더해 요약 높이 262 안에 들게(61번)
     + (s.said_place ? `<dt>${esc(U['말 그대로'])}</dt>${dd(s.said_place)}` : '')
-    + `<dt>${esc(U['연락처'])}</dt><dd class="none">${esc(U['연락처 값'])}</dd></dl>`;      // 연락처는 넣지 않고 어디 있는지만(57번 5나)
+    + `<dt>${esc(U['연락처'])}</dt>${callerNo() ? `<dd>${esc(callerNo())} <span class="sub2">${esc(U['가상 번호 표시'])}</span></dd>` : `<dd class="none">${esc(U['번호 없음'])}</dd>`}</dl>`;      // 전화가 온 번호(가상 · 가운데를 가림, 동규 11-19)
   // 처리할 담당 부서: 위치 전에는 같은 칸 안에 「가능성이 큰 곳」 두 줄(정해지면 이 칸이 담당 부서로 바뀐다)
   h += `<div class="slot s-to${r ? ' set' : ''}"><div class="t">${esc(U['담당 부서'])}${r ? '' : `<span>${esc(U['담당 부서 대기'])}</span>`}</div>`;
   if (r) h += `<p class="v">${esc(r.hit.to)}</p><p class="n"><span class="badge ${r.hit.basis === '확인' ? 'sure' : 'guess'}">${esc(M[r.hit.basis === '확인' ? '확인' : '추측'])}</span>${CTL() ? esc(r.hit.note || '') : ''}</p>`;      // 넘길 곳의 출처 글은 조작 화면에서만(main 깔끔한 화면과 같음)
@@ -709,7 +710,8 @@ document.addEventListener('click', async (ev) => {
     const U = K('접수 카드'), st = { filed: '접수됨', sent: '넘김' }[ui.status];
     const at = ui.t0 ? new Date(ui.t0) : null, p2 = (x) => String(x).padStart(2, '0');      // 받은 때(통화를 받은 시각)는 맨 아래 진행 상태 위에
     const when = at ? `\n${K('상담 기록')['받은 때']}: ${at.getFullYear()}-${p2(at.getMonth() + 1)}-${p2(at.getDate())} ${p2(at.getHours())}:${p2(at.getMinutes())}` : '';
-    try { await navigator.clipboard.writeText(V.summary.copy + when + (st ? `\n${U['진행 상태']}: ${U[st]}` : '')); ui.copied = U['복사됨']; } catch { ui.copied = U['복사 실패']; }
+    const tel = `\n${U['연락처']}: ${callerNo() ? `${callerNo()} ${U['가상 번호 표시']}` : U['번호 없음']}`;      // 넘겨받는 부서가 민원인에게 다시 연락할 때 쓰는 줄
+    try { await navigator.clipboard.writeText(V.summary.copy + tel + when + (st ? `\n${U['진행 상태']}: ${U[st]}` : '')); ui.copied = U['복사됨']; } catch { ui.copied = U['복사 실패']; }
     renderSide();
   }
   else if (d.act === 'law-copy') {      // 조례 답 · 근거 조항을 한 번에(문서로 넘길 때)

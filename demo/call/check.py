@@ -192,7 +192,7 @@ def fix_and_copy(done):
     """「일」 고치기(57번 6): 상담사가 고른 일이 읽은 일을 이기고 통화 글 · 단서 · 질문 기록은 그대로다. 복사 글(57번 5)은 받는 사람의 차례(일 → 번지수 → 찾아가는 말)에 민원인이 한 말 · 연락처 줄."""
     view = call("/api/view", {"state": done})["view"]
     rows = [x.split(": ", 1)[0] for x in view["summary"]["copy"].split("\n")]
-    assert rows[:4] == ["일", "번지수", "찾아가는 말", "민원인이 한 말"] and rows[-1] == "민원인 연락처", f"복사 글 차례 {rows}"
+    assert rows[:4] == ["일", "번지수", "찾아가는 말", "민원인이 한 말"] and rows[-2:] == ["민원을 받은 곳", "처음 접수한 담당자"], f"복사 글 차례 {rows}"
     assert view["summary"]["said"].startswith("상도1동 주민센터 근처 골목") and "010" not in view["summary"]["copy"], view["summary"]["said"]
     st, fixed = turn(done, fix="carcass")
     assert fixed["read_how"] == "fix" and fixed["matter"]["type"] == "carcass" and fixed["route"]["scope"] == "out" and "청소" in fixed["route"]["hit"]["to"], (fixed["matter"], fixed["route"])
@@ -229,9 +229,11 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
                 words |= {x["head"], x["unit"]} | ({x["more"]} if x.get("more") else set())
                 assert x["head"] in R and all(len(R[x["head"]].split(" · ")) == len(row) for row in x["rows"]), f"참고 자료: {k} 표 머리 「{R.get(x['head'])}」의 칸 수가 원문 표와 다름"
     need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거",
-                                          "민원인 말", "연락처", "연락처 값", "일 고치기", "일 고치기 설명", "일 고침 표시"},      # 61번 화면 고침 묶음에서 새로 쓴 말
+                                          "민원인 말", "연락처", "가상 번호 표시", "번호 없음", "일 고치기", "일 고치기 설명", "일 고침 표시"},      # 61번 화면 고침 묶음에서 새로 쓴 말
             "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름", "답 펼치기", "답 접기", "답 복사", "답 기다림", "답 지난 시간", "답 보통 시간", "초안 표시"},
             "통화 글": {"받기 안내", "다음 전화", "기록 보기", "가상 흐름"}, "이렇게 물어보세요": {"화면 설명", "끝 안내"}}
+    tel = {r[0]: r[1] for t in text["text"]["sections"].get("발신 번호", {"tables": []})["tables"] for r in t["rows"]}      # 가상 번호는 가운데를 가린 꼴로만(온전한 번호를 두지 않는다)
+    assert set(tel) >= set(EXPECT) | {"pothole"} and all(re.fullmatch(r"010-\*{4}-\d{4}", v) for v in tel.values()), f"발신 번호 표 {tel}"
     for sec, keys in need.items():
         assert keys <= rows(sec), f"문구 파일 {sec} 표에 없는 말: {keys - rows(sec)}"
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
