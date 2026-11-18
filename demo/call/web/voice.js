@@ -12,7 +12,7 @@
   const fast = () => (typeof SPEED === 'number' ? SPEED : 1);
   const mmss = (ms) => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
   // 이 스위치가 켜졌을 때만 보이는 글. 본 화면에 올리기로 하면 문구 파일(docs/content/A-05_통화위치좁히기.md)로 옮긴다
-  const T = { here: '이 기기 마이크로 통화', phone: '휴대폰으로 걸기', script: '대본을 음성 길로', hang: '끊기', pick: '받기', fake: '받아쓰기: 가짜(대본 글 · 친 글)', rtzr: '받아쓰기: 리턴제로', whisper: '받아쓰기: 이 컴퓨터 안',
+  const T = { here: '이 기기 마이크로 통화', phone: '휴대폰으로 걸기', script: '대본을 음성 길로', hang: '끊기', pick: '받기', fake: '받아쓰기: 가짜(대본 글 · 친 글)', rtzr: '받아쓰기: 리턴제로', whisper: '받아쓰기: 이 컴퓨터 안', elevenlabs: '받아쓰기: 일레븐랩스',
     listen: '듣는 중', speak: '읽어 주는 중', wait: '거는 사람을 기다리는 중', ring: '전화가 왔습니다', link: '휴대폰에서 이 주소를 엽니다', over: '통화가 끝났습니다', down: '받아쓰기가 끊겼습니다',
     nomic: '마이크를 쓸 수 없습니다. 브라우저의 마이크 허락과 https 주소인지 확인해 주세요.', code: '접근 코드', heard: '들어온 소리 {초}초', hold: '상담사가 말하는 중(스페이스)', agent: '상담사가 직접 묻는 통화',
     off: '음성 통화가 꺼져 있습니다.', dial: '전화 걸기', dialName: '120 민원 콜센터', dialLead: '가상 시연입니다. 실제 민원 접수가 아닙니다.', noroom: '상담 화면에서 받은 주소로 열어 주세요.',
@@ -182,11 +182,15 @@
       vapi(`pick?room=${st.room}`, {}).catch(() => {});
       drive();
     }
+    function terms() {      // 지금 나올 법한 지명: 질문의 보기 · 가능성이 큰 곳 · 이미 나온 단서. 받아쓰기가 미리 알려 주기를 받으면 쓴다(일레븐랩스 keyterms)
+      const q = ui.askQ, names = [].concat(q ? q.options.map((o) => o.label) : [], ((V && V.cands) || []).map((c) => c.name), S ? S.turns.flatMap((t) => cluesOf(t).map((c) => c.label || '')) : []);
+      return [...new Set(names.flatMap((n) => String(n).split(/ · | ~ /)).map((n) => n.trim()).filter((n) => n.length >= 2 && n.length <= 20))].slice(0, 50);
+    }
     async function agentSay(text) {      // 통화 글에 적고(지금 물을 말은 바꾸지 않는다), 소리 쪽에 읽어 달라고 넘기고, 다 읽을 때까지 기다린다
       st.busy = true; say(T.speak);
       await queue(() => turnReq({ line: { who: '상담사', text, via: 'voice' } }));
       try {
-        const { n } = await vapi(`ask?room=${st.room}`, { text }), t0 = Date.now(), cap = (5000 + text.length * 300) / fast();
+        const { n } = await vapi(`ask?room=${st.room}`, { text, terms: terms() }), t0 = Date.now(), cap = (5000 + text.length * 300) / fast();
         while (st.alive && st.played < n && Date.now() - t0 < cap) await sleep(100);
       } catch { /* 방이 닫혔으면 poll2가 끊는다 */ }
       st.busy = false; if (st.alive) say(T.listen);

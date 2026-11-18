@@ -9,8 +9,9 @@
 
 | 환경 변수 | 뜻 | 기본 |
 | CALL_VOICE | 1이면 켠다 | 끔 |
-| CALL_VOICE_STT | fake(대본 글 · 친 글을 흘림) · whisper(이 컴퓨터 안의 받아쓰기, 가입 없음) · rtzr(리턴제로) | 리턴제로 열쇠가 있으면 rtzr, 없으면 fake |
-| CALL_VOICE_TTS | 읽어 주기. none(소리 없이 글 길이만큼 기다림) · browser(기기에 든 읽어 주기). web/voice/tts/에 미리 만든 파일이 있으면 그것이 먼저 | none |
+| CALL_VOICE_STT | fake(대본 글 · 친 글을 흘림) · elevenlabs(일레븐랩스 실시간 받아쓰기) · whisper(이 컴퓨터 안의 받아쓰기, 가입 없음) · rtzr(리턴제로) | fake |
+| CALL_VOICE_TTS | 읽어 주기. none(소리 없이 글 길이만큼 기다림) · elevenlabs(일레븐랩스 음성 합성. 만든 소리는 web/voice/tts/에 남겨 다시 쓴다) · browser(기기에 든 읽어 주기). web/voice/tts/에 이미 파일이 있으면 그것이 먼저 | none |
+| ELEVENLABS_TTS_MODEL · ELEVENLABS_VOICE_ID | 음성 합성 모델 · 목소리 | eleven_multilingual_v2 · 「나의 우주」의 기본 목소리 |
 | CALL_VOICE_ASK | 질문을 누가 말하나. ai(화면이 띄운 질문을 읽어 준다) · agent(상담사가 직접 말한다. 읽어 주지 않는다). 주소 ?ask= 로도 바꾼다 | ai |
 | CALL_VOICE_CODE | 값이 있으면 통화를 열 때 이 접근 코드를 받는다(밖에 내놓을 때) | 없음 |
 | CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper는 300) |
@@ -23,6 +24,7 @@ import os
 import secrets
 import threading
 import time
+import urllib.request
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -30,7 +32,10 @@ from . import stt
 
 WEB = Path(__file__).resolve().parents[1] / "web"
 CODE = os.environ.get("CALL_VOICE_CODE", "")
-TTS = "browser" if os.environ.get("CALL_VOICE_TTS") == "browser" else "none"
+TTS = os.environ.get("CALL_VOICE_TTS") if os.environ.get("CALL_VOICE_TTS") in ("browser", "elevenlabs") else "none"
+ELEVEN_API = os.environ.get("ELEVENLABS_API_BASE", "https://api.elevenlabs.io")
+TTS_MODEL = os.environ.get("ELEVENLABS_TTS_MODEL") or "eleven_multilingual_v2"      # LLMOps 과제(「나의 우주」)와 그 시연 영상이 쓴 모델
+TTS_VOICE = os.environ.get("ELEVENLABS_VOICE_ID") or "JBFqnCBsd6RMkjVDRZzb"        # 「나의 우주」의 기본 목소리. 어느 목소리로 할지는 동규가 정한다
 ASK = "agent" if os.environ.get("CALL_VOICE_ASK") == "agent" else "ai"      # 질문을 누가 말하나: ai = 화면이 띄운 질문을 읽어 준다 · agent = 상담사가 직접 말한다(읽어 주지 않는다)
 STT = stt.pick()
 GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name == "whisper" else 900))      # 로컬 받아쓰기는 확정 글이 이미 0.7초의 조용함을 기다린 뒤에 온다
@@ -87,15 +92,48 @@ def _reap(now):
             del rooms[rid]
 
 
-# ---- 읽어 주기: 미리 만든 파일만 튼다(web/voice/tts/<글의 sha1 앞 12자>.mp3. 레포에 넣지 않는다). 실시간 음성 합성은 아직 꽂지 않았다
+# ---- 읽어 주기: web/voice/tts/<글의 sha1 앞 12자>.mp3 를 튼다(레포에 넣지 않는다). 파일이 없고 CALL_VOICE_TTS=elevenlabs면 그 자리에서 만들어 남긴다
+asked, tts_lock = set(), threading.Lock()      # 통화에서 읽어 달라고 한 글만 새로 만든다(아무 글이나 보내 열쇠를 쓰게 하지 못하게)
+
+
 def tts_name(text):
     return hashlib.sha1(" ".join(text.split()).encode("utf-8")).hexdigest()[:12] + ".mp3"
 
 
-def _say(h, text):
+def synth(text):
+    """일레븐랩스 음성 합성 → mp3 바이트. 목소리 설정은 LLMOps 시연 영상의 값 그대로."""
+    req = urllib.request.Request(f"{ELEVEN_API}/v1/text-to-speech/{TTS_VOICE}?output_format=mp3_44100_128",
+                                 json.dumps({"text": text, "model_id": TTS_MODEL, "voice_settings": {"stability": 0.45, "similarity_boost": 0.75, "style": 0.2}}).encode(),
+                                 {"xi-api-key": stt.eleven_key(), "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        body = r.read()
+    stt.used["tts_chars"] += len(text)
+    stt.used["tts_calls"] += 1
+    return body
+
+
+def tts_file(text, make=False):
+    """그 글의 음성 파일. 없으면 make일 때만 만들어 남긴다. → 파일 또는 None"""
+    text = " ".join(text.split())
     f = WEB / "voice" / "tts" / tts_name(text)
-    if not text or not f.is_file():
-        return h.send_json({"error": "미리 만든 음성 없음"}, 404)
+    if f.is_file() or not (text and make and TTS == "elevenlabs" and stt.eleven_key()):
+        return f if f.is_file() else None
+    with tts_lock:
+        if not f.is_file():
+            try:
+                body = synth(text)
+            except Exception as e:  # noqa: BLE001  못 만들면 화면은 소리 없이 기다린다
+                print(f"음성 합성 실패: {type(e).__name__}")
+                return None
+            f.parent.mkdir(exist_ok=True)
+            f.write_bytes(body)
+    return f
+
+
+def _say(h, text):
+    f = tts_file(text, make=tts_name(text) in asked)
+    if not f:
+        return h.send_json({"error": "음성 파일 없음"}, 404)
     body = f.read_bytes()
     h.send_response(200)
     h.send_header("Content-Type", "audio/mpeg")
@@ -116,7 +154,7 @@ def _api(h, body):
     u = urlsplit(h.path)
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
-        return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "ask": ASK, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
+        return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
     try:
@@ -163,9 +201,16 @@ def _api(h, body):
     if p == "pick":                             # 화면 쪽: 전화를 받았다(거는 쪽의 연결음이 그친다)
         r["picked"] = True
         return h.send_json({"ok": True})
-    if p == "ask":                              # 화면 쪽: 이 말을 읽어 달라
+    if p == "ask":                              # 화면 쪽: 이 말을 읽어 달라(+ 지금 나올 법한 지명 → 받아쓰기에 미리 알려 준다)
         if text:
             r["says"].append(text)
+            asked.add(tts_name(text))
+        terms = b.get("terms")
+        if isinstance(terms, list) and r["stt"] and hasattr(r["stt"], "hint"):
+            try:
+                r["stt"].hint(terms[:60])
+            except Exception as e:  # noqa: BLE001  지명을 못 알려 줘도 통화는 간다
+                print(f"지명을 알려 주지 못함: {type(e).__name__}")
         return h.send_json({"n": len(r["says"])})
     if p == "end":
         with lock:

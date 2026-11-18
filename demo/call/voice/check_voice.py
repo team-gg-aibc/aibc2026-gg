@@ -8,8 +8,11 @@
      → 그 글을 지금의 통화 길(/api/turn)에 넣으면 글로 넣었을 때와 같은 자리로 끝난다 → 화면이 띄운 질문이 소리 쪽에 읽어 줄 말로 건너간다.
      읽어 주기는 미리 만든 음성 파일이 있으면 그 파일을 주고, 없으면 404다.
   ③ 접근 코드가 틀리면 열리지 않고, 한꺼번에 여는 통화 수를 넘으면 거절한다.
-  ④ 리턴제로 받아쓰기 코드가 문서의 규격대로 말을 주고받는다(가짜 리턴제로 서버와. 진짜 서비스는 부르지 않는다).
+  ④ 리턴제로 · 일레븐랩스 받아쓰기 코드가 문서의 규격대로 말을 주고받는다(이 컴퓨터 안의 가짜 서버와. 진짜 서비스는 부르지 않는다).
+     일레븐랩스: 지명을 알려 주면 줄을 새로 열어 keyterms로 넘긴다.
+  ⑤ 일레븐랩스 음성 합성: 통화에서 읽어 달라고 한 글만 만들고, 만든 소리는 남겨 다시 쓴다(가짜 서버와).
 """
+import base64
 import hashlib
 import json
 import os
@@ -45,7 +48,7 @@ def code_of(path, body=None):
 
 
 def server(**env):
-    for port in (PORT, PORT + 1, PORT + 2):               # 그 포트에 다른 서버가 떠 있으면 그 서버를 점검하게 된다 → 비어 있을 때만 시작한다
+    for port in range(PORT, PORT + 5):                    # 그 포트에 다른 서버가 떠 있으면 그 서버를 점검하게 된다 → 비어 있을 때만 시작한다
         with socket.socket() as s:
             assert s.connect_ex(("127.0.0.1", port)) != 0, f"포트 {port}를 다른 프로그램이 쓰고 있다. CALL_CHECK_PORT로 빈 포트를 준다"
     p = subprocess.Popen([sys.executable, str(HERE.parent / "server.py")], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
@@ -191,7 +194,10 @@ def check_rtzr():
     os.environ.update(RTZR_CLIENT_ID="점검용-아이디", RTZR_CLIENT_SECRET="점검용-비밀")
     assert "127.0.0.1" in stt.RTZR_API and not stt.RTZR_ENV.exists()
     try:
+        os.environ["CALL_VOICE_STT"] = "rtzr"
         assert stt.has_keys() and stt.pick() is stt.Rtzr and stt._token() == "tok-123"
+        del os.environ["CALL_VOICE_STT"]
+        assert stt.pick() is stt.Fake, "받아쓰기를 고르지 않았는데 가짜가 아님"
         assert got["auth"][0] == "/v1/authenticate" and urllib.parse.parse_qs(got["auth"][1]) == {"client_id": ["점검용-아이디"], "client_secret": ["점검용-비밀"]}, got["auth"]
         stt.RTZR_API = f"http://127.0.0.1:{PORT + 2}"
         out = []
@@ -214,6 +220,92 @@ def check_rtzr():
     print("  ✓ 리턴제로 받아쓰기 코드: 인증 → 연결(bearer · 8000Hz MULAW · sommers_ko · CALL) → 도중 글 · 확정 글 → EOS (가짜 서버와)")
 
 
+def check_eleven():
+    """일레븐랩스 쪽 코드가 문서의 꼴대로 말하는가. 가짜 서버를 이 컴퓨터 안에 띄워 본다(진짜 주소 · 진짜 열쇠 파일은 쓰지 않는다)."""
+    from websockets.sync.server import serve
+    sys.path.insert(0, str(HERE.parent))
+    from voice import stt
+    conns, chunks = [], []
+
+    def ws(conn):
+        conns.append((conn.request.path, conn.request.headers.get("xi-api-key")))
+        conn.send(json.dumps({"message_type": "session_started", "session_id": "s1", "config": {"model_id": "scribe_v2_realtime", "commit_strategy": "vad"}}))
+        for n, msg in enumerate(conn, 1):
+            d = json.loads(msg)
+            chunks.append((len(conns), d["message_type"], d["commit"], d["sample_rate"], len(base64.b64decode(d["audio_base_64"]))))
+            if n == 1 and len(conns) == 1:
+                conn.send(json.dumps({"message_type": "partial_transcript", "text": "상도 일동"}))
+            if n == 2 and len(conns) == 1:
+                conn.send(json.dumps({"message_type": "committed_transcript", "text": "상도 일동 주민센터 앞이에요"}))
+
+    wss = serve(ws, "127.0.0.1", PORT + 3)
+    threading.Thread(target=wss.serve_forever, daemon=True).start()
+    stt.ELEVEN_WS, stt.ELEVEN_ENV = f"ws://127.0.0.1:{PORT + 3}", Path("/nonexistent")      # 불러온 모듈의 값을 직접 바꾼다(진짜 주소 · 진짜 열쇠 파일을 건드리지 않게)
+    os.environ["ELEVENLABS_API_KEY"] = "check-key"
+    assert stt.ELEVEN_WS.startswith("ws://127.0.0.1") and not stt.ELEVEN_ENV.exists() and stt.eleven_key() == "check-key"
+    try:
+        out = []
+        e = stt.Eleven(lambda final, text: out.append((final, text)), rate=32000)      # 일레븐랩스가 받지 않는 주파수 → 16000으로 바꿔 보낸다
+        e.feed(bytes(6400))
+        e.feed(bytes(6400))
+        t0 = time.time()
+        while len(out) < 2 and time.time() - t0 < 5:
+            time.sleep(0.02)
+        assert out == [(False, "상도 일동"), (True, "상도 1동 주민센터 앞이에요")], out      # 확정 글의 한글 숫자는 지명에 쓰이는 꼴만 숫자로
+        e.hint(["상도1동주민센터", "상도역", "상도역", "가"])                                  # 지명을 알려 주면 줄을 새로 연다(겹친 것 · 한 글자는 뺀다)
+        e.feed(bytes(6400))
+        t0 = time.time()
+        while len(chunks) < 3 and time.time() - t0 < 5:
+            time.sleep(0.02)
+        e.close()
+        q0, q1 = (urllib.parse.parse_qs(urllib.parse.urlsplit(p).query) for p, _ in conns)
+        assert [k for _, k in conns] == ["check-key"] * 2 and q0["model_id"] == ["scribe_v2_realtime"] and q0["language_code"] == ["ko"] and q0["audio_format"] == ["pcm_16000"] and q0["commit_strategy"] == ["vad"] and "keyterms" not in q0, (conns, q0)
+        assert q1["keyterms"] == ["상도1동주민센터", "상도역"], q1
+        assert chunks == [(1, "input_audio_chunk", False, 16000, 3200), (1, "input_audio_chunk", False, 16000, 3200), (2, "input_audio_chunk", False, 16000, 3200)], chunks
+        assert round(stt.used["stt_sec"], 2) == 0.3 and stt.used["stt_conn"] == 2, stt.used
+    finally:
+        wss.shutdown()
+    print("  ✓ 일레븐랩스 받아쓰기 코드: 연결(xi-api-key · pcm_16000 · vad · ko) → 도중 글 · 확정 글 → 지명을 알려 주면 새 줄에 keyterms (가짜 서버와)")
+
+
+def check_tts():
+    """일레븐랩스 음성 합성: 통화에서 읽어 달라고 한 글만 만들고, 만든 소리는 남겨 다시 쓴다(가짜 서버와)."""
+    calls = []
+
+    class Tts(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            calls.append((self.path, self.headers.get("xi-api-key"), json.loads(self.rfile.read(int(self.headers["Content-Length"])).decode())))
+            self.send_response(200)
+            self.send_header("Content-Length", "9")
+            self.end_headers()
+            self.wfile.write(b"ID3-synth")
+
+    p, _ = server(CALL_VOICE="1", CALL_VOICE_TTS="elevenlabs", ELEVENLABS_API_BASE=f"http://127.0.0.1:{PORT + 4}", ELEVENLABS_API_KEY="check-key", ELEVENLABS_ENV_FILE="/nonexistent", ELEVENLABS_VOICE_ID="voice-x")
+    mock = HTTPServer(("127.0.0.1", PORT + 4), Tts)      # 서버를 띄운 뒤에(서버는 포트 다섯이 비었을 때만 시작한다)
+    threading.Thread(target=mock.serve_forever, daemon=True).start()
+    text = f"점검용 읽어 주기 문장입니다 {os.getpid()}"
+    f = HERE.parent / "web" / "voice" / "tts" / (hashlib.sha1(text.encode("utf-8")).hexdigest()[:12] + ".mp3")
+    say = "/api/voice/say?text=" + urllib.parse.quote(text)
+    try:
+        assert call("/api/voice/info")["tts"] == "elevenlabs"
+        assert code_of(say) == 404 and not calls, "통화에서 요청하지 않은 글을 만들었다"
+        room = call("/api/voice/room", {})["room"]
+        call(f"/api/voice/ask?room={room}", {"text": text, "terms": ["상도역"]})      # 가짜 받아쓰기는 지명을 받지 않는다(그래도 통화는 간다)
+        for _ in range(2):                                                             # 두 번째는 남겨 둔 파일
+            with urllib.request.urlopen(BASE + say, timeout=10) as r:
+                assert r.headers["Content-Type"] == "audio/mpeg" and r.read() == b"ID3-synth"
+        assert len(calls) == 1 and calls[0][0].startswith("/v1/text-to-speech/voice-x?") and calls[0][1] == "check-key" and calls[0][2]["text"] == text and calls[0][2]["model_id"] == "eleven_multilingual_v2", calls
+        assert call("/api/voice/info")["used"]["tts_calls"] == 1
+    finally:
+        stop(p)
+        mock.shutdown()
+        f.unlink(missing_ok=True)
+    print("  ✓ 일레븐랩스 음성 합성: 통화에서 요청한 글만 만들고, 만든 소리를 남겨 다시 쓴다 (가짜 서버와)")
+
+
 def main():
     p, _ = server()                                       # ① 끔
     try:
@@ -234,6 +326,8 @@ def main():
     finally:
         stop(p)
     check_rtzr()                                          # ④
+    check_eleven()
+    check_tts()                                           # ⑤
     print("음성 통화 점검 통과")
 
 
