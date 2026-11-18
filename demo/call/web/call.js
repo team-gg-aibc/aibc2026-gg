@@ -367,7 +367,7 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
   const el = $('law'); if (!el) return;
   const M = K('일의 종류와 갈림'), e = engNow(), r = V && V.route, sc = V && V.matter && V.matter.scope, say = ((V && V.answer_box) || {})['안내'] || { name: K('접수 카드', '쓰임')['안내'] };
   const waiting = sc && sc !== 'out' && (!e || e.status === 'running');
-  let revealing = false;
+  let revealing = '';      // 글자를 흘리는 중이면 지금 보일 앞부분
   ui.engT0 = waiting ? ui.engT0 || Date.now() : 0;      // 기다리기 시작한 때(지난 시간을 세는 기준). 엔진은 답을 한 번에 돌려주므로 남은 초는 모른다
   let h = `<div class="hd"><h2 id="w-title">${esc(M['답 칸 제목'])}</h2>${hasAns(e) ? `<span class="by">${esc(engineLine(e))}</span>` : ''}${scopeBadge()}`
     + (hasAns(e) && sc === 'in' ? `<span class="copied" role="status">${esc(ui.lawCopied)}</span><button type="button" class="outline copy" data-act="law-copy">${esc(M['답 복사'])}</button>` : '') + '</div>';      // 답과 근거 조항을 한 번에(문서로 넘길 때, 접수 카드 복사와 같은 꼴)
@@ -388,8 +388,8 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
         + (c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(M['원문 열기'])} ↗</a>` : '') + '</div>';
       else {      // 답: 줄인 말(say) 세 줄 → 「펼치기」면 같은 자리에 엔진 답 전문(칸 안에서 펼치고 접기, 새 창 없음)
         const open = ui.lawOpen, text = open ? e.answer : e.say || e.answer, n = revealN(text, e.answer);
-        revealing = n < text.length;
-        h += `<p class="lab">${esc(say.name)} · <span class="draft">${esc(M['초안 표시'])}</span></p><p class="say${open ? ' open' : ''}">${esc(text.slice(0, n))}</p>`
+        if (n < text.length) revealing = text.slice(0, n) || ' ';
+        h += `<p class="lab">${esc(say.name)} · <span class="draft">${esc(M['초안 표시'])}</span></p><p class="say${open ? ' open' : ''}">${esc(text)}</p>`      // 칸 맞추기는 다 보인 글로 재고, 흘리는 중이면 아래에서 앞부분만 남긴다
           + `<button type="button" class="more" data-act="law-open" aria-expanded="${!!open}"${open || (e.say && e.say !== e.answer) ? '' : ' hidden'}>${esc(M[open ? '답 접기' : '답 펼치기'])}</button>`      // 줄인 답이거나 칸에서 잘리면 보인다(아래 fitLaw)
           + `<p class="from"><b>${esc(M['찾은 곳'])}</b><span class="chips2">${chips(null)}</span></p><p class="hint2">${esc(M['조항 누르기'])}${M['표준 답변 확인 켬'] === '켬' ? ` · ${esc(M['표준 답변 확인'])}` : ''}</p>`
           + (CTL() && e.ask ? `<p class="askq"><b>${esc(M['엔진 물음'])}</b>${esc(e.ask)}</p>` : '');
@@ -397,7 +397,8 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
     }
   }
   el.innerHTML = h;
-  if (!revealing) fitLaw(el);      // 글자를 흘리는 중에는 재지 않는다(다 흘리면 다시 그린다)
+  fitLaw(el);
+  if (revealing) el.querySelector('.say').textContent = revealing.trim();      // 글자를 차례로(칸은 이미 다 보인 글에 맞춰 둠)
 }
 function fitLaw(el) {      // 칸 높이(222) 안에: 답이 잘리면 「펼치기」를 보이고, 그래도 넘치면 답을 두 줄로, 그래도 넘치면 조항 누르기 안내 줄을 뺀다(61번, 공원 고양이처럼 근거 단추가 두 줄일 때)
   const sy = el.querySelector('.say:not(.open)'), more = el.querySelector('.more'), fit = () => el.scrollHeight <= el.clientHeight + 1;
