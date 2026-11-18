@@ -145,6 +145,7 @@ MOVE = (("걷기", re.compile(r"걸어|걷다|걷는|걸으|걷고|산책|도보
 FILLER = re.compile(r"(?<![가-힣A-Za-z0-9])(음+|어+|으음|그+|저+|그러니까|뭐지|뭐더라|아마)(?:…|\.{2,}|,)*(?![가-힣A-Za-z0-9])")      # 군말: 이름 사이에 끼어도(「마들역 어… 5번 출구」) 지우고 읽는다(코드 읽기만. Solar에는 말 그대로)
 FIXED_TAIL = re.compile(r"(?:아\s*)?(?:아니다|아니고|아니지|아니라|말고)[\s,.!]*")      # 보기 답 속의 「아 아니다」: 그 뒤의 말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」)
 UNSAID = re.compile(r"^(은|는|이|가|도|요|이요)?아?(아니(?!면)|말고)")      # 이름 바로 뒤의 「아 아니다 · 아니고 · 말고」: 스스로 고친 이름(11-15)
+NOTSEEN = re.compile(r"안 ?보여|안 ?보이|못 ?봤|못 ?보겠|없어요")      # (seenonce) 둘레에 댈 것이 없다는 답
 RETRACT = re.compile(r"(아까|방금|처음에?|앞에서)\s*(제가\s*)?(말씀드린|말한|말했던|얘기한|한)?\s*(거기|데|곳|자리|거|건|그곳)?\s*(는|은)?\s*(아니|틀렸|잘못)|잘못\s*(말|얘기)했")     # 「아까 거기 아니에요」: 앞 차례에 한 자리 말을 거둔다
 
 
@@ -165,6 +166,8 @@ def shortlist(said, R, asked_id=None):
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 국가지점번호"], 번호=label), "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True})
     for no, px, py in G.lamp_in(said):                    # 가로등 기둥의 관리번호를 읽어 줬다: 그 기둥 하나를 가리킨다
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 가로등"], 번호=no), "kind": "지점번호", "n": 1, "after": "", "by": "#" + no, "sure": True, "r": G.lamp_err.get(no, 12.0)})
+    for label, px, py in (addr_in(said, R) if "addrq" in L.ON and (asked_id == "addr" or ADDR_CUE.search(said)) else ()):     # (addrq · 47번 방법 2) 건물 주소판(도로명 + 번호)을 읽어 줬다: 그 건물 하나
+        out.append({"p": [round(px, 1), round(py, 1)], "name": f"{label} 건물", "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True, "r": 20.0})
     t = gaz.norm(said)
     if R is not None:                                     # 종류만 말했으면 지금 범위 안의 그런 곳 가운데 가능성이 큰 세 곳까지
         x, y, w = L._sample(R)
@@ -358,7 +361,7 @@ def code_read(said, asked, short, R):
         elif m["by"] not in seen_cat:                     # 종류만 말한 것: 가장 그럴듯한 한 곳
             seen_cat.add(m["by"])
             read["clues"].append({"t": "past", "p": m["p"], "how": how if how in L.DIST else "모름", "label": m["name"]} if rel == "past"
-                                 else {"t": "pt", "p": m["p"], "r": m.get("r") or (L.SIG[how] if how in ("바로", "가까이") else L.KIND_SIG.get(m["kind"], L.SIG["근처"])), "label": m["name"]})
+                                 else {"t": "pt", "p": m["p"], "r": m.get("r") or (max(L.SIG[how], L.KIND_SIG.get(m["kind"], 0) if "areafix" in L.ON and how != "바로" else 0) if how in ("바로", "가까이") else L.KIND_SIG.get(m["kind"], L.SIG["근처"])), "label": m["name"]})     # (areafix, 기본 끔 · 47번) 동네 · 산 이름은 「가까이」라도 그 넓이로(이름으로 읽을 때의 _sigma와 같게, 1118 #60)
         else:
             continue
         if m.get("fuzzy"):                                # 비슷한 이름으로 이은 단서: 정확히 맞은 것보다 약하게 치고, 화면에 「이렇게 알아들음」으로 보인다(11-15)
@@ -490,6 +493,12 @@ def code_read(said, asked, short, R):
         if q.get("id") in ("either", "which", "ago", "seen", "side", "lane", "went", "plate", "lampno", "from", "same", "next", "dist", "closest", "alike"):
             keep = [c for c in read["clues"] if "k" in c and c["k"] != gaz.norm(q.get("name") or "")] if q.get("id") == "dist" else []     # 거리 보기에는 이름이 없다: 답 속의 다른 표지(「스무 걸음쯤, 화장실 바로 앞」)는 살린다
             read["clues"], read["picked"] = keep, True    # 보기에서 고른 답이다: 보기 이름 속의 지명을 새 단서로 읽지 않는다
+        if "pastfix" in L.ON:                             # (pastfix, 기본 끔 · 47번) 「○○ 지나고 1분쯤 · 조금 지나서」로 보기를 댔으면 보기의 「방금 지남」 대신 시민이 말한 정도를 쓴다(1118 #83 · #89의 틀린 확정)
+            for c in s.get("clues", []):
+                said_c = next((x for x in read["clues"] if c.get("t") == "past" and x.get("t") == "past" and x.get("k") and x["k"] == gaz.norm(c.get("label") or "")), None)
+                if said_c is not None:
+                    read["clues"].remove(said_c)
+                    read["clues"].append(dict(c, how=said_c.get("how") or "모름", sure=True, **({"min": said_c["min"]} if said_c.get("min") else {})))
         read["clues"] += [dict(c, sure=True) for c in s.get("clues", []) if not any(x.get("label") == c.get("label") for x in read["clues"])]
         read["matter"].update(s.get("matter") or {})
         if s.get("drop"):
@@ -912,6 +921,34 @@ _addrs = {}
 BUNJI_FAR = 100      # m. 가장 가까운 주소 점이 이보다 멀면 「번지 없음」을 먼저 말한다(공원 안 · 자동차전용도로). 잰 값은 보고 42번
 
 
+ROAD_ADDR = re.compile(r"([가-힣][가-힣A-Za-z0-9]*(?:대로|로|길))\s*(\d{1,4}(?:-\d{1,3})?)(?![\d·.,]|가|길|번길)")     # 「벌말로 257」 · 「도산대로11길 21」 · 「고려대로 91-1」. 「종로1·2·3·4가동」 · 「을지로3가」는 주소가 아니다
+ADDR_CUE = re.compile(r"주소|번지|건물 ?번호|번호판")     # 주소를 말한다는 표시(주소판 질문의 답이 아니면 이 말이 있을 때만 읽는다)
+
+
+def addr_in(said, R=None):
+    """(addrq) 말 속의 도로명 주소(길 이름 + 건물 번호) → [(읽은 꼴, x, y)]. 주소 표는 상가정보의 가게가 든 건물만이라 가게 없는 건물의 번호는 못 찾는다(42번).
+    서울에 하나뿐인 주소면 그대로 쓴다. 같은 길 이름 · 번호가 여러 구에 있으면 지금 범위(둘레 300m) 안의 것 하나일 때만 쓴다. 갈리지 않으면 쓰지 않는다(틀린 건물로 확정하지 않게)."""
+    nearest_addr(127.0, 37.5)                             # 표를 읽어 둔다
+    if "ix" not in _addrs:
+        ix = {}
+        for n, r in enumerate(_addrs["rows"]):
+            road = r[3].split(" ", 1)[-1].replace(" ", "")
+            ix.setdefault(road, []).append(n)
+        _addrs["ix"] = ix
+    box = None
+    if R is not None:
+        x, y, _ = L._sample(R)
+        box = (x.min() - 300, y.min() - 300, x.max() + 300, y.max() + 300)
+    out = []
+    for m in ROAD_ADDR.finditer(said):
+        hits = _addrs["ix"].get(m.group(1) + m.group(2), [])
+        if box and len(hits) > 1:
+            hits = [n for n in hits if box[0] <= _addrs["x"][n] <= box[2] and box[1] <= _addrs["y"][n] <= box[3]]
+        if len(hits) == 1:
+            out.append((f"{m.group(1)} {m.group(2)}", float(_addrs["x"][hits[0]]), float(_addrs["y"][hits[0]])))
+    return out
+
+
 def nearest_addr(lon, lat):
     """좁힌 자리 → 가장 가까운 가게 자리의 주소 {"jibun", "road", "m"} 또는 None(표가 없으면). 표: tools/build_addr.py."""
     if not _addrs:
@@ -961,7 +998,8 @@ def build(st, extra=None):
     parts = L.describe(R, clues) if R else None
     anc = L.anchor(R, clues) if done else None
     line = where_line(parts, done, matter, anc) if parts else None
-    qs = L.questions(R, clues, matter, st["asked_log"])
+    blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
+    qs = L.questions(R, clues, dict(matter, blind=blind) if blind else matter, st["asked_log"])
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
     log = [a or "" for a in st["asked_log"]]
