@@ -35,6 +35,8 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_ON` · `CALL_OFF` | 질문 고르기 · 말 읽기 규칙을 켜고 끈다(견주어 잴 때만). 기본값은 `locate.py`의 `DEFAULT_ON`. 11/18에 실제 말투 고침 묶음(`SPEECH_ON`)을 더했다. 그 전 값으로 재려면 `CALL_ON=loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone` | 비움 |
 | `CALL_LOCCAP` | 한 통화에 묻는 위치 질문의 상한(11/18에 8 → 10. 앞 값으로 재려면 `8`) | 10 |
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
+| `CALL_CROSS` | 큰길 교차로 이름(`cross_nodes.tsv.gz`, 994개)을 지명 표에 넣는다. `1` 시민이 말하면 알아듣기만(질문 흐름은 그대로) · `2` 보기 · 되말에도 쓴다. 보고 60번 | 0(넣지 않음) |
+| `CALL_BIGM` | `CALL_ON`에 `bigplace`를 넣었을 때(기본 끔), 이 m보다 큰 장소만 넓은 곳으로 본다(`extents.tsv.gz`). 보고 60번 | 60 |
 | `CALL_ALIAS_FILE` | 상담사가 저장한 별명 파일 | `data/aliases_local.json`(git 무시) |
 | `CALL_TRIAL_FILE` | 사람이 해 보는 시험의 기록 파일 | `data/trials_local.jsonl`(git 무시) |
 
@@ -84,6 +86,8 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/seoul/lamps.tsv.gz` | 공공데이터포털 가로등 위치 정보(15107934 서울특별시 · 15070592 광진구 · 15107876 영등포구 · 15062578 서대문구), 이용허락범위 제한 없음 |
 | `data/seoul/park_toilets.tsv.gz` | 서울 열린데이터광장 OA-22586 서울시 공중화장실 위치정보, 공공누리 제1유형(출처 표시) |
 | `data/seoul/road_nodes.tsv.gz` | 국가교통정보센터 표준노드링크(2026-11-11판) |
+| `data/seoul/cross_nodes.tsv.gz` | 위와 같은 표준노드링크의 일반 도로 교차로 이름(`tools/build_cross.py`). `CALL_CROSS`를 켤 때만 읽는다 |
+| `data/seoul/extents.tsv.gz` | 넓은 장소의 크기(`tools/build_extent.py`): © OpenStreetMap 기여자, ODbL 1.0(위 서울 추출본의 면) + 같은 지명 표의 역 출구. `bigplace`를 켤 때만 쓴다 |
 | `data/extra_places.json` | 지도 자료에 이름이 없어 팀이 손으로 더한 시연 장소 |
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |

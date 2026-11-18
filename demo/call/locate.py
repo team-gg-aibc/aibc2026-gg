@@ -934,7 +934,7 @@ KIND_WORD = {"역 출구": "지하철 출구", "정류장": "버스 정류장", 
 
 def anchor(R, clues):
     """확정 문장의 기준이 될 「이름 붙은 한 점」: 시민이 말한 표지 가운데 가장 가까운 것(80m 안), 없으면 눈에 띄는 가까운 곳(60m 안).
-    → {name, p, d, tight} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다."""
+    → {name, p, d, tight, ext} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다. ext = (bigplace) 그 표지가 넓은 장소면 그 크기(m), 아니면 0 — 넓은 장소의 「바로 앞」은 p가 아니다."""
     x, y, ctx, said = R["cx"], R["cy"], R["ctx"], []
     for n, c in enumerate(clues):
         lab = c.get("name") or c.get("label") or ""
@@ -944,8 +944,8 @@ def anchor(R, clues):
         if "twinsanchor" in ON and "p" in c and lab and not (c.get("sure") and c.get("name")) and not lab.startswith(("가로등", "국가지점번호")) and twins(lab.split(" → ")[0], c["p"], np.array([x]), np.array([y]), 300.0):
             continue                                      # (twinsanchor, 기본 끔 · 53번) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다. twins에서 떼어 냈다: 공원 안에서 확인 문장의 기준 이름이 시민에게 안 보이는 것으로 바뀌어 맞는 자리에 「아니요」를 받았다
         if "p" in c and lab:
-            e = _flat(c, SIG["바로"])                         # (bigplace) 넓은 장소면 그 크기만큼은 「그 장소 앞」으로 친다. 핀은 그 한 점에 찍지 않는다(server.build)
-            said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, e))
+            e = _flat(c)                                      # (bigplace) 넓은 장소를 「바로 앞」이라고 한 단서면 그 크기만큼은 「그 장소 앞」으로 친다(「근처」처럼 넓게 말한 단서는 전처럼 그 한 점까지의 거리)
+            said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, _flat(c, SIG["바로"])))
         elif "k" in c:
             r = resolve(c["k"])
             if 0 < len(r["x"]) <= 40 and not r["areas"] and not _pk(r):
@@ -955,8 +955,9 @@ def anchor(R, clues):
                 full = G.name[r["ids"][j]] if r.get("ids") else lab
                 if len(r["x"]) > 1 and gaz.norm(full) != gaz.norm(lab) and gaz.norm(lab) in gaz.norm(full):
                     lab = full                                 # 같은 상표가 여럿이면 지점 이름까지 되말한다(「BYC 바로 앞」 → 「BYC 천호점 바로 앞」: 4.7km 떨어진 다른 지점으로 확정한 일, 11-14 밤)
-                e = _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0
-                said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, e))
+                ext = _exts(r, _sigma(c, r["kinds"])) if c["t"] == "at" else None
+                e = float(ext[j]) if ext is not None else 0
+                said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0))
     best = min(said, default=None)
     if best and best[0] <= 80:
         return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3], "ext": best[4]}
@@ -1492,6 +1493,18 @@ def selftest():
     assert Rs["r"] > 5000 and Rt["r"] < 400, (Rs["r"], Rt["r"])
     pts, cell = heat(R1)
     assert len(pts) <= 2500 and cell >= STEP
+    # (bigplace) 넓은 곳의 「바로 앞」은 그 크기만큼 넓게 서고, 작은 곳은 그대로다. 넓은 곳에는 한가운데 점에 핀을 찍지 않는다
+    had = "bigplace" in ON
+    big, small = [{"t": "at", "k": k("서울문창초등학교"), "how": "바로"}], [{"t": "at", "k": k("상도1동주민센터"), "how": "바로"}]
+    ON.discard("bigplace")
+    r0, s0 = infer(big)["r"], infer(small)["r"]
+    ON.add("bigplace")
+    Rg, s1 = infer(big), infer(small)["r"]
+    ext = float(G.ext[resolve(k("서울문창초등학교"))["ids"][0]])
+    assert r0 <= DONE_M < ext < Rg["r"] < ext + 60 and s0 == s1 and not is_done(Rg), (r0, ext, Rg["r"], s0, s1)
+    a = anchor(Rg, big)
+    assert a["ext"] == ext and a["d"] == 0 and anchor(infer(small), small)["ext"] == 0, a
+    ON.add("bigplace") if had else ON.discard("bigplace")
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
 
