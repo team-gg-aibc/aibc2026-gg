@@ -5,15 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>통화로 위치 좁히기 (시연)</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
 <link rel="stylesheet" href="call.css">
 </head>
-<body data-tone="dark">
+<body data-tone="light">
 <!-- 120 상담사가 통화 중에 보는 화면. 지도가 화면 전체이고 칸이 그 위에 떠 있다(3판 담당자 화면의 생김새를 따름).
      글자는 모두 /api/text(docs/content/A-05_통화위치좁히기.md)에서 채운다. 시민에게 보이는 화면은 없다.
-     배치는 관제 화면 꼴: 어두운 바탕 · 지도가 화면 전체 · 왼쪽 통화 기록 · 지도 위 추천 질문 · 오른쪽 접수 카드 · 아래 좁혀진 과정 -->
+     배치는 관제 화면 꼴: 밝은 바탕(시안 A, call.css 맨 위) · 지도가 화면 전체 · 왼쪽 통화 기록 · 지도 위 추천 질문 · 오른쪽 접수 카드 · 아래 좁혀진 과정 -->
 <div id="map" aria-hidden="true"></div>
 <p id="map-failed" class="map-failed" hidden></p>
 

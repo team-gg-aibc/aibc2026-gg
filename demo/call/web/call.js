@@ -22,7 +22,7 @@ let REFS = { types: {}, refs: {} };      // 참고 자료 칸의 값(web/refs.js
 let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 이 화면에서 확인받은 통화. NEXTS = 지금 상태에서 고를 수 있는 상태
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
 const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || '', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
-             typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'light' ? 'light' : 'dark',
+             typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'dark' ? 'dark' : 'light',
              view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '' };      // view: 통화 | 상담 기록(?view=records&rec=R01)
 const tabs = {};
 function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게
@@ -521,16 +521,15 @@ function renderRecCard() {
 }
 function renderAll() { renderTop(); renderTalk(); renderAsk(); renderRange(); renderSide(); renderRecList(); renderMap(); }
 
-// ---- 지도 (MapLibre + OpenFreeMap positron 바탕에 톤별로 다시 칠함)
+// ---- 지도 (MapLibre + OpenFreeMap positron 바탕에 화면 밝기별로 다시 칠함. 색은 call.css의 --map-*)
 const STYLE = 'https://tiles.openfreemap.org/styles/positron', CAM = { pitch: 46, bearing: -10 }, FILL = 0.78;
-const PAL = {
-  light: { bg: '#e9edf1', water: '#a8cbe9', waterway: '#8bbbe3', park: '#cde6c1', wood: '#c3dfb4', resid: '#e4e7eb', bFoot: '#d9dde3', road: '#ffffff', roadMinor: '#f6f7f9', roadCase: '#c9cfd8',
-    rail: '#bcc3cd', label: '#3a4454', halo: '#ffffff', waterLabel: '#1f4774', parkLabel: '#2f6b3a', parkLine: '#86b973', bLow: '#d3d9e2', bMid: '#b9c3d1', bHigh: '#94a3b8', roof: '#f5f7fa', bLine: '#a3adbb',
-    mask: '#dfe4ea', maskOp: 0.72, accent: '#0a7368', hot: '#e8590c', light: { color: '#ffffff', intensity: 0.4 } },
-  dark: { bg: '#0a111d', water: '#15406e', waterway: '#1f5a96', park: '#1a4a32', wood: '#1c4d35', resid: '#111a29', bFoot: '#1a2538', road: '#3a4b68', roadMinor: '#26334b', roadCase: '#141d2d',
-    rail: '#2e3b55', label: '#c9d6ea', halo: '#0a111d', waterLabel: '#93c5f7', parkLabel: '#8fd6a6', parkLine: '#3d9663', bLow: '#1d2a41', bMid: '#283a58', bHigh: '#385078', roof: '#465d87', bLine: '#33476a',
-    mask: '#02050a', maskOp: 0.7, accent: '#38d6c4', hot: '#ffd166', light: { color: '#cfe0ff', intensity: 0.6 } },
-};
+const MAPC = ['bg', 'water', 'waterway', 'park', 'wood', 'resid', 'b-foot', 'road', 'road-minor', 'road-case', 'rail', 'label', 'halo', 'water-label', 'park-label', 'park-line',
+  'b-low', 'b-mid', 'b-high', 'roof', 'b-line', 'mask', 'mask-op', 'data', 'hot', 'cloud-a', 'light', 'light-i'];
+function pal() {   // 지금 화면 밝기의 지도 색 = call.css의 --map-* 변수(색은 그 파일에만 적는다). b-low → C.bLow
+  const cs = getComputedStyle(document.body), C = {};
+  for (const k of MAPC) C[k.replace(/-(\w)/g, (_, c) => c.toUpperCase())] = cs.getPropertyValue('--map-' + k).trim();
+  return C;
+}
 let map = null, mapOk = false, lastFit = '';
 const markers = [];
 const shown = (el) => (el && getComputedStyle(el).display !== 'none' ? el.getBoundingClientRect() : null);
@@ -557,9 +556,9 @@ function fitPoints(pts, F, maxZ) {   // 기울인 시점에서 점들을 화면�
 function paint(id, prop, v) { if (map.getLayer(id)) { try { map.setPaintProperty(id, prop, v); } catch { /* 그 층에 없는 속성 */ } } }
 const H = ['coalesce', ['get', 'render_height'], 10], H0 = ['coalesce', ['get', 'render_min_height'], 0];
 const rgba = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`;
-const cloudColor = (C) => ['interpolate', ['linear'], ['heatmap-density'], 0, rgba(C.accent, 0), 0.08, rgba(C.accent, 0.35), 0.45, rgba(C.accent, 0.8), 1, rgba(C.hot, 0.95)];   // 가능성이 클수록 짙게, 가장 큰 곳만 다른 색
+const cloudColor = (C) => ['interpolate', ['linear'], ['heatmap-density'], 0, rgba(C.data, 0), 0.08, rgba(C.data, +C.cloudA), 0.45, rgba(C.data, 0.8), 1, rgba(C.hot, 0.95)];   // 가능성이 클수록 짙게(한 색의 단계), 가장 큰 곳은 가장 짙은 색
 function applyTone() {
-  const C = PAL[ui.tone];
+  const C = pal();
   for (const l of map.getStyle().layers) {
     if (l.source !== 'openmaptiles' || l.id.startsWith('own-')) continue;
     if (l.type === 'line' && l['source-layer'] === 'transportation') paint(l.id, 'line-color', /casing/.test(l.id) ? C.roadCase : /rail/.test(l.id) ? C.rail : /minor|path|service|pier/.test(l.id) ? C.roadMinor : C.road);
@@ -571,12 +570,12 @@ function applyTone() {
   paint('building', 'fill-color', C.bFoot); paint('building', 'fill-outline-color', C.bLine);
   paint('own-park-line', 'line-color', C.parkLine); paint('own-park-label', 'text-color', C.parkLabel); paint('own-park-label', 'text-halo-color', C.halo);
   paint('own-b3d', 'fill-extrusion-color', ['interpolate', ['linear'], H, 0, C.bLow, 40, C.bMid, 150, C.bHigh]); paint('own-roof', 'fill-extrusion-color', C.roof);
-  paint('own-mask', 'fill-color', C.mask); paint('own-mask', 'fill-opacity', C.maskOp); paint('own-area', 'line-color', C.accent);
+  paint('own-mask', 'fill-color', C.mask); paint('own-mask', 'fill-opacity', +C.maskOp); paint('own-area', 'line-color', C.data);
   paint('own-cloud', 'heatmap-color', cloudColor(C)); paint('own-ring', 'line-color', C.hot);
-  map.setLight({ anchor: 'viewport', position: [1.15, 210, 30], ...C.light });
+  map.setLight({ anchor: 'viewport', position: [1.15, 210, 30], color: C.light, intensity: +C.lightI });
 }
 function addOwnLayers() {
-  const firstSym = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id, C = PAL[ui.tone], ring = META.seoul;
+  const firstSym = (map.getStyle().layers.find((l) => l.type === 'symbol') || {}).id, C = pal(), ring = META.seoul;
   const add = (spec, before) => { if (!map.getLayer(spec.id)) map.addLayer(spec, before); };
   const empty = { type: 'FeatureCollection', features: [] };
   for (const l of map.getStyle().layers) { const f = l.type === 'symbol' && map.getLayoutProperty(l.id, 'text-field'); if (f && /name/.test(JSON.stringify(f))) map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]); }
@@ -597,9 +596,9 @@ function addOwnLayers() {
         layout: { 'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5 }, paint: { 'text-color': C.parkLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } });
   // 서울 밖은 흐리게 가리고 경계에 선
   map.addSource('own-mask', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], ring] } } });
-  add({ id: 'own-mask', type: 'fill', source: 'own-mask', paint: { 'fill-color': C.mask, 'fill-opacity': C.maskOp } });
+  add({ id: 'own-mask', type: 'fill', source: 'own-mask', paint: { 'fill-color': C.mask, 'fill-opacity': +C.maskOp } });
   map.addSource('own-area', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ring } } });
-  add({ id: 'own-area', type: 'line', source: 'own-area', paint: { 'line-color': C.accent, 'line-width': 1.6, 'line-opacity': 0.75 } });
+  add({ id: 'own-area', type: 'line', source: 'own-area', paint: { 'line-color': C.data, 'line-width': 1.6, 'line-opacity': 0.75 } });
 }
 function initMap() {
   if (!window.maplibregl) return mapFailed();
