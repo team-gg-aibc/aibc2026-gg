@@ -1271,7 +1271,7 @@ def build(st, extra=None):
     summary["go"] = ". ".join([line] + [x for x in extra_go if x]) if done and line else None       # 현장에 나가는 사람이 이 한 줄만 읽고 찾아가게
     if handoff and line:
         summary["go"] = fill(S["넘김 찾아가는 말"], 위치=line.replace(" — ", ", ").split(", 자리 미확정")[0])
-    exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆"))
+    exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆")) and not anc.get("ext")      # (bigplace) 넓은 장소의 「바로 앞」은 그 장소의 한가운데 점이 아니다: 범위의 가운데에 찍는다
     pin = {"at": gaz.lonlat(*anc["p"]) if exact else parts["center"], "exact": exact, "label": (line or "").split(", ", 1)[-1]} if done and not handoff else None      # 솔직한 끝에는 핀을 찍지 않는다(받는 사람이 「거기」로 읽는다)
     summary["point"] = "{1:.5f}, {0:.5f}".format(*pin["at"]) if pin else None
     summary["bunji"] = bunji_of(pin, handoff and line, L.place_class(R)[0] if pin else None)      # 자동차전용도로 위는 방음벽 너머 가게가 가까워도 번지가 아니다

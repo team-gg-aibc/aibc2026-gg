@@ -74,6 +74,11 @@ elif any(os.environ.get(k, "1") == "0" for k in ("CALL_SHOPS", "CALL_NODES", "CA
     os.environ.update(CALL_SHOPS="1", CALL_NODES="1", CALL_PARKNAMES="1", CALL_RAMPS="1", CALL_TOILETS="1")
     W = gaz.Gazetteer()
     os.environ.update(keep)
+elif os.environ.get("SIM_CROSS"):                     # (60번) 교차로 이름을 대는 시민: 시민이 보는 세상에만 교차로 이름(tools/build_cross.py)을 넣는다. 시스템의 지명 표는 CALL_CROSS 그대로. 이 값이 없으면 기본 동작 그대로
+    keep = os.environ.get("CALL_CROSS", "0")
+    os.environ["CALL_CROSS"] = "2"
+    W = gaz.Gazetteer()
+    os.environ["CALL_CROSS"] = keep
 else:
     W = G
 THINGS = ("화장실", "놀이터", "정자", "운동기구", "음수대", "분수")    # 이름 없이 종류로 말하는 것(「화장실 옆이에요」)

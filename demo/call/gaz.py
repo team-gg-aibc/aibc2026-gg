@@ -222,12 +222,23 @@ class Gazetteer:
         if os.environ.get("CALL_NODES", "1") != "0" and (DIR / "road_nodes.tsv.gz").exists():
             rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "road_nodes.tsv.gz", "rt", encoding="utf-8"))]
         self.node1 = len(rows)
+        self.cross0 = len(rows)               # 여기부터 표준노드링크의 일반 도로 교차로 이름(tools/build_cross.py, 60번). CALL_CROSS=0(기본)이면 넣지 않는다.
+        cross = os.environ.get("CALL_CROSS", "0")      # 1 = 시민이 말하면 알아듣기만 한다(둘레 찾기에는 넣지 않아 보기 · 되말로 먼저 내밀지 않는다: 질문 흐름이 그대로). 2 = 보기 · 되말에도 쓴다
+        if cross in ("1", "2") and (DIR / "cross_nodes.tsv.gz").exists():
+            rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "cross_nodes.tsv.gz", "rt", encoding="utf-8"))]
+        self.cross1 = len(rows)
         extra = json.loads((HERE / "data" / "extra_places.json").read_text(encoding="utf-8"))["places"] if (HERE / "data" / "extra_places.json").exists() else []
         if ALIAS_FILE.exists():                       # 상담사가 저장한 별명(사람들이 부르는 이름 → 확인받은 자리). 레포에 올리지 않는 로컬 파일
             extra += [dict(a, kind="별명") for a in json.loads(ALIAS_FILE.read_text(encoding="utf-8"))]
         rows += [[e["name"], e["kind"], str(e["lon"]), str(e["lat"]), "", ""] for e in extra]
         self.name, self.kind, self.brand = [r[0] for r in rows], [r[1] for r in rows], [r[4] for r in rows]
         self.x, self.y = xy([float(r[2]) for r in rows], [float(r[3]) for r in rows])
+        self.ext = np.zeros(len(rows))        # 넓은 장소의 크기(m): 지명 표의 한 점 → 가장 먼 가장자리, 역은 가장 먼 출구(tools/build_extent.py, 60번). 표에 없으면 0. 쓰는 곳은 locate.py의 bigplace 스위치뿐
+        if (DIR / "extents.tsv.gz").exists():
+            at = {tuple(r[:4]): i for i, r in enumerate(rows[:self.shop0])}
+            for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "extents.tsv.gz", "rt", encoding="utf-8")):
+                if tuple(r[:4]) in at:
+                    self.ext[at[tuple(r[:4])]] = float(r[4])
         areas = json.load(_open("areas.json"))
         self.parks = [{"name": p["name"], "ring": _ring(p["ring"])} for p in areas["parks"]]
         self.gu = [{"name": g["name"], "ring": _ring(g["ring"])} for g in areas["gu"]]
@@ -294,6 +305,8 @@ class Gazetteer:
         # 가까운 장소 찾기용 격자(250m)
         self.cell = {}
         for i, (cx, cy) in enumerate(zip((self.x // 250).astype(int), (self.y // 250).astype(int))):
+            if cross != "2" and self.cross0 <= i < self.cross1:
+                continue                      # (CALL_CROSS=1) 교차로 이름은 이름으로만 찾는다
             self.cell.setdefault((cx, cy), []).append(i)
 
     def add_alias(self, name, lon, lat):
@@ -301,7 +314,7 @@ class Gazetteer:
         x, y = xy(lon, lat)
         i = len(self.name)
         self.name.append(name), self.kind.append("별명"), self.brand.append("")
-        self.x, self.y = np.append(self.x, float(x)), np.append(self.y, float(y))
+        self.x, self.y, self.ext = np.append(self.x, float(x)), np.append(self.y, float(y)), np.append(self.ext, 0.0)
         self.ix.setdefault(norm(name), []).append(("p", i))
         self.cell.setdefault((int(float(x) // 250), int(float(y) // 250)), []).append(i)
         return i
