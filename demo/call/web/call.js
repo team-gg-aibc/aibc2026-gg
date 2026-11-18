@@ -18,6 +18,7 @@ async function api(path, body) {
 }
 
 let DOC = null, SCRIPTS = {}, MODE = 'live', META = {}, S = null, V = null, seq = 0, runId = 0, pollT = 0;
+let REFS = { types: {}, refs: {} };      // 참고 자료 칸의 값(web/refs.json, tools/build_refs.py가 조례 원문 · 넘길 곳 표에서 뽑음)
 let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 이 화면에서 확인받은 통화. NEXTS = 지금 상태에서 고를 수 있는 상태
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
 const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || '', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
@@ -68,7 +69,7 @@ function resetCall() {
   runId++; seq++; clearTimeout(pollT); voiceN = 0; ui.t0 = 0; ui.t1 = 0; ui.answered = false; ui.holdAns = false; ui.openSame = false; ui.askQ = null;
   S = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines: [], turns: [] };
   V = null;
-  Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null, fateOpen: undefined });
+  Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null, fateOpen: undefined, cite: null });
   renderAll();
 }
 async function send(body, hold) {   // 서버에 한 번 보내고 받은 상태로 갈아 끼운다(hold: 받은 뒤 화면에 올리기 전에 기다릴 것)
@@ -205,7 +206,7 @@ async function play() {
       if (REC) (window.__events = window.__events || []).push(['ans', performance.now(), null, null]);      // 녹화 때 남김: 조례 답이 칸에 뜬 때(차례별 시각 표용)
       if (ui.scene === 'vendor') await wait(800);        // 공원 노점 장면만: 답이 그려진 뒤 읽는다(창 없는 녹화에서 답 칸이 0.4초 늦게 그려졌다). 다른 두 장면은 그대로
       if (!(await line('상담사', (V.engine && (V.engine.say || V.engine.answer)) || K('일의 종류와 갈림')['엔진 확인 불가 말']))) return stop();
-      if (ui.scene === 'vendor') { ui.openSame = true; renderSide(); $('side').scrollTo({ top: 99999, behavior: 'smooth' }); if (REC) window.__events.push(['same', performance.now(), null, null]); }      // 공원 노점 장면만: 답을 읽은 뒤 「같은 일이 다른 자리였다면」을 펼쳐 보인다(자리가 답을 가른다)
+      if (ui.scene === 'vendor' && REC) window.__events.push(['same', performance.now(), null, null]);      // 공원 노점 장면: 「같은 일이 다른 자리였다면」은 이제 카드 맨 아래 참고 자료 칸에 늘 보인다(카드를 내리지 않음, 11-18 확정)
     }
     if (V.confirmed) break;
     const q = ui.askQ;
@@ -317,7 +318,7 @@ function engineLine(e) {
   const M = K('일의 종류와 갈림');
   return e.how === 'saved' ? fill(M['미리 받은 답'], { 초: e.sec }) : fill(M['지금 만든 답'], { 초: e.sec });
 }
-function fateTable(r) {      // 「살았나 · 죽었나 × 자리」: 조례 6종 안팎과 넘길 곳은 표(routes.json)의 줄 그대로, 지금 통화의 줄을 칠한다
+function fateTable(r, open) {      // 「살았나 · 죽었나 × 자리」: 조례 6종 안팎과 넘길 곳은 표(routes.json)의 줄 그대로, 지금 통화의 줄을 칠한다
   // 자리 · 크기: 옛 「같은 일이 다른 자리였다면」 표 자리 그대로. 그 표가 펼쳐져 보이던 일(동물 사체)만 펼치고, 표가 없던 일(유기 동물)은 한 줄로 접어 둔다(누르면 펼침). 다른 칸은 옮기지 않는다(11-18 동규)
   const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), cur = F[r.class] || r.class;
   const row = (f, i, all) => `<tr class="${f.here ? 'here' : ''}">${i ? '' : `<th rowspan="${all.length}">${esc(F[f.alive ? '살아 있음' : '죽음'])}</th>`}`
@@ -325,81 +326,121 @@ function fateTable(r) {      // 「살았나 · 죽었나 × 자리」: 조례 6
     + `<td>${esc(f.scope === 'in' ? fill(F['6종 안 줄'], { 조례: (f.law || '').replace(/^서울특별시\s*/, '') }) : F['6종 밖 줄'])}</td>`
     + `<td>${esc(f.to)} <span class="badge ${f.basis === '확인' ? 'sure' : 'guess'}">${esc(F[f.basis === '확인' ? '확인' : '추측'])}</span></td></tr>`;
   const part = (alive) => r.fate.filter((f) => f.alive === alive).map(row).join('');
-  return `<details class="same fate"${(ui.fateOpen ?? r.others.length > 1) ? ' open' : ''}><summary title="${esc(F['꼬리'])}">${esc(F['제목'])}</summary><table><colgroup><col class="c1"><col class="c2"><col class="c3"><col></colgroup>`
+  return `<details class="same fate"${(open || (ui.fateOpen ?? r.others.length > 1)) ? ' open' : ''}><summary title="${esc(F['꼬리'])}">${esc(F['제목'])}</summary><table><colgroup><col class="c1"><col class="c2"><col class="c3"><col></colgroup>`
     + `${part(true)}${part(false)}</table></details>`;      // 머리줄 · 설명 줄 없이(설명은 제목에 마우스를 올리면): 옛 표 크기 안에
 }
-function nearBox() {      // 접수 카드 안 「이 자리 둘레 지난 기록」: 그때 넘긴 위치와 처리 상태. 누르면 상담 기록 화면에서 연다
-  const near = nearRecs();
-  if (!V || !(V.done || V.confirmed)) return '';
-  const B = K('상담 기록'), U = K('접수 카드'), ex = near.some((x) => x.r.sample);
-  return `<div class="box near"><div class="t">${esc(U['둘레 기록 제목'])}${ex ? ` <em class="ex">${esc(B['예시 표시'])}</em>` : ''}</div>`
-    + (near.length ? '' : `<p class="r">${esc(fill(U['둘레 기록 없음'], { 거리: Number(B['둘레 거리']) || 400 }))}</p>`)
-    + near.map(({ r, d }) => `<button type="button" data-rec="${esc(r.id)}" title="${esc(U['둘레 기록 열기'])}"><span class="nh">${esc(ago(r))} · ${esc(r.matter)} ${stb(r.status)}</span>`
-      + `<span class="ng"><b>${esc(U['그때 넘긴 위치'])}</b>${esc(r.go)} (${esc(r.range || '')})</span><span class="nd">${esc(fill(U['여기서 거리'], { 거리: Math.round(d / 10) * 10 }))} · ${esc(r.to)}</span></button>`).join('')
-    + (ex ? `<p class="exnote">${esc(B['예시 꼬리'])}</p>` : '') + '</div>';
+function nearBox() {      // 접수 카드 안 「이 자리 둘레 지난 기록」: 고정 칸에 한 줄씩(상태 · 언제 · 일 · 그때 넘긴 범위 · 여기서 거리). 누르면 상담 기록 화면에서 연다. 위치 전에는 자리만
+  const B = K('상담 기록'), U = K('접수 카드'), near = nearRecs(), ex = near.some((x) => x.r.sample);
+  let h = `<div class="slot s-near"><div class="t">${esc(U['둘레 기록 제목'])}${ex ? `<em class="ex">${esc(B['예시 표시'])}</em>` : ''}</div>`;
+  if (!V || !(V.done || V.confirmed)) h += `<p class="wait">${esc(U['위치 대기'])}</p>`;
+  else if (!near.length) h += `<p class="wait">${esc(fill(U['둘레 기록 없음'], { 거리: Number(B['둘레 거리']) || 400 }))}</p>`;
+  else h += near.map(({ r, d }) => `<button type="button" class="nr" data-rec="${esc(r.id)}" title="${esc(U['둘레 기록 열기'])} · ${esc(U['그때 넘긴 위치'])} ${esc(r.go)} · ${esc(r.to)}">${stb(r.status)}`
+    + `<span class="g">${esc(ago(r))} · ${esc(String(r.matter).split(' · ')[0])} · ${esc(r.range || '')}</span><span class="d">${esc(fill(U['여기서 거리'], { 거리: Math.round(d / 10) * 10 }))}</span></button>`).join('');
+  return h + '</div>';
 }
-function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수한 담당자 · 일 · 위치 → 처리할 담당 부서 → 처리 진행 상태 → (6종 안이면) 추천 답
+// ---- 11-18 확정 화면(동규 「안 가, (a), B」): 칸 자리 · 높이는 통화 단계와 상관없이 같다. 조례 근거 답 = 가운데 위 「지금 물을 말」 옆 칸(말할 것 띠),
+//      접수 카드 = 넘길 것(요약 → 처리할 담당 부서 → 이 자리 둘레 지난 기록 → 처리 진행 상태 → 보일 것이 있을 때만 맨 아래 「참고 자료」)
+const shortLaw = (l) => String(l || '').replace(/^서울특별시\s*/, '');
+const engNow = () => V && V.engine && (ui.holdAns ? { status: 'running', citations: [] } : V.engine);
+const hasAns = (e) => !!(e && e.status === 'ready' && e.answer && e.citations && e.citations.length);
+const citeText = (e, s) => [...new Set(e.citations.map((c) => c.law))].map((l) => `${s ? shortLaw(l) : l} ${e.citations.filter((c) => c.law === l).map((c) => c.article).join(' · ')}`).join(' / ');
+function scopeBadge() {
+  const M = K('일의 종류와 갈림'), sc = V && V.matter && V.matter.scope, lab = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음' }[sc];
+  return sc ? `<span class="badge ${sc === 'in' ? 'in' : sc === 'out' ? 'out' : 'going'}">${esc(M[lab])}</span>` : '';
+}
+function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾는 중 → 답. 조항(또는 「답 전문」)을 누르면 이 칸 안에서 조문으로 바뀌고 「← 답으로」로 돌아온다(새 창 없음)
+  const el = $('law'); if (!el) return;
+  const M = K('일의 종류와 갈림'), e = engNow(), r = V && V.route, sc = V && V.matter && V.matter.scope, say = ((V && V.answer_box) || {})['안내'] || { name: K('접수 카드', '쓰임')['안내'] };
+  let h = `<div class="hd"><h2 id="w-title">${esc(M['답 칸 제목'])}</h2>${hasAns(e) ? `<span class="by">${esc(engineLine(e))}</span>` : ''}${scopeBadge()}</div>`;
+  if (!sc) h += `<p class="idle">${esc(M['답 대기'])}</p>`;
+  else if (sc === 'out') {
+    const t = e && e.status === 'running' ? M['엔진 찾는 중'] : e && e.status === 'ready' && e.citations.length && V.matter.law ? fill(M['엔진 참고'], { 조항: e.citations.map((c) => c.label).join(' · ') }) : M['엔진 확인 불가'];
+    h += `<p class="idle">${esc((r && r.scope_why) || M['6종 밖'])}</p>` + (M['6종 밖 엔진 표시'] === '켬' || CTL() ? `<p class="idle">${esc(t)}</p>` : '');
+  } else {
+    const q = e && (e.question || V.matter.ask);
+    if (q && ui.cite == null) h += `<p class="cq"><b>${esc(M['시민 물음'])}</b>${esc(q)}</p>`;
+    if (!e || e.status === 'running') h += `<p class="idle">${esc(M['엔진 찾는 중'])}</p><div class="skel" aria-busy="true"><i></i><i></i><i></i></div>`;
+    else if (!e.answer) h += `<p class="idle">${esc(e.error === 'nosaved' ? M['저장된 답 없음'] : e.error ? M['엔진 못 부름'] : M['엔진 못 찾음'])}</p>`;
+    else {
+      const chips = (on) => [...new Set(e.citations.map((c) => c.law))].map((l) => `${esc(shortLaw(l))} ` + e.citations.map((c, i) => [c, i]).filter(([c]) => c.law === l).map(([c, i]) => `<button type="button" data-act="cite" data-i="${i}" class="${on === i ? 'on' : ''}" title="${esc(c.label)}">${esc(c.article)}</button>`).join('')).join(' ')      // 조례 이름은 한 번, 단추는 조항 번호만
+        + (e.say && on != null ? `<button type="button" data-act="cite" data-i="full" class="${on === 'full' ? 'on' : ''}">${esc(M['답 전문'])}</button>` : '');      // 답을 보는 동안의 「답 전문」 단추는 칸 제목 줄에
+      const c = typeof ui.cite === 'number' ? e.citations[ui.cite] : null;
+      if (ui.cite === 'full') h += `<div class="qv"><div class="qtop"><button type="button" data-act="cite-back">${esc(M['답으로'])}</button><span class="chips2">${chips('full')}</span></div><p class="full">${esc(e.answer)}</p></div>`;
+      else if (c) h += `<div class="qv"><div class="qtop"><button type="button" data-act="cite-back">${esc(M['답으로'])}</button><span class="chips2">${chips(ui.cite)}</span></div>`
+        + `<div class="lb">${esc(c.label)}<span>${esc(fill(M['시행'], { 날짜: c.effective }))}</span></div>${c.quotes.map((x) => `<blockquote>「${esc(x)}」</blockquote>`).join('')}`
+        + (c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(M['원문 열기'])} ↗</a>` : '') + '</div>';
+      else h = h.replace('</h2>', `</h2>${e.say ? `<button type="button" class="fullbtn" data-act="cite" data-i="full">${esc(M['답 전문'])}</button>` : ''}`) + `<p class="lab">${esc(say.name)}</p><p class="say">${esc(e.say || e.answer)}</p>`
+        + `<p class="from"><b>${esc(M['찾은 곳'])}</b><span class="chips2">${chips(null)}</span></p><p class="hint2">${esc(M['조항 누르기'])}${M['표준 답변 확인 켬'] === '켬' ? ` · ${esc(M['표준 답변 확인'])}` : ''}</p>`
+        + (CTL() && e.ask ? `<p class="askq"><b>${esc(M['엔진 물음'])}</b>${esc(e.ask)}</p>` : '');
+    }
+  }
+  el.innerHTML = h;
+}
+function refBlock() {      // 참고 자료(범용): 일의 종류마다 다르다. 조례 원문의 값(web/refs.json) → 자리 · 상태에 따라 표(서버의 넘길 곳 표) → 처리 기관 한 줄. 보일 것이 없으면 칸이 없다
+  if (!V || !V.matter || !V.matter.type) return '';
+  const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), U = K('접수 카드'), r = V.route, type = V.matter.type;
+  const T = (REFS.types || {})[type] || { routes: [] }, refs = (REFS.refs || {})[type] || [];
+  let h = '', place = '', gal = '';
+  const laws = new Set();
+  for (const x of refs) {
+    if (x.law) laws.add(`${x.law}|${x.effective}`);
+    if (x.kind === 'table') h += `<p class="rh">${esc(shortLaw(x.law))} ${esc(x.where)}</p><table class="rt"><colgroup><col class="c0">${x.head.slice(1).map(() => '<col>').join('')}</colgroup><tr>${x.head.map((c) => `<th>${esc(c)}</th>`).join('')}</tr>`
+      + `${x.rows.map((row) => `<tr>${row.map((c, i) => `<td class="${i ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p class="ab">${esc(fill(U['단위'], { 단위: x.unit }) + (x.more ? ' · ' + x.more : ''))}</p>`;
+    else if (x.kind === 'quote') h += `<p class="ab">「${esc(x.text.replace(/^(.*?다\.)\s.+$/, '$1 …'))}」 — ${esc(refs.some((y) => y.kind === 'table' && y.law === x.law) ? '' : shortLaw(x.law) + ' ')}${esc(x.where)}</p>`;      // 같은 조례의 표가 위에 있으면 조례 이름은 빼고, 두 문장 넘는 조문은 첫 문장만
+    else if (x.kind === 'text') h += `<p class="rh">${esc(shortLaw(x.law))} ${esc(x.where)}</p><blockquote>${esc(x.text)}</blockquote>`;
+    else if (x.kind === 'absent') h += `<p class="ab">${esc(x.text)}</p>`;
+    else if (x.kind === 'gal') gal = `<p class="ab gal">${esc(fill(U['갈래 줄'], { 갈래: x.gal, 기관: x.agency }))}</p>`;
+  }
+  if (r && r.fate && r.fate.length) place = fateTable(r, true);
+  else if (r && r.others.length > 1) {      // 같은 일이 다른 자리였다면 + 그 자리의 조례 6종 안팎(넘길 곳 표의 scope · law). 지금 자리와 같은 줄 · 서로 같은 줄은 묶는다
+    const cls = Object.fromEntries(['자동차전용도로', '한강공원', '시 공원', '공원', '길'].map((c) => [M['다른 자리 · ' + c], c]));
+    const sc6 = (p) => { const c = cls[p.split(' · ')[0]], rt = T.routes.find((x) => !x.class || x.class === c) || {}, s = rt.scope || T.scope, l = rt.law || T.law;
+      return s === 'out' ? F['6종 밖 줄'] : l ? fill(F['6종 안 줄'], { 조례: shortLaw(l) }) : M['6종 후보']; };
+    const here = r.others.find((o) => o.here), same = (o) => here && o.to === here.to && sc6(o.place) === sc6(here.place);
+    const rest = r.others.filter((o) => !o.here && same(o)), rows = [];
+    for (const o of r.others.filter((x) => x.here || !same(x))) { const g = !o.here && rows.find((x) => !x.here && x.to === o.to && sc6(x.place) === sc6(o.place)); if (g) g.place += ' · ' + o.place; else rows.push({ ...o }); }
+    const one6 = new Set(r.others.map((o) => sc6(o.place))).size === 1;
+    place = `<details class="same" open><summary>${esc(M['다른 자리 제목'])}</summary><table class="rt"><colgroup><col class="c1">${one6 ? '' : '<col class="c2">'}<col></colgroup><tr><th>${esc(F['자리'])}</th>${one6 ? '' : `<th>${esc(F['조례'])}</th>`}<th>${esc(F['넘길 곳'])}</th></tr>`
+      + rows.map((o) => `<tr class="${o.here ? 'here' : ''}"><td>${esc(o.place)}${o.here ? ` <span class="badge in">${esc(M['지금 자리'])}</span>` : ''}</td>${one6 ? '' : `<td>${esc(sc6(o.place))}</td>`}<td>${esc(o.to)} <span class="badge ${o.basis === '확인' ? 'sure' : 'guess'}">${esc(F[o.basis === '확인' ? '확인' : '추측'])}</span></td></tr>`).join('') + '</table>'
+      + `<p class="ab">${esc([one6 ? fill(U['6종 같음'], { 값: sc6(r.others[0].place) }) : '', rest.length ? fill(U['같은 줄 묶음'], { 자리: rest.map((o) => o.place).join(' · ') }) : ''].filter(Boolean).join(' · '))}</p></details>`;
+  }
+  if (!h && !place) return '';
+  const src = [place ? U['출처 표'] : '', gal ? U['출처 갈래'] : '', ...[...laws].map((k) => { const [l, d] = k.split('|'); return fill(U['출처 조례'], { 조례: shortLaw(l), 날짜: d }); })].filter(Boolean).join(' · ');
+  return `<div class="slot s-ref"><div class="t">${esc(U['참고 제목'])}<span>${esc(V.matter.line || '')}</span></div><div class="rbody" data-more="${esc(U['더 있음'])}">${h}${place}${gal}</div><p class="src">${esc(U['출처'])}: ${esc(src)}</p></div>`;
+}
+function renderSide() {   // 접수 카드 = 넘길 것. 덩어리 차례 · 높이 고정: 요약 → 처리할 담당 부서 → 둘레 기록 → 진행 상태 → (보일 것이 있을 때만) 참고 자료
+  renderLaw();
   if (ui.view === 'records') return renderRecCard();
-  const M = K('일의 종류와 갈림'), U = K('접수 카드'), r = V && V.route, e = V && V.engine && (ui.holdAns ? { status: 'running', citations: [] } : V.engine), s = (V && V.summary) || {}, box = (V && V.answer_box) || {};
-  const none = `<dd class="none">${esc(U['미정'])}</dd>`, dd = (v, extra = '') => (v ? `<dd>${esc(v)}${extra}</dd>` : none);
-  const sc = V && V.matter.scope, scLabel = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음' }[sc];
-  const scope = sc ? ` <span class="badge ${sc === 'in' ? 'in' : sc === 'out' ? 'out' : 'going'}">${esc(M[scLabel])}</span>` : '';
-  const lawLine = r && sc === 'in' && e && e.citations && e.citations.length ? fill(M['적용 조례'], { 장소: [r.class_name, r.class].filter(Boolean).join(' · '), 조례: [...new Set(e.citations.map((c) => c.label.replace(/\s*제\d+조.*$/, '')))].join(' · ') }) : r && r.scope === 'out' ? r.scope_why : '';
-  let h = `<div class="chd"><h2>${esc(U['제목'])}</h2><span class="badge guess">${esc(U['가상 표시'])}</span></div><dl class="sum">`
+  const M = K('일의 종류와 갈림'), U = K('접수 카드'), r = V && V.route, e = engNow(), s = (V && V.summary) || {}, sc = V && V.matter && V.matter.scope;
+  const none = `<dd class="none">${esc(U['미정'])}</dd>`, dd = (v, x = '') => (v ? `<dd>${esc(v)}${x}</dd>` : none);
+  const lawLine = r && sc === 'in' && hasAns(e) ? fill(M['적용 조례'], { 장소: [r.class_name, r.class].filter(Boolean).join(' · '), 조례: [...new Set(e.citations.map((c) => c.label.replace(/\s*제\d+조.*$/, '')))].join(' · ') })
+    : r && r.scope === 'out' ? M['6종 밖'] : (V && V.matter && V.matter.law) || '';      // 이 자리에 걸리는 조례(엔진이 붙인 근거의 조례 이름) · 6종 밖 · 표가 정한 조례
+  const cites = sc === 'in' && hasAns(e) ? citeText(e, true) : sc === 'out' ? U['6종 밖 근거'] : '';      // 부서에 넘길 근거 조항(조항 이름). 인용문 · 시행일 · 원문은 조례 칸에서 누르면 본다
+  let h = `<div class="chd"><h2>${esc(U['제목'])}</h2><span class="badge guess">${esc(U['가상 표시'])}</span><span class="copied" role="status">${esc(ui.copied)}</span><button type="button" class="outline copy" data-act="copy"${s.where ? '' : ' disabled'}>${esc(U['복사'])}</button></div>`
+    + '<dl class="sum">'
     + `<dt>${esc(U['받은 곳'])}</dt><dd>${esc(U['받은 곳 값'])}</dd>`
     + `<dt>${esc(U['접수 담당자'])}</dt><dd>${esc(U['접수 담당자 값'])} <span class="sub">${esc(U['접수 담당자 설명'])}</span></dd>`
-    + `<dt>${esc(U['일'])}</dt>${dd(s.matter, scope)}` + (lawLine ? `<dt>${esc(U['조례 줄'])}</dt><dd>${esc(lawLine)}</dd>` : '')      // 이 자리에 걸리는 조례(엔진이 붙인 근거의 조례 이름) 또는 6종 밖인 까닭(표의 글)
-    + `${s.go ? `<dt class="go">${esc(U['찾아가는 말'])}</dt><dd class="go">${esc(s.go)}</dd>` : `<dt>${esc(U['위치'])}</dt>${dd(s.where)}`}`
-    + (s.bunji ? `<dt class="go">${esc(U['번지수'])}</dt><dd class="go">${esc(s.bunji.text)}${s.bunji.road ? `<span class="rd">${esc(s.bunji.road)}</span>` : ''}</dd>` : '')      // 위치가 정해진 뒤에만(통화 중 화면은 그대로)
-    + `<dt>${esc(U['좌표'])}</dt>${dd(s.point)}${V && V.pin && V.pin.exact ? '' : `<dt>${esc(U['범위'])}</dt>${dd(s.size)}`}`
+    + `<dt>${esc(U['일'])}</dt>${dd(s.matter, ' ' + scopeBadge())}`
+    + `<dt>${esc(U['조례 줄'])}</dt>${dd(lawLine)}<dt>${esc(U['근거'])}</dt>${dd(cites)}`
+    + (s.go ? `<dt class="go">${esc(U['찾아가는 말'])}</dt><dd class="go">${esc(s.go)}</dd>` : `<dt>${esc(U['위치'])}</dt>${dd(s.where)}`)
+    + `<dt class="go">${esc(U['번지수'])}</dt>${s.bunji ? `<dd class="go">${esc(s.bunji.text)}${s.bunji.road ? `<span class="rd">${esc(s.bunji.road)}</span>` : ''}</dd>` : none}`
+    + `<dt>${esc(U['좌표'])}</dt>${dd(s.point)}` + (V && V.pin && V.pin.exact ? '' : `<dt>${esc(U['범위'])}</dt>${dd(s.size)}`)
     + (s.said_place ? `<dt>${esc(U['말 그대로'])}</dt>${dd(s.said_place)}` : '') + '</dl>';
-  // 위치가 정해지기 전: 가능성이 큰 곳(확률 막대). 정해지면 이 자리가 담당 부서로 바뀐다
-  if (!r) {
-    const c = (V && V.cands) || [];
-    h += `<div class="box cand"><div class="t">${esc(U['후보 제목'])}</div>` + (c.length ? c.map((x) => `<div class="cd"><span class="nm">${esc(x.name)}</span><span class="pb"><i style="width:${Math.round(x.p * 100)}%"></i></span><span class="pv">${Math.round(x.p * 100)}%</span></div>`).join('')
-      : `<p class="r wait">${esc(U['후보 없음'])}</p>`) + '</div>';
-  }
-  h += `<div class="box to${r ? ' set' : ''}"><div class="t">${esc(U['담당 부서'])}</div>`;
-  if (!r) h += `<p class="r wait">${esc(U['담당 부서 대기'])}</p>`;
-  else h += `<p class="v">${esc(r.hit.to)}</p><p class="n"><span class="badge ${r.hit.basis === '확인' ? 'sure' : 'guess'}">${esc(M[r.hit.basis === '확인' ? '확인' : '추측'])}</span>${esc(r.hit.note)}</p>`;
-  if (r && r.scope_why) h += `<p class="n">${esc(r.scope_why)}</p>`;
-  if (r && r.fate && r.fate.length) h += fateTable(r);      // 동물의 일: 「살았나 · 죽었나 × 자리」 한 표(같은 일 다른 자리 표를 넓힌 것)
-  else if (r && r.others.length > 1) h += `<details class="same" open><summary>${esc(M['다른 자리 제목'])}</summary><table>${r.others.map((o) => `<tr class="${o.here ? 'here' : ''}"><td>${esc(o.place)}${o.here ? ` <span class="badge in">${esc(M['지금 자리'])}</span>` : ''}</td><td>${esc(o.to)}${o.basis === '확인' ? '' : ` <span class="badge guess">${esc(M['추측'])}</span>`}</td></tr>`).join('')}</table></details>`;
+  // 처리할 담당 부서: 위치 전에는 같은 칸 안에 「가능성이 큰 곳」 두 줄(정해지면 이 칸이 담당 부서로 바뀐다)
+  h += `<div class="slot s-to${r ? ' set' : ''}"><div class="t">${esc(U['담당 부서'])}${r ? '' : `<span>${esc(U['담당 부서 대기'])}</span>`}</div>`;
+  if (r) h += `<p class="v">${esc(r.hit.to)}</p><p class="n"><span class="badge ${r.hit.basis === '확인' ? 'sure' : 'guess'}">${esc(M[r.hit.basis === '확인' ? '확인' : '추측'])}</span>${CTL() ? esc(r.hit.note || '') : ''}</p>`;      // 넘길 곳의 출처 글은 조작 화면에서만(main 깔끔한 화면과 같음)
+  else h += ((V && V.cands) || []).slice(0, 2).map((x) => `<div class="cd"><span class="nm">${esc(x.name)}</span><span class="pb"><i style="width:${Math.round(x.p * 100)}%"></i></span><span class="pv">${Math.round(x.p * 100)}%</span></div>`).join('');
   h += '</div>';
   h += nearBox();
-  // 처리 진행 상태: 다섯 칸을 모두 보인다. 확인받기 전에는 고를 수 없고, 상담사는 접수됨 · 넘김만 고른다(나머지는 담당 부서가 알려 오면 상담 기록 화면에서)
+  // 처리 진행 상태: 다섯 칸을 모두 보이고, 막힌 까닭은 한 줄로(확인받기 전 / 담당 부서가 알려 오면)
   const can = !!(V && V.confirmed);
   h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend>`
-    + radio5('status', ui.status, (id) => can && (id === ui.status || (['filed', 'sent'].includes(id) && (NEXTS[ui.status] || []).includes(id))), (id) => (!can ? '' : ['doing', 'recall', 'closed'].includes(id) ? U['상태 막힘 부서'] : whyOff(id, ui.status)))
-    + (can ? `<p class="hint">${esc(U['상태 안내'])}</p>` : `<p class="exnote">${esc(U['상태 막힘 통화'])}</p>`) + '</fieldset>';
-  // 엔진: 6종 안이면 추천 답을 두 칸으로(상담사가 안내할 말 / 부서에 넘길 근거), 6종 밖이면 물러났는지 한 줄
-  const asked = e && e.ask ? `<p class="askq"><b>${esc(M['엔진 물음'])}</b>${esc(e.ask)}</p>` : '';
-  const h0 = h.length;
-  if (V && V.matter.scope && V.matter.scope !== 'out' && e) {
-    const say = box['안내'] || box, basis = box['근거'] || { name: M['근거 조항'], guide: '' };      // 예전 서버 코드가 떠 있어도 깨지지 않게
-    h += `<div class="box ans${e.status === 'ready' && e.answer ? ' got' : ''}"><div class="t">${esc(M['답 칸 제목'])}${e.status === 'ready' && e.answer ? `<span>${esc(engineLine(e))}</span>` : ''}</div>`
-      + (e.question || V.matter.ask ? `<p class="cq"><b>${esc(M['시민 물음'])}</b>${esc(e.question || V.matter.ask)}</p>` : '');
-    if (e.status === 'running') h += `<p class="guide">${esc(M['엔진 찾는 중'])}</p><div class="skel" aria-busy="true"><i></i><i></i><i></i></div>`;
-    else if (e.answer) {
-      h += `<p class="guide">${esc(say.guide)}</p><p class="lab">${esc(say.name)}</p><p class="a say">${esc(e.say || e.answer)}</p>`
-        + `<p class="from"><b>${esc(M['찾은 곳'])}</b>${esc([...new Set(e.citations.map((c) => c.law))].map((law) => `${law} ${e.citations.filter((c) => c.law === law).map((c) => c.article).join(' · ')}`).join(' / '))}</p>`      // 엔진이 한 일: 어느 조례 몇 조에서 찾았나
-        + (M['표준 답변 확인 켬'] === '켬' ? `<p class="std">${esc(M['표준 답변 확인'])}</p>` : '') + '</div>'
-        + `<div class="box ans basis"><div class="t">${esc(basis.name)}</div><p class="guide">${esc(basis.guide)}</p>`
-        + (e.citations.length && r ? `<p class="applies">${esc(fill(M['적용 조례'], { 장소: [r.class_name, r.class].filter(Boolean).join(' · '), 조례: [...new Set(e.citations.map((c) => c.label.replace(/\s*제\d+조.*$/, '')))].join(' · ') }))}</p>` : '')
-        + e.citations.map((c) => `<div class="cite"><div class="lb">${esc(c.label)}<span>${esc(fill(M['시행'], { 날짜: c.effective }))}</span></div>${c.quotes.map((q) => `<blockquote>「${esc(q)}」</blockquote>`).join('')}${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(M['원문 열기'])}</a>` : ''}</div>`).join('') + (e.say ? `<details class="full"><summary>${esc(M['답 전문'])}</summary><p>${esc(e.answer)}</p></details>` : '') + asked;
-    } else h += `<p class="guide">${esc(e.error === 'nosaved' ? M['저장된 답 없음'] : e.error ? M['엔진 못 부름'] : M['엔진 못 찾음'])}</p>` + asked;
-    h += '</div>';
-  } else if (V && V.matter.scope === 'out' && e) {
-    const t = e.status === 'running' ? M['엔진 찾는 중'] : e.error === 'nosaved' ? M['저장된 답 없음'] : e.error ? M['엔진 못 부름']
-      : e.citations.length && V.matter.law ? fill(M['엔진 참고'], { 조항: e.citations.map((c) => c.label).join(' · ') }) : CTL() ? `${M['엔진 확인 불가']} (${engineLine(e)})` : M['엔진 확인 불가'];
-    if (M['6종 밖 엔진 표시'] === '켬' || CTL()) h += `<p class="eng">${esc(t)}</p>` + (e.status === 'ready' ? asked : '');
-  }
-  if (V && V.matter && V.matter.ask && h.length > h0) { const ans = h.slice(h0); h = h.slice(0, h0).replace('</dl>', '</dl>' + ans); }     // 시민이 규정을 물은 통화에서는 답 칸을 카드 위쪽으로 올린다
-  h += `<div class="sumbtn"><button type="button" class="outline" data-act="copy"${s.where ? '' : ' disabled'}>${esc(U['복사'])}</button>`
-    + (CTL() && V && V.confirmed && V.pin ? `<button type="button" class="outline" data-act="alias">${esc(U['별명 저장'])}</button>` : '')      // 별명 저장은 숨은 조작 화면에서만(본 화면에 둘지는 동규가 정함)
-    + (CTL() && TRIAL && S && S.lines.length ? `<button type="button" class="outline" data-act="trial">${esc(U['시험 기록'])} ${esc(TRIAL)}</button>` : '')      // 사람이 해 보는 시험(?trial=번호)에서만
-    + `<span role="status">${esc(ui.copied)}</span></div>`;
-  const el = $('side'), top = el.scrollTop; el.innerHTML = h; el.scrollTop = top;
+    + radio5('status', ui.status, (id) => can && (id === ui.status || (['filed', 'sent'].includes(id) && (NEXTS[ui.status] || []).includes(id))), () => '')
+    + `<p class="exnote">${esc(can ? U['상태 막힘 부서'] : U['상태 막힘 통화'])}</p>${can ? `<p class="hint">${esc(U['상태 안내'])}</p>` : ''}</fieldset>`;
+  h += refBlock();
+  if (CTL() && V && V.confirmed && V.pin) h += `<div class="sumbtn"><button type="button" class="outline" data-act="alias">${esc(U['별명 저장'])}</button>${TRIAL && S && S.lines.length ? `<button type="button" class="outline" data-act="trial">${esc(U['시험 기록'])} ${esc(TRIAL)}</button>` : ''}</div>`;      // 숨은 조작 화면에서만
+  const el = $('side'); el.innerHTML = h;
+  const rb = el.querySelector('.s-ref .rbody'); if (rb) rb.classList.toggle('cut', rb.scrollHeight > rb.clientHeight + 2);      // 참고 자료가 칸보다 길면 칸 안에서만 잘리고 「아래에 더 있음」
 }
 // ---- 상담 기록 화면: 왼쪽 목록(상태 칩 · 넘긴 곳 고르기) · 지도 번호 점 · 오른쪽 고른 기록(그때의 접수 카드 + 처리 상태 + 처리 기록)
 function renderRecList() {
@@ -619,6 +660,8 @@ document.addEventListener('click', async (ev) => {
     try { await api('/api/trial', { trial: TRIAL, state: S, sec: ui.t0 ? Math.round(((ui.t1 || Date.now()) - ui.t0) / 1000) : null }); ui.copied = fill(U['시험 기록 남김'], { 번호: TRIAL }); } catch { ui.copied = U['시험 기록 실패']; }
     renderSide();
   }
+  else if (d.act === 'cite') { ui.cite = d.i === 'full' ? 'full' : Number(d.i); renderLaw(); }      // 조례 칸 안에서 조문(인용문 · 시행일 · 원문 열기)으로
+  else if (d.act === 'cite-back') { ui.cite = null; renderLaw(); }
   else if (d.act === 'copy' && V) {
     const U = K('접수 카드'), st = { filed: '접수됨', sent: '넘김' }[ui.status];
     try { await navigator.clipboard.writeText(V.summary.copy + (st ? `\n${U['진행 상태']}: ${U[st]}` : '')); ui.copied = U['복사됨']; } catch { ui.copied = U['복사 실패']; }
@@ -643,6 +686,7 @@ document.addEventListener('change', async (ev) => {
   if (TRIAL) { ui.scene = 'free'; document.body.classList.add('ctl'); }      // 사람 시험(?trial=번호): 열자마자 직접 통화(글로 넣기) · 시험 기록 단추
   if (!ui.scene) ui.scene = (scenes()[0] || {}).id || 'free';      // 첫 장면(장면 표의 맨 위). 표에 없는 장면도 ?auto=로 연다
   if (!SCRIPTS[ui.scene]) ui.input = 'type';
+  try { REFS = await (await fetch('refs.json')).json(); } catch { /* 참고 자료 없이도 통화는 된다 */ }
   await loadRecords();
   resetCall(); initMap();
   window.CALL = { ui, get S() { return S; }, get V() { return V; }, get map() { return map; }, get RECS() { return RECS; }, play, resetCall, freeRect, openRec };   // 점검용
