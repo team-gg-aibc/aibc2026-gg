@@ -182,12 +182,12 @@ def k_fromto(c, rng):
 
 
 def k_walk(c, rng):
-    """「A에서 걸어서 N분」: 걸음 1분 = 약 70m, 사람의 어림은 ±30%쯤 흔들린다고 둔다(짐작)."""
+    """「A에서 걸어서 N분」: 걸음 1분 = 약 70m, 걸은 길은 곧은 거리 ÷ 0.75(33번 2-6의 값), 사람의 어림은 ±30%쯤 흔들린다고 둔다(짐작)."""
     a = station(c, 150, 700)
     if not a:
         return None
     da, ia = a
-    n = max(2, round(da * math.exp(rng.gauss(0, 0.3)) / 70))
+    n = max(2, round(da / 0.75 * math.exp(rng.gauss(0, 0.3)) / 70))
     return [rng.choice([f"{G.name[ia]}에서 걸어서 {n}분쯤 온 데예요.", f"{G.name[ia]}에서 {n}분 정도 걸어왔어요.", f"{G.name[ia]} 나와서 한 {n}분 걸었어요."])]
 
 

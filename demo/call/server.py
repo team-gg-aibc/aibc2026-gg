@@ -640,7 +640,7 @@ def code_read(said, asked, short, R):
 FACIL = {"주민센터": ("주민센터", "행정복지센터"), "동사무소": ("주민센터", "행정복지센터"), "행정복지센터": ("주민센터", "행정복지센터"), "우체국": ("우체국",), "파출소": ("파출소", "지구대"), "지구대": ("지구대", "파출소"),
          "초등학교": ("초등학교",), "중학교": ("중학교",), "고등학교": ("고등학교",), "도서관": ("도서관",), "소방서": ("소방서", "119안전센터"), "보건소": ("보건소",), "성당": ("성당",), "구청": ("구청",), "경찰서": ("경찰서",)}
 MINS = {"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "육": 6, "칠": 7, "팔": 8, "구": 9, "십": 10, "십오": 15, "이십": 20}
-WALK_M = 70.0      # 걸음 1분에 가는 거리(m). 짐작 — 통화 자료로 맞춘 값이 아니다
+WALK_M = 70.0 * 0.75      # 걸어서 1분에 곧은 거리로 얼마나 가나(m): 걸음 70m × 길이 굽은 몫 0.75. 33번 2-6(「입구에서 걸어서 몇 분」 설계)의 값을 그대로 쓴다. 짐작 — 통화 자료로 맞춘 값이 아니다
 
 
 def _one_spot(key):
@@ -682,7 +682,7 @@ def speech_fix(said, read, short, clues):
             mins = float(MINS.get(mm.group(2)) or mm.group(2)) if mm else 0
             if p and 1 <= mins <= 20:
                 ring = WALK_M * mins
-                read["clues"] = [c for c in read["clues"] if k0(c) != m["key"]] + [{"t": "pt", "p": [round(p[0], 1), round(p[1], 1)], "ring": ring, "r": max(40.0, 0.35 * ring), "e": 0.15, "walk": True, "sure": True,
+                read["clues"] = [c for c in read["clues"] if k0(c) != m["key"]] + [{"t": "pt", "p": [round(p[0], 1), round(p[1], 1)], "ring": ring, "r": max(40.0, 0.45 * ring), "e": 0.25, "walk": True, "sure": True,
                                                                                "label": f"{m['name']}에서 걸어서 {mins:g}분쯤"}]
                 skip.append(m["key"])
     road_talk = any(c.get("t") == "at" and "k" in c and L.resolve(c["k"])["roads"] and not len(L.resolve(c["k"])["x"]) for c in list(clues) + read["clues"])
