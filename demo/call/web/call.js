@@ -414,7 +414,7 @@ function renderSide() {   // 접수 카드 = 넘길 것. 덩어리 차례 · 높
   const M = K('일의 종류와 갈림'), U = K('접수 카드'), r = V && V.route, e = engNow(), s = (V && V.summary) || {}, sc = V && V.matter && V.matter.scope;
   const none = `<dd class="none">${esc(U['미정'])}</dd>`, dd = (v, x = '') => (v ? `<dd>${esc(v)}${x}</dd>` : none);
   const lawLine = r && sc === 'in' && hasAns(e) ? fill(M['적용 조례'], { 장소: [r.class_name, r.class].filter(Boolean).join(' · '), 조례: [...new Set(e.citations.map((c) => c.label.replace(/\s*제\d+조.*$/, '')))].join(' · ') })
-    : r && r.scope === 'out' ? M['6종 밖'] : (V && V.matter && V.matter.law) || '';      // 이 자리에 걸리는 조례(엔진이 붙인 근거의 조례 이름) · 6종 밖 · 표가 정한 조례
+    : r && r.scope === 'out' ? M['6종 밖'] : '';      // 조례 이름은 엔진이 근거 조항을 붙였을 때만 단정한다(server.py build()의 6종 안 판정과 같음). 찾는 중 · 근거 없음 · 위치 전에는 「아직 정해지지 않음」(PR #114 리뷰)
   const cites = sc === 'in' && hasAns(e) ? citeText(e, true) : sc === 'out' ? U['6종 밖 근거'] : '';      // 부서에 넘길 근거 조항(조항 이름). 인용문 · 시행일 · 원문은 조례 칸에서 누르면 본다
   let h = `<div class="chd"><h2>${esc(U['제목'])}</h2><span class="badge guess">${esc(U['가상 표시'])}</span><span class="copied" role="status">${esc(ui.copied)}</span><button type="button" class="outline copy" data-act="copy"${s.where ? '' : ' disabled'}>${esc(U['복사'])}</button></div>`
     + '<dl class="sum">'
