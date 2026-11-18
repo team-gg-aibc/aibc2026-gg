@@ -1314,6 +1314,9 @@ def _merge(code, model):
     sure = [c for c in code.get("clues") or [] if c.get("sure")]
     skip = set(code.get("skip") or ())                    # (53번 스위치들) 코드가 뜻을 정해 거둔 이름: Solar가 「근처」 · 「방향」으로 되살리지 않는다
     model = dict(model, clues=[c for c in model.get("clues") or [] if str(c.get("k") or "").split("|")[0] not in skip])
+    if "choicekeep" in L.ON:                              # (choicekeep, 기본 끔 · 53번) 「○○ 지나고 1분쯤 됐어요」: 코드는 시민이 말한 정도(1분쯤 · 조금)로 읽어 두는데, Solar가 보기를 고르면 그 보기에 미리 든 「방금 지남」 단서가 다시 들어와 이겼다(47번 pastfix가 실제 호출 길에서 풀리던 일). 같은 표지의 「지났다 · 못 미쳤다」를 코드가 뚜렷이 읽었으면 보기 단서는 버린다
+        nl = lambda c: gaz.norm(str(c.get("label") or c.get("k") or "").split(" → ")[0])      # noqa: E731
+        model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("past", "before") and nl(c) and any(x.get("t") == c["t"] and nl(x) == nl(c) for x in sure))])
     same = lambda a, b: (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a.get("label") and a.get("label") == b.get("label"))   # noqa: E731
     return dict(model, clues=sure + [c for c in model.get("clues") or [] if not any(same(c, x) for x in sure)])
 
