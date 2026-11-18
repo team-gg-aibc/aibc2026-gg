@@ -24,7 +24,7 @@ import gaz
 
 G = gaz.load()
 STEP, DONE_M, DONE_ROAD_M, MASS = 20, 50, 100, 0.9     # 끝내는 기준: 범위의 반지름 50m. 길 위는 구간 200m(차로 지나며 찾으니 넓게 잡음 — 추측)
-EPS = {"at": 0.12, "road": 0.04, "pt": 0.05, "in": 0.07, "out": 0.07, "between": 0.07, "past": 0.07, "before": 0.07, "cat": 0.5, "cone": 0.12, "closest": 0.15, "half": 0.1}   # 단서 종류마다 「이 말이 틀렸을 몫」(이름은 자료가 낡았을 몫까지)
+EPS = {"anyof": 0.2, "at": 0.12, "road": 0.04, "pt": 0.05, "in": 0.07, "out": 0.07, "between": 0.07, "past": 0.07, "before": 0.07, "cat": 0.5, "cone": 0.12, "closest": 0.15, "half": 0.1}   # 단서 종류마다 「이 말이 틀렸을 몫」(이름은 자료가 낡았을 몫까지)
 WEAK = 0.3       # 비슷한 이름으로 이은 단서(받아 적기가 틀렸다고 보고 고쳐 이은 것)가 틀렸을 몫. 정확히 맞은 이름(0.12)보다 약하게(11-15)
 AROUND = (450.0, 200.0)     # 「○○ 쪽」(11-16): 그 자리에서 450m 안은 고르게, 그 밖은 폭 200m로 줄어든다(90%가 드는 거리 약 800m). 짐작 — 통화 자료로 맞춘 값이 아니다
 SIG = {"바로": 18.0, "가까이": 40.0, "근처": 100.0, "모름": 100.0, "보임": 150.0, "쪽": AROUND[0]}        # 「바로 앞 · 옆」 · 「근처」를 몇 m 폭(종 모양의 표준편차)으로 볼지. 90%가 드는 반지름은 그 2.1배
@@ -271,7 +271,13 @@ def _support(n, c, ctx):
     """단서가 가리키는 곳의 격자점 → (점들, 종류). fine = 촘촘히, many = 지점이 많은 이름, area = 넓은 구역(성기게). 없으면 None."""
     t = c["t"]
     if t == "pt":
+        if c.get("walk"):                                 # (walkmin · 53번) 「○○에서 걸어서 N분」의 고리: 600m로 자르면 먼 쪽이 잘린다
+            rad = min(c["ring"] + 2.5 * c.get("r", 100), 1800)
+            return discs(c["p"][0], c["p"][1], rad, 1 if rad <= 700 else 2), "fine"
         return discs(c["p"][0], c["p"][1], min((c.get("ring") or 0) + 3 * c.get("r", 100), 600)), "fine"
+    if t == "anyof":                                      # (facil · 53번) 동 이름 없이 말한 시설: 지금 범위 안의 그런 곳 가운데 하나
+        ps = np.asarray(c["ps"], float)
+        return discs(ps[:, 0], ps[:, 1], min(3 * c.get("r", 100), 600)), "fine"
     if t == "at":
         r = resolve(c["k"])
         parts, cls = [], "fine"
@@ -332,6 +338,9 @@ def _like(n, c, keys, x, y, ctx):
         if c.get("ring") is not None:                     # 「○○에서 스무 걸음쯤」: 표지 둘레의 고리(33번 2-2)
             return np.exp(-(np.hypot(x - c["p"][0], y - c["p"][1]) - c["ring"]) ** 2 / (2 * s * s))
         return np.exp(-((x - c["p"][0]) ** 2 + (y - c["p"][1]) ** 2) / (2 * s * s))
+    if t == "anyof":
+        ps, s = np.asarray(c["ps"], float), c.get("r", 100.0)
+        return np.exp(-np.min((x[:, None] - ps[None, :, 0]) ** 2 + (y[:, None] - ps[None, :, 1]) ** 2, axis=1) / (2 * s * s))
     if t == "closest":                                    # 「(보기 넷 가운데) A가 가장 가까워요」: A가 다른 보기보다 가까운 구역, 멀수록 조금씩(33번 2-4)
         dA = np.hypot(x - c["p"][0], y - c["p"][1])
         dO = np.min([np.hypot(x - a, y - b) for a, b in c["others"]], axis=0) if c.get("others") else np.full(len(x), 1e9)
@@ -543,9 +552,17 @@ def infer(clues):
             if sum(parts) > 0 and sum(1 for v in parts if v >= 0.1 * sum(parts)) >= 2:
                 alike.append((n, [round(v / sum(parts), 3) for v in parts]))
     pk = any(_pk(resolve(c["k"])) for c in clues if "k" in c and c["t"] in ("at", "past", "before"))       # 면 · 선으로 된 공원 안 이름(park_names)이 범위를 받치고 있나
-    named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest")]
+    named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof")]
     heard_only = bool(named) and all(c.get("heard") for c in named)      # 자리 단서가 모두 비슷한 이름으로 이은 것뿐이다(11-15)
     R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
+    if "guessdrop" in ON:                                 # (guessdrop, 기본 끔 · 53번) 시스템이 짐작으로 이은 단서(비슷한 이름으로 이음 · 종류 낱말로 고른 한 곳)가 시민이 또렷이 댄 이름과 어긋나면 짐작 쪽을 버린다
+        weak = [n for n, c in enumerate(clues) if c.get("heard") or c.get("guess")]
+        firm_low = [n for n, v in trust.items() if v < 0.35 and n not in weak and clues[n]["t"] in ("at", "pt", "past", "before", "between", "in", "out", "anyof")]
+        if weak and firm_low:                             # 지금 범위가 또렷한 단서를 「틀린 말」로 치고 있다: 짐작 단서를 빼고 다시 센다. ponytail: 짐작 단서를 한꺼번에 뺀다(어느 것이 어긋났는지 가르지 않는다)
+            R2 = infer([c for n, c in enumerate(clues) if n not in weak])
+            if R2 is not None:
+                R2["dropped"] = [clues[n].get("label") or "" for n in weak]
+                return R2
     if any(c["t"] == "half" for c in clues) and is_done(R):      # 둘 중 고르기 답이 있어야만 좁혀진 것이면 아직 끝이 아니다: 이 답 하나로는 끝내지 않는다(11-16)
         R0 = infer([c for c in clues if c["t"] != "half"])
         R["needs_half"] = R0 is None or not is_done(R0)
@@ -886,6 +903,8 @@ def anchor(R, clues):
         if lab.endswith(" 쪽") or c["t"] not in ("pt", "at", "past", "before"):
             continue
         tight = (c["t"] == "pt" and c.get("r", 100.0) <= SIG["바로"]) or c.get("how") == "바로"
+        if "twins" in ON and "p" in c and lab and not (c.get("sure") and c.get("name")) and not lab.startswith(("가로등", "국가지점번호")) and twins(lab.split(" → ")[0], c["p"], np.array([x]), np.array([y]), 300.0):
+            continue                                      # (twins) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다: 시민은 다른 지점 앞에서도 「네」라고 한다
         if "p" in c and lab:
             said.append((math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight))
         elif "k" in c:
@@ -902,10 +921,26 @@ def anchor(R, clues):
     if best and best[0] <= 80:
         return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3]}
     idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R)]
+    if "twins" in ON:
+        idx = [i for i in idx if not twins(G.brand[i] or G.name[i], (G.x[i], G.y[i]), np.array([x]), np.array([y]), 300.0)]
     if not idx:
         return None
     j = min(idx, key=lambda i: math.hypot(G.x[i] - x, G.y[i] - y) / PROM.get(G.kind[i], 1.0))
     return {"name": G.name[j], "p": [round(float(G.x[j]), 1), round(float(G.y[j]), 1)], "d": math.hypot(G.x[j] - x, G.y[j] - y), "tight": False}
+
+
+def twins(label, p, x, y, pad=150.0):
+    """(twins · 53번) 그 이름의 다른 곳이 지금 범위(점 x, y의 둘레 pad m)에 따로 있나 → 서로 40m 넘게 떨어진 자리들 [[x, y], …](p 포함, 둘 이상일 때만) 또는 None.
+    같은 이름 · 같은 상표 · 그 이름으로 시작하는 지점 이름(「이마트24」 ↔ 「이마트24 경희대점」)을 같은 이름으로 본다: 시민은 「이마트24 옆이에요」라고만 말한다."""
+    k = gaz.norm(label)
+    if len(k) < 2:
+        return None
+    keep = [[float(p[0]), float(p[1])]]
+    for i in _places_in(float(np.min(x)) - pad, float(np.min(y)) - pad, float(np.max(x)) + pad, float(np.max(y)) + pad, 8000):
+        n = gaz.norm(G.name[i])
+        if (n == k or n.startswith(k) or (G.brand[i] and gaz.norm(G.brand[i]) == k)) and all(math.hypot(G.x[i] - q[0], G.y[i] - q[1]) > 40 for q in keep):
+            keep.append([round(float(G.x[i]), 1), round(float(G.y[i]), 1)])
+    return keep if len(keep) >= 2 else None
 
 
 def _same_name(anc):

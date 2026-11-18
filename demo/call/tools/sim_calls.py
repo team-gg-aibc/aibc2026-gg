@@ -50,6 +50,7 @@ sys.path.insert(0, str(HERE))
 SOLAR = "--solar" in sys.argv
 ARG = lambda name, default: type(default)(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default   # noqa: E731
 N, LIE, DUNNO, YES, SOUND = ARG("--n", 30), ARG("--lie", 0.0), ARG("--dunno", 0.0), ARG("--yes", 0.0), ARG("--sound", 0.0)
+LOOSE, SEE = ARG("--loose", 1.0), ARG("--see", 1.0)      # (53번) 거리 말이 헐거운 시민: --loose 2면 24m까지 「바로 앞」 · 50m까지 「옆」. --see 2면 120m(길 위 80m) 안의 이름까지 「근처」로 댄다. 기본 1 = 전과 같다
 if "--model" in sys.argv:
     os.environ["CALL_MODEL"] = sys.argv[sys.argv.index("--model") + 1]
 os.environ["CALL_MODE"] = "live" if SOLAR else "code"
@@ -197,7 +198,7 @@ def mismatch(view, hist0):
     return out
 
 
-HOW = lambda d: "바로 앞이에요" if d <= 12 else "옆이에요" if d <= 25 else "근처예요"   # noqa: E731
+HOW = lambda d: "바로 앞이에요" if d <= 12 * LOOSE else "옆이에요" if d <= 25 * LOOSE else "근처예요"   # noqa: E731
 
 
 def inside(c):
@@ -535,7 +536,7 @@ def truth(c, q, view, rng, st):
         return f"{say(W.name[st_[0]])} 근처예요" if st_ else "역은 잘 모르겠어요"
     # where · mark · finer: 60m 안에 보이는 가장 가까운 간판 · 건물(이미 말한 것은 빼고)
     pred = (lambda i: VISIBLE(i) and W.kind[i] in gaz.ROADSIDE) if c["cat"] == "자동차전용도로" else VISIBLE     # 자동차전용도로에서는 차에서 보이는 큰 표지만
-    seen = [i for i in near(x, y, 40 if road else 60, pred) if W.name[i] not in view["chips"] and not any(W.name[i] in ch for ch in view["chips"])]
+    seen = [i for i in near(x, y, (40 if road else 60) * SEE, pred) if W.name[i] not in view["chips"] and not any(W.name[i] in ch for ch in view["chips"])]
     if seen:
         d = math.hypot(W.x[seen[0]] - x, W.y[seen[0]] - y)
         return f"{say(W.name[seen[0]])} {HOW(d)}"
