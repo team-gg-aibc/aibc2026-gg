@@ -167,7 +167,7 @@ def shortlist(said, R, asked_id=None):
     for no, px, py in G.lamp_in(said):                    # 가로등 기둥의 관리번호를 읽어 줬다: 그 기둥 하나를 가리킨다
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 가로등"], 번호=no), "kind": "지점번호", "n": 1, "after": "", "by": "#" + no, "sure": True, "r": G.lamp_err.get(no, 12.0)})
     for label, px, py in (addr_in(said, R) if "addrq" in L.ON and (asked_id == "addr" or ADDR_CUE.search(said)) else ()):     # (addrq · 47번 방법 2) 건물 주소판(도로명 + 번호)을 읽어 줬다: 그 건물 하나
-        out.append({"p": [round(px, 1), round(py, 1)], "name": f"{label} 건물", "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True, "r": 20.0})
+        out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 주소판"], 주소=label), "kind": "지점번호", "n": 1, "after": "", "by": "@" + label, "sure": True, "r": 20.0})     # 「@」 = 주소. 「#」(가로등 · 지점번호)과 달리 시설물 번호 칸에는 넣지 않는다
     t = gaz.norm(said)
     if R is not None:                                     # 종류만 말했으면 지금 범위 안의 그런 곳 가운데 가능성이 큰 세 곳까지
         x, y, w = L._sample(R)
@@ -355,7 +355,7 @@ def code_read(said, asked, short, R):
             mins = re.match(r"^.{0,8}?(\d+|한|일|두|이|세|삼|네|사|오|다섯|십|십오)\s*분", m["after"]) if rel == "past" else None
             if mins:                                      # 「○○ 지나고 2분쯤」 → 속도 × 시간으로 셈한다
                 read["clues"][-1]["min"] = float({"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "십": 10, "십오": 15}.get(mins.group(1)) or mins.group(1))
-        elif m["by"] not in seen_cat and not str(m["by"]).startswith(("#", "≈")) and sum(1 for o in short if o.get("by") == m["by"] and o.get("mass", 0) >= 0.3 * m.get("mass", 1)) >= 2:
+        elif m["by"] not in seen_cat and not str(m["by"]).startswith(("#", "≈", "@")) and sum(1 for o in short if o.get("by") == m["by"] and o.get("mass", 0) >= 0.3 * m.get("mass", 1)) >= 2:
             seen_cat.add(m["by"])                         # 종류만 말했는데 범위 안에 그런 곳이 여럿: 하나를 고르지 않고 「그런 곳 가운데 하나 둘레」로 읽는다(다른 분수로 확정하지 않게)
             read["clues"].append({"t": "cat", "c": m["kind"], "s": L.SIG["바로"] if how == "바로" else 60.0, "e": 0.15, "label": fill(tab("위치 범위")["단서 · 종류 바로 옆" if how == "바로" else "단서 · 종류 보임"], 종류=m["by"])})
         elif m["by"] not in seen_cat:                     # 종류만 말한 것: 가장 그럴듯한 한 곳
@@ -403,7 +403,7 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "plate":
         no = re.search(r"[A-Za-z가-힣]{0,4}[- ]?\d[\d\- ]{2,}\d?", said)
         lamp = next((m["name"] for m in short if str(m.get("by", "")).startswith("#")), None)
-        if lamp or no:
+        if lamp or (no and not any(str(m.get("by", "")).startswith("@") for m in short)):      # 번호판을 물었는데 주소를 읽어 줬으면(「@」) 그 숫자를 시설물 번호로 적지 않는다
             read["matter"]["plate"] = lamp or re.sub(r"\s+", " ", no.group()).strip()[:24]
         elif re.search(r"없|안 ?보|모르", said):
             pick = 0
@@ -423,7 +423,7 @@ def code_read(said, asked, short, R):
                 single = len(r["x"]) >= 1 and float(max(r["x"]) - min(r["x"]) + max(r["y"]) - min(r["y"])) <= 40
                 read["clues"] = [{"t": "at", "k": m["key"], "how": "보임", "sig": sig, "e": 0.2, "via": "check", "single": single, "sure": True, "label": m["name"]}]
                 break
-            if str(m.get("by", "")).startswith(("#", "≈")):
+            if str(m.get("by", "")).startswith(("#", "≈", "@")):
                 read["clues"] = [{"t": "pt", "p": m["p"], "r": sig, "e": 0.2, "via": "check", "single": True, "sure": True, "label": m["name"]}]
                 break
     elif q.get("id") == "check" and R is not None:       # 열린 확인(CALL_ON=check): 시민이 댄 이름이 보이는 둘레에 지금 후보 가능성이 얼마나 드나
@@ -438,7 +438,7 @@ def code_read(said, asked, short, R):
                 near3 = [(a, b) for a, b in pts if math.hypot(a - R["cx"], b - R["cy"]) <= 3000]
                 if not d or (len(d) > 3 and len(near3) >= 2) or any(math.hypot(a - c, b - e) > 300 for a, b in near3 for c, e in near3):
                     continue                              # 「파리바게뜨」처럼 지점이 여럿인 상표, 「하월곡」처럼 갈래가 300m 넘게 퍼진 이름은 어느 점인지 몰라 쓰지 않는다(11-15)
-            elif str(m.get("by", "")).startswith(("#", "≈")):
+            elif str(m.get("by", "")).startswith(("#", "≈", "@")):
                 pts = [(m["p"][0], m["p"][1])]
             else:
                 continue
