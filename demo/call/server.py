@@ -433,7 +433,7 @@ def code_read(said, asked, short, R):
             read["clues"].append({"t": "cat", "c": m["kind"], "s": L.SIG["바로"] if how == "바로" else 60.0, "e": 0.15, "label": fill(tab("위치 범위")["단서 · 종류 바로 옆" if how == "바로" else "단서 · 종류 보임"], 종류=m["by"])})
         elif m["by"] not in seen_cat:                     # 종류만 말한 것: 가장 그럴듯한 한 곳
             seen_cat.add(m["by"])
-            guess_n = None if str(m["by"]).startswith(("#", "≈")) else len(read["clues"])      # (guessdrop) 종류 낱말로 고른 한 곳은 짐작이다(번호를 읽어 준 것 · 비슷한 이름은 따로 표시가 있다)
+            guess_n = None if str(m["by"]).startswith(("#", "≈", "@")) else len(read["clues"])      # (guessdrop) 종류 낱말로 고른 한 곳은 짐작이다(번호를 읽어 준 것 · 비슷한 이름은 따로 표시가 있다)
             read["clues"].append({"t": "past", "p": m["p"], "how": how if how in L.DIST else "모름", "label": m["name"]} if rel == "past"
                                  else {"t": "pt", "p": m["p"], "r": m.get("r") or (max(L.SIG[how], L.KIND_SIG.get(m["kind"], 0) if "areafix" in L.ON and how != "바로" else 0) if how in ("바로", "가까이") else L.KIND_SIG.get(m["kind"], L.SIG["근처"])), "label": m["name"]})     # (areafix, 기본 끔 · 47번) 동네 · 산 이름은 「가까이」라도 그 넓이로(이름으로 읽을 때의 _sigma와 같게, 1118 #60)
             if guess_n is not None and "guessdrop" in L.ON:

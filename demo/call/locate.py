@@ -903,8 +903,8 @@ def anchor(R, clues):
         if lab.endswith(" 쪽") or c["t"] not in ("pt", "at", "past", "before"):
             continue
         tight = (c["t"] == "pt" and c.get("r", 100.0) <= SIG["바로"]) or c.get("how") == "바로"
-        if "twins" in ON and "p" in c and lab and not (c.get("sure") and c.get("name")) and not lab.startswith(("가로등", "국가지점번호")) and twins(lab.split(" → ")[0], c["p"], np.array([x]), np.array([y]), 300.0):
-            continue                                      # (twins) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다: 시민은 다른 지점 앞에서도 「네」라고 한다
+        if "twinsanchor" in ON and "p" in c and lab and not (c.get("sure") and c.get("name")) and not lab.startswith(("가로등", "국가지점번호")) and twins(lab.split(" → ")[0], c["p"], np.array([x]), np.array([y]), 300.0):
+            continue                                      # (twinsanchor, 기본 끔 · 53번) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다. twins에서 떼어 냈다: 공원 안에서 확인 문장의 기준 이름이 시민에게 안 보이는 것으로 바뀌어 맞는 자리에 「아니요」를 받았다
         if "p" in c and lab:
             said.append((math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight))
         elif "k" in c:
@@ -921,7 +921,7 @@ def anchor(R, clues):
     if best and best[0] <= 80:
         return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3]}
     idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R)]
-    if "twins" in ON:
+    if "twinsanchor" in ON:
         idx = [i for i in idx if not twins(G.brand[i] or G.name[i], (G.x[i], G.y[i]), np.array([x]), np.array([y]), 300.0)]
     if not idx:
         return None
