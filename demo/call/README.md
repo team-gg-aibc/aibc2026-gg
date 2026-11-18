@@ -85,7 +85,7 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/seoul/road_nodes.tsv.gz` | 국가교통정보센터 표준노드링크(2026-11-11판) |
 | `data/extra_places.json` | 지도 자료에 이름이 없어 팀이 손으로 더한 시연 장소 |
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
-| `web/heights/*.geojson` | 시연 자리(상도동 · 서울숲 · 안암역) 둘레 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap. 원본 CSV(약 410MB)는 레포 밖에 두고 `tools/make_heights.py`로 둘레만 잘라 만든다 |
+| `web/heights/index.json` · `cells/*.json` · `hi.geojson` | 서울 전체 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 칸(확대 14 지도 타일, 약 1.9km 네모)마다 파일 하나이고 화면은 보이는 칸만 읽는다(172칸 · 68,197채 · 3.9MB). 지도 타일보다 실제가 높은 건물만 담는다. 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap(2026-11-15판 타일). 원본 CSV(약 410MB)와 지도 타일(287장, 41MB)은 레포 밖에 두고 `tools/make_heights.py`로 만든다(약 2분) |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |
 
 자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
