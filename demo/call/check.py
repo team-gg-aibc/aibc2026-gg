@@ -59,6 +59,10 @@ def check_end(name, view, sizes):
     assert all(w in s["where"] for w in e["where"]), f"{name}: 위치 한 줄 {s['where']}"
     assert s["point"] and s["matter"] and e["to"] in s["to"] and s["go"] and view["pin"] and all(k in s["copy"] for k in ("민원을 받은 곳", "처음 접수한 담당자", "찾아가는 말", "번지수", "지도 좌표", "일", "처리할 담당 부서")), f"{name}: 접수 카드 {s}"
     assert view["answer_box"]["안내"]["name"] and view["answer_box"]["근거"]["name"] and view["heat"]["pts"] and len(view["heat"]["pts"]) <= 2500, f"{name}: 추천 답 칸 이름 · 지도에 그릴 점"
+    if r.get("fate"):       # 동물의 일: 「살았나 · 죽었나 × 자리」 표(11-18). 표의 줄 그대로, 지금 통화의 줄 하나만 칠함
+        f, dead = r["fate"], [x for x in r["fate"] if not x["alive"]]
+        assert sum(x["here"] for x in f) == 1 and {x["alive"] for x in f} == {True, False} and all(x["to"] and "{" not in x["to"] and (x["scope"] == "in") == x["alive"] for x in f), f"{name}: 살았나 표 {f}"
+        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "추측"), ("자동차전용도로", "추측")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
     eng = view["engine"]
     assert eng["status"] == "ready" and not eng["error"] and eng["ask"], f"{name}: 엔진 {eng}"
     if e["cite"]:       # 6종 안: 근거 조항이 붙은 추천 답
@@ -201,6 +205,8 @@ def main():
         assert text["mode"] == "saved" and set(text["scripts"]) >= set(EXPECT) and text["places"] > 100000 and len(text["seoul"]) > 100
         html = urllib.request.urlopen(BASE + "/", timeout=5).read().decode("utf-8")
         assert 'id="ask"' in html and "call.js" in html
+        buttons = [r[0] for t in text["text"]["sections"]["통화 장면"]["tables"] for r in t["rows"]]
+        assert buttons == ["cat_street", "free"], f"장면 단추는 한 장면과 직접 통화만 {buttons}"      # 다른 대본은 주소로만(11-18)
         greeting = next(r[1] for t in text["text"]["sections"]["통화 글"]["tables"] for r in t["rows"] if r[0] == "인사")
         ends = {name: play(name, text["scripts"][name], greeting) for name in EXPECT}
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다

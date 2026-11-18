@@ -749,6 +749,9 @@ def matter_ready(matter):
     return True
 
 
+FATE_PLACES = ("길", "시 공원", "자동차전용도로")      # 「살았나 · 죽었나」 표에 늘 보이는 자리(지금 자리가 다른 종류면 그 줄을 더한다)
+
+
 def route_of(matter, R):
     """일의 종류 × 장소 종류 → 넘길 곳 한 줄, 조례 6종 안팎, 같은 일이 다른 곳이었다면."""
     t = TYPES[matter["type"]]
@@ -764,10 +767,20 @@ def route_of(matter, R):
         if r and (c, r["to"]) not in seen:
             seen.add((c, r["to"]))
             others.append({"place": names[c], "to": put(r["to"], c), "basis": r["basis"], "here": c == cls})
+    fate = []      # 동물의 일: 살았나(유기 동물) · 죽었나(동물 사체) × 자리 → 조례 6종 안팎 · 넘길 곳. 표의 줄 그대로이고, 지금 통화의 줄에 here(11-18 동규 「살았나 · 죽었나」)
+    if t.get("animal"):
+        for k, alive in (("stray", True), ("carcass", False)):
+            tt = TYPES[k]
+            rows = [(c, next(r for r in tt["routes"] if ok(r, c))) for c in FATE_PLACES + (() if cls in FATE_PLACES else (cls,))]
+            rows = [{"alive": alive, "class": c, "to": put(r["to"], c), "basis": r["basis"], "scope": r.get("scope", tt["scope"]), "law": r.get("law") or tt.get("law"),
+                     "here": k == matter["type"] and c == cls} for c, r in rows]
+            if len({x["to"] for x in rows}) == 1:
+                rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
+            fate += rows
     scope = hit.get("scope", t["scope"])
     return {"type": matter["type"], "name": t["name"], "item": t["item"], "scope": scope, "scope_why": hit.get("scope_why") or (t.get("scope_why") if scope == "out" else None),
             "law": hit.get("law") or t.get("law"), "class": cls, "class_name": cname, "ask_engine": scope == "in" or bool(t.get("ask_engine")),
-            "hit": {"to": put(hit["to"], cls), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else []}
+            "hit": {"to": put(hit["to"], cls), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else [], "fate": fate}
 
 
 # ---- 엔진 (조례 답). 일의 종류와 큰 장소가 정해지면 미리 부르기 시작한다. 엔진에는 통화 글을 그대로 넣지 않고 간추린 물음을 넣는다
@@ -1021,7 +1034,8 @@ def build(st, extra=None):
     doubt = [clues[n].get("label") or "" for n, v in (R["trust"].items() if R else []) if v < 0.35 and n < len(clues)]
     view = {"mode": MODE, "size": size, "size_text": size_line or tab("위치 범위")["통화 전"], "heat": {"pts": pts, "cell": cell},     # 지도 아래 범위 글도 카드와 같은 말: 이름 있는 구역에서 나온 범위면 「○○ 전체」, 아니면 반지름 · 구간(11-15 동규)
             "center": parts["center"] if parts else None, "radius": round((size or {}).get("r") or R["r"]) if R else None, "region": (parts or {}).get("region"), "done": done, "confirmed": confirmed, "question": question,
-            "matter": {"line": matter_line, "scope": (None if not route else "out" if route["scope"] == "out" else "in" if in_scope else "wait" if not engine or engine.get("status") != "ready" else "nocite"), **matter},
+            "matter": {"line": matter_line, "scope": (None if not route else "out" if route["scope"] == "out" else "in" if in_scope else "wait" if not engine or engine.get("status") != "ready" else "nocite"),
+                       "law": (route or {}).get("law"), **matter},      # law: 표가 이 일 · 자리에 둔 조례(없으면 6종 밖의 엔진 참고 줄을 보이지 않는다)
             "route": assigned, "pin": pin, "engine": engine, "answer_box": {k: {"name": kinds[k], "guide": guides[k]} for k in ("안내", "근거")}, "summary": summary,
             "chips": [c.get("label") or c.get("k") or "" for c in clues], "cands": cands,
             "heard": list({c["heard"]: {"said": c["heard"], "as": c.get("label") or ""} for c in clues if c.get("heard")}.values()), "unfound": lost, "step": step, "doubt": [d for d in doubt if d], "elsewhere": round(R["elsewhere"], 2) if R else None,

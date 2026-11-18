@@ -20,7 +20,7 @@ async function api(path, body) {
 let DOC = null, SCRIPTS = {}, MODE = 'live', META = {}, S = null, V = null, seq = 0, runId = 0, pollT = 0;
 let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 이 화면에서 확인받은 통화. NEXTS = 지금 상태에서 고를 수 있는 상태
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
-const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || 'roadkill', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
+const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || '', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
              typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'light' ? 'light' : 'dark',
              view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '' };      // view: 통화 | 상담 기록(?view=records&rec=R01)
 const tabs = {};
@@ -176,7 +176,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT' || ev.metaKey || ev.ctrlKey || !DOC) return;
   const sc = scenes(), k = ev.key.toLowerCase();
   if (ev.key === '`') { document.body.classList.toggle('ctl'); renderAll(); }
-  else if ('12'.includes(k) && sc[Number(k) - 1]) { ui.scene = sc[Number(k) - 1].id; ui.input = 'script'; resetCall(); }
+  else if ('12'.includes(k) && sc[Number(k) - 1]) { ui.scene = sc[Number(k) - 1].id; ui.input = SCRIPTS[ui.scene] ? 'script' : 'type'; resetCall(); }
   else if (k === '0') { ui.scene = 'free'; ui.input = 'type'; resetCall(); document.body.classList.add('ctl'); renderAll(); }
   else if (ev.key === 'Enter' && !ui.playing) play();
   else if (k === 'v') { ui.voice = !ui.voice; renderTop(); }
@@ -317,6 +317,16 @@ function engineLine(e) {
   const M = K('일의 종류와 갈림');
   return e.how === 'saved' ? fill(M['미리 받은 답'], { 초: e.sec }) : fill(M['지금 만든 답'], { 초: e.sec });
 }
+function fateTable(r) {      // 「살았나 · 죽었나 × 자리」: 조례 6종 안팎과 넘길 곳은 표(routes.json)의 줄 그대로, 지금 통화의 줄을 칠한다
+  const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), cur = F[r.class] || r.class;
+  const row = (f, i, all) => `<tr class="${f.here ? 'here' : ''}">${i ? '' : `<th rowspan="${all.length}">${esc(F[f.alive ? '살아 있음' : '죽음'])}</th>`}`
+    + `<td>${esc(f.class ? F[f.class] : F['어디서든'])}${f.here ? ` <span class="badge in">${esc(f.class ? M['지금 자리'] : fill(F['지금 자리 글'], { 자리: cur }))}</span>` : ''}</td>`
+    + `<td>${esc(f.scope === 'in' ? fill(F['6종 안 줄'], { 조례: (f.law || '').replace(/^서울특별시\s*/, '') }) : F['6종 밖 줄'])}</td>`
+    + `<td>${esc(f.to)} <span class="badge ${f.basis === '확인' ? 'sure' : 'guess'}">${esc(F[f.basis === '확인' ? '확인' : '추측'])}</span></td></tr>`;
+  const part = (alive) => r.fate.filter((f) => f.alive === alive).map(row).join('');
+  return `<details class="same fate" open><summary>${esc(F['제목'])}</summary><table><colgroup><col class="c1"><col class="c2"><col class="c3"><col></colgroup>`
+    + `<tr class="hd"><th></th><th>${esc(F['자리'])}</th><th>${esc(F['조례'])}</th><th>${esc(F['넘길 곳'])}</th></tr>${part(true)}${part(false)}</table><p class="fnote">${esc(F['꼬리'])}</p></details>`;
+}
 function nearBox() {      // 접수 카드 안 「이 자리 둘레 지난 기록」: 그때 넘긴 위치와 처리 상태. 누르면 상담 기록 화면에서 연다
   const near = nearRecs();
   if (!V || !(V.done || V.confirmed)) return '';
@@ -352,7 +362,8 @@ function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수�
   if (!r) h += `<p class="r wait">${esc(U['담당 부서 대기'])}</p>`;
   else h += `<p class="v">${esc(r.hit.to)}</p><p class="n"><span class="badge ${r.hit.basis === '확인' ? 'sure' : 'guess'}">${esc(M[r.hit.basis === '확인' ? '확인' : '추측'])}</span>${esc(r.hit.note)}</p>`;
   if (r && r.scope_why) h += `<p class="n">${esc(r.scope_why)}</p>`;
-  if (r && r.others.length > 1) h += `<details class="same" open><summary>${esc(M['다른 자리 제목'])}</summary><table>${r.others.map((o) => `<tr class="${o.here ? 'here' : ''}"><td>${esc(o.place)}${o.here ? ` <span class="badge in">${esc(M['지금 자리'])}</span>` : ''}</td><td>${esc(o.to)}${o.basis === '확인' ? '' : ` <span class="badge guess">${esc(M['추측'])}</span>`}</td></tr>`).join('')}</table></details>`;
+  if (r && r.fate && r.fate.length) h += fateTable(r);      // 동물의 일: 「살았나 · 죽었나 × 자리」 한 표(같은 일 다른 자리 표를 넓힌 것)
+  else if (r && r.others.length > 1) h += `<details class="same" open><summary>${esc(M['다른 자리 제목'])}</summary><table>${r.others.map((o) => `<tr class="${o.here ? 'here' : ''}"><td>${esc(o.place)}${o.here ? ` <span class="badge in">${esc(M['지금 자리'])}</span>` : ''}</td><td>${esc(o.to)}${o.basis === '확인' ? '' : ` <span class="badge guess">${esc(M['추측'])}</span>`}</td></tr>`).join('')}</table></details>`;
   h += '</div>';
   h += nearBox();
   // 처리 진행 상태: 다섯 칸을 모두 보인다. 확인받기 전에는 고를 수 없고, 상담사는 접수됨 · 넘김만 고른다(나머지는 담당 부서가 알려 오면 상담 기록 화면에서)
@@ -379,10 +390,10 @@ function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수�
     h += '</div>';
   } else if (V && V.matter.scope === 'out' && e) {
     const t = e.status === 'running' ? M['엔진 찾는 중'] : e.error === 'nosaved' ? M['저장된 답 없음'] : e.error ? M['엔진 못 부름']
-      : e.citations.length ? fill(M['엔진 참고'], { 조항: e.citations.map((c) => c.label).join(' · ') }) : CTL() ? `${M['엔진 확인 불가']} (${engineLine(e)})` : M['엔진 확인 불가'];
+      : e.citations.length && V.matter.law ? fill(M['엔진 참고'], { 조항: e.citations.map((c) => c.label).join(' · ') }) : CTL() ? `${M['엔진 확인 불가']} (${engineLine(e)})` : M['엔진 확인 불가'];
     if (M['6종 밖 엔진 표시'] === '켬' || CTL()) h += `<p class="eng">${esc(t)}</p>` + (e.status === 'ready' ? asked : '');
   }
-  if (V && V.matter && V.matter.ask && h.length > h0) { const ans = h.slice(h0); h = h.slice(0, h0).replace('</dl>', '</dl>' + ans); }     // 시민이 규정을 물은 통화에서는 답 칸을 카드 위쪽으로 올린다
+  if (V && V.matter && V.matter.ask && !V.confirmed && h.length > h0) { const ans = h.slice(h0); h = h.slice(0, h0).replace('</dl>', '</dl>' + ans); }     // 시민이 규정을 물은 통화에서는 답 칸을 카드 위쪽으로 올린다. 위치를 확인받으면(답은 이미 읽음) 제자리(아래)로: 넘길 곳 · 살았나 표가 스크롤 없이 보이게(11-18)
   h += `<div class="sumbtn"><button type="button" class="outline" data-act="copy"${s.where ? '' : ' disabled'}>${esc(U['복사'])}</button>`
     + (CTL() && V && V.confirmed && V.pin ? `<button type="button" class="outline" data-act="alias">${esc(U['별명 저장'])}</button>` : '')      // 별명 저장은 숨은 조작 화면에서만(본 화면에 둘지는 동규가 정함)
     + (CTL() && TRIAL && S && S.lines.length ? `<button type="button" class="outline" data-act="trial">${esc(U['시험 기록'])} ${esc(TRIAL)}</button>` : '')      // 사람이 해 보는 시험(?trial=번호)에서만
@@ -628,6 +639,7 @@ document.addEventListener('change', async (ev) => {
   document.title = `${K('맨 위 띠')['화면 이름']} (시연)`;
   document.body.dataset.tone = ui.tone;
   if (TRIAL) { ui.scene = 'free'; document.body.classList.add('ctl'); }      // 사람 시험(?trial=번호): 열자마자 직접 통화(글로 넣기) · 시험 기록 단추
+  if (!ui.scene) ui.scene = (scenes()[0] || {}).id || 'free';      // 첫 장면(장면 표의 맨 위). 표에 없는 장면도 ?auto=로 연다
   if (!SCRIPTS[ui.scene]) ui.input = 'type';
   await loadRecords();
   resetCall(); initMap();

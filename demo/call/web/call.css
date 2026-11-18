@@ -270,3 +270,13 @@ body:not(.view-records) #reclist { display: none; }
 .rlab { padding: 2px 9px; border-radius: 7px; background: var(--ink); color: var(--panel-solid); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: var(--shadow); }
 .rk { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px dashed var(--sub); background: var(--panel); color: var(--ink); font-size: 10.5px; font-weight: 800; cursor: pointer; }
 .ex { font-style: normal; }
+
+/* 「살았나 · 죽었나 × 자리」 표: 같은 일 다른 자리 표를 넓힌 것. 지금 통화의 줄만 칠한다 */
+.same.fate table { table-layout: fixed; font-size: 12px; }
+.same.fate col.c1 { width: 58px; } .same.fate col.c2 { width: 92px; } .same.fate col.c3 { width: 74px; }
+.same.fate th, .same.fate td { padding: 5px 5px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; color: var(--text); width: auto; background: none; font-weight: 500; }
+.same.fate tr.hd th { color: var(--sub); font-size: 11px; font-weight: 700; border-top: 0; padding-top: 2px; }
+.same.fate th[rowspan] { color: var(--ink); font-weight: 800; }
+.same.fate tr.here td { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+.same.fate .badge { font-size: 10.5px; padding: 0 6px; margin-left: 2px; }
+.same.fate .fnote { margin: 4px 0 0; color: var(--sub); font-size: 11px; }
