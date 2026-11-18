@@ -189,8 +189,8 @@ body:not(.ctl) .ask .q { font-size: 22px; line-height: 1.35; }
 .live.call.ring::before { background: #ffd166; }
 .live.call.over { opacity: .7; }
 @keyframes callblink { 50% { opacity: .25; } }
-.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: callblink 1.4s infinite; }
-.lines .ring button { animation: none; }
+.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: ringline 1.4s infinite; }
+@keyframes ringline { 50% { border-color: var(--line); } }      /* 테두리만 깜빡(64번 P13) */
 .range .undo { padding: 3px 10px; font-size: 12px; margin-left: 10px; }
 .range .foot .demo { margin-left: auto; opacity: .55; font-size: 11px; }
 
@@ -363,3 +363,4 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 #side .sum dd.said { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 #side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
 #side .sum .badge { font-size: 10.5px; padding: 0 7px; }
+@media (prefers-reduced-motion: reduce) { .lines .ring { animation: none; } }

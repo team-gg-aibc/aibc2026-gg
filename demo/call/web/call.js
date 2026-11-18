@@ -54,10 +54,11 @@ function ago(r) {
 const metres = (a, b) => Math.hypot((a[0] - b[0]) * 88200, (a[1] - b[1]) * 111000);
 const recNo = (r) => RECS.length - RECS.indexOf(r);      // 번호 = 들어온 차례(오래된 것이 1)
 const recShown = () => RECS.filter((r) => (ui.recSt === 'all' || r.status === ui.recSt) && (!ui.recTo || r.to === ui.recTo));
-function nearRecs() {      // 좁힌 자리 둘레의 지난 기록(이 통화 것은 빼고 가까운 셋). 위치가 정해진 뒤에만
+function nearRecs() {      // 좁힌 자리 둘레의 지난 기록(가까운 셋). 위치가 정해진 뒤에만
+  // ponytail: 예시 기록만 본다 — 시연을 되풀이하면 이 화면에서 쌓은 시험 통화가 같은 자리(0m)로 세 줄을 채웠다(64번 P02). 실제 접수 기록과 이으면 모든 기록을 본다
   if (!V || !(V.done || V.confirmed) || !V.center) return [];
   const at = (V.pin && V.pin.at) || V.center, R = Number(K('상담 기록')['둘레 거리']) || 400;
-  return RECS.filter((r) => r.id !== S.id && r.point).map((r) => ({ r, d: metres(r.point, at) })).filter((x) => x.d <= R).sort((a, b) => a.d - b.d).slice(0, 3);
+  return RECS.filter((r) => r.sample && r.point).map((r) => ({ r, d: metres(r.point, at) })).filter((x) => x.d <= R).sort((a, b) => a.d - b.d).slice(0, 3);
 }
 async function loadRecords() { try { const d = await api('/api/records'); RECS = d.records; NEXTS = d.next; } catch { /* 기록 없이도 통화는 된다 */ } }
 async function recPost(body) {      // 기록 쌓기 · 상태 바꾸기 · 처음 상태로. 받은 목록으로 갈아 끼운다
@@ -71,7 +72,8 @@ function resetCall() {
   S = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines: [], turns: [] };
   V = null;
   Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null, fateOpen: undefined, cite: null,
-    engT0: 0, reveal: null, lawOpen: false, lawCopied: '' });
+    engT0: 0, reveal: null, lawOpen: false, lawCopied: '', pin: false });
+  document.body.classList.remove('pinning');      // 찍기를 켠 채 새 통화로 가면 남던 것(64번 P07)
   renderAll();
 }
 async function send(body, hold) {   // 서버에 한 번 보내고 받은 상태로 갈아 끼운다(hold: 받은 뒤 화면에 올리기 전에 기다릴 것)
@@ -176,12 +178,13 @@ function speak(info) {
 const CTL = () => document.body.classList.contains('ctl');
 if (P.get('ctl') === '1') document.body.classList.add('ctl');
 document.addEventListener('keydown', (ev) => {
-  if (ev.target.tagName === 'INPUT' || ev.metaKey || ev.ctrlKey || !DOC) return;
+  if (ev.target.closest('input, select, textarea, button') || ev.metaKey || ev.ctrlKey || !DOC) return;
   const sc = scenes(), k = ev.key.toLowerCase();
   if (ev.key === '`') { document.body.classList.toggle('ctl'); renderAll(); }
+  else if (ui.view === 'records' || (ui.input === 'type' && S && S.lines.length)) return;      // 상담 기록 화면 · 글로 넣는 통화 중에는 통화를 지우는 글쇠를 받지 않는다(64번 P04 · P08)
   else if ('12'.includes(k) && sc[Number(k) - 1]) { ui.scene = sc[Number(k) - 1].id; ui.input = SCRIPTS[ui.scene] ? 'script' : 'type'; resetCall(); }
   else if (k === '0') { ui.scene = 'free'; ui.input = 'type'; resetCall(); document.body.classList.add('ctl'); renderAll(); }
-  else if (ev.key === 'Enter' && !ui.playing) play();
+  else if (ev.key === 'Enter' && !ui.playing && SCRIPTS[ui.scene]) play();
   else if (k === 'v') { ui.voice = !ui.voice; renderTop(); }
   else if (k === 't') setTone(ui.tone === 'dark' ? 'light' : 'dark');
 });
@@ -192,7 +195,7 @@ async function play() {
   if (!sc) return;
   ui.t0 = Date.now(); ui.t1 = 0; ui.playing = true; renderTalk();
   const hold = async () => { while (ui.paused && alive()) await new Promise((r) => setTimeout(r, 120)); return alive(); };
-  const line = async (who, text) => { if (!(await hold())) return false; const vi = await voiceInfo(text); await Promise.all([typeLine(who, text, alive, vi && vi.ms * 0.92, vi && vi.ct), speak(vi)]); if (who === '시민') await wait(500); return alive() && turnReq({ line: { who, text, via: 'script' } }); };      // 시민의 말이 끝나고 받아 적기가 마무리되는 짧은 틈 뒤에 읽는다
+  const line = async (who, text) => { if (!(await hold())) return false; const vi = await voiceInfo(text); await Promise.all([typeLine(who, text, alive, vi && vi.ms * 0.92, vi && vi.ct), speak(vi)]); if (who === '시민') await wait(500); return alive() && (await turnReq({ line: { who, text, via: 'script' } })) && alive(); };      // 그 사이 새 통화가 시작됐으면 이 재생은 멈춘다(64번 P11)      // 시민의 말이 끝나고 받아 적기가 마무리되는 짧은 틈 뒤에 읽는다
   const stop = () => { if (alive()) { ui.playing = false; renderTalk(); renderAsk(); } };
   await wait(500);
   if (!(await line('상담사', T['인사']))) return stop();
@@ -271,7 +274,7 @@ function renderTalk() {
   if (!CTL() && !(S && S.lines.length) && !ui.typing) {
     const sc = scenes().find((s) => s.id === ui.scene);
     h += `<li class="ring"><span>${esc(T['전화 옴'])}${callerNo() ? `<small class="no">${esc(callerNo())} ${esc(K('접수 카드')['가상 번호 표시'])}</small>` : ''}</span><button type="button" class="primary" data-act="play">${esc(T['받기'])}</button></li>`
-      + `<li class="ring-note">${esc(T['받기 안내'])}${sc ? ` ${esc(sc.name)}` : ''}</li>`;      // 누르면 무슨 일이 생기는지(57번 1)
+      + `<li class="ring-note">${SCRIPTS[ui.scene] ? `${esc(T['받기 안내'])}${sc ? ` ${esc(sc.name)}` : ''}` : esc(sc ? sc.desc : '')}</li>`;      // 누르면 무슨 일이 생기는지(57번 1). 대본 없는 장면은 그 설명(「대본 없이 글로 넣기」)
   }
   for (const l of (S ? S.lines : [])) {   // 시민의 말 아래에 그 말에서 뽑힌 단서를 칩으로 붙인다
     const t = l.who === '시민' ? S.turns[n++] : null;
@@ -310,7 +313,7 @@ function renderAsk() {
     h += `<p class="q">${esc(q.say)}</p><p class="why"><b>${esc(A['까닭'])}</b>${esc(q.why)}</p>`;
     const meta = [q.bits_text, ui.ms != null && V.read_how ? fill(A['걸린 시간'], { 초: (ui.ms / 1000).toFixed(2) }) : '', ui.model].filter(Boolean);
     if (meta.length) h += `<p class="exp">${meta.map(esc).join('<span class="sep"> · </span>')}</p>`;
-    if (q.options.length) h += `<div class="opts"><span class="k">${esc(A['답 단추'])}</span>${q.options.map((o, i) => `<button type="button" data-opt="${i}"${ui.pending || (ui.playing && !ui.paused) ? ' disabled' : ''}>${esc(o.label)}</button>`).join('')}</div>`;
+    if (q.options.length) h += `<div class="opts"><span class="k">${esc(A['답 단추'])}</span>${q.options.map((o, i) => `<button type="button" data-opt="${i}"${ui.pending || ui.playing ? ' disabled' : ''}>${esc(o.label)}</button>`).join('')}</div>`;
   }
   el.innerHTML = h;
 }
@@ -460,7 +463,7 @@ function fixBox() {      // 「일」 고치기(57번 6): 화면이 읽은 일�
   const U = K('접수 카드'), types = META.types || {}, cur = V && V.matter && V.matter.type;
   if (!cur || !Object.keys(types).length) return '';
   return (S.fix ? ` <span class="badge guess">${esc(U['일 고침 표시'])}</span>` : '')
-    + ` <select class="fix" aria-label="${esc(U['일 고치기 설명'])}" title="${esc(U['일 고치기 설명'])}"${ui.pending || (ui.playing && !ui.paused) ? ' disabled' : ''}><option value="" selected hidden>${esc(U['일 고치기'])}</option>`
+    + ` <select class="fix" aria-label="${esc(U['일 고치기 설명'])}" title="${esc(U['일 고치기 설명'])}"${ui.pending || ui.playing ? ' disabled' : ''}><option value="" selected hidden>${esc(U['일 고치기'])}</option>`
     + Object.entries(types).map(([k, name]) => `<option value="${esc(k)}"${k === cur ? ' disabled' : ''}>${esc(name)}</option>`).join('') + '</select>';
 }
 function renderSide() {   // 접수 카드 = 넘길 것. 덩어리 차례 · 높이 고정: 요약 → 처리할 담당 부서 → 둘레 기록 → 진행 상태 → (보일 것이 있을 때만) 참고 자료
@@ -686,6 +689,7 @@ function setTone(t) { ui.tone = t; document.body.dataset.tone = t; renderTop(); 
 
 // ---- 누르는 것
 document.addEventListener('click', async (ev) => {
+  if (ev.target.closest('#side .s-ref summary')) { ev.preventDefault(); return; }      // 참고 자료 표는 늘 펼친다(눌러 접히면 다시 그릴 때 저절로 펼쳐지던 것, 64번 P12)
   const rk = ev.target.closest('[data-rec]');      // 기록 하나(목록 · 지도 점 · 통화 카드의 둘레 기록) → 상담 기록 화면에서 연다
   if (rk) { openRec(rk.dataset.rec); return; }
   const b = ev.target.closest('button'); if (!b || b.disabled) return;
@@ -700,7 +704,7 @@ document.addEventListener('click', async (ev) => {
   else if (d.opt !== undefined && ui.askQ) { const o = ui.askQ.options[Number(d.opt)]; if (o) queue(() => turnReq({ set: o.set, label: o.label })); }
   else if (d.act === 'pin') { ui.pin = !ui.pin; document.body.classList.toggle('pinning', ui.pin); renderRange(); }
   else if (d.act === 'undo') queue(() => turnReq({ undo: true }));
-  else if (d.act === 'play') play();
+  else if (d.act === 'play') { if (SCRIPTS[ui.scene]) play(); else { ui.input = 'type'; resetCall(); document.body.classList.add('ctl'); renderAll(); const t = $('k-text'); if (t) t.focus(); } }      // 대본 없는 장면은 글로 넣는 통화(64번 P03)
   else if (d.act === 'pause') { ui.paused = !ui.paused; renderTalk(); renderAsk(); }
   else if (d.act === 'reset') resetCall();
   else if (d.act === 'send') { const t = $('k-text'), v = t.value.trim(); if (v) { t.value = ''; queue(() => citizen(v, 'type')); } }
