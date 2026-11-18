@@ -12,12 +12,18 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fast = () => (typeof SPEED === 'number' ? SPEED : 1);
   const mmss = (ms) => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
-  // 이 스위치가 켜졌을 때만 보이는 글. 본 화면에 올리기로 하면 문구 파일(docs/content/A-05_통화위치좁히기.md)로 옮긴다
-  const T = { here: '이 기기 마이크로 통화', phone: '휴대폰으로 걸기', script: '대본을 음성 길로', hang: '끊기', pick: '받기', fake: '받아쓰기: 가짜(대본 글 · 친 글)', rtzr: '받아쓰기: 리턴제로', whisper: '받아쓰기: 이 컴퓨터 안', elevenlabs: '받아쓰기: 일레븐랩스',
-    listen: '듣는 중', speak: '읽어 주는 중', wait: '거는 사람을 기다리는 중', ring: '전화가 왔습니다', link: '휴대폰에서 이 주소를 엽니다', over: '통화가 끝났습니다', down: '받아쓰기가 끊겼습니다',
-    nomic: '마이크를 쓸 수 없습니다. 브라우저의 마이크 허락과 https 주소인지 확인해 주세요.', code: '접근 코드', heard: '들어온 소리 {초}초', hold: '상담사가 말하는 중(스페이스)', agent: '상담사가 직접 묻는 통화',
-    off: '음성 통화가 꺼져 있습니다.', dial: '전화 걸기', dialName: '120 민원 콜센터', dialLead: '가상 시연입니다. 실제 민원 접수가 아닙니다.', noroom: '상담 화면에서 받은 주소로 열어 주세요.',
-    calling: '연결 중…', talking: '통화 중', say: '말할 글(가짜 받아쓰기)', send: '말하기', noline: '시민 역 소리 파일이 없습니다(tts_lines.py --citizen)' };
+  // 화면 글은 문구 파일(docs/content/A-05_통화위치좁히기.md 「음성 통화」 절)에서만 가져온다. 왼쪽 = 이 파일 안의 이름, 오른쪽 = 문구 표의 항목
+  const NAMES = { here: '단추 · 이 기기 마이크', phone: '단추 · 휴대폰으로 걸기', script: '단추 · 대본을 음성 길로', pick: '단추 · 받기', hang: '단추 · 끊기',
+    fake: '받아쓰기 · 가짜', elevenlabs: '받아쓰기 · 일레븐랩스', whisper: '받아쓰기 · 이 컴퓨터 안', rtzr: '받아쓰기 · 리턴제로',
+    listen: '상태 · 듣는 중', speak: '상태 · 읽어 주는 중', wait: '상태 · 거는 사람 기다림', ring: '상태 · 전화 옴', over: '상태 · 통화 끝', down: '상태 · 받아쓰기 끊김',
+    hold: '상태 · 상담사가 말하는 중', agent: '상태 · 상담사가 직접 묻는 통화', taken: '상태 · 상담사가 넘겨받음', approve: '상태 · 접수 확인 기다림', heard: '상태 · 들어온 소리',
+    link: '안내 · 휴대폰 주소', nomic: '안내 · 마이크 못 씀', noline: '안내 · 민원인 역 소리 없음', code: '안내 · 접근 코드',
+    dialName: '휴대폰 · 이름', dialLead: '휴대폰 · 안내', noroom: '휴대폰 · 주소 없음', off: '휴대폰 · 꺼짐', dial: '휴대폰 · 전화 걸기', calling: '휴대폰 · 연결 중', talking: '휴대폰 · 통화 중', say: '휴대폰 · 말할 글', send: '휴대폰 · 말하기' };
+  const T = {};
+  function loadText(doc) {      // 문구 표 → T. 표에 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게(call.js의 K와 같은 버릇)
+    const t = (((doc && doc.sections && doc.sections['음성 통화']) || {}).tables || []).find((x) => x.head[0] === '항목'), rows = t ? Object.fromEntries(t.rows.map((r) => [r[0], r[1]])) : {};
+    for (const [k, n] of Object.entries(NAMES)) T[k] = rows[n] ?? `[${n}]`;
+  }
 
   async function vapi(path, body, raw) {
     const r = await fetch('/api/voice/' + path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': raw ? 'application/octet-stream' : 'application/json' }, body: raw ? body : JSON.stringify(body) });
@@ -28,7 +34,9 @@
 
   // ---- 읽어 주기: 미리 만든 파일(서버 web/voice/tts/) → 기기에 든 읽어 주기(CALL_VOICE_TTS=browser일 때만) → 소리 없이 글 길이만큼 기다림
   const player = new Audio();
-  async function speakOut(text, info) {
+  let interrupt = () => {};      // 넘겨받기: 지금 읽는 말을 그 자리에서 끝낸다
+  function speakOut(text, info) { return new Promise((done) => { interrupt = done; speakOn(text, info).then(done); }); }
+  async function speakOn(text, info) {
     const quietMs = Math.min(9000, 600 + text.length * 95) / fast();
     if (QUIET) return sleep(quietMs);
     try {
@@ -62,7 +70,7 @@
 
   // ---- 소리 쪽: 마이크 → 서버, 읽어 줄 말 → 스피커. 상담 화면이 받기 전과 읽어 주는 동안에는 마이크 소리를 0으로 보낸다(연결음 · 제 목소리를 받아쓰지 않게, 줄은 살아 있게)
   function Caller(room, info, on) {
-    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false, tape = null, tape0 = 0, sent = 0;      // tape: 마이크 대신 보낼 소리(16kHz)
+    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false, tape = null, tape0 = 0, sent = 0, cut = 0;      // tape: 마이크 대신 보낼 소리(16kHz)
     const me = { hold: false }, todo = [];
     async function mic() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
@@ -88,6 +96,7 @@
         try {
           const d = await vapi(`audio?room=${room}&says=${seen}&played=${played}`, all.buffer, true);
           if (d.picked && !picked) { picked = true; on('picked'); }
+          if (d.cut > cut) { cut = d.cut; todo.length = 0; player.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); interrupt(); }      // 상담사가 넘겨받음: 읽던 말 · 남은 말을 버린다
           for (const s of d.says) { seen = s.n; todo.push(s); }
           if (d.down) on('down');
         } catch { if (alive) { stop(); on('over'); } return; }
@@ -153,7 +162,7 @@
   // ---- 상담 화면: 화면 쪽(+ 이 기기 마이크 · 대본이면 소리 쪽도 함께)
   function deskPage(info) {
     const ASK = Q.get('ask') === 'agent' || Q.get('ask') === 'ai' ? Q.get('ask') : info.ask;
-    const st = { room: null, caller: null, alive: false, how: '', since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', gapT: 0, busy: false, spoken: null, state: '', link: '' };
+    const st = { room: null, caller: null, alive: false, how: '', since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', gapT: 0, busy: false, spoken: null, state: '', link: '', ask: ASK, taken: false, approved: false, waitApprove: false };
     document.head.insertAdjacentHTML('beforeend', '<style>#t-mic button.on{background:var(--ink);color:var(--panel-solid)}#notice{user-select:all;word-break:break-all}body.voice-wait #lines .ring{display:none}</style>');
     document.querySelector('header.top').insertAdjacentHTML('beforeend', '<span class="lab" id="voice-box" role="status"></span><div class="seg" role="group" id="t-mic" aria-label="음성 통화"></div>');
     const bar = document.getElementById('t-mic'), box = document.getElementById('voice-box');
@@ -161,16 +170,22 @@
     function draw() {
       bar.innerHTML = st.alive ? (ringing() ? `<button type="button" class="on" data-mic="pick">${esc(T.pick)}</button>` : '') + `<button type="button"${ringing() ? '' : ' class="on"'} data-mic="hang">${esc(T.hang)}</button>`
         : [['here', T.here], ['phone', T.phone]].concat(SCRIPTS[ui.scene] ? [['script', T.script]] : []).map(([id, name]) => `<button type="button" data-mic="${id}">${esc(name)}</button>`).join('');
-      box.textContent = st.state ? `${T[info.stt]} · ${st.state}` + (st.heard ? ` · ${T.heard.replace('{초}', st.heard.toFixed(1))}` : '') + (ASK === 'agent' && st.alive ? ` · ${T.agent}` : '') : '';
+      box.textContent = st.state ? `${T[info.stt]} · ${st.state}` + (st.heard ? ` · ${T.heard.replace('{초}', st.heard.toFixed(1))}` : '') + (st.ask === 'agent' && st.alive && !st.taken ? ` · ${T.agent}` : '') : '';
       document.body.classList.toggle('voice-wait', st.alive && !st.joined);      // 거는 사람이 들어오기 전에는 「전화가 왔습니다」를 보이지 않는다
       const link = st.alive && st.how === 'phone' && !st.joined ? `${T.link}: ${location.origin}/dial.html?room=${st.room}` : '';      // 거는 사람이 들어올 때까지 받아 적기 칸의 알림 자리에
       if (link !== st.link) { ui.notice = st.link = link; renderTalk(); }
+      emit();
+    }
+    function emit() {      // 화면 요소(누가 말하는 중 · 넘겨받기 · 접수 전 확인)가 받는 상태: window의 'voice:state' 사건 + body의 data-voice-speaker(56번 13절)
+      const speaker = !st.alive ? '' : st.busy ? 'ai' : st.caller && st.caller.hold ? 'agent' : ui.typing && ui.typing.who === '시민' ? 'caller' : '';
+      document.body.dataset.voiceSpeaker = speaker;
+      window.dispatchEvent(new CustomEvent('voice:state', { detail: { speaker, alive: st.alive, picked: st.picked, how: st.how, ask: st.ask, taken: st.taken, waitingApproval: st.waitApprove, state: st.state } }));
     }
     function say(s) { st.state = s; draw(); }
     function onEvent(e) {      // 받아쓴 글: 도중 글은 받아 적기 칸에 흐르고, 확정 글 뒤 잠깐 조용하면 한 차례로 끊어 통화 길에 넣는다
       clearTimeout(st.gapT);
       if (e.final) { st.text = `${st.text} ${e.text}`.trim(); st.gapT = setTimeout(commit, info.gap_ms / fast()); }
-      ui.typing = { who: '시민', text: e.final ? st.text : `${st.text} ${e.text}`.trim() }; renderTyping();
+      ui.typing = { who: '시민', text: e.final ? st.text : `${st.text} ${e.text}`.trim() }; renderTyping(); emit();
     }
     function commit() {
       const t = st.text; st.text = ''; st.spoken = null;      // 같은 질문이 다시 떠도 읽어 주게
@@ -204,17 +219,17 @@
       await queue(() => turnReq({ line: { who: '상담사', text, via: 'voice' } }));
       try {
         const { n } = await vapi(`ask?room=${st.room}`, { text, terms: terms() }), t0 = Date.now(), cap = (5000 + text.length * 300) / fast();
-        while (st.alive && st.played < n && Date.now() - t0 < cap) await sleep(100);
+        while (st.alive && !st.taken && st.played < n && Date.now() - t0 < cap) await sleep(100);
       } catch { /* 방이 닫혔으면 poll2가 끊는다 */ }
-      st.busy = false; if (st.alive) say(T.listen);
+      st.busy = false; if (st.alive && !st.taken) say(T.listen); else emit();
     }
     const citizenSays = (text) => (info.stt === 'fake' ? st.caller.fake(text).then(() => true) : st.caller.line(text));      // 대본의 시민 줄: 가짜면 글로, 진짜 받아쓰기면 시민 역 소리로
     async function drive() {      // 화면이 띄운 것을 차례로 읽는다: 인사 → (조례 답) → 질문 … → 맺음말. 단추 · 되돌리기로 질문이 바뀌어도 바뀐 것을 읽는다
       const C = K('통화 글');
       ui.t0 = Date.now();
-      if (ASK === 'agent') return;      // 상담사가 직접 묻는 꼴: 읽어 주지 않는다. 화면이 띄운 질문은 상담사가 읽은 것으로 보고, 시민의 말이 들어올 때 통화 글에 적힌다(글로 넣을 때와 같다)
+      if (st.ask === 'agent') return;      // 상담사가 직접 묻는 꼴: 읽어 주지 않는다. 화면이 띄운 질문은 상담사가 읽은 것으로 보고, 시민의 말이 들어올 때 통화 글에 적힌다(글로 넣을 때와 같다)
       await agentSay(C['인사']);
-      while (st.alive) {
+      while (st.alive && !st.taken) {
         await sleep(150);
         if (ui.pending || st.busy || st.text || ui.typing || !V) continue;
         if (V.matter && V.matter.ask && V.engine && !ui.answered) {      // 시민이 규정을 물었으면 조례 답을 한 번 읽는다(대본 재생과 같은 순서)
@@ -224,6 +239,8 @@
           continue;
         }
         if (V.confirmed) {
+          if (window.VOICE.needApproval && !st.approved) { if (!st.waitApprove) { st.waitApprove = true; say(T.approve); } continue; }      // 접수 전 상담사 확인(화면 요소가 VOICE.needApproval을 켰을 때만): 누르기 전에는 「전달하겠습니다」를 읽지 않는다
+          st.waitApprove = false;
           await agentSay(V.summary.to ? fill(C['맺음말'], { '넘길 곳': V.summary.to.replace(/ · /g, ', ') }) : C['맺음말 넘길 곳 모름']);
           ui.ended = true; renderTalk();      // 「넘김」은 상담사가 고른다(대본 재생처럼 대신 고르지 않는다)
           return hang(T.over);
@@ -232,7 +249,7 @@
         if (q && key !== st.spoken) {
           st.spoken = key;
           await agentSay(q.say);
-          if (st.how === 'script' && st.alive && ui.askQ === q) { const a = SCRIPTS[ui.scene][q.id]; if (!a) return hang(C['대본에 없는 질문']); if (!(await citizenSays(a))) return hang(T.noline); }
+          if (st.how === 'script' && st.alive && !st.taken && ui.askQ === q) { const a = SCRIPTS[ui.scene][q.id]; if (!a) return hang(C['대본에 없는 질문']); if (!(await citizenSays(a))) return hang(T.noline); }
         } else if (st.how === 'script' && !q && !S.turns.length && !st.said1) { st.said1 = true; if (!(await citizenSays(SCRIPTS[ui.scene]['처음']))) return hang(T.noline); }      // 인사 뒤 첫 말
       }
     }
@@ -242,13 +259,19 @@
       if (info.code && !code) { code = window.prompt(T.code) || ''; sessionStorage.setItem('voice-code', code); }
       resetCall();
       try { st.room = (await vapi('room', { code })).room; } catch (e) { sessionStorage.removeItem('voice-code'); return say(String(e.message)); }
-      Object.assign(st, { alive: true, how, since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', busy: false, spoken: null, said1: false, caller: null });
+      Object.assign(st, { alive: true, how, since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', busy: false, spoken: null, said1: false, caller: null, ask: ASK, taken: false, approved: false, waitApprove: false });
       say(how === 'phone' ? T.wait : T.listen);
       if (how !== 'phone') {
         st.caller = Caller(st.room, info, (s) => { if (s === 'down') say(T.down); });
         try { await st.caller.start(how === 'here', how === 'script' && info.stt !== 'fake'); } catch { return hang(T.nomic); }
       }
       poll2();
+    }
+    function takeover() {      // 상담사가 통화를 넘겨받는다: AI가 읽던 말을 소리 쪽에서 끊고, 이 통화의 나머지는 상담사가 직접 묻는 꼴로 간다. 받아쓰기는 계속 흐른다
+      if (!st.alive || st.taken) return;
+      st.taken = true; st.ask = 'agent'; st.busy = false;
+      vapi(`cut?room=${st.room}`, {}).catch(() => {});
+      say(T.taken);
     }
     function hang(why) {
       if (!st.alive) return;
@@ -264,21 +287,28 @@
       else if (ev.target.closest('[data-scene]')) setTimeout(draw, 0);      // 장면을 바꾸면 「대본을 음성 길로」 단추가 그 장면에 맞게
     }, true);
     const hold = (down) => (ev) => {      // 상담사가 직접 묻는 꼴 · 한 기기 마이크: 상담사가 말하는 동안 스페이스를 누르고 있으면 그 소리는 받아쓰지 않는다
-      if (ev.code !== 'Space' || ASK !== 'agent' || !st.alive || !st.caller || ev.target.tagName === 'INPUT') return;
+      if (ev.code !== 'Space' || st.ask !== 'agent' || !st.alive || !st.caller || ev.target.tagName === 'INPUT') return;
       ev.preventDefault();
       if (st.caller.hold !== down) { st.caller.hold = down; say(down ? T.hold : T.listen); }
     };
     document.addEventListener('keydown', hold(true)); document.addEventListener('keyup', hold(false));
-    window.VOICE = { st, start, hang, pickup, ask: ASK };      // 점검용
+    Object.assign(window.VOICE, { st, start, hang, pickup, takeover, approve() { st.approved = true; emit(); } });      // 화면 요소 · 점검이 쓰는 자리(56번 13절)
+    Object.defineProperty(window.VOICE, 'ask', { get: () => st.ask, configurable: true });      // 지금 질문을 누가 말하나(넘겨받으면 agent)
     draw();
     if (Q.get('mic')) start(Q.get('mic'));
   }
 
+  window.VOICE = Object.assign({ needApproval: false }, window.VOICE);      // 화면 요소가 접수 전 확인을 쓰면 true로(56번 13절. 이 파일보다 먼저 켜 둬도 남는다). 아래에서 나머지 자리를 채운다
   (async () => {
     const info = await fetch('/api/voice/info').then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    if (!info || !info.on) { const el = document.getElementById('d-lead'); if (el) el.textContent = T.off; return; }      // 스위치가 꺼져 있으면 휴대폰 화면만 그 사실을 알린다
-    if (typeof citizen !== 'function') return dialPage(info);
+    if (typeof citizen !== 'function') {      // 휴대폰 화면: 문구를 직접 받는다
+      loadText(await fetch('/api/text').then((r) => r.json()).then((t) => t.text).catch(() => null));
+      if (!info || !info.on) { document.getElementById('d-lead').textContent = T.off; return; }      // 스위치가 꺼져 있으면 휴대폰 화면만 그 사실을 알린다
+      return dialPage(info);
+    }
+    if (!info || !info.on) return;
     while (!DOC) await sleep(50);      // call.js가 문구를 다 받은 뒤에
+    loadText(DOC);
     deskPage(info);
   })();
 })();

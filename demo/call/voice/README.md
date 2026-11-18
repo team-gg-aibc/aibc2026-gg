@@ -36,6 +36,18 @@ OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_MODE=saved CALL_PORT=8780 python3 demo/
 
 환경 변수는 `hub.py` 맨 위 표에 있다. 받아쓰기는 `CALL_VOICE_STT=fake|elevenlabs|whisper|rtzr`, 읽어 주기는 `CALL_VOICE_TTS=none|elevenlabs|browser`로 고른다. 일레븐랩스 열쇠는 `~/.config/gg-team/elevenlabs.env`의 `ELEVENLABS_API_KEY`(목소리: AI는 「나의 우주」·LLMOps 시연 영상의 '따뜻한', 시민 역은 '부드러운'). 리턴제로 열쇠는 `~/.config/gg-team/rtzr.env`의 `RTZR_CLIENT_ID` · `RTZR_CLIENT_SECRET`이고(값은 찍지 않는다) `websockets` 꾸러미(11 이상)가 있어야 한다.
 
+## 화면 요소와 잇는 자리
+
+화면 요소(누가 말하는 중 · 넘겨받기 · 접수 전 확인)는 `window.VOICE`가 있을 때만 쓴다(음성 스위치가 켜졌을 때).
+
+| 자리 | 뜻 |
+|---|---|
+| `window`의 `voice:state` 사건 · `body[data-voice-speaker]` | 지금 누가 말하는 중(`ai` · `caller` · `agent` · 빈 값)과 통화 상태 |
+| `VOICE.takeover()` | 상담사가 넘겨받는다: AI가 읽던 말을 끊고 남은 말을 버린다. 그 뒤로는 상담사가 직접 묻는 꼴 |
+| `VOICE.needApproval = true` · `VOICE.approve()` | 켜 두면 위치가 확인돼도 상담사가 확인을 누를 때까지 맺음말을 읽지 않는다 |
+
+자세한 약속은 팀 보고 56번 13절에 있다. 화면 글은 문구 파일(`docs/content/A-05_통화위치좁히기.md` 「음성 통화」 절)에서만 가져온다.
+
 ## 어떻게 도나
 
 전화 한 통이 방 하나다. 방에는 두 쪽이 붙는다.

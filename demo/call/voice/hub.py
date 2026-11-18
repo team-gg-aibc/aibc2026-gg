@@ -58,7 +58,7 @@ def open_room():
         if len(rooms) >= MAX_ROOMS or len(opens) >= OPENS_PER_HOUR:
             return None
         rid = secrets.token_hex(3)
-        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False}
+        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False, "cut": 0}
         opens.append(now)
         return rid
 
@@ -208,7 +208,7 @@ def _api(h, body):
         if body and r["stt"]:
             feed(r, body)
         r["played"] = max(r["played"], _int(q, "played", 0, 10**6, 0))
-        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"], "picked": r["picked"]})
+        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"], "picked": r["picked"], "cut": r["cut"]})
     if p == "fake":                             # 소리 쪽(가짜 받아쓰기일 때만 뜻이 있다): 이 글을 「말한다」
         if r["stt"] and text:
             r["stt"].speak(text)
@@ -219,6 +219,9 @@ def _api(h, body):
         since = _int(q, "since", 0, 10**6, 0)
         ev = r["events"][since:]
         return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"]})
+    if p == "cut":                              # 화면 쪽: 상담사가 넘겨받았다 → 소리 쪽이 읽던 말을 끊는다
+        r["cut"] += 1
+        return h.send_json({"ok": True})
     if p == "pick":                             # 화면 쪽: 전화를 받았다(거는 쪽의 연결음이 그친다)
         r["picked"] = True
         return h.send_json({"ok": True})

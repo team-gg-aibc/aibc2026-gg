@@ -100,6 +100,8 @@ def check_fake(text):
     assert call(f"/api/voice/audio?room={room}", raw=bytes(4800))["picked"] is False      # 소리 0.05초(48kHz 16비트): 마이크 → 서버 길. 아직 받지 않았다(거는 쪽은 연결음)
     call(f"/api/voice/pick?room={room}", {})                                 # 상담 화면이 받는다
     assert call(f"/api/voice/audio?room={room}", raw=b"")["picked"] is True
+    call(f"/api/voice/cut?room={room}", {})                                  # 상담사가 넘겨받으면 소리 쪽이 끊을 차례를 안다
+    assert call(f"/api/voice/audio?room={room}", raw=b"")["cut"] == 1
     seen = {"since": 0, "says": 0, "partials": 0}
 
     def hear(said, q):
@@ -130,8 +132,9 @@ def check_fake(text):
     same = ("where", "to", "point", "bunji")
     assert voice["confirmed"] and all(voice["summary"].get(k) == plain["summary"].get(k) for k in same), f"음성 길의 끝이 글로 넣었을 때와 다름\n  글: {plain['summary']}\n  음성: {voice['summary']}"
     assert code_of(f"/api/voice/end?room={room}", {}) == 200 and code_of(f"/api/voice/desk?room={room}") == 404
-    name = hashlib.sha1(" ".join(greeting.split()).encode("utf-8")).hexdigest()[:12] + ".mp3"      # 읽어 주기: 미리 만든 파일이 있으면 그 파일을, 없으면 404(화면은 소리 없이 기다린다)
-    f, say = HERE.parent / "web" / "voice" / "tts" / name, "/api/voice/say?text=" + urllib.parse.quote(greeting)
+    probe = f"점검용 읽어 주기 파일 {os.getpid()}"                              # 읽어 주기: 미리 만든 파일이 있으면 그 파일을, 없으면 404(화면은 소리 없이 기다린다). 남이 만든 음성 파일에 기대지 않게 점검만의 글로
+    name = hashlib.sha1(probe.encode("utf-8")).hexdigest()[:12] + ".mp3"
+    f, say = HERE.parent / "web" / "voice" / "tts" / name, "/api/voice/say?text=" + urllib.parse.quote(probe)
     assert not f.exists() and code_of(say) == 404, "음성 파일이 없는데 404가 아님(또는 점검이 지울 파일이 이미 있음)"
     f.parent.mkdir(exist_ok=True)
     f.write_bytes(b"ID3-check")
