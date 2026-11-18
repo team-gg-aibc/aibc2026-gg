@@ -759,12 +759,16 @@ def matter_ready(matter):
     return True
 
 
+FATE_PLACES = ("길", "시 공원", "자동차전용도로")      # 「살았나 · 죽었나」 표에 늘 보이는 자리(지금 자리가 다른 종류면 그 줄을 더한다)
+
+
 def route_of(matter, R):
     """일의 종류 × 장소 종류 → 넘길 곳 한 줄, 조례 6종 안팎, 같은 일이 다른 곳이었다면."""
     t = TYPES[matter["type"]]
     cls, cname = L.place_class(R)
-    d = {"gu": L._area_at(G.gu, R["cx"], R["cy"]) or "관할 구", "park": cname or "공원"}
-    put = lambda s: s.replace("{구}", d["gu"]).replace("{공원}", d["park"])   # noqa: E731
+    W = tab("일의 종류와 갈림")
+    gu = L._area_at(G.gu, R["cx"], R["cy"]) or W["구 모름"]
+    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
     names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
@@ -773,11 +777,21 @@ def route_of(matter, R):
         r = next((r for r in t["routes"] if ok(r, c)), None)
         if r and (c, r["to"]) not in seen:
             seen.add((c, r["to"]))
-            others.append({"place": names[c], "to": put(r["to"]), "basis": r["basis"], "here": c == cls})
+            others.append({"place": names[c], "to": put(r["to"], c), "basis": r["basis"], "here": c == cls})
+    fate = []      # 동물의 일: 살았나(유기 동물) · 죽었나(동물 사체) × 자리 → 조례 6종 안팎 · 넘길 곳. 표의 줄 그대로이고, 지금 통화의 줄에 here(11-18 동규 「살았나 · 죽었나」)
+    if t.get("animal"):
+        for k, alive in (("stray", True), ("carcass", False)):
+            tt = TYPES[k]
+            rows = [(c, next(r for r in tt["routes"] if ok(r, c))) for c in FATE_PLACES + (() if cls in FATE_PLACES else (cls,))]
+            rows = [{"alive": alive, "class": c, "to": put(r["to"], c), "basis": r["basis"], "scope": r.get("scope", tt["scope"]), "law": r.get("law") or tt.get("law"),
+                     "here": k == matter["type"] and c == cls} for c, r in rows]
+            if len({x["to"] for x in rows}) == 1:
+                rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
+            fate += rows
     scope = hit.get("scope", t["scope"])
     return {"type": matter["type"], "name": t["name"], "item": t["item"], "scope": scope, "scope_why": hit.get("scope_why") or (t.get("scope_why") if scope == "out" else None),
             "law": hit.get("law") or t.get("law"), "class": cls, "class_name": cname, "ask_engine": scope == "in" or bool(t.get("ask_engine")),
-            "hit": {"to": put(hit["to"]), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else []}
+            "hit": {"to": put(hit["to"], cls), "basis": hit["basis"], "note": hit["note"]}, "others": others if len({o["to"] for o in others}) > 1 else [], "fate": fate}
 
 
 # ---- 엔진 (조례 답). 일의 종류와 큰 장소가 정해지면 미리 부르기 시작한다. 엔진에는 통화 글을 그대로 넣지 않고 간추린 물음을 넣는다
@@ -1064,7 +1078,8 @@ def build(st, extra=None):
     doubt = [clues[n].get("label") or "" for n, v in (R["trust"].items() if R else []) if v < 0.35 and n < len(clues)]
     view = {"mode": MODE, "size": size, "size_text": size_line or tab("위치 범위")["통화 전"], "heat": {"pts": pts, "cell": cell},     # 지도 아래 범위 글도 카드와 같은 말: 이름 있는 구역에서 나온 범위면 「○○ 전체」, 아니면 반지름 · 구간(11-15 동규)
             "center": parts["center"] if parts else None, "radius": round((size or {}).get("r") or R["r"]) if R else None, "region": (parts or {}).get("region"), "done": done, "confirmed": confirmed, "question": question,
-            "matter": {"line": matter_line, "scope": (None if not route else "out" if route["scope"] == "out" else "in" if in_scope else "wait" if not engine or engine.get("status") != "ready" else "nocite"), **matter},
+            "matter": {"line": matter_line, "scope": (None if not route else "out" if route["scope"] == "out" else "in" if in_scope else "wait" if not engine or engine.get("status") != "ready" else "nocite"),
+                       "law": (route or {}).get("law"), **matter},      # law: 표가 이 일 · 자리에 둔 조례(없으면 6종 밖의 엔진 참고 줄을 보이지 않는다)
             "route": assigned, "pin": pin, "engine": engine, "answer_box": {k: {"name": kinds[k], "guide": guides[k]} for k in ("안내", "근거")}, "summary": summary,
             "chips": [c.get("label") or c.get("k") or "" for c in clues], "cands": cands,
             "heard": list({c["heard"]: {"said": c["heard"], "as": c.get("label") or ""} for c in clues if c.get("heard")}.values()), "unfound": lost, "step": step, "doubt": [d for d in doubt if d], "elsewhere": round(R["elsewhere"], 2) if R else None,
@@ -1281,6 +1296,90 @@ def save_trial(b):
     return {"ok": True, "trial": trial}, 200
 
 
+# ---- 상담 기록: 예시 기록(data/records_sample.json) + 이 화면에서 확인받은 통화(로컬 파일, git 무시). 넘길 곳 · 조례 안팎 · 번지수는 표와 주소 표에서만 채운다
+STATUSES = ["filed", "sent", "doing", "recall", "closed"]       # 접수됨 · 담당 부서로 넘김 · 처리 중 · 현장에서 못 찾음 · 다시 전화 · 끝남
+NEXT = {"filed": ["sent"], "sent": ["doing", "recall", "closed"], "doing": ["recall", "closed"], "recall": ["sent", "doing", "closed"], "closed": []}      # 지금 상태에서 고를 수 있는 것(되돌리기는 없다)
+_PATH = {"filed": ["filed"], "sent": ["filed", "sent"], "doing": ["filed", "sent", "doing"], "recall": ["filed", "sent", "doing", "recall"], "closed": ["filed", "sent", "doing", "closed"]}
+RECORD_FILE = Path(os.environ.get("CALL_RECORD_FILE") or HERE / "data" / "records_local.json")
+_samples = []
+
+
+def _sample_records():
+    if not _samples:
+        for r in json.loads((HERE / "data" / "records_sample.json").read_text(encoding="utf-8"))["records"]:
+            x, y = gaz.xy(*r["at"])
+            rt = route_of({"type": r["type"], "animal": r.get("animal"), "alive": r.get("alive")}, L.infer([{"t": "pt", "p": [float(x), float(y)], "r": 30.0}]))
+            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
+                             "bunji": bunji_of({"at": r["at"]}, r["range_m"] > BUNJI_FAR, rt["class"]), "point": r["at"], "range": size_text({"kind": r.get("kind", "radius"), "m": r["range_m"]}),
+                             "range_m": r["range_m"], "range_kind": r.get("kind", "radius"),
+                             "scope": rt["scope"] if rt["scope"] == "out" or rt["law"] else "cand",      # 표가 6종 안으로 보되 조례를 정하지 않은 일(주차 = 통화 때 엔진에 묻는다)은 예시 기록에서 「후보」
+                             "law": rt["law"] if rt["scope"] == "in" else None, "scope_why": rt["scope_why"], "to": rt["hit"]["to"],
+                             "basis": rt["hit"]["basis"], "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": [{"status": s} for s in _PATH[r["status"]]]})
+    return _samples
+
+
+def _local():
+    try:
+        d = json.loads(RECORD_FILE.read_text(encoding="utf-8"))
+        return {"added": list(d.get("added") or []), "log": dict(d.get("log") or {})}
+    except (OSError, ValueError):
+        return {"added": [], "log": {}}
+
+
+def _write_local(d):
+    tmp = RECORD_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(RECORD_FILE)
+
+
+def records(d=None):
+    """새 기록(나중 것이 위) + 예시 기록. 상태는 처리 기록의 마지막 줄."""
+    d = d or _local()
+    out = [dict(r, log=list(r["log"]) + d["log"].get(r["id"], [])) for r in list(reversed(d["added"])) + _sample_records()]
+    for r in out:
+        r["status"] = r["log"][-1]["status"]
+    return out
+
+
+def record_of(st, view, old=None):
+    """확인받은 통화 → 기록 한 건. 화면이 보낸 값은 상태만 믿고 접수 카드를 다시 엮는다."""
+    s, rt, e = view["summary"], view["route"], view.get("engine") or {}
+    cites = [c["label"] for c in e.get("citations") or []] if view["matter"]["scope"] == "in" else []
+    return {"id": st["id"], "sample": False, "at": (old or {}).get("at") or int(time.time() * 1000), "matter": s["matter"], "go": s["go"] or s["where"], "bunji": s["bunji"],
+            "point": view["pin"]["at"] if view["pin"] else view["center"], "range": s["size"], "range_m": (view["size"] or {}).get("m"), "range_kind": (view["size"] or {}).get("kind"), "scope": view["matter"]["scope"],
+            "law": " · ".join(dict.fromkeys(re.sub(r"\s*제\d+조.*$", "", c) for c in cites)) or None, "cites": cites, "scope_why": rt["scope_why"], "to": rt["hit"]["to"], "basis": rt["hit"]["basis"],
+            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}]}
+
+
+def save_record(b):
+    """op=save {state, status}: 확인받은 통화를 기록에 쌓거나 고쳐 쓴다(같은 통화 id면 한 건) · op=status {id, status}: 상태 바꾸기(NEXT에 없으면 막음) · op=reset: 이 화면에서 더한 것을 모두 거둔다."""
+    op, now = b.get("op"), int(time.time() * 1000)
+    if op == "save":
+        st, view = turn(b.get("state") or {}, {})
+        if not view["confirmed"] or not view["route"]:
+            return {"error": "위치를 확인받은 통화만 기록에 쌓는다"}, 400
+    with _alias_lock:
+        d = _local()
+        if op == "save":
+            old = next((r for r in d["added"] if r["id"] == st["id"]), None)
+            rec = record_of(st, view, old)
+            want, now_st = b.get("status"), (rec["log"] + d["log"].get(rec["id"], []))[-1]["status"]
+            if want in NEXT[now_st] and want in ("filed", "sent"):
+                d["log"].setdefault(rec["id"], []).append({"status": want, "at": now})
+            d["added"] = [r for r in d["added"] if r["id"] != st["id"]] + [rec]
+        elif op == "status":
+            cur = next((r for r in records(d) if r["id"] == b.get("id")), None)
+            if not cur or b.get("status") not in NEXT[cur["status"]]:
+                return {"error": "고를 수 없는 상태"}, 400
+            d["log"].setdefault(cur["id"], []).append({"status": b["status"], "at": now})
+        elif op == "reset":
+            d = {"added": [], "log": {}}
+        else:
+            return {"error": "없는 일"}, 400
+        _write_local(d)
+        return {"records": records(d), "next": NEXT}, 200
+
+
 def play(scene, wait_engine=True):
     """장면 하나를 대본대로 끝까지 돌린다(화면의 「대본 재생」과 같은 순서). → (상태, 화면, 걸음마다의 기록)."""
     script, T = scripts()[scene], tab("통화 글")
@@ -1372,6 +1471,8 @@ class Handler(SimpleHTTPRequestHandler):
             meta = json.loads((gaz.DIR / "meta.json").read_text(encoding="utf-8"))
             return self.send_json({"text": doc(), "scripts": scripts(), "mode": MODE, "done_m": L.DONE_M, "seoul": [gaz.lonlat(x, y) for x, y in G.seoul],
                                    "places": len(G.name), "roads": meta["roads"]})      # 가게(상가정보)까지 든 지명 표의 곳 수
+        if p == "/api/records":
+            return self.send_json({"records": records(), "next": NEXT})
         return super().do_GET()
 
     def do_POST(self):
@@ -1391,6 +1492,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(*save_alias(b))
             if p == "/api/trial":                # 사람이 해 보는 시험의 기록(숨은 조작 · ?trial=번호일 때만 화면에 단추)
                 return self.send_json(*save_trial(b))
+            if p == "/api/records":              # 상담 기록: 확인받은 통화 쌓기 · 처리 상태 바꾸기 · 처음 상태로
+                return self.send_json(*save_record(b))
             if p == "/api/view":                 # 상태 그대로 다시 엮는다(엔진 답을 기다릴 때)
                 st, view = turn(b.get("state") or {}, {})
                 return self.send_json({"state": st, "view": view})
