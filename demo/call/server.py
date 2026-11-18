@@ -1272,7 +1272,9 @@ def _sample_records():
             rt = route_of({"type": r["type"], "animal": r.get("animal"), "alive": r.get("alive")}, L.infer([{"t": "pt", "p": [float(x), float(y)], "r": 30.0}]))
             _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
                              "bunji": bunji_of({"at": r["at"]}, r["range_m"] > BUNJI_FAR, rt["class"]), "point": r["at"], "range": size_text({"kind": r.get("kind", "radius"), "m": r["range_m"]}),
-                             "range_m": r["range_m"], "range_kind": r.get("kind", "radius"), "scope": rt["scope"], "law": rt["law"] if rt["scope"] == "in" else None, "scope_why": rt["scope_why"], "to": rt["hit"]["to"],
+                             "range_m": r["range_m"], "range_kind": r.get("kind", "radius"),
+                             "scope": rt["scope"] if rt["scope"] == "out" or rt["law"] else "cand",      # 표가 6종 안으로 보되 조례를 정하지 않은 일(주차 = 통화 때 엔진에 묻는다)은 예시 기록에서 「후보」
+                             "law": rt["law"] if rt["scope"] == "in" else None, "scope_why": rt["scope_why"], "to": rt["hit"]["to"],
                              "basis": rt["hit"]["basis"], "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": [{"status": s} for s in _PATH[r["status"]]]})
     return _samples
 

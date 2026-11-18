@@ -160,7 +160,7 @@ def records(done):
     """상담 기록: 예시 기록은 넘길 곳 · 조례 안팎을 표에서 채워 오고, 위치를 확인받은 통화만 쌓이며, 처리 상태는 정해진 차례로만 바뀐다(되돌리기 없음)."""
     d = call("/api/records")
     nxt, samples = d["next"], [r for r in d["records"] if r["sample"]]
-    assert len(samples) >= 10 and all(r["to"] and "{" not in r["to"] and r["scope"] in ("in", "out") and r["point"] and r["go"] and r["range"] and r["status"] in nxt for r in samples), "예시 기록이 비었거나 표에서 채워지지 않음"
+    assert len(samples) >= 10 and all(r["to"] and "{" not in r["to"] and r["scope"] in ("in", "out", "cand") and r["point"] and r["go"] and r["range"] and r["status"] in nxt for r in samples), "예시 기록이 비었거나 표에서 채워지지 않음"
     assert {r["status"] for r in samples} == set(nxt) and all((r["scope"] == "in") == bool(r["law"]) for r in samples), "예시 기록의 상태 · 조례 칸"
     post = lambda body: call("/api/records", body)      # noqa: E731
     def refused(body):

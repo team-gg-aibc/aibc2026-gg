@@ -416,7 +416,7 @@ function renderRecList() {
 function renderRecCard() {
   const B = K('상담 기록'), U = K('접수 카드'), M = K('일의 종류와 갈림'), r = RECS.find((x) => x.id === ui.rec);
   if (!r) { $('side').innerHTML = `<div class="chd"><h2>${esc(B['제목'])}</h2></div><p class="empty">${esc(B['고르기 안내'])}</p>`; return; }
-  const sc = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음' }[r.scope];
+  const sc = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음', cand: '6종 후보' }[r.scope];
   const law = r.law ? fill(M['적용 조례'], { 장소: r.place, 조례: r.law }) + (r.sample ? ` ${B['표 기준']}` : '') : r.scope_why;
   let h = `<div class="chd"><h2>${esc(fill(B['카드 제목'], { 번호: recNo(r) }))}</h2>${r.sample ? `<em class="ex">${esc(B['예시 표시'])}</em>` : `<span class="stb st-sent">${esc(B['새 기록'])}</span>`}</div><dl class="sum">`
     + `<dt>${esc(B['받은 때'])}</dt><dd>${esc(ago(r))} · ${esc(U['받은 곳 값'])}</dd>`
