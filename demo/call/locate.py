@@ -746,7 +746,8 @@ SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,
              ",twins,fuzzy2,lamponce2"                    # 같은 이름이 둘레에 또 있으면 한 지점으로 좁히지 않기 + 머리만 비슷하게 이은 이름에 뒷말 맞추기(「천호엮 5번 출구」 → 천호역 5번 출구. 둘은 묶어서만) + 가로등 번호 「못 봤어요」 뒤 다시 안 묻기(49번)
              ",addrread,addrline"                         # 주소를 말하면 읽기(묻지는 않는다) + 주소 표에 없는 건물번호를 같은 길의 번호 사이로 어림
              ",fillerlist,finerkeep,choicekeep")          # Solar가 다시 읽을 때 코드 읽기의 규칙 셋이 풀리던 것(실제 호출 길)
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀린 글 넷 + 큰 장소의 넓이(11-19 동규, 60번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]

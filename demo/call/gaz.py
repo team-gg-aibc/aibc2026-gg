@@ -223,8 +223,8 @@ class Gazetteer:
         if os.environ.get("CALL_NODES", "1") != "0" and (DIR / "road_nodes.tsv.gz").exists():
             rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "road_nodes.tsv.gz", "rt", encoding="utf-8"))]
         self.node1 = len(rows)
-        self.cross0 = len(rows)               # 여기부터 표준노드링크의 일반 도로 교차로 이름(tools/build_cross.py, 60번). CALL_CROSS=0(기본)이면 넣지 않는다.
-        cross = os.environ.get("CALL_CROSS", "0")      # 1 = 시민이 말하면 알아듣기만 한다(둘레 찾기에는 넣지 않아 보기 · 되말로 먼저 내밀지 않는다: 질문 흐름이 그대로). 2 = 보기 · 되말에도 쓴다
+        self.cross0 = len(rows)               # 여기부터 표준노드링크의 일반 도로 교차로 이름(tools/build_cross.py, 60번). CALL_CROSS=0이면 넣지 않는다.
+        cross = os.environ.get("CALL_CROSS", "1")      # (11-19 동규, 60번: 기본 1. 넣기 전과 견줄 때 CALL_CROSS=0) 1 = 시민이 말하면 알아듣기만 한다(둘레 찾기에는 넣지 않아 보기 · 되말로 먼저 내밀지 않는다: 질문 흐름이 그대로). 2 = 보기 · 되말에도 쓴다
         if cross in ("1", "2") and (DIR / "cross_nodes.tsv.gz").exists():
             rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "cross_nodes.tsv.gz", "rt", encoding="utf-8"))]
         self.cross1 = len(rows)
