@@ -11,8 +11,8 @@
 | 환경 변수 | 뜻 | 기본 |
 | CALL_DIRECT | 1이면 켠다 | 끔 |
 | CALL_DIRECT_CODE | 접근 코드 | 없음(누구나 표를 받는다) |
-| CALL_DIRECT_MAX_TURNS | 표 하나가 넣을 수 있는 민원인의 말 수 | 40 |
-| CALL_DIRECT_MAX_ALL | 서버를 띄운 동안 모두 합친 민원인의 말 수 | 600 |
+| CALL_DIRECT_MAX_TURNS | 표 하나가 넣을 수 있는 민원인의 말 수 | 0 = 제한 없음 |
+| CALL_DIRECT_MAX_ALL | 서버를 띄운 동안 모두 합친 민원인의 말 수 | 0 = 제한 없음 |
 """
 import hmac
 import io
@@ -23,8 +23,8 @@ import threading
 from http.cookies import SimpleCookie
 
 CODE = os.environ.get("CALL_DIRECT_CODE", "")
-MAX_TURNS = int(os.environ.get("CALL_DIRECT_MAX_TURNS", "40"))
-MAX_ALL = int(os.environ.get("CALL_DIRECT_MAX_ALL", "600"))
+MAX_TURNS = int(os.environ.get("CALL_DIRECT_MAX_TURNS", "0")) or 10**9      # 0 = 제한 없음(기본). 현장 테스트는 앞에 둔 문지기가 막는다
+MAX_ALL = int(os.environ.get("CALL_DIRECT_MAX_ALL", "0")) or 10**9
 COOKIE = "gg_call"
 passes, used, lock = {}, {"all": 0}, threading.Lock()      # 표 → 넣은 민원인의 말 수. ponytail: 서버 메모리에만(다시 띄우면 0). 여러 서버로 늘리면 밖의 저장소로
 
@@ -94,4 +94,4 @@ def attach(Handler):
         return post(self)
 
     Handler.do_GET, Handler.do_POST = do_GET, do_POST
-    print(f"직접 통화 켬: 접근 코드 {'받음' if CODE else '없음'} · 표마다 {MAX_TURNS}마디 · 모두 {MAX_ALL}마디")
+    print(f"직접 통화 켬: 접근 코드 {'받음' if CODE else '없음'} · 상한 {MAX_TURNS if MAX_TURNS < 10**9 else '없음'} · {MAX_ALL if MAX_ALL < 10**9 else '없음'}")

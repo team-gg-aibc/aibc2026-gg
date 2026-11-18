@@ -13,6 +13,7 @@
 | CALL_VOICE_TTS | 읽어 주기. none(소리 없이 글 길이만큼 기다림) · elevenlabs(일레븐랩스 음성 합성. 만든 소리는 web/voice/tts/에 남겨 다시 쓴다) · browser(기기에 든 읽어 주기). web/voice/tts/에 이미 파일이 있으면 그것이 먼저 | none |
 | ELEVENLABS_TTS_MODEL · ELEVENLABS_VOICE_ID | 음성 합성 모델 · 목소리 | eleven_multilingual_v2 · 「나의 우주」의 기본 목소리 |
 | CALL_VOICE_ASK | 질문을 누가 말하나. ai(화면이 띄운 질문을 읽어 준다) · agent(상담사가 직접 말한다. 읽어 주지 않는다). 주소 ?ask= 로도 바꾼다 | ai |
+| (직접 통화와 함께) | 휴대폰(`/dial.html`)이 먼저 걸면 방이 「기다림」으로 열리고, 직접 통화를 켠 상담 화면이 와서 받는다(`waiting` · `claim`). 휴대폰은 글로만 붙을 수 있다(`join?text=1` · `text`) | |
 | CALL_VOICE_CODE | 값이 있으면 통화를 열 때 이 접근 코드를 받는다(밖에 내놓을 때) | 없음 |
 | CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper · elevenlabs는 300) |
 | ELEVENLABS_CITIZEN_VOICE_ID | 「대본을 음성 길로」에서 시민 역 목소리(tts_lines.py --citizen이 만든다) | 「나의 우주」의 '부드러운' |
@@ -40,6 +41,7 @@ TTS_VOICE = os.environ.get("ELEVENLABS_VOICE_ID") or "JBFqnCBsd6RMkjVDRZzb"     
 CITIZEN_VOICE = os.environ.get("ELEVENLABS_CITIZEN_VOICE_ID") or "EXAVITQu4vr4xnSDxMaL"     # 시민 역('부드러운'). 대본 시연용 소리 파일을 만들 때만 쓴다
 ASK = "agent" if os.environ.get("CALL_VOICE_ASK") == "agent" else "ai"      # 질문을 누가 말하나: ai = 화면이 띄운 질문을 읽어 준다 · agent = 상담사가 직접 말한다(읽어 주지 않는다)
 STT = stt.pick()
+DIRECT = os.environ.get("CALL_DIRECT") == "1"      # 직접 통화(배포 판)와 함께 켜졌나: 휴대폰은 읽어 주기 없이 상담사 말을 글로만 보인다
 GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name in ("whisper", "elevenlabs") else 900))      # 이 둘은 확정 글이 이미 조용함을 기다린 뒤에 온다
 MAX_ROOMS = int(os.environ.get("CALL_VOICE_MAX_ROOMS", "4"))             # 리턴제로 무료는 스트리밍 5줄까지(문서)
 ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC", "600"))
@@ -49,8 +51,8 @@ rooms, opens, lock = {}, [], threading.Lock()
 
 
 # ---- 방 (전화 회선도 이 셋을 부른다)
-def open_room():
-    """방을 연다 → 방 이름. 꽉 찼으면 None."""
+def open_room(waiting=False):
+    """방을 연다 → 방 이름. 꽉 찼으면 None. waiting = 휴대폰이 먼저 건 통화(상담 화면이 와서 받을 때까지 기다린다)."""
     now = time.time()
     with lock:
         _reap(now)
@@ -58,7 +60,7 @@ def open_room():
         if len(rooms) >= MAX_ROOMS or len(opens) >= OPENS_PER_HOUR:
             return None
         rid = secrets.token_hex(3)
-        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False, "cut": 0}
+        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False, "cut": 0, "caller": False, "waiting": waiting}
         opens.append(now)
         return rid
 
@@ -173,21 +175,25 @@ def _api(h, body):
     u = urlsplit(h.path)
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
-        return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
+        return h.send_json({"on": True, "direct": DIRECT, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
     if p == "line":
         return _line(h, q.get("text", "")[:500])
     try:
-        b = json.loads(body.decode("utf-8")) if body and p in ("room", "ask", "fake") else {}
+        b = json.loads(body.decode("utf-8")) if body and p in ("room", "ask", "fake", "text") else {}
     except ValueError:
         b = {}
     if not isinstance(b, dict):
         b = {}
-    if p == "room":                             # 화면 쪽이 통화를 연다
+    if p == "waiting":                          # 화면 쪽(직접 통화): 휴대폰이 걸어 와 받을 사람을 기다리는 통화
+        with lock:
+            _reap(time.time())
+            return h.send_json({"rooms": [rid for rid, r_ in rooms.items() if r_["waiting"]]})
+    if p == "room":                             # 통화를 연다: 화면 쪽(휴대폰으로 걸기) 또는 휴대폰(from: phone, 상담 화면이 와서 받는다)
         if CODE and not hmac.compare_digest(str(b.get("code", "")).encode(), CODE.encode()):
             return h.send_json({"error": "접근 코드가 다릅니다."}, 403)
-        rid = open_room()
+        rid = open_room(waiting=b.get("from") == "phone")
         return h.send_json({"room": rid}) if rid else h.send_json({"error": "지금은 통화가 꽉 찼습니다. 잠시 뒤에 다시 해 주세요."}, 429)
     with lock:
         _reap(time.time())
@@ -197,6 +203,20 @@ def _api(h, body):
     if not r:
         return h.send_json({"error": "끝난 통화입니다."}, 404)
     text = " ".join(str(b.get("text", "")).split())[:500]
+    if p == "claim":                            # 화면 쪽: 기다리는 통화를 받는다(한 화면만)
+        with lock:
+            if not r["waiting"]:
+                return h.send_json({"error": "이미 받은 통화입니다."}, 409)
+            r["waiting"] = False
+        return h.send_json({"ok": True})
+    if p == "join" and q.get("text") == "1":    # 소리 쪽이 글로만 붙는다(받아쓰기를 열지 않는다)
+        r["caller"] = True
+        return h.send_json({"ok": True, "stt": None})
+    if p == "text":                             # 소리 쪽: 민원인이 친 글 한 줄(받아쓰기를 거치지 않고 확정 글로)
+        if text:
+            r["caller"] = True
+            r["events"].append({"final": True, "text": text, "typed": True})
+        return h.send_json({"ok": True})
     if p == "join":                             # 소리 쪽이 붙는다(마이크의 표본화 주파수를 그대로 알린다. 서버에서 바꾸지 않는다)
         try:
             join(r, _int(q, "rate", 8000, 48000, 16000), q.get("enc") if q.get("enc") in ("MULAW", "ALAW") else "LINEAR16")
@@ -218,7 +238,7 @@ def _api(h, body):
             r["stt"].pump()
         since = _int(q, "since", 0, 10**6, 0)
         ev = r["events"][since:]
-        return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"]})
+        return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"] or r["caller"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"]})
     if p == "cut":                              # 화면 쪽: 상담사가 넘겨받았다 → 소리 쪽이 읽던 말을 끊는다
         r["cut"] += 1
         return h.send_json({"ok": True})

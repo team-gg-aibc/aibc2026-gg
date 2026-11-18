@@ -11,6 +11,7 @@
   const Q = new URLSearchParams(location.search), QUIET = Q.get('quiet') === '1';
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fast = () => (typeof SPEED === 'number' ? SPEED : 1);
+  const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));      // 휴대폰 화면에는 call.js가 없다
   const mmss = (ms) => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
   // 화면 글은 문구 파일(docs/content/A-05_통화위치좁히기.md 「음성 통화」 절)에서만 가져온다. 왼쪽 = 이 파일 안의 이름, 오른쪽 = 문구 표의 항목
   const NAMES = { here: '단추 · 이 기기 마이크', phone: '단추 · 휴대폰으로 걸기', script: '단추 · 대본을 음성 길로', pick: '단추 · 받기', hang: '단추 · 끊기',
@@ -18,7 +19,7 @@
     listen: '상태 · 듣는 중', speak: '상태 · 읽어 주는 중', wait: '상태 · 거는 사람 기다림', ring: '상태 · 전화 옴', over: '상태 · 통화 끝', down: '상태 · 받아쓰기 끊김',
     hold: '상태 · 상담사가 말하는 중', agent: '상태 · 상담사가 직접 묻는 통화', taken: '상태 · 상담사가 넘겨받음', approve: '상태 · 접수 확인 기다림', heard: '상태 · 들어온 소리',
     link: '안내 · 휴대폰 주소', nomic: '안내 · 마이크 못 씀', noline: '안내 · 민원인 역 소리 없음', code: '안내 · 접근 코드',
-    dialName: '휴대폰 · 이름', dialLead: '휴대폰 · 안내', noroom: '휴대폰 · 주소 없음', off: '휴대폰 · 꺼짐', dial: '휴대폰 · 전화 걸기', calling: '휴대폰 · 연결 중', talking: '휴대폰 · 통화 중', say: '휴대폰 · 말할 글', send: '휴대폰 · 말하기' };
+    dialName: '휴대폰 · 이름', dialLead: '휴대폰 · 안내', noroom: '휴대폰 · 주소 없음', off: '휴대폰 · 꺼짐', dial: '휴대폰 · 전화 걸기', calling: '휴대폰 · 연결 중', talking: '휴대폰 · 통화 중', say: '휴대폰 · 말할 글', send: '휴대폰 · 말하기', micOn: '휴대폰 · 마이크 켜기', agentName: '휴대폰 · 상담사', meName: '휴대폰 · 나' };
   const T = {};
   function loadText(doc) {      // 문구 표 → T. 표에 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게(call.js의 K와 같은 버릇)
     const t = (((doc && doc.sections && doc.sections['음성 통화']) || {}).tables || []).find((x) => x.head[0] === '항목'), rows = t ? Object.fromEntries(t.rows.map((r) => [r[0], r[1]])) : {};
@@ -107,6 +108,7 @@
       while (alive) {
         const s = todo.shift();
         if (!s) { await sleep(80); continue; }
+        if (info.direct) { on('speak', s.text); played = s.n; on('listen', s.text); continue; }      // 직접 통화(배포 판): 읽어 주지 않고 글로만 바로 보인다
         speaking = true; on('speak', s.text);
         await speakOut(s.text, info);
         speaking = false; played = s.n; on('listen', s.text);
@@ -114,13 +116,15 @@
     }
     function stop() { alive = false; if (stream) stream.getTracks().forEach((t) => t.stop()); if (ctx) ctx.close().catch(() => {}); }
     return Object.assign(me, {
-      async start(useMic, useTape) {
+      async start(useMic, useTape, textOnly) {
         let rate = 16000;
         if (useMic) rate = await mic();
         if (useTape) { tape = { q: new Int16Array(0) }; tape0 = performance.now(); }
-        await vapi(`join?room=${room}&rate=${Math.round(rate)}`, {});
+        await vapi(textOnly ? `join?room=${room}&text=1` : `join?room=${room}&rate=${Math.round(rate)}`, {});      // 글로만 붙으면 받아쓰기를 열지 않는다
         loop(); mouth();
       },
+      async enableMic() { const rate = await mic(); await vapi(`join?room=${room}&rate=${Math.round(rate)}`, {}); },      // 글로 하던 통화에 마이크를 더한다
+      text: (t) => vapi(`text?room=${room}`, { text: t }),      // 민원인이 친 글 한 줄
       fake: (text) => vapi(`fake?room=${room}`, { text }),      // 가짜 받아쓰기일 때: 이 글을 「말한다」
       async line(text) {      // 진짜 받아쓰기일 때: 이 글의 시민 역 소리를 마이크 대신 보낸다 → 없으면 false
         const r = await fetch('/api/voice/line?text=' + encodeURIComponent(text));
@@ -134,29 +138,46 @@
     });
   }
 
-  // ---- 휴대폰 화면(dial.html): 소리 쪽만. 전화 걸기 → 연결음 → (상담 화면이 받으면) 통화 중 00:12 → 끊기
-  function dialPage(info) {
-    const $ = (id) => document.getElementById(id), room = (Q.get('room') || '').replace(/[^0-9a-f]/g, '');
+  // ---- 휴대폰 화면(dial.html): 소리 쪽(민원인). 전화 걸기 → 연결음 → (상담 화면이 받으면) 통화 중 00:12 → 끊기
+  //   글을 치면 통화로 들어가고(받아쓰기를 거치지 않음), 상담사 말(질문 · 조례 답 · 끝인사)은 이 화면의 대화창에 글로 뜬다. 마이크는 「마이크로도 말하기」를 눌렀을 때만.
+  //   직접 통화(배포 판)에서는 주소에 방이 없어도 건다: 방이 「기다림」으로 열리고, 직접 통화를 켠 상담 화면이 와서 받는다. 읽어 주지 않는다.
+  async function dialPage(info) {
+    const $ = (id) => document.getElementById(id), log = $('d-log');
+    let room = (Q.get('room') || '').replace(/[^0-9a-f]/g, '');
     const btn = $('d-call'), set = (cls, line) => { document.body.dataset.call = cls; $('d-state').textContent = line; btn.textContent = cls === 'idle' || cls === 'over' ? T.dial : T.hang; };
     let c = null, t0 = 0, tick = 0, quietRing = () => {};
-    $('d-name').textContent = T.dialName; $('d-lead').textContent = room ? T.dialLead : T.noroom; $('d-stt').textContent = T[info.stt];
-    $('d-text').placeholder = T.say; $('d-send').textContent = T.send;
-    set('idle', ''); btn.disabled = !room;
-    function over(line) { quietRing(); clearInterval(tick); c = null; set('over', `${line || T.over}${t0 ? ' · ' + mmss(Date.now() - t0) : ''}`); t0 = 0; $('d-fake').hidden = true; }
+    $('d-name').textContent = T.dialName; $('d-lead').textContent = room || info.direct ? T.dialLead : T.noroom; $('d-stt').textContent = info.direct ? '' : T[info.stt];
+    $('d-text').placeholder = T.say; $('d-send').textContent = T.send; $('d-mic').textContent = T.micOn;
+    set('idle', ''); btn.disabled = !room && !info.direct;
+    if (info.direct) {      // 직접 통화: 표(쿠키)를 받는다. 접근 코드가 있으면 묻는다
+      const d = await fetch('/api/direct/info').then((r) => r.json()).catch(() => ({}));
+      if (d.on && !d.pass) {
+        const r = await fetch('/api/direct/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: d.code ? (window.prompt(T.code) || '') : '' }) });
+        if (!r.ok) { btn.disabled = true; return set('over', T.code); }
+      }
+    }
+    function bubble(who, text) { log.insertAdjacentHTML('beforeend', `<li class="${who}"><b>${esc(who === 'me' ? T.meName : T.agentName)}</b><span>${esc(text)}</span></li>`); log.scrollTop = log.scrollHeight; }
+    function over(line) { quietRing(); clearInterval(tick); c = null; set('over', `${line || T.over}${t0 ? ' · ' + mmss(Date.now() - t0) : ''}`); t0 = 0; $('d-form').hidden = true; $('d-mic').hidden = true; if (info.direct) room = ''; requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; }); }      // 끝나면 위 그림이 다시 커져 마지막 말이 밀리니 한 번 더 내린다
     btn.onclick = async () => {
       if (c) { const x = c; c = null; x.hangup(); return over(); }
-      $('d-said').textContent = '';
+      log.innerHTML = ''; $('d-said').textContent = '';
+      if (!room) { try { room = (await vapi('room', { from: 'phone' })).room; } catch (e) { return set('over', String(e.message)); } }      // 직접 통화: 상담 화면이 와서 받는다
       const mine = c = Caller(room, info, (s, text) => {
         if (c !== mine) return;      // 이미 끊은 통화의 소식
-        if (s === 'picked') { quietRing(); t0 = Date.now(); tick = setInterval(() => set('on', `${T.talking} ${mmss(Date.now() - t0)}`), 500); set('on', `${T.talking} 00:00`); $('d-fake').hidden = info.stt !== 'fake'; }
-        else if (s === 'speak') $('d-said').textContent = text;
+        if (s === 'picked') { quietRing(); t0 = Date.now(); tick = setInterval(() => set('on', `${T.talking} ${mmss(Date.now() - t0)}`), 500); set('on', `${T.talking} 00:00`); $('d-form').hidden = false; $('d-mic').hidden = !info.direct || info.stt === 'fake'; $('d-text').focus(); }
+        else if (s === 'speak') { if (info.direct) bubble('agent', text); else $('d-said').textContent = text; }
         else if (s === 'over') over();
         else if (s === 'down') $('d-said').textContent = T.down;
       });
       quietRing = ringback(); set('ring', T.calling);      // 누른 자리에서 연결음을 시작한다(휴대폰은 누른 뒤에만 소리를 허락한다)
-      try { await mine.start(true); } catch { if (c === mine) over(T.nomic); }
+      try { await mine.start(!info.direct, false, info.direct); } catch { if (c === mine) over(T.nomic); }      // 직접 통화는 글로만 붙는다(마이크는 나중에 고를 수 있다)
     };
-    $('d-fake').onsubmit = (ev) => { ev.preventDefault(); const v = $('d-text').value.trim(); if (v && c) { c.fake(v); $('d-text').value = ''; } };
+    $('d-form').onsubmit = (ev) => {      // 답을 기다리는 동안에도 보낸다(상담 화면이 모아 두었다 합쳐 읽는다)
+      ev.preventDefault();
+      const v = $('d-text').value.trim();
+      if (v && c) { c.text(v); bubble('me', v); $('d-text').value = ''; }
+    };
+    $('d-mic').onclick = async () => { if (!c) return; try { await c.enableMic(); $('d-mic').disabled = true; } catch { $('d-said').textContent = T.nomic; } };
   }
 
   // ---- 상담 화면: 화면 쪽(+ 이 기기 마이크 · 대본이면 소리 쪽도 함께)
@@ -183,6 +204,7 @@
     }
     function say(s) { st.state = s; draw(); }
     function onEvent(e) {      // 받아쓴 글: 도중 글은 받아 적기 칸에 흐르고, 확정 글 뒤 잠깐 조용하면 한 차례로 끊어 통화 길에 넣는다
+      if (e.typed && window.DIRECT) return window.DIRECT.said(e.text, 'type');      // 휴대폰에서 친 글: 직접 통화 길로 바로(합치기는 그쪽이 한다)
       clearTimeout(st.gapT);
       if (window.DIRECT) window.DIRECT.heard();      // 직접 통화: 말하는 동안은 읽지 않게 알린다
       if (e.final) { st.text = `${st.text} ${e.text}`.trim(); st.gapT = setTimeout(commit, info.gap_ms / fast()); }
@@ -197,7 +219,7 @@
         try {
           const d = await vapi(`desk?room=${st.room}&since=${st.since}`);
           st.since = d.next; st.played = d.played; st.heard = d.heard_sec;
-          if (d.joined && !st.joined) { st.joined = true; if (st.how === 'phone') say(T.ring); else pickup(); }      // 휴대폰이 걸어 오면 「받기」를 기다린다. 한 기기면 바로 받는다
+          if (d.joined && !st.joined) { st.joined = true; if (st.how === 'phone' && !window.DIRECT) say(T.ring); else pickup(); }      // 직접 통화는 AI 상담이라 바로 받는다      // 휴대폰이 걸어 오면 「받기」를 기다린다. 한 기기면 바로 받는다
           if (d.down) say(T.down);
           if (st.picked) d.events.forEach(onEvent);
           draw();
@@ -209,7 +231,7 @@
       if (!st.alive || st.picked) return;
       st.picked = true; say(T.listen);
       vapi(`pick?room=${st.room}`, {}).catch(() => {});
-      if (!window.DIRECT) drive();      // 직접 통화에서는 읽어 주지 않는다(상담사 말은 direct.js가 대화창에만 올린다)
+      if (!window.DIRECT) drive(); else window.DIRECT.greet();      // 직접 통화에서는 읽어 주지 않는다(상담사 말은 direct.js가 대화창에 올리고 휴대폰에 넘긴다)
     }
     function terms() {      // 지금 나올 법한 지명: 질문의 보기 · 가능성이 큰 곳 · 이미 나온 단서. 받아쓰기가 미리 알려 주기를 받으면 쓴다(일레븐랩스 keyterms)
       const q = ui.askQ, names = [].concat(q ? q.options.map((o) => o.label) : [], ((V && V.cands) || []).map((c) => c.name), S ? S.turns.flatMap((t) => cluesOf(t).map((c) => c.label || '')) : []);
@@ -274,6 +296,20 @@
       vapi(`cut?room=${st.room}`, {}).catch(() => {});
       say(T.taken);
     }
+    async function watch() {      // 직접 통화: 휴대폰이 걸어 와 기다리는 통화를 이 화면이 받는다(한 화면만 받는다). 통화가 없을 때만
+      for (;;) {
+        await sleep(1500);
+        if (st.alive) continue;
+        const d = await vapi('waiting').catch(() => ({ rooms: [] }));
+        for (const rid of d.rooms || []) {
+          if (!(await vapi(`claim?room=${rid}`, {}).then(() => true, () => false))) continue;      // 다른 화면이 먼저 받음
+          resetCall(); if (window.DIRECT) window.DIRECT.st.posted.clear();
+          Object.assign(st, { room: rid, alive: true, how: 'phone', since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', busy: false, spoken: null, said1: false, caller: null, ask: ASK, taken: false, approved: false, waitApprove: false });
+          say(T.ring); poll2();
+          break;
+        }
+      }
+    }
     function hang(why) {
       if (!st.alive) return;
       st.alive = false; clearTimeout(st.gapT);
@@ -293,9 +329,11 @@
       if (st.caller.hold !== down) { st.caller.hold = down; say(down ? T.hold : T.listen); }
     };
     document.addEventListener('keydown', hold(true)); document.addEventListener('keyup', hold(false));
-    Object.assign(window.VOICE, { st, start, hang, pickup, takeover, approve() { st.approved = true; emit(); } });      // 화면 요소 · 점검이 쓰는 자리(56번 13절)
+    Object.assign(window.VOICE, { st, start, hang, pickup, takeover, approve() { st.approved = true; emit(); },
+      relay(text) { if (st.alive && st.room) vapi(`ask?room=${st.room}`, { text }).catch(() => {}); } });      // 화면 요소 · 점검이 쓰는 자리(56번 13절). relay = 상담사 말을 휴대폰 화면에 글로 넘긴다(직접 통화)
     Object.defineProperty(window.VOICE, 'ask', { get: () => st.ask, configurable: true });      // 지금 질문을 누가 말하나(넘겨받으면 agent)
     draw();
+    if (window.DIRECT) watch();
     if (Q.get('mic')) start(Q.get('mic'));
   }
 

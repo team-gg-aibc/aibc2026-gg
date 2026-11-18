@@ -11,6 +11,7 @@
   ④ 리턴제로 · 일레븐랩스 받아쓰기 코드가 문서의 규격대로 말을 주고받는다(이 컴퓨터 안의 가짜 서버와. 진짜 서비스는 부르지 않는다).
      일레븐랩스: 지명을 알려 주면 줄을 새로 열어 keyterms로 넘긴다.
   ⑤ 일레븐랩스 음성 합성: 통화에서 읽어 달라고 한 글만 만들고, 만든 소리는 남겨 다시 쓴다(가짜 서버와).
+  ⑥ 휴대폰이 먼저 거는 통화: 방이 「기다림」으로 열리고 한 화면만 받는다. 휴대폰은 글로만 붙어(받아쓰기 없음) 친 글을 보내고, 상담사 말을 받는다.
 """
 import base64
 import hashlib
@@ -309,6 +310,26 @@ def check_tts():
     print("  ✓ 일레븐랩스 음성 합성: 통화에서 요청한 글만 만들고, 만든 소리를 남겨 다시 쓴다 (가짜 서버와)")
 
 
+def check_phone_text():
+    room = call("/api/voice/room", {"from": "phone"})["room"]                     # 휴대폰이 먼저 건다
+    assert room in call("/api/voice/waiting")["rooms"], "기다리는 통화에 없음"
+    assert call(f"/api/voice/desk?room={room}")["joined"] is False
+    assert call(f"/api/voice/join?room={room}&text=1", {})["stt"] is None            # 글로만 붙는다
+    d = call(f"/api/voice/desk?room={room}")
+    assert d["joined"] is True and d["heard_sec"] == 0, d
+    assert code_of(f"/api/voice/claim?room={room}", {}) == 200 and code_of(f"/api/voice/claim?room={room}", {}) == 409, "한 통화를 두 화면이 받음"
+    assert room not in call("/api/voice/waiting")["rooms"]
+    call(f"/api/voice/text?room={room}", {"text": "  상도1동 주민센터   근처예요 "})
+    call(f"/api/voice/text?room={room}", {"text": ""})                               # 빈 글은 넣지 않는다
+    ev = call(f"/api/voice/desk?room={room}")["events"]
+    assert ev == [{"final": True, "text": "상도1동 주민센터 근처예요", "typed": True}], ev
+    n = call(f"/api/voice/ask?room={room}", {"text": "바로 앞에 뭐가 보이세요?"})["n"]  # 상담사 말 → 휴대폰
+    assert [x["text"] for x in call(f"/api/voice/audio?room={room}&says=0", raw=b"")["says"]] == ["바로 앞에 뭐가 보이세요?"] and n == 1
+    assert call("/api/voice/info")["direct"] is False
+    call(f"/api/voice/end?room={room}", {})
+    print("  ✓ 휴대폰이 먼저 거는 통화: 기다림 → 한 화면만 받음 · 글로만 붙음 · 친 글이 확정 글로 · 상담사 말이 휴대폰으로")
+
+
 def main():
     p, _ = server()                                       # ① 끔
     try:
@@ -321,6 +342,11 @@ def main():
     p, text = server(CALL_VOICE="1")                      # ② 켬(가짜 받아쓰기)
     try:
         check_fake(text)
+    finally:
+        stop(p)
+    p, _ = server(CALL_VOICE="1")                         # ⑥
+    try:
+        check_phone_text()
     finally:
         stop(p)
     p, _ = server(CALL_VOICE="1", CALL_VOICE_CODE="맞음", CALL_VOICE_MAX_ROOMS="2")      # ③
