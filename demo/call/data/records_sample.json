@@ -1,14 +1,14 @@
 {
- "note": "상담 기록 화면의 예시 기록. 팀이 만든 예시이고 실제 상담 기록이 아니다(사람 이름 · 전화번호 없음, 날짜는 「3일 전」 꼴). 자리(at)는 지명 표(data/seoul · extra_places.json)에서 찾은 곳 둘레의 시연용 대략 위치, 처리 상태(status)는 화면을 보이려고 정한 값이다. 「현장에서 못 찾음 · 다시 전화」 세 건은 위치를 넓게 넘긴 예(현장 말: 못 찾으면 민원인에게 다시 전화, 광주의 한 구청 도로 민원 담당, 11-17)를 보이려고 넣었다. 일의 종류(type)는 routes.json의 이름이고, 넘길 곳 · 조례 6종 안팎 · 번지수는 서버가 표(route_of)와 주소 표에서 채운다. go = 그때 담당 부서에 넘긴 찾아가는 말(예시 글), range_m = 그때 넘긴 범위. 최신이 위, id 번호 = 들어온 차례(화면의 번호와 같다).",
+ "note": "상담 기록 화면의 예시 기록. 팀이 만든 예시이고 실제 상담 기록이 아니다(사람 이름 · 전화번호 없음, 날짜는 「3일 전」 꼴). 자리(at)는 지명 표(data/seoul · extra_places.json)에서 찾은 곳 둘레의 시연용 대략 위치, 처리 상태(status)는 화면을 보이려고 정한 값이다. 위치를 넓게 넘겨 「현장에서 못 찾음 · 다시 전화」가 된 예는 한 건(R09, 주 장면 cat_street의 상도1동 주민센터 둘레)만 둔다(현장 말: 못 찾으면 민원인에게 다시 전화, 광주의 한 구청 도로 민원 담당, 11-17 · 한 건만은 동규 11-18). 나머지는 자리를 좁혀 넘긴 기록이다. 일의 종류(type)는 routes.json의 이름이고, 넘길 곳 · 조례 6종 안팎 · 번지수는 서버가 표(route_of)와 주소 표에서 채운다. go = 그때 담당 부서에 넘긴 찾아가는 말(예시 글), range_m = 그때 넘긴 범위. 최신이 위, id 번호 = 들어온 차례(화면의 번호와 같다).",
  "records": [
-  {"id": "R14", "ago": "오늘", "type": "stray", "animal": "고양이", "alive": true, "at": [126.9208, 37.493], "range_m": 400, "go": "보라매공원 안 어딘가", "status": "filed"},
+  {"id": "R14", "ago": "오늘", "type": "stray", "animal": "고양이", "alive": true, "at": [126.9206, 37.4937], "range_m": 30, "go": "보라매공원 중앙바닥분수 옆", "status": "filed"},
   {"id": "R13", "ago": "1일 전", "type": "park_use", "at": [127.037, 37.544], "range_m": 25, "go": "서울숲 호수 수변휴게실 옆 벤치", "status": "doing"},
   {"id": "R12", "ago": "1일 전", "type": "light", "at": [127.047, 37.547], "range_m": 40, "go": "뚝섬역 앞 보도의 가로등", "status": "sent"},
-  {"id": "R11", "ago": "2일 전", "type": "carcass", "animal": "고양이", "alive": false, "at": [127.04037, 37.53869], "range_m": 3000, "kind": "length", "go": "강변북로 구리 방향, 성수대교 근처 어딘가", "status": "recall"},
+  {"id": "R11", "ago": "2일 전", "type": "carcass", "animal": "고양이", "alive": false, "at": [127.04037, 37.53869], "range_m": 80, "kind": "length", "go": "강변북로 구리 방향, 성수대교분기점 지나 맨 오른쪽 갓길", "status": "doing"},
   {"id": "R10", "ago": "2일 전", "type": "vendor", "at": [126.9617, 37.5446], "range_m": 60, "go": "효창공원 안 산책로", "status": "sent"},
   {"id": "R09", "ago": "3일 전", "type": "stray", "animal": "고양이", "alive": true, "at": [126.9522, 37.4988], "range_m": 500, "go": "상도동 주택가 골목 어딘가, 상도역에서 올라오는 길", "status": "recall"},
   {"id": "R08", "ago": "4일 전", "type": "litter", "at": [127.0276, 37.499], "range_m": 20, "go": "강남역 11번 출구 바로 앞", "status": "closed"},
-  {"id": "R07", "ago": "5일 전", "type": "stray", "animal": "고양이", "alive": true, "at": [127.0352, 37.5432], "range_m": 690, "go": "서울숲 안쪽 어딘가(시민도 자리를 모름)", "status": "recall"},
+  {"id": "R07", "ago": "5일 전", "type": "stray", "animal": "고양이", "alive": true, "at": [127.03914, 37.54133], "range_m": 25, "go": "서울숲 곤충식물원 옆 화장실 앞", "status": "closed"},
   {"id": "R06", "ago": "6일 전", "type": "smoking", "at": [126.933, 37.5277], "range_m": 40, "go": "여의도한강공원 멀티플라자 앞", "status": "doing"},
   {"id": "R05", "ago": "8일 전", "type": "parking", "at": [126.9049, 37.5531], "range_m": 20, "go": "망원로 CU 망원로점 앞", "status": "closed"},
   {"id": "R04", "ago": "9일 전", "type": "litter", "at": [126.9536, 37.4984], "range_m": 30, "go": "상도1동 주민센터 건너편 버스 정류장 옆", "status": "closed"},
