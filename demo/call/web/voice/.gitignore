@@ -1,0 +1,3 @@
+# 영상용 음성 파일은 레포에 넣지 않는다(만드는 법은 tools/make_voice_gemini.py)
+*.mp3
+index.json

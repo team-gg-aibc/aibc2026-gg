@@ -1,0 +1,1258 @@
+{
+ "reads": {
+  "ebcb591a0f625e0e": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "carcass",
+     "animal": "고양이",
+     "alive": false
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.21,
+   "said": "여보세요? 저 지금 운전 중인데요, 방금 도로에 고양이가 차에 치여 있는 걸 봤어요. 뒤차들이 피하느라 위험해 보여서요.",
+   "asked": "where"
+  },
+  "cb959e1c5c597aa4": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "강변북로",
+      "label": "강변북로"
+     }
+    ],
+    "matter": {
+     "type": "carcass"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.31,
+   "said": "강변북로예요. 그냥 지나가다 봐서 주소는 모르겠어요.",
+   "asked": "where"
+  },
+  "5d14e0041521047e": {
+   "out": {
+    "clues": [
+     {
+      "t": "past",
+      "k": "성수대교",
+      "label": "성수대교",
+      "how": "모름"
+     },
+     {
+      "t": "before",
+      "k": "영동대교",
+      "label": "영동대교",
+      "how": "모름"
+     },
+     {
+      "t": "between",
+      "p": [
+       [
+        3247.5,
+        -1119.5
+       ],
+       [
+        5184.7,
+        -1822.2
+       ]
+      ],
+      "label": "성수대교 ~ 영동대교 사이"
+     }
+    ],
+    "matter": {
+     "type": "carcass"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.63,
+   "said": "다리를 하나 지났는데, 동호대교였나? 아, 아니다. 성수대교요. 성수대교 지났고 영동대교는 아직 안 나왔어요.",
+   "asked": "between"
+  },
+  "37dba530e4efaad7": {
+   "out": {
+    "clues": [
+     {
+      "t": "past",
+      "p": [
+       3704.4,
+       -1298.7
+      ],
+      "how": "바로",
+      "label": "서울숲 보행다리"
+     }
+    ],
+    "matter": {
+     "type": "carcass",
+     "alive": false
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.02,
+   "said": "음, 사람 건너다니는 육교 밑을 막 지나자마자 봤어요. 맨 오른쪽 차선 가장자리에 있었어요.",
+   "asked": "passed"
+  },
+  "b0ea4d8918d69206": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "plate": "없음"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.46,
+   "said": "아뇨, 운전 중이라 못 봤어요. 이미 지나왔고요.",
+   "asked": "lampno"
+  },
+  "8faa8bf9dd08aab2": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "carcass"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.87,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
+  },
+  "8578398e332aa6c0": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray",
+     "animal": "개",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.63,
+   "said": "저기요, 공원에 큰 개가 혼자 돌아다니는데 주인이 안 보여요. 애들도 많아서 좀 걱정돼서요.",
+   "asked": "where"
+  },
+  "e2b551bcb129cfc3": {
+   "out": {
+    "clues": [
+     {
+      "t": "in",
+      "a": [
+       "park",
+       568
+      ],
+      "label": "서울숲 안"
+     }
+    ],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 3.28,
+   "said": "서울숲 안쪽이에요. 여기가 정확히 어딘지는 모르겠어요.",
+   "asked": "where"
+  },
+  "8486dacc7cf00613": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "leash": false,
+     "type": "stray",
+     "animal": "개"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.41,
+   "said": "목줄은 없는 것 같아요. 근데 이런 개는 신고하면 누가 와서 데려가는 거예요?",
+   "asked": "leash"
+  },
+  "08e6f39f29293aad": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "사슴있는데",
+      "label": "사슴우리"
+     }
+    ],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.08,
+   "said": "간판 같은 건 없고요. 아, 사슴 있는 데 있잖아요. 거기 근처예요.",
+   "asked": "mark"
+  },
+  "ca25bd9142126930": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "사슴우리",
+      "label": "사슴우리"
+     },
+     {
+      "t": "pt",
+      "p": [
+       3080.8,
+       -811.4
+      ],
+      "r": 18.0,
+      "label": "사슴우리 옆 화장실"
+     },
+     {
+      "t": "pt",
+      "p": [
+       3070.2,
+       -793.6
+      ],
+      "dist_of": "사슴우리",
+      "sure": true,
+      "name": "사슴우리",
+      "label": "사슴우리에서 스무 걸음쯤",
+      "ring": 15.0,
+      "r": 8.0
+     }
+    ],
+    "matter": {
+     "side": "근처",
+     "steps": "스무",
+     "steps_of": "사슴우리",
+     "type": "stray",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.8,
+   "said": "스무 걸음쯤이요. 사슴 우리 옆에 화장실이 있는데, 그 화장실 바로 앞 잔디에 앉아 있어요.",
+   "asked": "dist"
+  },
+  "45de2d5f1e4dc387": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.55,
+   "said": "네, 맞아요. 거기예요.",
+   "asked": "confirm"
+  },
+  "8064423a7a64f403": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "서울숲",
+      "label": "서울숲"
+     }
+    ],
+    "matter": {
+     "type": "vendor"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 3.65,
+   "said": "여보세요, 서울숲 근처인데요. 누가 잔디밭에 돗자리를 쫙 펴 놓고 물건을 팔고 있어요. 저렇게 장사해도 되는 거예요?",
+   "asked": "where"
+  },
+  "35a8e36d8d8a75ee": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "거울연못",
+      "label": "거울연못"
+     },
+     {
+      "t": "in",
+      "a": [
+       "park",
+       568
+      ],
+      "label": "서울숲 안"
+     }
+    ],
+    "matter": {
+     "type": "vendor"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.25,
+   "said": "공원 안이에요. 거울연못 옆 잔디밭이요.",
+   "asked": "zone"
+  },
+  "57d5e376e5361444": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "vendor"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 4.18,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
+  },
+  "42116ae9ac69a0d2": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "road"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.26,
+   "said": "여보세요, 길 가다 보니까 도로가 움푹 파여서 구멍이 크게 나 있어요. 차들이 그걸 피하느라 휘청해서 위험해 보여요.",
+   "asked": "where"
+  },
+  "6c0d8ab0d9677a76": {
+   "out": {
+    "clues": [
+     {
+      "t": "past",
+      "k": "고대앞사거리",
+      "label": "고대앞사거리",
+      "how": "모름"
+     },
+     {
+      "t": "toward",
+      "k": "안암역",
+      "label": "안암역"
+     }
+    ],
+    "matter": {
+     "type": "road"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.99,
+   "said": "고대앞사거리에서 안암역 가는 방향이에요. 번지는 모르겠어요.",
+   "asked": "where"
+  },
+  "0f50dfc4b62a8514": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "안암역2번출구",
+      "label": "안암역 2번 출구",
+      "how": "바로"
+     }
+    ],
+    "matter": {
+     "type": "road"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.15,
+   "said": "안암역 2번 출구 바로 앞이에요. 출구에서 나오자마자 차도에 있어요.",
+   "asked": "mark"
+  },
+  "e3efb36adc640e47": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "lane": "차로",
+     "type": "road"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.42,
+   "said": "차로 위예요. 맨 오른쪽 차로요.",
+   "asked": "lane"
+  },
+  "4236b47f53082608": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "road"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.62,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
+  },
+  "f39a339bf49e04cc": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray",
+     "animal": "고양이",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.83,
+   "said": "여보세요, 집 앞 골목에 고양이가 한 마리 웅크리고 있는데요, 다리를 다쳤는지 절뚝거려요.",
+   "asked": "where"
+  },
+  "454df09d806dd5cc": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "상도1동주민센터",
+      "label": "상도1동주민센터"
+     },
+     {
+      "t": "toward",
+      "k": "상도역",
+      "label": "상도역"
+     }
+    ],
+    "matter": {},
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.93,
+   "said": "상도1동 주민센터 근처 골목이에요. 상도역에서 올라오는 길이요. 번지는 모르겠어요.",
+   "asked": "where"
+  },
+  "ee530dd8b4a7c555": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "leash": false,
+     "type": "stray",
+     "animal": "고양이"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.75,
+   "said": "목줄은 없어요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "asked": "leash"
+  },
+  "3e9ddbd3e3bf769f": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "상도1동주민센터",
+      "label": "상도1동주민센터",
+      "how": "바로"
+     }
+    ],
+    "matter": {},
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.26,
+   "said": "상도1동 주민센터 바로 앞이에요.",
+   "asked": "finer"
+  },
+  "7aa5ce93fdcd78e9": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "자리에",
+      "label": "자리에"
+     }
+    ],
+    "matter": {
+     "went": "그 자리",
+     "type": "stray",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.25,
+   "said": "지금도 그 자리에 있어요.",
+   "asked": "went"
+  },
+  "4ea28dc8d35e3065": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.93,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
+  },
+  "ffd5804a8a9f50d8": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray",
+     "animal": "고양이",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.41,
+   "said": "저기요, 공원에 고양이가 한 마리 있는데 다리를 다쳤는지 절뚝거려요. 애들도 많아서 좀 걱정돼서요.",
+   "asked": "where"
+  },
+  "0a6a42acad766726": {
+   "out": {
+    "clues": [
+     {
+      "t": "in",
+      "a": [
+       "park",
+       568
+      ],
+      "label": "서울숲 안"
+     }
+    ],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.63,
+   "said": "서울숲 안쪽이에요. 여기가 정확히 어딘지는 모르겠어요.",
+   "asked": "where"
+  },
+  "3bd0dffa10c93343": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "leash": false,
+     "type": "stray",
+     "animal": "고양이",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 0.95,
+   "said": "목줄은 없는 것 같아요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "asked": "leash"
+  },
+  "d101926a20b64f12": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "사슴있는데",
+      "label": "사슴우리"
+     }
+    ],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.83,
+   "said": "간판 같은 건 없고요. 아, 사슴 있는 데 있잖아요. 거기 근처예요.",
+   "asked": "mark"
+  },
+  "32198a122821d69d": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "사슴우리",
+      "label": "사슴우리"
+     },
+     {
+      "t": "at",
+      "k": "사슴우리",
+      "label": "사슴우리",
+      "how": "바로"
+     },
+     {
+      "t": "pt",
+      "p": [
+       3070.2,
+       -793.6
+      ],
+      "dist_of": "사슴우리",
+      "sure": true,
+      "name": "사슴우리",
+      "label": "사슴우리에서 스무 걸음쯤",
+      "ring": 15.0,
+      "r": 8.0
+     }
+    ],
+    "matter": {
+     "side": "근처",
+     "steps": "스무",
+     "steps_of": "사슴우리",
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [
+     "사슴우리 옆 화장실"
+    ],
+    "said_place": ""
+   },
+   "sec": 2.18,
+   "said": "스무 걸음쯤이요. 사슴 우리 옆에 화장실이 있는데, 그 화장실 바로 앞 잔디에 웅크리고 있어요.",
+   "asked": "dist"
+  },
+  "d66a333174be625f": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "went": "그 자리",
+     "type": "stray",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.77,
+   "said": "지금도 그 자리에 웅크리고 있어요.",
+   "asked": "went"
+  },
+  "4590db0aeb262b98": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.15,
+   "said": "네, 맞아요. 거기예요.",
+   "asked": "confirm"
+  }
+ },
+ "engine": {
+  "carcass|강변북로(자동차전용도로) 위": {
+   "response": {
+    "answer": "확인 불가. 서울시 조례 6종에서 이 질문의 답을 찾지 못했습니다. 다른 법령이나 자치구가 정하는 일일 수 있으니 서울시 120다산콜에 문의해 주세요.",
+    "citation": [],
+    "source_url": "",
+    "effective_date": ""
+   },
+   "reason": "판정 거절",
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    }
+   ],
+   "ask": "강변북로(자동차전용도로) 위에서 차에 치여 도로에 놓인 고양이 사체를 발견했는데, 뒤차들이 피하느라 위험해 보여 신고하려 합니다. 누가 맡아 어떻게 처리해야 하나요?",
+   "ask_sec": 2.6,
+   "question": null,
+   "say": null,
+   "sec": 7.9,
+   "settings": "4fb47ff9df76"
+  },
+  "stray|서울숲 안|2c87f6": {
+   "response": {
+    "answer": "서울숲에서 주인 없이 돌아다니는 개는 유실·유기동물에 해당할 수 있습니다. 구청장이 지체 없이 구조·보호하도록 조치해야 하지만, 누가 직접 현장에 와서 데려가는지는 조례에 정해져 있지 않습니다.",
+    "citation": [
+     "서울특별시 동물보호 조례 제2조",
+     "서울특별시 동물보호 조례 제10조 제1항",
+     "서울특별시 동물보호 조례 제10조 제3항"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171829",
+    "effective_date": "2026-10-01"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제2조 제3호",
+     "quote": "유실ㆍ유기동물(이하 \"유기동물\"이라 한다)이란 제1호에 따른 동물 중 도로ㆍ공원 등의 공공장소에서 소유자등이 없이 배회하거나 내버려진 동물을 말한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제3항",
+     "quote": "구청장 또는 동물보호센터의 장은 제1항에 따라 구조한 동물을 동물보호센터에 보호조치하여야 한다. 다만, 시장 또는 구청장은 동물의 치료와 보호를 위해 영 제6조에 따른 민간단체에 소속된 자 또는 법 제90조에 따른 명예동물보호관에게 보호조치를 하도록 요청할 수 있으며 예산의 범위에서 필요한 경비를 지원할 수 있다."
+    }
+   ],
+   "ask": "서울숲 안에서 목줄 없이 큰 개가 혼자 돌아다니고 주인이 보이지 않으며 아이들이 많아 걱정되는 상황에서, 이런 개를 신고하면 누가 와서 데려가는지 알고 싶습니다.",
+   "ask_sec": 0.8,
+   "question": "근데 이런 개는 신고하면 누가 와서 데려가는 거예요?",
+   "say": "서울숲에서 주인 없이 돌아다니는 개는 유실·유기동물에 해당할 수 있습니다. 구청장이 지체 없이 구조·보호하도록 조치해야 하지만, 누가 직접 현장에 와서 데려가는지는 조례에 정해져 있지 않습니다.",
+   "sec": 9.1,
+   "settings": "4fb47ff9df76"
+  },
+  "vendor|서울숲 안|769d29": {
+   "response": {
+    "answer": "서울숲과 같은 도시공원에서는 법 제49조제1항 및 제2항 각 호의 금지행위를 해서는 안 되며, 개인이 임의로 돗자리를 펴고 물건을 파는 상행위는 허용되지 않습니다. 다만 공원관리청이 공익에 부합한다고 판단하여 허용한 행사의 경우에는 도시공원 관리에 현저한 지장을 주지 않는 범위에서 상행위가 허용될 수 있습니다. 따라서 질문처럼 개인이 임의로 돗자리를 펴고 물건을 파는 것은 원칙적으로 안 됩니다.",
+    "citation": [
+     "서울특별시 도시공원 조례 제22조 제1항",
+     "서울특별시 도시공원 조례 제22조 제2항"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2147709",
+    "effective_date": "2026-07-13"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 도시공원 조례 제22조 제1항",
+     "quote": "누구든지 법 제2조제3호에 해당하는 도시공원에서 법 제49조제1항 및 제2항 각 호의 행위(※ 그 내용은 이 자료에 없다)를 하여서는 아니된다."
+    },
+    {
+     "label": "서울특별시 도시공원 조례 제22조 제2항",
+     "quote": "제1항에도 불구하고 공원관리청이 공익에 부합한다고 판단하여 허용한 행사의 경우에는 도시공원의 관리에 현저한 지장을 초래하지 않는 범위에서 다음 각 호의 행위를 허용할 수 있다. 1. 국가 또는 지방자치단체 및 「공공기관의 운영에 관한 법률」에 따라 지정된 공공기관이 주최ㆍ주관하는 행사의 상행위"
+    }
+   ],
+   "ask": "서울숲 안 거울연못 옆 잔디밭에서 누가 돗자리를 쫙 펴 놓고 물건을 팔고 있는데, 저렇게 장사해도 되는 거예요?",
+   "ask_sec": 1.1,
+   "question": "저렇게 장사해도 되는 거예요?",
+   "say": "개인이 임의로 돗자리를 펴고 물건을 파는 상행위는 허용되지 않습니다. 다만 공원관리청이 공익에 부합한다고 판단해 허용한 행사라면, 공원 관리에 지장을 주지 않는 범위에서 상행위가 허용될 수 있습니다.",
+   "sec": 9.3,
+   "settings": "4fb47ff9df76"
+  },
+  "stray|동작구의 길가|d2f22c": {
+   "response": {
+    "answer": "동작구청에 신고하면 됩니다. 구조한 동물은 동물보호센터에 보호조치하지만, 누가 직접 와서 데려가는지 같은 구체적인 인력이나 절차는 조례에 정해져 있지 않습니다.",
+    "citation": [
+     "서울특별시 동물보호 조례 제10조 제1항",
+     "서울특별시 동물보호 조례 제10조 제3항",
+     "서울특별시 동물보호 조례 제2조"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171829",
+    "effective_date": "2026-10-01"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제3항",
+     "quote": "구청장 또는 동물보호센터의 장은 제1항에 따라 구조한 동물을 동물보호센터에 보호조치하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제2조 제5호",
+     "quote": "“길고양이”란 도심지나 주택가에서 자연적으로 번식하여 자생적으로 살아가는 고양이를 말한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제2조 제3호",
+     "quote": "“유실ㆍ유기동물(이하 “유기동물”이라 한다)”이란 제1호에 따른 동물 중 도로ㆍ공원 등의 공공장소에서 소유자등이 없이 배회하거나 내버려진 동물을 말한다."
+    }
+   ],
+   "ask": "동작구 길가에서 다리를 다친 듯 절뚝거리는 목줄 없는 고양이를 발견했는데, 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "ask_sec": 1.1,
+   "question": "근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "say": "동작구청에 신고하면 됩니다. 구조한 동물은 동물보호센터에 보호조치하지만, 누가 직접 와서 데려가는지 같은 구체적인 인력이나 절차는 조례에 정해져 있지 않습니다.",
+   "sec": 10.5,
+   "settings": "4fb47ff9df76"
+  },
+  "stray|서울숲 안|d2f22c": {
+   "response": {
+    "answer": "다친 고양이를 신고하면 구청장이 구조·보호 조치를 합니다. 실제 구조는 구청장이나 동물보호센터장이 안전한 방법으로 하고, 구조한 동물은 동물보호센터에 보호됩니다. 치료·보호를 위해 민간단체 소속자나 명예동물보호관에게 보호조치를 요청하고 예산 범위에서 경비를 지원할 수도 있습니다.",
+    "citation": [
+     "서울특별시 동물보호 조례 제10조 제1항",
+     "서울특별시 동물보호 조례 제10조 제2항",
+     "서울특별시 동물보호 조례 제10조 제3항"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171829",
+    "effective_date": "2026-10-01"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제2항",
+     "quote": "구청장 또는 동물보호센터의 장이 유기동물을 구조하고자 할 경우, 사람과 동물이 모두 안전한 방법을 사용하도록 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제3항",
+     "quote": "구청장 또는 동물보호센터의 장은 제1항에 따라 구조한 동물을 동물보호센터에 보호조치하여야 한다. 다만, 시장 또는 구청장은 동물의 치료와 보호를 위해 영 제6조에 따른 민간단체에 소속된 자 또는 법 제90조에 따른 명예동물보호관에게 보호조치를 하도록 요청할 수 있으며 예산의 범위에서 필요한 경비를 지원할 수 있다."
+    }
+   ],
+   "ask": "서울숲 안에서 다리를 다쳐 절뚝거리는 목줄 없는 고양이가 있는데, 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "ask_sec": 0.7,
+   "question": "근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+   "say": "다친 고양이를 신고하면 구청장이 구조·보호 조치를 합니다. 실제 구조는 구청장이나 동물보호센터장이 안전한 방법으로 하고, 구조한 동물은 동물보호센터에 보호됩니다. 치료·보호를 위해 민간단체 소속자나 명예동물보호관에게 보호조치를 요청하고 예산 범위에서 경비를 지원할 수도 있습니다.",
+   "sec": 6.0,
+   "settings": "4fb47ff9df76"
+  }
+ },
+ "made": {
+  "at": "2026-11-15T11:16:33+09:00",
+  "read_model": "solar-pro4",
+  "engine_settings": "4fb47ff9df76",
+  "engine_config": "eval/configs/release.json",
+  "calls": {
+   "read": 2,
+   "ask": 2,
+   "engine": 2,
+   "tokens_in": 39007,
+   "tokens_out": 1677,
+   "reused": 10
+  },
+  "steps": {
+   "roadkill": [
+    {
+     "said": "여보세요? 저 지금 운전 중인데요, 방금 도로에 고양이가 차에 치여 있는 걸 봤어요. 뒤차들이 피하느라 위험해 보여서요.",
+     "m": null,
+     "code_next": "where",
+     "next": "where",
+     "code_ms": 1,
+     "read": "live",
+     "read_sec": 2.21
+    },
+    {
+     "said": "강변북로예요. 그냥 지나가다 봐서 주소는 모르겠어요.",
+     "m": 22190,
+     "code_next": "between",
+     "next": "between",
+     "code_ms": 1102,
+     "read": "live",
+     "read_sec": 2.31
+    },
+    {
+     "said": "다리를 하나 지났는데, 동호대교였나? 아, 아니다. 성수대교요. 성수대교 지났고 영동대교는 아직 안 나왔어요.",
+     "m": 2040,
+     "code_next": "passed",
+     "next": "passed",
+     "code_ms": 26,
+     "read": "live",
+     "read_sec": 2.63
+    },
+    {
+     "said": "음, 사람 건너다니는 육교 밑을 막 지나자마자 봤어요. 맨 오른쪽 차선 가장자리에 있었어요.",
+     "m": 160,
+     "code_next": "lampno",
+     "next": "lampno",
+     "code_ms": 34,
+     "read": "live",
+     "read_sec": 2.02
+    },
+    {
+     "said": "아뇨, 운전 중이라 못 봤어요. 이미 지나왔고요.",
+     "m": 160,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 47,
+     "read": "live",
+     "read_sec": 2.46
+    },
+    {
+     "said": "네, 맞아요.",
+     "m": 160,
+     "code_next": null,
+     "next": null,
+     "code_ms": 44,
+     "read": "live",
+     "read_sec": 2.87
+    }
+   ],
+   "stray": [
+    {
+     "said": "저기요, 공원에 큰 개가 혼자 돌아다니는데 주인이 안 보여요. 애들도 많아서 좀 걱정돼서요.",
+     "m": null,
+     "code_next": "where",
+     "next": "where",
+     "code_ms": 0,
+     "read": "live",
+     "read_sec": 1.63
+    },
+    {
+     "said": "서울숲 안쪽이에요. 여기가 정확히 어딘지는 모르겠어요.",
+     "m": 690,
+     "code_next": "leash",
+     "next": "leash",
+     "code_ms": 30,
+     "read": "live",
+     "read_sec": 3.28
+    },
+    {
+     "said": "목줄은 없는 것 같아요. 근데 이런 개는 신고하면 누가 와서 데려가는 거예요?",
+     "m": 690,
+     "code_next": "mark",
+     "next": "mark",
+     "code_ms": 59,
+     "read": "live",
+     "read_sec": 1.41
+    },
+    {
+     "said": "간판 같은 건 없고요. 아, 사슴 있는 데 있잖아요. 거기 근처예요.",
+     "m": 200,
+     "code_next": "dist",
+     "next": "dist",
+     "code_ms": 11,
+     "read": "live",
+     "read_sec": 2.08
+    },
+    {
+     "said": "스무 걸음쯤이요. 사슴 우리 옆에 화장실이 있는데, 그 화장실 바로 앞 잔디에 앉아 있어요.",
+     "m": 20,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 7,
+     "read": "live",
+     "read_sec": 1.8
+    },
+    {
+     "said": "네, 맞아요. 거기예요.",
+     "m": 20,
+     "code_next": null,
+     "next": null,
+     "code_ms": 7,
+     "read": "live",
+     "read_sec": 1.55
+    }
+   ]
+  }
+ },
+ "made_vendor": {
+  "at": "2026-11-15T18:09:33+09:00",
+  "read_model": "solar-pro4",
+  "engine_settings": "4fb47ff9df76",
+  "engine_config": "eval/configs/release.json",
+  "calls": {
+   "read": 3,
+   "ask": 2,
+   "engine": 1,
+   "tokens_in": 39594,
+   "tokens_out": 865
+  },
+  "steps": {
+   "vendor": [
+    {
+     "said": "여보세요, 서울숲 근처인데요. 누가 잔디밭에 돗자리를 쫙 펴 놓고 물건을 팔고 있어요. 저렇게 장사해도 되는 거예요?",
+     "m": 1240,
+     "code_next": "zone",
+     "next": "zone",
+     "code_ms": 121,
+     "read": "live",
+     "read_sec": 3.65
+    },
+    {
+     "said": "공원 안이에요. 거울연못 옆 잔디밭이요.",
+     "m": 40,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 13,
+     "read": "live",
+     "read_sec": 2.25
+    },
+    {
+     "said": "네, 맞아요.",
+     "m": 40,
+     "code_next": null,
+     "next": null,
+     "code_ms": 15,
+     "read": "live",
+     "read_sec": 4.18
+    }
+   ]
+  }
+ },
+ "made_pothole": {
+  "at": "2026-11-17T17:45:06+09:00",
+  "read_model": "solar-pro4",
+  "engine_settings": "4fb47ff9df76",
+  "engine_config": "eval/configs/release.json",
+  "calls": {
+   "read": 5,
+   "ask": 0,
+   "engine": 0,
+   "tokens_in": 5343,
+   "tokens_out": 446
+  },
+  "steps": {
+   "pothole": [
+    {
+     "said": "여보세요, 길 가다 보니까 도로가 움푹 파여서 구멍이 크게 나 있어요. 차들이 그걸 피하느라 휘청해서 위험해 보여요.",
+     "m": null,
+     "code_next": "where",
+     "next": "where",
+     "code_ms": 2,
+     "read": "live",
+     "read_sec": 2.26
+    },
+    {
+     "said": "고대앞사거리에서 안암역 가는 방향이에요. 번지는 모르겠어요.",
+     "m": 1950,
+     "code_next": "finer",
+     "next": "mark",
+     "code_ms": 78,
+     "read": "live",
+     "read_sec": 2.99
+    },
+    {
+     "said": "안암역 2번 출구 바로 앞이에요. 출구에서 나오자마자 차도에 있어요.",
+     "m": 40,
+     "code_next": "lane",
+     "next": "lane",
+     "code_ms": 270,
+     "read": "live",
+     "read_sec": 1.15
+    },
+    {
+     "said": "차로 위예요. 맨 오른쪽 차로요.",
+     "m": 40,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 13,
+     "read": "live",
+     "read_sec": 1.42
+    },
+    {
+     "said": "네, 맞아요.",
+     "m": 40,
+     "code_next": null,
+     "next": null,
+     "code_ms": 12,
+     "read": "live",
+     "read_sec": 2.62
+    }
+   ]
+  }
+ },
+ "made_cat_street": {
+  "at": "2026-11-17T21:27:56+09:00",
+  "read_model": "solar-pro4",
+  "engine_settings": "4fb47ff9df76",
+  "engine_config": "eval/configs/release.json",
+  "calls": {
+   "read": 6,
+   "ask": 1,
+   "engine": 1,
+   "tokens_in": 25996,
+   "tokens_out": 1354
+  },
+  "steps": {
+   "cat_street": [
+    {
+     "said": "여보세요, 집 앞 골목에 고양이가 한 마리 웅크리고 있는데요, 다리를 다쳤는지 절뚝거려요.",
+     "m": null,
+     "code_next": "where",
+     "next": "where",
+     "code_ms": 3,
+     "read": "live",
+     "read_sec": 1.83
+    },
+    {
+     "said": "상도1동 주민센터 근처 골목이에요. 상도역에서 올라오는 길이요. 번지는 모르겠어요.",
+     "m": 210,
+     "code_next": "leash",
+     "next": "leash",
+     "code_ms": 17,
+     "read": "live",
+     "read_sec": 1.93
+    },
+    {
+     "said": "목줄은 없어요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+     "m": 210,
+     "code_next": "finer",
+     "next": "finer",
+     "code_ms": 66,
+     "read": "live",
+     "read_sec": 1.75
+    },
+    {
+     "said": "상도1동 주민센터 바로 앞이에요.",
+     "m": 40,
+     "code_next": "went",
+     "next": "went",
+     "code_ms": 272,
+     "read": "live",
+     "read_sec": 1.26
+    },
+    {
+     "said": "지금도 그 자리에 있어요.",
+     "m": 40,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 9,
+     "read": "live",
+     "read_sec": 2.25
+    },
+    {
+     "said": "네, 맞아요.",
+     "m": 40,
+     "code_next": null,
+     "next": null,
+     "code_ms": 7,
+     "read": "live",
+     "read_sec": 1.93
+    }
+   ]
+  }
+ },
+ "made_cat_park": {
+  "at": "2026-11-17T21:28:29+09:00",
+  "read_model": "solar-pro4",
+  "engine_settings": "4fb47ff9df76",
+  "engine_config": "eval/configs/release.json",
+  "calls": {
+   "read": 7,
+   "ask": 2,
+   "engine": 1,
+   "tokens_in": 24461,
+   "tokens_out": 1255
+  },
+  "steps": {
+   "cat_park": [
+    {
+     "said": "저기요, 공원에 고양이가 한 마리 있는데 다리를 다쳤는지 절뚝거려요. 애들도 많아서 좀 걱정돼서요.",
+     "m": null,
+     "code_next": "where",
+     "next": "where",
+     "code_ms": 3,
+     "read": "live",
+     "read_sec": 2.41
+    },
+    {
+     "said": "서울숲 안쪽이에요. 여기가 정확히 어딘지는 모르겠어요.",
+     "m": 690,
+     "code_next": "leash",
+     "next": "leash",
+     "code_ms": 126,
+     "read": "live",
+     "read_sec": 1.63
+    },
+    {
+     "said": "목줄은 없는 것 같아요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+     "m": 690,
+     "code_next": "mark",
+     "next": "mark",
+     "code_ms": 77,
+     "read": "live",
+     "read_sec": 0.95
+    },
+    {
+     "said": "간판 같은 건 없고요. 아, 사슴 있는 데 있잖아요. 거기 근처예요.",
+     "m": 200,
+     "code_next": "dist",
+     "next": "dist",
+     "code_ms": 12,
+     "read": "live",
+     "read_sec": 2.83
+    },
+    {
+     "said": "스무 걸음쯤이요. 사슴 우리 옆에 화장실이 있는데, 그 화장실 바로 앞 잔디에 웅크리고 있어요.",
+     "m": 20,
+     "code_next": "went",
+     "next": "went",
+     "code_ms": 236,
+     "read": "live",
+     "read_sec": 2.18
+    },
+    {
+     "said": "지금도 그 자리에 웅크리고 있어요.",
+     "m": 20,
+     "code_next": "confirm",
+     "next": "confirm",
+     "code_ms": 11,
+     "read": "live",
+     "read_sec": 1.77
+    },
+    {
+     "said": "네, 맞아요. 거기예요.",
+     "m": 20,
+     "code_next": null,
+     "next": null,
+     "code_ms": 11,
+     "read": "live",
+     "read_sec": 1.15
+    }
+   ]
+  }
+ }
+}
