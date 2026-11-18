@@ -153,14 +153,14 @@ async function typeLine(who, text, alive, totalMs, ct) {      // ct가 있으면
   for (let i = 1; i <= text.length && alive(); i += 2) { ui.typing.text = text.slice(0, i + 1); renderTyping(); await new Promise((r) => setTimeout(r, step)); }
   if (alive()) { ui.typing.text = text; renderTyping(); }
 }
-// 목소리(영상용): 미리 만들어 둔 음성 파일을 튼다: web/voice/<장면>-<줄 번호 두 자리>.mp3 (제작 도구 tools/make_voice_gemini.py로 만듦, 줄 번호와 글은 `server.py --lines`).
+// 목소리(영상용): 미리 만들어 둔 음성 파일을 튼다: web/voice/<장면>-<줄 번호 두 자리>.mp3 (레포에 없음. 줄 번호와 글은 `server.py --lines`).
 // 파일이 없으면 소리 없이 글 길이만큼 기다린다. 화면이 모델을 부르지 않는다(파일만 튼다)
 let voiceN = 0, VOICE_IDX = null;
 const REC = P.get('rec') === '1';      // 녹화용: 페이지는 소리를 내지 않고 줄마다 시작 시각만 남긴다(소리는 녹화 뒤에 얹는다)
 async function voiceInfo(text) {      // 이번 줄의 음성 파일과 길이. 파일이 없으면 말하는 빠르기로 어림한 길이만 준다
   if (!ui.voice) return null;
   if (VOICE_IDX === null) { try { VOICE_IDX = await (await fetch('voice/index.json')).json(); } catch { VOICE_IDX = {}; } }      // {파일 이름: 길이(초)}
-  const file = `${ui.scene}-${String(++voiceN).padStart(2, '0')}.mp3`, v = VOICE_IDX[file], dur = v && (v.dur || v);      // {dur, ct: 글자마다 소리 나는 시각} (tools/align_voice.py)
+  const file = `${ui.scene}-${String(++voiceN).padStart(2, '0')}.mp3`, v = VOICE_IDX[file], dur = v && (v.dur || v);      // {dur, ct: 글자마다 소리 나는 시각}
   return { file, dur, ct: v && v.ct && v.ct.length === text.length ? v.ct : null, ms: dur ? dur * 1000 : Math.min(9000, 600 + text.length * 95) / SPEED };
 }
 function speak(info) {

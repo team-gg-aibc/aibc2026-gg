@@ -1,7 +1,7 @@
 """대본 재생을 창 없는 크로미움으로 녹화하고(소리 없음), 페이지는 소리를 내지 않고(--mute-audio, ?rec=1) 줄마다 시작 시각만 남기며, 그 시각에 음성 파일을 ffmpeg로 얹어 mp4 두 개(소리 · 자막만)를 만든다.
 
-    먼저: CALL_MODE=saved CALL_PORT=8773 python3 demo/call/server.py  (저장된 답 방식 서버), python3 demo/call/tools/make_voice_gemini.py <열쇠 파일>  (음성 파일)
-    python3 demo/call/tools/record_video.py <roadkill|stray|vendor> <mp4를 둘 폴더> <임시 폴더>
+    먼저: CALL_MODE=saved CALL_PORT=8773 python3 demo/call/server.py  (저장된 답 방식 서버), 음성 파일은 web/voice/에 미리 둔다(레포에 없음)
+    python3 demo/call/tools/record_video.py <cat_street|cat_park|roadkill> <mp4를 둘 폴더> <임시 폴더>
 필요한 것: playwright(크로미움) · ffmpeg. 올리지 않는다. 목소리는 서비스가 부르는 모델이 아니다(제작 도구).
 """
 import json, subprocess, sys, time
@@ -54,7 +54,7 @@ for f, _ in delays:
     cmd += ["-i", f"demo/call/web/{f}"]
 flt = ";".join(f"[{n + 1}:a]adelay={d}|{d}[a{n}]" for n, (_, d) in enumerate(delays)) + ";" + "".join(f"[a{n}]" for n in range(len(delays))) + f"amix=inputs={len(delays)}:normalize=0[a]"
 enc = ["-c:v", "libx264", "-crf", "27", "-preset", "medium", "-pix_fmt", "yuv420p", "-r", "30", "-movflags", "+faststart"]
-name = {"roadkill": "로드킬", "stray": "유기견", "vendor": "공원노점"}[scene]
+name = {"cat_street": "다친고양이-골목", "cat_park": "다친고양이-공원", "roadkill": "로드킬", "stray": "유기견", "vendor": "공원노점"}.get(scene, scene)      # 표에 없는 장면은 장면 이름 그대로
 if delays:
     subprocess.run(cmd + ["-filter_complex", flt, "-map", "0:v", "-map", "[a]"] + enc + ["-c:a", "aac", "-b:a", "96k", str(out_dir / f"시연-{name}-소리.mp4")], check=True)
 subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{cut:.3f}", "-to", f"{end:.3f}", "-i", str(video)] + enc + ["-an", str(out_dir / f"시연-{name}-자막만.mp4")], check=True)

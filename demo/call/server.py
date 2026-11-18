@@ -55,6 +55,7 @@ usage = {"read": 0, "ask": 0, "engine": 0, "tokens_in": 0, "tokens_out": 0}
 
 if MODE == "live":
     from engine import config, pipeline, upstage                # noqa: E402  엔진 코드는 고치지 않고 불러다 쓴다
+    from engine.flow2 import plain                              # noqa: E402  줄인 안내 말도 엔진 쉬운 말 단계와 같은 검사(accept)로 거른다
     ENGINE_CFG = config.load(os.environ.get("ENGINE_CONFIG") or str(ROOT / "eval" / "configs" / "release.json"))
     READ_CFG = {**ENGINE_CFG, "chat_model": MODEL, "temperature": 0.0, "reasoning_effort": None}
 
@@ -127,7 +128,7 @@ def clue_of(key, rel, how, label=None):
         key = "|".join([key] + alts)
     areas = [a for a in L.resolve(key)["areas"] if a[0] == "park"]
     if rel in ("in", "out") and areas:
-        return {"t": rel, "a": list(areas[0]), "label": f"{label or G.display(key)} {'안' if rel == 'in' else '바깥 길'}"}
+        return {"t": rel, "a": list(areas[0]), "label": fill(tab("위치 범위")["단서 · 공원 안" if rel == "in" else "단서 · 공원 바깥 길"], 이름=label or G.display(key))}
     res = L.resolve(key)
     if rel in ("past", "before", "toward") and res["roads"] and not len(res["x"]):
         rel = "at"                                        # 길 이름은 「지나온 표지」 · 「가는 쪽」이 될 수 없다(「강변북로예요. 그냥 지나가다 봐서」 · 「올림픽대로 하남 방향」): 그 길 위로 읽는다
@@ -161,9 +162,9 @@ def shortlist(said, R, asked_id=None):
                 out.append({"key": n["key"], "name": n["name"], "kind": n["kinds"][0], "n": n["n"], "after": n["after"], "fuzzy": False, "said": n["said"]})
                 break
     for label, px, py in gaz.jijum(said):                 # 국가지점번호를 읽어 줬다: 번호가 곧 좌표(10m 칸)
-        out.append({"p": [round(px, 1), round(py, 1)], "name": f"국가지점번호 {label}", "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True})
+        out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 국가지점번호"], 번호=label), "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True})
     for no, px, py in G.lamp_in(said):                    # 가로등 기둥의 관리번호를 읽어 줬다: 그 기둥 하나를 가리킨다
-        out.append({"p": [round(px, 1), round(py, 1)], "name": f"가로등 {no}", "kind": "지점번호", "n": 1, "after": "", "by": "#" + no, "sure": True, "r": G.lamp_err.get(no, 12.0)})
+        out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 가로등"], 번호=no), "kind": "지점번호", "n": 1, "after": "", "by": "#" + no, "sure": True, "r": G.lamp_err.get(no, 12.0)})
     t = gaz.norm(said)
     if R is not None:                                     # 종류만 말했으면 지금 범위 안의 그런 곳 가운데 가능성이 큰 세 곳까지
         x, y, w = L._sample(R)
@@ -232,7 +233,7 @@ def _body_spot(body, names):
 
 def _spot(spot, said, after, by):
     cx, cy, r, lab = spot
-    return {"p": [round(cx, 1), round(cy, 1)], "r": round(r), "name": f"{lab} 둘레", "kind": "건물", "n": 1, "after": after, "by": "≈" + by, "fuzzy": True, "said": said}
+    return {"p": [round(cx, 1), round(cy, 1)], "r": round(r), "name": fill(tab("위치 범위")["단서 · 비슷한 이름 둘레"], 이름=lab), "kind": "건물", "n": 1, "after": after, "by": "≈" + by, "fuzzy": True, "said": said}
 
 
 def _far_names(found):
@@ -353,7 +354,7 @@ def code_read(said, asked, short, R):
                 read["clues"][-1]["min"] = float({"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "십": 10, "십오": 15}.get(mins.group(1)) or mins.group(1))
         elif m["by"] not in seen_cat and not str(m["by"]).startswith(("#", "≈")) and sum(1 for o in short if o.get("by") == m["by"] and o.get("mass", 0) >= 0.3 * m.get("mass", 1)) >= 2:
             seen_cat.add(m["by"])                         # 종류만 말했는데 범위 안에 그런 곳이 여럿: 하나를 고르지 않고 「그런 곳 가운데 하나 둘레」로 읽는다(다른 분수로 확정하지 않게)
-            read["clues"].append({"t": "cat", "c": m["kind"], "s": L.SIG["바로"] if how == "바로" else 60.0, "e": 0.15, "label": f"{m['by']} {'바로 옆' if how == '바로' else '보임'}"})
+            read["clues"].append({"t": "cat", "c": m["kind"], "s": L.SIG["바로"] if how == "바로" else 60.0, "e": 0.15, "label": fill(tab("위치 범위")["단서 · 종류 바로 옆" if how == "바로" else "단서 · 종류 보임"], 종류=m["by"])})
         elif m["by"] not in seen_cat:                     # 종류만 말한 것: 가장 그럴듯한 한 곳
             seen_cat.add(m["by"])
             read["clues"].append({"t": "past", "p": m["p"], "how": how if how in L.DIST else "모름", "label": m["name"]} if rel == "past"
@@ -367,7 +368,7 @@ def code_read(said, asked, short, R):
         fixed = False
     for kind in G.categories(said):
         if not any(m.get("kind") == kind for m in short):
-            read["clues"].append({"t": "cat", "c": kind, "label": f"{kind} 보임"})
+            read["clues"].append({"t": "cat", "c": kind, "label": fill(tab("위치 범위")["단서 · 종류 보임"], 종류=kind)})
     q = asked or {}
     _tag_station(read, q)
     _tag_drive(read, said)
@@ -760,7 +761,7 @@ def route_of(matter, R):
     put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else "그 공원")   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
-    names = {"자동차전용도로": "자동차전용도로 위", "한강공원": "한강공원 안", "시 공원": "서울시가 관리하는 공원 안", "공원": "동네 공원 안", "길": "그 밖의 길"}
+    names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
     others, seen = [], set()
     for c in names:
         r = next((r for r in t["routes"] if ok(r, c)), None)
@@ -820,12 +821,14 @@ def _run_engine(key, said, tname, place, job, question=None):
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
-    res["ask"] = res["ask"] or f"{place}에서 {tname}가 들어왔습니다. 이 일에 걸리는 서울시 조례 규정과 맡는 곳이 어떻게 되나요?"
+    res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=place, 일=tname)
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
+    word = "정보"                                         # 엔진 쉬운 말 단계가 쓴 결론 낱말(네 · 아니요 · 정보). 판단 기록에 없으면 「정보」
     try:                                                  # ② 엔진
         resp, tr = pipeline.answer(res["ask"], ENGINE_CFG)
         read = (tr.get("flow2") or {}).get("read") or {}
+        word = ((tr.get("flow2") or {}).get("plain") or {}).get("word") or word
         res.update(response=resp, reason=tr.get("reason"),
                    evidence=[{"label": e.get("label", ""), "quote": e.get("quote", "")} for e in read.get("evidence") or [] if isinstance(e, dict)])
         usage["tokens_in"] += sum(c.get("in", 0) for c in tr.get("calls") or [])
@@ -840,8 +843,10 @@ def _run_engine(key, said, tname, place, job, question=None):
         res["say"] = card["answer"].strip()
     elif card["answer"]:                                  # ③ 아직 길면 통화에서 읽을 한두 문장으로 줄이기(Solar). 못 줄이면 엔진 답 그대로 보인다
         try:
-            res["say"] = _solar(SAY_PROMPT, (f"[시민이 물은 것]\n{question}\n\n" if question else "") + f"[답]\n{card['answer']}", _schema("say", {"say": {"type": "string"}}))["say"].strip()[:220]
+            new = _solar(SAY_PROMPT, (f"[시민이 물은 것]\n{question}\n\n" if question else "") + f"[답]\n{card['answer']}", _schema("say", {"say": {"type": "string"}}))["say"].strip()[:220]
             usage["ask"] += 1
+            why = plain.accept(new, card["answer"], word, [chunks().get(c["label"], {}).get("text", "") for c in card["citations"]])   # 없던 숫자 · 결론 낱말 바뀜 · 「정해져 있지 않다」 빠짐 · 길어짐이면 버린다
+            res["say"], res["say_drop"] = (None, why) if why else (new, None)      # 버리면 화면은 엔진 답을 그대로 읽는다(e.say || e.answer)
         except Exception as e:  # noqa: BLE001
             print(f"안내 말 줄이기 실패: {type(e).__name__}", file=sys.stderr)
     if recording is not None and not res["error"]:
