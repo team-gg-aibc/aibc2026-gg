@@ -4,7 +4,8 @@
 //   화면 쪽(desk):   전화를 받고, 받아쓴 글을 받아 적기 칸에 올리고, 확정된 말을 지금의 통화 길(citizen → /api/turn)에 그대로 넣고, 화면이 띄운 질문을 읽어 달라고 넘긴다.
 // 위치 좁히기 · 질문 고르기는 건드리지 않는다. call.js의 것(ui · S · V · citizen · turnReq · queue …)을 그대로 불러 쓴다.
 // 질문을 누가 말하나(서버 CALL_VOICE_ASK, 주소 ?ask=): ai = 화면이 띄운 질문을 읽어 준다 · agent = 상담사가 직접 말한다(읽어 주지 않는다. 한 기기 마이크면 상담사가 말하는 동안 스페이스를 누르고 있는다)
-// 주소 옵션(점검 · 녹화용): ?mic=script 열자마자 대본 글을 소리 대신 흘려 장면을 끝까지 · ?quiet=1 아무 소리도 틀지 않는다(글 길이만큼 기다림)
+// 대본을 음성 길로(?mic=script · 단추): 가짜 받아쓰기면 대본 글을 소리 대신 흘리고, 진짜 받아쓰기면 시민 역 소리 파일(web/voice/citizen/, tts_lines.py --citizen)을 마이크 대신 실제 속도로 보낸다
+// 주소 옵션(점검 · 녹화용): ?mic=script 열자마자 대본을 음성 길로 · ?quiet=1 아무 소리도 틀지 않는다(글 길이만큼 기다림)
 'use strict';
 (() => {
   const Q = new URLSearchParams(location.search), QUIET = Q.get('quiet') === '1';
@@ -16,7 +17,7 @@
     listen: '듣는 중', speak: '읽어 주는 중', wait: '거는 사람을 기다리는 중', ring: '전화가 왔습니다', link: '휴대폰에서 이 주소를 엽니다', over: '통화가 끝났습니다', down: '받아쓰기가 끊겼습니다',
     nomic: '마이크를 쓸 수 없습니다. 브라우저의 마이크 허락과 https 주소인지 확인해 주세요.', code: '접근 코드', heard: '들어온 소리 {초}초', hold: '상담사가 말하는 중(스페이스)', agent: '상담사가 직접 묻는 통화',
     off: '음성 통화가 꺼져 있습니다.', dial: '전화 걸기', dialName: '120 민원 콜센터', dialLead: '가상 시연입니다. 실제 민원 접수가 아닙니다.', noroom: '상담 화면에서 받은 주소로 열어 주세요.',
-    calling: '연결 중…', talking: '통화 중', say: '말할 글(가짜 받아쓰기)', send: '말하기' };
+    calling: '연결 중…', talking: '통화 중', say: '말할 글(가짜 받아쓰기)', send: '말하기', noline: '시민 역 소리 파일이 없습니다(tts_lines.py --citizen)' };
 
   async function vapi(path, body, raw) {
     const r = await fetch('/api/voice/' + path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': raw ? 'application/octet-stream' : 'application/json' }, body: raw ? body : JSON.stringify(body) });
@@ -61,7 +62,7 @@
 
   // ---- 소리 쪽: 마이크 → 서버, 읽어 줄 말 → 스피커. 상담 화면이 받기 전과 읽어 주는 동안에는 마이크 소리를 0으로 보낸다(연결음 · 제 목소리를 받아쓰지 않게, 줄은 살아 있게)
   function Caller(room, info, on) {
-    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false;
+    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false, tape = null, tape0 = 0, sent = 0;      // tape: 마이크 대신 보낼 소리(16kHz)
     const me = { hold: false }, todo = [];
     async function mic() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
@@ -77,6 +78,10 @@
     }
     async function loop() {
       while (alive) {
+        if (tape) {      // 마이크 대신: 흐른 시간만큼(실제 속도) 소리 파일을 보내고, 없으면 조용한 소리를 보낸다(받아쓰기가 말끝을 알게)
+          const due = Math.round((performance.now() - tape0) / 1000 * 16000) - sent, o = new Int16Array(Math.max(0, due));
+          o.set(tape.q.subarray(0, o.length)); tape.q = tape.q.subarray(o.length); sent += o.length; chunks.push(o);
+        }
         const n = chunks.reduce((s, c) => s + c.length, 0), all = new Int16Array(n);
         let at = 0; for (const c of chunks) { all.set(c, at); at += c.length; }
         chunks = [];
@@ -100,13 +105,21 @@
     }
     function stop() { alive = false; if (stream) stream.getTracks().forEach((t) => t.stop()); if (ctx) ctx.close().catch(() => {}); }
     return Object.assign(me, {
-      async start(useMic) {
+      async start(useMic, useTape) {
         let rate = 16000;
         if (useMic) rate = await mic();
+        if (useTape) { tape = { q: new Int16Array(0) }; tape0 = performance.now(); }
         await vapi(`join?room=${room}&rate=${Math.round(rate)}`, {});
         loop(); mouth();
       },
       fake: (text) => vapi(`fake?room=${room}`, { text }),      // 가짜 받아쓰기일 때: 이 글을 「말한다」
+      async line(text) {      // 진짜 받아쓰기일 때: 이 글의 시민 역 소리를 마이크 대신 보낸다 → 없으면 false
+        const r = await fetch('/api/voice/line?text=' + encodeURIComponent(text));
+        if (!r.ok || !tape) return false;
+        const b = await r.arrayBuffer(), pcm = new Int16Array(b.slice(44));      // 우리가 만든 wav(머리 44바이트, 16kHz 한 줄기)
+        const q = new Int16Array(tape.q.length + pcm.length); q.set(tape.q); q.set(pcm, tape.q.length); tape.q = q;
+        return true;
+      },
       hangup() { stop(); return vapi(`end?room=${room}`, {}).catch(() => {}); },      // 끊는다(상대 쪽도 곧 안다)
       stop,
     });
@@ -147,7 +160,7 @@
     const ringing = () => st.alive && st.joined && !st.picked;
     function draw() {
       bar.innerHTML = st.alive ? (ringing() ? `<button type="button" class="on" data-mic="pick">${esc(T.pick)}</button>` : '') + `<button type="button"${ringing() ? '' : ' class="on"'} data-mic="hang">${esc(T.hang)}</button>`
-        : [['here', T.here], ['phone', T.phone]].concat(info.stt === 'fake' && SCRIPTS[ui.scene] ? [['script', T.script]] : []).map(([id, name]) => `<button type="button" data-mic="${id}">${esc(name)}</button>`).join('');
+        : [['here', T.here], ['phone', T.phone]].concat(SCRIPTS[ui.scene] ? [['script', T.script]] : []).map(([id, name]) => `<button type="button" data-mic="${id}">${esc(name)}</button>`).join('');
       box.textContent = st.state ? `${T[info.stt]} · ${st.state}` + (st.heard ? ` · ${T.heard.replace('{초}', st.heard.toFixed(1))}` : '') + (ASK === 'agent' && st.alive ? ` · ${T.agent}` : '') : '';
       document.body.classList.toggle('voice-wait', st.alive && !st.joined);      // 거는 사람이 들어오기 전에는 「전화가 왔습니다」를 보이지 않는다
       const link = st.alive && st.how === 'phone' && !st.joined ? `${T.link}: ${location.origin}/dial.html?room=${st.room}` : '';      // 거는 사람이 들어올 때까지 받아 적기 칸의 알림 자리에
@@ -195,6 +208,7 @@
       } catch { /* 방이 닫혔으면 poll2가 끊는다 */ }
       st.busy = false; if (st.alive) say(T.listen);
     }
+    const citizenSays = (text) => (info.stt === 'fake' ? st.caller.fake(text).then(() => true) : st.caller.line(text));      // 대본의 시민 줄: 가짜면 글로, 진짜 받아쓰기면 시민 역 소리로
     async function drive() {      // 화면이 띄운 것을 차례로 읽는다: 인사 → (조례 답) → 질문 … → 맺음말. 단추 · 되돌리기로 질문이 바뀌어도 바뀐 것을 읽는다
       const C = K('통화 글');
       ui.t0 = Date.now();
@@ -218,8 +232,8 @@
         if (q && key !== st.spoken) {
           st.spoken = key;
           await agentSay(q.say);
-          if (st.how === 'script' && st.alive && ui.askQ === q) { const a = SCRIPTS[ui.scene][q.id]; if (a) st.caller.fake(a); else return hang(C['대본에 없는 질문']); }
-        } else if (st.how === 'script' && !q && !S.turns.length && !st.said1) { st.said1 = true; st.caller.fake(SCRIPTS[ui.scene]['처음']); }      // 인사 뒤 첫 말
+          if (st.how === 'script' && st.alive && ui.askQ === q) { const a = SCRIPTS[ui.scene][q.id]; if (!a) return hang(C['대본에 없는 질문']); if (!(await citizenSays(a))) return hang(T.noline); }
+        } else if (st.how === 'script' && !q && !S.turns.length && !st.said1) { st.said1 = true; if (!(await citizenSays(SCRIPTS[ui.scene]['처음']))) return hang(T.noline); }      // 인사 뒤 첫 말
       }
     }
     async function start(how) {
@@ -232,7 +246,7 @@
       say(how === 'phone' ? T.wait : T.listen);
       if (how !== 'phone') {
         st.caller = Caller(st.room, info, (s) => { if (s === 'down') say(T.down); });
-        try { await st.caller.start(how === 'here'); } catch { return hang(T.nomic); }
+        try { await st.caller.start(how === 'here', how === 'script' && info.stt !== 'fake'); } catch { return hang(T.nomic); }
       }
       poll2();
     }

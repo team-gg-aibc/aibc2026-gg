@@ -14,7 +14,8 @@
 | ELEVENLABS_TTS_MODEL · ELEVENLABS_VOICE_ID | 음성 합성 모델 · 목소리 | eleven_multilingual_v2 · 「나의 우주」의 기본 목소리 |
 | CALL_VOICE_ASK | 질문을 누가 말하나. ai(화면이 띄운 질문을 읽어 준다) · agent(상담사가 직접 말한다. 읽어 주지 않는다). 주소 ?ask= 로도 바꾼다 | ai |
 | CALL_VOICE_CODE | 값이 있으면 통화를 열 때 이 접근 코드를 받는다(밖에 내놓을 때) | 없음 |
-| CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper는 300) |
+| CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper · elevenlabs는 300) |
+| ELEVENLABS_CITIZEN_VOICE_ID | 「대본을 음성 길로」에서 시민 역 목소리(tts_lines.py --citizen이 만든다) | 「나의 우주」의 '부드러운' |
 | CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수 | 4 · 600 · 40 |
 """
 import hashlib
@@ -35,10 +36,11 @@ CODE = os.environ.get("CALL_VOICE_CODE", "")
 TTS = os.environ.get("CALL_VOICE_TTS") if os.environ.get("CALL_VOICE_TTS") in ("browser", "elevenlabs") else "none"
 ELEVEN_API = os.environ.get("ELEVENLABS_API_BASE", "https://api.elevenlabs.io")
 TTS_MODEL = os.environ.get("ELEVENLABS_TTS_MODEL") or "eleven_multilingual_v2"      # LLMOps 과제(「나의 우주」)와 그 시연 영상이 쓴 모델
-TTS_VOICE = os.environ.get("ELEVENLABS_VOICE_ID") or "JBFqnCBsd6RMkjVDRZzb"        # 「나의 우주」의 기본 목소리. 어느 목소리로 할지는 동규가 정한다
+TTS_VOICE = os.environ.get("ELEVENLABS_VOICE_ID") or "JBFqnCBsd6RMkjVDRZzb"        # 「나의 우주」의 기본 목소리 '따뜻한'(LLMOps 시연 영상도 이 목소리). 어느 목소리로 할지는 동규가 정한다
+CITIZEN_VOICE = os.environ.get("ELEVENLABS_CITIZEN_VOICE_ID") or "EXAVITQu4vr4xnSDxMaL"     # 시민 역('부드러운'). 대본 시연용 소리 파일을 만들 때만 쓴다
 ASK = "agent" if os.environ.get("CALL_VOICE_ASK") == "agent" else "ai"      # 질문을 누가 말하나: ai = 화면이 띄운 질문을 읽어 준다 · agent = 상담사가 직접 말한다(읽어 주지 않는다)
 STT = stt.pick()
-GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name == "whisper" else 900))      # 로컬 받아쓰기는 확정 글이 이미 0.7초의 조용함을 기다린 뒤에 온다
+GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name in ("whisper", "elevenlabs") else 900))      # 이 둘은 확정 글이 이미 조용함을 기다린 뒤에 온다
 MAX_ROOMS = int(os.environ.get("CALL_VOICE_MAX_ROOMS", "4"))             # 리턴제로 무료는 스트리밍 5줄까지(문서)
 ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC", "600"))
 OPENS_PER_HOUR = int(os.environ.get("CALL_VOICE_OPENS_PER_HOUR", "40"))
@@ -100,9 +102,9 @@ def tts_name(text):
     return hashlib.sha1(" ".join(text.split()).encode("utf-8")).hexdigest()[:12] + ".mp3"
 
 
-def synth(text):
-    """일레븐랩스 음성 합성 → mp3 바이트. 목소리 설정은 LLMOps 시연 영상의 값 그대로."""
-    req = urllib.request.Request(f"{ELEVEN_API}/v1/text-to-speech/{TTS_VOICE}?output_format=mp3_44100_128",
+def synth(text, voice=None, fmt="mp3_44100_128"):
+    """일레븐랩스 음성 합성 → 소리 바이트(fmt: mp3_44100_128 · pcm_16000 등). 목소리 설정은 LLMOps 시연 영상의 값 그대로."""
+    req = urllib.request.Request(f"{ELEVEN_API}/v1/text-to-speech/{voice or TTS_VOICE}?output_format={fmt}",
                                  json.dumps({"text": text, "model_id": TTS_MODEL, "voice_settings": {"stability": 0.45, "similarity_boost": 0.75, "style": 0.2}}).encode(),
                                  {"xi-api-key": stt.eleven_key(), "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -128,6 +130,23 @@ def tts_file(text, make=False):
             f.parent.mkdir(exist_ok=True)
             f.write_bytes(body)
     return f
+
+
+def citizen_file(text):
+    """「대본을 음성 길로」의 시민 역 소리: web/voice/citizen/<글의 sha1 앞 12자>.wav (16kHz 한 줄기). 서버는 만들지 않고 있는 파일만 준다(tts_lines.py --citizen)."""
+    return WEB / "voice" / "citizen" / tts_name(text).replace(".mp3", ".wav")
+
+
+def _line(h, text):
+    f = citizen_file(text)
+    if not text or not f.is_file():
+        return h.send_json({"error": "시민 음성 파일 없음"}, 404)
+    body = f.read_bytes()
+    h.send_response(200)
+    h.send_header("Content-Type", "audio/wav")
+    h.send_header("Content-Length", str(len(body)))
+    h.end_headers()
+    h.wfile.write(body)
 
 
 def _say(h, text):
@@ -157,6 +176,8 @@ def _api(h, body):
         return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
+    if p == "line":
+        return _line(h, q.get("text", "")[:500])
     try:
         b = json.loads(body.decode("utf-8")) if body and p in ("room", "ask", "fake") else {}
     except ValueError:

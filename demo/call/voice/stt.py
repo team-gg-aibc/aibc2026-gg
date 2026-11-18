@@ -198,7 +198,7 @@ class Whisper:
 ELEVEN_WS = os.environ.get("ELEVENLABS_WS_BASE", "wss://api.elevenlabs.io")
 ELEVEN_ENV = Path(os.environ.get("ELEVENLABS_ENV_FILE") or Path.home() / ".config" / "gg-team" / "elevenlabs.env")
 ELEVEN_STT_MODEL = os.environ.get("ELEVENLABS_STT_MODEL", "scribe_v2_realtime")      # 또는 scribe_v3_live
-ELEVEN_VAD_SEC = os.environ.get("ELEVENLABS_VAD_SILENCE_SECS", "")                   # 마디를 끊는 조용한 초. 비우면 일레븐랩스 기본값
+ELEVEN_VAD_SEC = os.environ.get("ELEVENLABS_VAD_SILENCE_SECS", "0.8")                # 마디를 끊는 조용한 초. 일레븐랩스 기본은 1.5초라 길다. 0.8은 합성 목소리로 잰 값(56번 12절) — 사람 말은 중간 쉼이 길어 마디가 갈릴 수 있다. 비우면 일레븐랩스 기본값
 used = {"stt_sec": 0.0, "stt_conn": 0, "tts_chars": 0, "tts_calls": 0}               # 일레븐랩스에 쓴 양(보고용): 보낸 소리의 초 · 연 줄 · 읽힌 글자 · 부른 횟수
 
 
