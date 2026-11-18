@@ -207,8 +207,8 @@ body:not(.ctl) .ask .q { font-size: 22px; line-height: 1.35; }
 .live.call.ring::before { background: var(--nf); }
 .live.call.over { opacity: .7; }
 @keyframes callblink { 50% { opacity: .25; } }
-.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: callblink 1.4s infinite; }
-.lines .ring button { animation: none; }
+.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: ringline 1.4s infinite; }
+@keyframes ringline { 50% { border-color: var(--line); } }      /* 테두리만 깜빡(64번 P13) */
 .range .undo { padding: 3px 10px; font-size: 12px; margin-left: 10px; }
 .range .foot .demo { margin-left: auto; color: var(--sub); font-size: 11px; }      /* 흐리게(투명도) 대신 보조 글자색: 대비 기준(4.5) 넘김 */
 
@@ -371,9 +371,13 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 .law .lab .draft { color: var(--text); }
 .law .wait2 { margin: 3px 0 0; color: var(--sub); font-size: 12px; font-variant-numeric: tabular-nums; }
 .law .say.open { display: block; -webkit-line-clamp: unset; flex: 1 1 auto; min-height: 0; overflow-y: auto; font-weight: 500; font-size: 12.5px; scrollbar-width: thin; }
+.law .cq, .law .lab, .law .from, .law .hint2, .law .more { flex: none; }      /* 답 칸의 줄은 줄어들지 않는다(넘치면 fitLaw가 답을 두 줄로) */
+.law .say.tight { -webkit-line-clamp: 2; }
+.law .more[hidden] { display: none; }
 .law .more { align-self: flex-start; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 11.5px; font-weight: 700; flex: none; }
 .lines .ring .no { display: block; margin-top: 2px; color: var(--sub); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 #side .sum .sub2 { color: var(--sub); font-weight: 400; font-size: 11px; }
 #side .sum dd.said { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 11.5px; letter-spacing: -.02em; }      /* Plex 폭: 한 줄에 더 들어가게(12 → 11.5px) */
 #side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 0; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
 #side .sum .badge { font-size: 10.5px; padding: 0 7px; }
+@media (prefers-reduced-motion: reduce) { .lines .ring { animation: none; } }
