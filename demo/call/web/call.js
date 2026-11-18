@@ -18,9 +18,11 @@ async function api(path, body) {
 }
 
 let DOC = null, SCRIPTS = {}, MODE = 'live', META = {}, S = null, V = null, seq = 0, runId = 0, pollT = 0;
+let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 이 화면에서 확인받은 통화. NEXTS = 지금 상태에서 고를 수 있는 상태
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
 const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || 'roadkill', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
-             typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'light' ? 'light' : 'dark' };
+             typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'light' ? 'light' : 'dark',
+             view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '' };      // view: 통화 | 상담 기록(?view=records&rec=R01)
 const tabs = {};
 function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게
   const key = `${section}|${head}|${col}`;
@@ -32,6 +34,34 @@ function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없�
 }
 const SIT = () => K('상황별 안내', '상황');
 const scenes = () => ((DOC.sections['통화 장면'] || {}).tables || [{ rows: [] }])[0].rows.map(([id, name, desc]) => ({ id, name, desc }));
+
+// ---- 상담 기록: 처리 상태 다섯 칸과 고를 수 있는 차례(서버 NEXT와 같은 표). 넘길 곳 · 조례는 서버가 표에서 채운 값만 보인다
+const ST = ['filed', 'sent', 'doing', 'closed', 'recall'];      // 놓는 차례(마지막 칸이 넓다)
+const stName = (s) => K('접수 카드')[{ filed: '접수됨', sent: '넘김', doing: '처리 중', recall: '현장 못 찾음', closed: '끝남' }[s]];
+const stb = (s) => `<span class="stb st-${s}">${esc(stName(s))}</span>`;
+const whyOff = (t, c) => K('상담 기록')[c === 'closed' ? '막힘 끝남' : { filed: '막힘 되돌림', sent: '막힘 처리 시작', doing: '막힘 넘기기 전', recall: '막힘 현장 전', closed: '막힘 넘기기 전' }[t]];
+function radio5(name, cur, ok, why) {      // 선택지를 모두 보이고, 막힌 칸은 흐리게 + 까닭
+  return `<div class="opts5">${ST.map((id) => { const can = ok(id), w = !can && cur !== id ? why(id) : '';
+    return `<label class="${can ? '' : 'off'}${cur === id ? ' on' : ''}${id === 'recall' ? ' wide' : ''}"><input type="radio" name="${name}" value="${id}"${cur === id ? ' checked' : ''}${can ? '' : ' disabled'}>${esc(stName(id))}${w ? `<small>${esc(w)}</small>` : ''}</label>`; }).join('')}</div>`;
+}
+function ago(r) {
+  const B = K('상담 기록'); if (r.ago) return r.ago;
+  const m = Math.floor((Date.now() - r.at) / 60000);
+  return m < 1 ? B['방금'] : m < 60 ? fill(B['분 전'], { 분: m }) : fill(B['시간 전'], { 시간: Math.floor(m / 60) });
+}
+const metres = (a, b) => Math.hypot((a[0] - b[0]) * 88200, (a[1] - b[1]) * 111000);
+const recNo = (r) => RECS.length - RECS.indexOf(r);      // 번호 = 들어온 차례(오래된 것이 1)
+const recShown = () => RECS.filter((r) => (ui.recSt === 'all' || r.status === ui.recSt) && (!ui.recTo || r.to === ui.recTo));
+function nearRecs() {      // 좁힌 자리 둘레의 지난 기록(이 통화 것은 빼고 가까운 셋). 위치가 정해진 뒤에만
+  if (!V || !(V.done || V.confirmed) || !V.center) return [];
+  const at = (V.pin && V.pin.at) || V.center, R = Number(K('상담 기록')['둘레 거리']) || 400;
+  return RECS.filter((r) => r.id !== S.id && r.point).map((r) => ({ r, d: metres(r.point, at) })).filter((x) => x.d <= R).sort((a, b) => a.d - b.d).slice(0, 3);
+}
+async function loadRecords() { try { const d = await api('/api/records'); RECS = d.records; NEXTS = d.next; } catch { /* 기록 없이도 통화는 된다 */ } }
+async function recPost(body) {      // 기록 쌓기 · 상태 바꾸기 · 처음 상태로. 받은 목록으로 갈아 끼운다
+  try { const d = await api('/api/records', body); RECS = d.records; NEXTS = d.next; ui.recErr = ''; renderRecList(); return true; } catch { ui.recErr = K('상담 기록')['저장 실패']; return false; }
+}
+function openRec(id) { ui.view = 'records'; ui.rec = id; lastFit = ''; renderAll(); }
 
 // ---- 통화 상태
 function resetCall() {
@@ -48,7 +78,7 @@ async function send(body, hold) {   // 서버에 한 번 보내고 받은 상태
     if (hold) await hold(d.view);
     if (my !== seq) return null;
     S = d.state; V = d.view;
-    if (V.confirmed && !ui.status) ui.status = 'filed';       // 위치를 확인받으면 접수됨
+    if (V.confirmed && !ui.status) { ui.status = 'filed'; recPost({ op: 'save', state: S, status: 'filed' }).then(() => { renderTop(); renderSide(); }); }      // 위치를 확인받으면 접수됨 → 상담 기록에 쌓인다
     if ((V.confirmed || (V.question && V.question.id === 'handoff')) && ui.t0 && !ui.t1) ui.t1 = Date.now();      // 통화가 끝난 때(사람 시험의 걸린 시간)
     if (!V.confirmed) ui.status = null;
     return V;
@@ -190,7 +220,7 @@ async function play() {
     await line('상담사', V.summary.to ? fill(T['맺음말'], { '넘길 곳': V.summary.to.replace(/ · /g, ', ') }) : T['맺음말 넘길 곳 모름']);
     ui.ended = true;
     await wait(900);
-    if (alive()) { ui.status = 'sent'; renderSide(); renderTop(); }      // 대본에서는 상담사가 「담당 부서로 넘김」을 고른 것으로 보인다
+    if (alive()) { ui.status = 'sent'; renderSide(); renderTop(); recPost({ op: 'save', state: S, status: 'sent' }).then(() => { renderTop(); renderSide(); }); }      // 대본에서는 상담사가 「담당 부서로 넘김」을 고른 것으로 보인다
   }
   stop();
 }
@@ -199,6 +229,10 @@ async function play() {
 function renderTop() {
   const T = K('맨 위 띠'), step = V ? (ui.status === 'sent' ? 5 : V.step) : 1;
   $('t-title').textContent = T['화면 이름']; $('t-who').textContent = T['쓰는 사람'];
+  const B = K('상담 기록');
+  $('t-view').setAttribute('aria-label', B['화면 고르기']);
+  $('t-view').innerHTML = [['call', '통화'], ['records', '기록']].map(([id, k]) => `<button type="button" data-view="${id}" aria-pressed="${ui.view === id}">${esc(B[k])}${id === 'records' && RECS.length ? `<b>${RECS.length}</b>` : ''}</button>`).join('');
+  document.body.classList.toggle('view-records', ui.view === 'records');
   $('t-steps').innerHTML = [1, 2, 3, 4].map((n) => `<li class="${n < step ? 'past' : n === step ? 'now' : ''}"><b>${n}</b>${esc(T['단계 ' + n])}</li>`).join('');
   if (CTL()) { $('t-mode').textContent = T[{ saved: '저장된 답', code: '코드만', live: '실제 호출' }[MODE]]; $('t-mode').className = 'live ' + MODE; } else callStatus();
   $('t-scene').setAttribute('aria-label', T['장면 고르기']);
@@ -283,7 +317,18 @@ function engineLine(e) {
   const M = K('일의 종류와 갈림');
   return e.how === 'saved' ? fill(M['미리 받은 답'], { 초: e.sec }) : fill(M['지금 만든 답'], { 초: e.sec });
 }
+function nearBox() {      // 접수 카드 안 「이 자리 둘레 지난 기록」: 그때 넘긴 위치와 처리 상태. 누르면 상담 기록 화면에서 연다
+  const near = nearRecs();
+  if (!V || !(V.done || V.confirmed)) return '';
+  const B = K('상담 기록'), U = K('접수 카드'), ex = near.some((x) => x.r.sample);
+  return `<div class="box near"><div class="t">${esc(U['둘레 기록 제목'])}${ex ? ` <em class="ex">${esc(B['예시 표시'])}</em>` : ''}</div>`
+    + (near.length ? '' : `<p class="r">${esc(fill(U['둘레 기록 없음'], { 거리: Number(B['둘레 거리']) || 400 }))}</p>`)
+    + near.map(({ r, d }) => `<button type="button" data-rec="${esc(r.id)}" title="${esc(U['둘레 기록 열기'])}"><span class="nh">${esc(ago(r))} · ${esc(r.matter)} ${stb(r.status)}</span>`
+      + `<span class="ng"><b>${esc(U['그때 넘긴 위치'])}</b>${esc(r.go)} (${esc(r.range || '')})</span><span class="nd">${esc(fill(U['여기서 거리'], { 거리: Math.round(d / 10) * 10 }))} · ${esc(r.to)}</span></button>`).join('')
+    + (ex ? `<p class="exnote">${esc(B['예시 꼬리'])}</p>` : '') + '</div>';
+}
 function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수한 담당자 · 일 · 위치 → 처리할 담당 부서 → 처리 진행 상태 → (6종 안이면) 추천 답
+  if (ui.view === 'records') return renderRecCard();
   const M = K('일의 종류와 갈림'), U = K('접수 카드'), r = V && V.route, e = V && V.engine && (ui.holdAns ? { status: 'running', citations: [] } : V.engine), s = (V && V.summary) || {}, box = (V && V.answer_box) || {};
   const none = `<dd class="none">${esc(U['미정'])}</dd>`, dd = (v, extra = '') => (v ? `<dd>${esc(v)}${extra}</dd>` : none);
   const sc = V && V.matter.scope, scLabel = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음' }[sc];
@@ -309,11 +354,12 @@ function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수�
   if (r && r.scope_why) h += `<p class="n">${esc(r.scope_why)}</p>`;
   if (r && r.others.length > 1) h += `<details class="same" open><summary>${esc(M['다른 자리 제목'])}</summary><table>${r.others.map((o) => `<tr class="${o.here ? 'here' : ''}"><td>${esc(o.place)}${o.here ? ` <span class="badge in">${esc(M['지금 자리'])}</span>` : ''}</td><td>${esc(o.to)}${o.basis === '확인' ? '' : ` <span class="badge guess">${esc(M['추측'])}</span>`}</td></tr>`).join('')}</table></details>`;
   h += '</div>';
-  // 처리 진행 상태: 선택지를 모두 보인다. 확인받기 전에는 고를 수 없고, 뒤의 둘은 담당 부서가 바꾼다
+  h += nearBox();
+  // 처리 진행 상태: 다섯 칸을 모두 보인다. 확인받기 전에는 고를 수 없고, 상담사는 접수됨 · 넘김만 고른다(나머지는 담당 부서가 알려 오면 상담 기록 화면에서)
   const can = !!(V && V.confirmed);
-  h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend><div class="opts4">${[['filed', '접수됨', can], ['sent', '넘김', can], ['doing', '처리 중', false], ['closed', '끝남', false]].map(([id, name, ok]) =>
-    `<label class="${ok ? '' : 'off'}${ui.status === id ? ' on' : ''}"><input type="radio" name="status" value="${id}"${ui.status === id ? ' checked' : ''}${ok ? '' : ' disabled'}>${esc(U[name])}</label>`).join('')}</div>`
-    + `<p class="hint">${esc(can ? `${U['상태 막힘 부서']} ${U['상태 안내']}` : U['상태 막힘 통화'])}</p></fieldset>`;
+  h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend>`
+    + radio5('status', ui.status, (id) => can && (id === ui.status || (['filed', 'sent'].includes(id) && (NEXTS[ui.status] || []).includes(id))), (id) => (!can ? '' : ['doing', 'recall', 'closed'].includes(id) ? U['상태 막힘 부서'] : whyOff(id, ui.status)))
+    + (can ? `<p class="hint">${esc(U['상태 안내'])}</p>` : `<p class="exnote">${esc(U['상태 막힘 통화'])}</p>`) + '</fieldset>';
   // 엔진: 6종 안이면 추천 답을 두 칸으로(상담사가 안내할 말 / 부서에 넘길 근거), 6종 밖이면 물러났는지 한 줄
   const asked = e && e.ask ? `<p class="askq"><b>${esc(M['엔진 물음'])}</b>${esc(e.ask)}</p>` : '';
   const h0 = h.length;
@@ -343,7 +389,40 @@ function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수�
     + `<span role="status">${esc(ui.copied)}</span></div>`;
   const el = $('side'), top = el.scrollTop; el.innerHTML = h; el.scrollTop = top;
 }
-function renderAll() { renderTop(); renderTalk(); renderAsk(); renderRange(); renderSide(); renderMap(); }
+// ---- 상담 기록 화면: 왼쪽 목록(상태 칩 · 넘긴 곳 고르기) · 지도 번호 점 · 오른쪽 고른 기록(그때의 접수 카드 + 처리 상태 + 처리 기록)
+function renderRecList() {
+  const B = K('상담 기록'), list = recShown(), n = (s) => RECS.filter((r) => s === 'all' || r.status === s).length;
+  let h = `<header><h2 id="l-title"><span class="big">${RECS.length}</span>${esc(B['제목'])}</h2><p class="lead">${esc(B['안내'])}</p>`
+    + `<div class="chips" role="group">${['all', 'filed', 'sent', 'doing', 'recall', 'closed'].map((s) => `<button type="button" data-rst="${s}" class="${s === 'all' ? 'all' : 'st-' + s}" aria-pressed="${ui.recSt === s}">${esc(s === 'all' ? B['모두'] : stName(s))} <b>${n(s)}</b></button>`).join('')}</div>`
+    + `<select id="rec-to" aria-label="${esc(B['넘긴 곳 모두'])}"><option value="">${esc(B['넘긴 곳 모두'])}</option>${[...new Set(RECS.map((r) => r.to))].sort().map((t) => `<option${t === ui.recTo ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></header>`;
+  h += `<ol class="recs">${list.length ? list.map((r) => `<li><button type="button" data-rec="${esc(r.id)}" class="${r.id === ui.rec ? 'on' : ''}"><span class="no">${recNo(r)}</span><span class="m">${esc(r.matter)}</span>${stb(r.status)}`
+    + `<span class="g">${r.sample ? '' : `<span class="new">${esc(B['새 기록'])}</span> · `}${esc(ago(r))} · ${esc(r.go)}</span></button></li>`).join('') : `<li class="none">${esc(B['없음'])}</li>`}</ol>`;
+  h += `<footer><div class="lgd">${['filed', 'sent', 'doing', 'recall', 'closed'].map((s) => `<span class="st-${s}"><i></i>${esc(stName(s))}</span>`).join('')}</div>`
+    + `<p class="exnote"><em class="ex">${esc(B['예시 표시'])}</em> ${esc(B['예시 꼬리'])}</p>`
+    + `<div class="row"><span class="exnote">${esc(ui.recErr || B['지도 범례'])}</span><button type="button" class="outline" data-act="rec-reset" title="${esc(B['되돌리기 설명'])}">${esc(B['되돌리기'])}</button></div></footer>`;
+  $('reclist').innerHTML = h;
+}
+function renderRecCard() {
+  const B = K('상담 기록'), U = K('접수 카드'), M = K('일의 종류와 갈림'), r = RECS.find((x) => x.id === ui.rec);
+  if (!r) { $('side').innerHTML = `<div class="chd"><h2>${esc(B['제목'])}</h2></div><p class="empty">${esc(B['고르기 안내'])}</p>`; return; }
+  const sc = { in: '6종 안', out: '6종 밖', wait: '6종 확인 중', nocite: '6종 근거 없음' }[r.scope];
+  const law = r.law ? fill(M['적용 조례'], { 장소: r.place, 조례: r.law }) + (r.sample ? ` ${B['표 기준']}` : '') : r.scope_why;
+  let h = `<div class="chd"><h2>${esc(fill(B['카드 제목'], { 번호: recNo(r) }))}</h2>${r.sample ? `<em class="ex">${esc(B['예시 표시'])}</em>` : `<span class="stb st-sent">${esc(B['새 기록'])}</span>`}</div><dl class="sum">`
+    + `<dt>${esc(B['받은 때'])}</dt><dd>${esc(ago(r))} · ${esc(U['받은 곳 값'])}</dd>`
+    + `<dt>${esc(U['일'])}</dt><dd>${esc(r.matter)}${sc ? ` <span class="badge ${r.scope === 'in' ? 'in' : r.scope === 'out' ? 'out' : 'going'}">${esc(M[sc])}</span>` : ''}</dd>`
+    + (law ? `<dt>${esc(U['조례 줄'])}</dt><dd>${esc(law)}</dd>` : '')
+    + `<dt class="go">${esc(U['찾아가는 말'])}</dt><dd class="go">${esc(r.go)}</dd>`
+    + (r.bunji ? `<dt class="go">${esc(U['번지수'])}</dt><dd class="go">${esc(r.bunji.text)}${r.bunji.road ? `<span class="rd">${esc(r.bunji.road)}</span>` : ''}</dd>` : '')
+    + `<dt>${esc(U['범위'])}</dt><dd>${esc(r.range || '')}</dd><dt>${esc(B['장소'])}</dt><dd>${esc(r.place)}</dd></dl>`;
+  h += `<div class="box to set"><div class="t">${esc(U['담당 부서'])}</div><p class="v">${esc(r.to)}</p><p class="n"><span class="badge ${r.basis === '확인' ? 'sure' : 'guess'}">${esc(M[r.basis === '확인' ? '확인' : '추측'])}</span></p></div>`;
+  if (r.status === 'recall') h += `<div class="box recall"><div class="t">${esc(B['다시 전화 제목'])}</div><p>${esc(fill(B['다시 전화 글'], { 범위: r.range || '' }))}</p></div>`;
+  const next = NEXTS[r.status] || [];
+  h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend>${radio5('rstatus', r.status, (id) => id === r.status || next.includes(id), (id) => whyOff(id, r.status))}<p class="exnote">${esc(B['상태 안내'])}</p></fieldset>`;
+  h += `<div class="box"><div class="t">${esc(B['처리 기록'])}</div><ol class="rlog">${r.log.map((x) => `<li>${stb(x.status)}${x.at ? `<small>${esc(ago({ at: x.at }))}</small>` : ''}</li>`).join('')}</ol></div>`
+    + (ui.recErr ? `<p class="exnote">${esc(ui.recErr)}</p>` : '');
+  $('side').innerHTML = h;
+}
+function renderAll() { renderTop(); renderTalk(); renderAsk(); renderRange(); renderSide(); renderRecList(); renderMap(); }
 
 // ---- 지도 (MapLibre + OpenFreeMap positron 바탕에 톤별로 다시 칠함)
 const STYLE = 'https://tiles.openfreemap.org/styles/positron', CAM = { pitch: 46, bearing: -10 }, FILL = 0.78;
@@ -359,7 +438,7 @@ let map = null, mapOk = false, lastFit = '';
 const markers = [];
 const shown = (el) => (el && getComputedStyle(el).display !== 'none' ? el.getBoundingClientRect() : null);
 function freeRect() {   // 칸에 가리지 않은 지도 자리
-  const L = shown($('talk')), R = shown($('side')), A = shown($('ask')), B = shown($('range'));
+  const L = shown($('talk')) || shown($('reclist')), R = shown($('side')), A = shown($('ask')), B = shown($('range'));
   const l = (L ? L.right : 0) + 26, r = (R ? R.left : innerWidth) - 26, t = (A ? A.bottom : 56) + 34, b = (B ? B.top : innerHeight) - 30;
   return { l, r, t, b, w: Math.max(r - l, 120), h: Math.max(b - t, 120), cx: (l + r) / 2, cy: (t + b) / 2 };
 }
@@ -442,8 +521,27 @@ function initMap() {
 }
 function mapFailed() { $('map-failed').hidden = false; $('map-failed').textContent = K('지도')['지도 실패']; }
 const circle = ([lon, lat], m) => Array.from({ length: 49 }, (_, i) => { const a = (i / 48) * 2 * Math.PI; return [lon + (m / 88200) * Math.cos(a), lat + (m / 111000) * Math.sin(a)]; });
+function renderRecMap(jump) {      // 기록 화면: 고른 조건의 기록마다 번호 점(상태색 + 목록과 같은 번호), 고른 기록은 그때 넘긴 범위를 점선 원으로
+  const list = recShown(), sel = RECS.find((r) => r.id === ui.rec), ringM = sel && sel.range_m ? (sel.range_kind === 'length' ? sel.range_m / 2 : sel.range_m) : 0;
+  map.getSource('own-cloud').setData({ type: 'FeatureCollection', features: [] });
+  map.getSource('own-ring').setData(sel && ringM > 60 ? { type: 'Feature', geometry: { type: 'LineString', coordinates: circle(sel.point, ringM) } } : { type: 'FeatureCollection', features: [] });
+  while (markers.length) markers.pop().remove();
+  for (const r of list) {
+    const el = document.createElement('div');
+    el.className = `rdot st-${r.status}${r === sel ? ' on' : ''}`; el.textContent = recNo(r); el.dataset.rec = r.id; el.title = `${ago(r)} · ${r.matter} · ${stName(r.status)}`;
+    markers.push(new maplibregl.Marker({ element: el }).setLngLat(r.point).addTo(map));
+  }
+  if (sel) { const lab = document.createElement('div'); lab.className = 'rlab'; lab.textContent = sel.go; markers.push(new maplibregl.Marker({ element: lab, anchor: 'bottom', offset: [0, -20] }).setLngLat(sel.point).addTo(map)); }
+  const key = JSON.stringify(['rec', ui.rec, ui.recSt, ui.recTo, list.length, innerWidth, innerHeight]);
+  if (key === lastFit) return;
+  lastFit = key;
+  const pts = sel ? circle(sel.point, Math.max(150, Math.min(ringM, 800))) : list.length >= 2 ? list.map((r) => r.point) : list.length ? circle(list[0].point, 300) : META.seoul;
+  const cam = fitPoints(pts, freeRect(), sel ? 16 : 15);
+  if (jump) map.jumpTo(cam); else map.flyTo({ ...cam, duration: 1200 / Math.min(SPEED, 3), essential: true });
+}
 function renderMap(jump) {
   if (!mapOk) return;
+  if (ui.view === 'records') return renderRecMap(jump);
   const heat = (V && V.heat) || { pts: [], cell: 20 }, pts = heat.pts;
   map.getSource('own-cloud').setData({ type: 'FeatureCollection', features: pts.map(([x, y, w]) => ({ type: 'Feature', properties: { w }, geometry: { type: 'Point', coordinates: [x, y] } })) });
   const px = (z) => Math.max(3, (heat.cell * 2.2) * (2 ** z) / 124100);      // 점 하나의 폭(m)을 그 확대에서의 화면 픽셀로(서울 위도). 이웃 점과 겹쳐 이어지게 넉넉히
@@ -464,6 +562,9 @@ function renderMap(jump) {
     const pin = document.createElement('div'); pin.className = 'mpin'; put(pin, at);
     const lab = document.createElement('div'); lab.className = 'pinlab'; lab.textContent = (V.pin && V.pin.label) || K('지도')['정해진 자리']; put(lab, at, { anchor: 'top', offset: [0, 18] });
   }
+  for (const { r } of nearRecs()) {      // 둘레의 지난 기록: 속 빈 점(번호 = 상담 기록의 번호). 누르면 기록 화면에서 연다
+    const el = document.createElement('div'); el.className = 'rk'; el.textContent = recNo(r); el.dataset.rec = r.id; el.title = `${ago(r)} · ${r.matter} · ${stName(r.status)}`; put(el, r.point);
+  }
   const strong = pts.filter((p) => p[2] >= 0.12), fitPts = (strong.length >= 2 ? strong : pts).map((p) => [p[0], p[1]]);
   const use = fitPts.length >= 2 ? fitPts : fitPts.length ? circle(fitPts[0], 60) : META.seoul;
   const key = JSON.stringify([use.length, use[0], use[use.length - 1], innerWidth, innerHeight, !!(V && V.done)]);
@@ -476,9 +577,14 @@ function setTone(t) { ui.tone = t; document.body.dataset.tone = t; renderTop(); 
 
 // ---- 누르는 것
 document.addEventListener('click', async (ev) => {
+  const rk = ev.target.closest('[data-rec]');      // 기록 하나(목록 · 지도 점 · 통화 카드의 둘레 기록) → 상담 기록 화면에서 연다
+  if (rk) { openRec(rk.dataset.rec); return; }
   const b = ev.target.closest('button'); if (!b || b.disabled) return;
   const d = b.dataset;
-  if (d.scene) { ui.scene = d.scene; ui.input = SCRIPTS[d.scene] ? 'script' : 'type'; resetCall(); }
+  if (d.view) { if (ui.view !== d.view) { ui.view = d.view; lastFit = ''; if (d.view === 'records') await loadRecords(); renderAll(); } }
+  else if (d.rst) { ui.recSt = d.rst; renderRecList(); renderMap(); }
+  else if (d.act === 'rec-reset') { if (await recPost({ op: 'reset' })) ui.rec = null; lastFit = ''; renderAll(); }
+  else if (d.scene) { ui.scene = d.scene; ui.input = SCRIPTS[d.scene] ? 'script' : 'type'; resetCall(); }
   else if (d.tone) setTone(d.tone);
   else if (d.voice) { ui.voice = !ui.voice; renderTop(); }
   else if (d.input) { if (ui.input !== d.input) { ui.input = d.input; if (ui.playing) resetCall(); renderTalk(); renderAsk(); } }
@@ -508,7 +614,11 @@ document.addEventListener('click', async (ev) => {
   }
 });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'k-text' && !ev.isComposing) { ev.preventDefault(); document.querySelector('[data-act="send"]').click(); } });
-document.addEventListener('change', (ev) => { if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); } });
+document.addEventListener('change', async (ev) => {
+  if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); await recPost({ op: 'save', state: S, status: ui.status }); renderTop(); renderSide(); }
+  else if (ev.target.name === 'rstatus' && ui.rec) { await recPost({ op: 'status', id: ui.rec, status: ev.target.value }); renderTop(); renderRecList(); renderRecCard(); renderMap(); }
+  else if (ev.target.id === 'rec-to') { ui.recTo = ev.target.value; renderRecList(); renderMap(); }
+});
 
 (async function main() {
   try {
@@ -519,7 +629,8 @@ document.addEventListener('change', (ev) => { if (ev.target.name === 'status') {
   document.body.dataset.tone = ui.tone;
   if (TRIAL) { ui.scene = 'free'; document.body.classList.add('ctl'); }      // 사람 시험(?trial=번호): 열자마자 직접 통화(글로 넣기) · 시험 기록 단추
   if (!SCRIPTS[ui.scene]) ui.input = 'type';
+  await loadRecords();
   resetCall(); initMap();
-  window.CALL = { ui, get S() { return S; }, get V() { return V; }, get map() { return map; }, play, resetCall, freeRect };   // 점검용
+  window.CALL = { ui, get S() { return S; }, get V() { return V; }, get map() { return map; }, get RECS() { return RECS; }, play, resetCall, freeRect, openRec };   // 점검용
   if (P.get('auto') && SCRIPTS[ui.scene]) setTimeout(play, CTL() ? 0 : 1800);      // 깔끔한 화면에서는 전화가 걸려 온 것처럼 잠깐 울린 뒤 받는다
 })();

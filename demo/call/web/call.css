@@ -211,3 +211,62 @@ body:not(.ctl) .ask .q { font-size: 22px; line-height: 1.35; }
 
 /* 깔끔한 화면에서는 좁은 창에서도 통화 상태(통화 중 · 받아 적기 연결됨)를 보인다 */
 body:not(.ctl) .top .live.call { display: inline-flex !important; }
+
+/* ---- 상담 기록: 통화 화면과 같은 지도 · 같은 칸 자리. 맨 위 띠의 「통화 | 상담 기록」으로 오간다(3판 담당자 화면의 목록 · 번호 점 · 카드 꼴).
+   상태색은 늘 글자와 함께 쓴다 */
+body[data-tone="light"] { --sent: #1d5fd0; } body[data-tone="dark"] { --sent: #7cb3ff; }
+.st-filed { --k: var(--sub); } .st-sent { --k: var(--sent); } .st-doing { --k: var(--making); } .st-recall { --k: var(--fail); } .st-closed { --k: var(--ok); }
+.stb { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 99px; border: 1px solid var(--k); color: var(--ink); font-size: 11.5px; font-weight: 700; white-space: nowrap; line-height: 1.7; }
+.stb::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k); flex: none; }
+.ex { display: inline-flex; align-items: center; padding: 0 8px; border-radius: 99px; border: 1px dashed var(--nf); color: var(--ink); font-size: 11px; font-weight: 700; white-space: nowrap; line-height: 1.7; }
+.exnote { margin: 6px 0 0; color: var(--sub); font-size: 11.5px; }
+body.view-records #talk, body.view-records #ask, body.view-records #range, body.view-records #t-steps, body.view-records #t-scene, body.view-records #t-mode { display: none !important; }
+body:not(.view-records) #reclist { display: none; }
+.top #t-view button b { margin-left: 4px; font-weight: 800; }
+/* 왼쪽: 기록 목록 */
+.reclist { position: fixed; top: 56px; left: 10px; bottom: 10px; width: 330px; z-index: 3; display: flex; flex-direction: column; overflow: hidden; }
+.reclist header { padding: 11px 13px 9px; border-bottom: 1px solid var(--line); }
+.reclist h2 { margin: 0; font-size: 17px; color: var(--ink); display: flex; align-items: baseline; gap: 6px; } .reclist h2 .big { font-size: 24px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.chips button { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12px; font-weight: 600; }
+.chips button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k, transparent); }
+.chips button.all::before { display: none; }
+.chips button b { color: var(--ink); } .chips button[aria-pressed="true"] { border-color: var(--ink); background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.reclist select { margin-top: 8px; width: 100%; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 12.5px; }
+.recs { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; flex: 1; }
+.recs button { width: 100%; text-align: left; display: grid; grid-template-columns: 28px 1fr auto; gap: 1px 8px; padding: 7px 12px; border: 0; border-left: 3px solid transparent; background: transparent; color: var(--text); }
+.recs button:hover { background: var(--soft); } .recs button.on { background: var(--accent-soft); border-left-color: var(--accent); }
+.recs .no { grid-row: span 2; color: var(--sub); font-weight: 800; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.recs .m { color: var(--ink); font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recs .g { grid-column: 2 / 4; color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recs .new { color: var(--accent); font-weight: 800; }
+.recs .none { padding: 14px; color: var(--sub); font-size: 12.5px; }
+.reclist footer { padding: 8px 12px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.reclist footer .lgd { display: flex; flex-wrap: wrap; gap: 3px 9px; color: var(--sub); font-size: 11.5px; } .reclist footer .lgd span { display: inline-flex; align-items: center; gap: 4px; }
+.reclist footer .lgd i { width: 9px; height: 9px; border-radius: 50%; background: var(--k); }
+.reclist footer .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.reclist footer .outline { padding: 4px 10px; font-size: 12px; }
+/* 오른쪽: 고른 기록 · 통화 카드의 둘레 기록 */
+.box.recall { border: 1.5px solid var(--fail); background: transparent; }
+.box.recall p { margin: 3px 0 0; color: var(--ink); font-size: 12.5px; }
+.rlog { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px 4px; align-items: center; font-size: 12px; color: var(--text); }
+.rlog li { display: inline-flex; align-items: center; gap: 4px; } .rlog li + li::before { content: "→"; color: var(--sub); margin-right: 2px; }
+.rlog small { color: var(--sub); font-size: 11px; }
+.radio .opts5 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.radio .opts5 label { flex-wrap: wrap; row-gap: 0; } .radio .opts5 label.wide { grid-column: 1 / 3; }
+.radio .opts5 label small { flex-basis: 100%; padding-left: 21px; color: var(--sub); font-size: 11px; font-weight: 500; line-height: 1.4; }
+.radio .opts5 label.off { opacity: .62; }
+.box.near { background: transparent; }
+.box.near .t .ex { margin-left: 6px; }
+.box.near button { display: grid; width: 100%; text-align: left; gap: 1px; margin-top: 6px; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--soft); color: var(--text); font-size: 12px; }
+.box.near button:hover { border-color: var(--accent); }
+.box.near .nh { display: flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 700; flex-wrap: wrap; }
+.box.near .ng { color: var(--text); } .box.near .ng b { color: var(--sub); font-weight: 600; margin-right: 4px; }
+.box.near .nd { color: var(--sub); font-size: 11px; }
+.box.near .r { color: var(--sub); }
+/* 지도 위 기록 점: 번호 + 상태색(목록 · 범례에 글자로도). 통화 화면에서는 속 빈 회색 점 */
+.rdot { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: var(--k); color: var(--panel-solid); border: 2px solid var(--panel-solid); font-size: 11px; font-weight: 800; box-shadow: var(--shadow); cursor: pointer; }
+.rdot.on { min-width: 30px; height: 30px; font-size: 13px; box-shadow: 0 0 0 3px var(--k), var(--shadow); }
+.rlab { padding: 2px 9px; border-radius: 7px; background: var(--ink); color: var(--panel-solid); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: var(--shadow); }
+.rk { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px dashed var(--sub); background: var(--panel); color: var(--ink); font-size: 10.5px; font-weight: 800; cursor: pointer; }
+.ex { font-style: normal; }

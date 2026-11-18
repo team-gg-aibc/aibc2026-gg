@@ -36,6 +36,7 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
 | `CALL_ALIAS_FILE` | 상담사가 저장한 별명 파일 | `data/aliases_local.json`(git 무시) |
 | `CALL_TRIAL_FILE` | 사람이 해 보는 시험의 기록 파일 | `data/trials_local.jsonl`(git 무시) |
+| `CALL_RECORD_FILE` | 이 화면에서 쌓은 상담 기록 · 바꾼 처리 상태 | `data/records_local.json`(git 무시) |
 
 ## 장면 주소
 
@@ -46,9 +47,18 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `/?auto=roadkill` | 운전하다 본 고양이 사체 → 자동차전용도로 구간 (강변북로, 조례 6종 밖) |
 | `/?auto=stray` · `vendor` · `pothole` | 화면 장면 단추에는 없는 대본(공원 유기견 · 공원 노점 · 길 파손) |
 
+- `/?view=records` 상담 기록 화면, `&rec=R09` 그 기록을 열어 둔다.
 - `auto`를 주면 열자마자 대본을 재생한다. 그 밖의 주소 옵션: `?speed=3` 빠르게 · `?stop=<질문 이름>` 그 질문에서 멈춤 · `?tone=light` 밝은 화면.
 - 「직접 통화」(키보드 `0`)에서는 서울의 아무 곳이나 글로 넣어 볼 수 있다. 예: 「마포구인데요, 스타벅스 앞 가로등이 꺼져 있어요」 → 「합정역 근처예요」.
 - `?voice=1`(또는 「목소리」 단추)은 영상용이다. `web/voice/<장면>-<번호>.mp3`가 있으면 틀고, 없으면 소리 없이 글 길이만큼 기다린다. 음성 파일은 레포에 없다. 화면은 파일을 틀기만 하고 모델을 부르지 않는다. 브라우저 받아쓰기 · 읽어 주기는 쓰지 않는다.
+
+## 상담 기록
+
+맨 위 띠의 「통화 | 상담 기록」으로 오간다. 같은 지도 위에 왼쪽 기록 목록(상태 칩 · 넘긴 곳 고르기) · 지도의 번호 점 · 오른쪽 고른 기록(그때 넘긴 접수 카드 + 처리 상태 + 처리 기록)이 뜬다.
+
+- 위치를 확인받은 통화가 기록에 쌓인다(접수됨). 통화 화면에서는 접수됨 · 담당 부서로 넘김만 고르고, 처리 중 · 현장에서 못 찾음 · 다시 전화 · 끝남은 기록 화면에서 바꾼다. 되돌리기는 없고 막힌 칸에는 까닭이 붙는다(차례는 `server.py`의 `NEXT`).
+- 통화 중 위치가 정해지면 접수 카드 안에 「이 자리 둘레 지난 기록」(400m 안 가까운 셋)이 뜨고, 지도에 속 빈 번호 점이 찍힌다. 누르면 기록 화면에서 연다.
+- 지난 기록 14건은 팀이 만든 예시다(`data/records_sample.json`, 화면에 「예시 자료」). 넘길 곳 · 확인/추측 · 조례 6종 안팎 · 번지수는 서버가 `routes.json`과 주소 표에서 채운다. 「처음 상태로 되돌리기」는 이 화면에서 쌓은 것과 바꾼 상태를 거둔다.
 
 ## 점검
 

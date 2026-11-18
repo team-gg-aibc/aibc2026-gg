@@ -1238,6 +1238,88 @@ def save_trial(b):
     return {"ok": True, "trial": trial}, 200
 
 
+# ---- 상담 기록: 예시 기록(data/records_sample.json) + 이 화면에서 확인받은 통화(로컬 파일, git 무시). 넘길 곳 · 조례 안팎 · 번지수는 표와 주소 표에서만 채운다
+STATUSES = ["filed", "sent", "doing", "recall", "closed"]       # 접수됨 · 담당 부서로 넘김 · 처리 중 · 현장에서 못 찾음 · 다시 전화 · 끝남
+NEXT = {"filed": ["sent"], "sent": ["doing", "recall", "closed"], "doing": ["recall", "closed"], "recall": ["sent", "doing", "closed"], "closed": []}      # 지금 상태에서 고를 수 있는 것(되돌리기는 없다)
+_PATH = {"filed": ["filed"], "sent": ["filed", "sent"], "doing": ["filed", "sent", "doing"], "recall": ["filed", "sent", "doing", "recall"], "closed": ["filed", "sent", "doing", "closed"]}
+RECORD_FILE = Path(os.environ.get("CALL_RECORD_FILE") or HERE / "data" / "records_local.json")
+_samples = []
+
+
+def _sample_records():
+    if not _samples:
+        for r in json.loads((HERE / "data" / "records_sample.json").read_text(encoding="utf-8"))["records"]:
+            x, y = gaz.xy(*r["at"])
+            rt = route_of({"type": r["type"], "animal": r.get("animal"), "alive": r.get("alive")}, L.infer([{"t": "pt", "p": [float(x), float(y)], "r": 30.0}]))
+            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
+                             "bunji": bunji_of({"at": r["at"]}, r["range_m"] > BUNJI_FAR, rt["class"]), "point": r["at"], "range": size_text({"kind": r.get("kind", "radius"), "m": r["range_m"]}),
+                             "range_m": r["range_m"], "range_kind": r.get("kind", "radius"), "scope": rt["scope"], "law": rt["law"] if rt["scope"] == "in" else None, "scope_why": rt["scope_why"], "to": rt["hit"]["to"],
+                             "basis": rt["hit"]["basis"], "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": [{"status": s} for s in _PATH[r["status"]]]})
+    return _samples
+
+
+def _local():
+    try:
+        d = json.loads(RECORD_FILE.read_text(encoding="utf-8"))
+        return {"added": list(d.get("added") or []), "log": dict(d.get("log") or {})}
+    except (OSError, ValueError):
+        return {"added": [], "log": {}}
+
+
+def _write_local(d):
+    tmp = RECORD_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(RECORD_FILE)
+
+
+def records(d=None):
+    """새 기록(나중 것이 위) + 예시 기록. 상태는 처리 기록의 마지막 줄."""
+    d = d or _local()
+    out = [dict(r, log=list(r["log"]) + d["log"].get(r["id"], [])) for r in list(reversed(d["added"])) + _sample_records()]
+    for r in out:
+        r["status"] = r["log"][-1]["status"]
+    return out
+
+
+def record_of(st, view, old=None):
+    """확인받은 통화 → 기록 한 건. 화면이 보낸 값은 상태만 믿고 접수 카드를 다시 엮는다."""
+    s, rt, e = view["summary"], view["route"], view.get("engine") or {}
+    cites = [c["label"] for c in e.get("citations") or []] if view["matter"]["scope"] == "in" else []
+    return {"id": st["id"], "sample": False, "at": (old or {}).get("at") or int(time.time() * 1000), "matter": s["matter"], "go": s["go"] or s["where"], "bunji": s["bunji"],
+            "point": view["pin"]["at"] if view["pin"] else view["center"], "range": s["size"], "range_m": (view["size"] or {}).get("m"), "range_kind": (view["size"] or {}).get("kind"), "scope": view["matter"]["scope"],
+            "law": " · ".join(dict.fromkeys(re.sub(r"\s*제\d+조.*$", "", c) for c in cites)) or None, "cites": cites, "scope_why": rt["scope_why"], "to": rt["hit"]["to"], "basis": rt["hit"]["basis"],
+            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}]}
+
+
+def save_record(b):
+    """op=save {state, status}: 확인받은 통화를 기록에 쌓거나 고쳐 쓴다(같은 통화 id면 한 건) · op=status {id, status}: 상태 바꾸기(NEXT에 없으면 막음) · op=reset: 이 화면에서 더한 것을 모두 거둔다."""
+    op, now = b.get("op"), int(time.time() * 1000)
+    if op == "save":
+        st, view = turn(b.get("state") or {}, {})
+        if not view["confirmed"] or not view["route"]:
+            return {"error": "위치를 확인받은 통화만 기록에 쌓는다"}, 400
+    with _alias_lock:
+        d = _local()
+        if op == "save":
+            old = next((r for r in d["added"] if r["id"] == st["id"]), None)
+            rec = record_of(st, view, old)
+            want, now_st = b.get("status"), (rec["log"] + d["log"].get(rec["id"], []))[-1]["status"]
+            if want in NEXT[now_st] and want in ("filed", "sent"):
+                d["log"].setdefault(rec["id"], []).append({"status": want, "at": now})
+            d["added"] = [r for r in d["added"] if r["id"] != st["id"]] + [rec]
+        elif op == "status":
+            cur = next((r for r in records(d) if r["id"] == b.get("id")), None)
+            if not cur or b.get("status") not in NEXT[cur["status"]]:
+                return {"error": "고를 수 없는 상태"}, 400
+            d["log"].setdefault(cur["id"], []).append({"status": b["status"], "at": now})
+        elif op == "reset":
+            d = {"added": [], "log": {}}
+        else:
+            return {"error": "없는 일"}, 400
+        _write_local(d)
+        return {"records": records(d), "next": NEXT}, 200
+
+
 def play(scene, wait_engine=True):
     """장면 하나를 대본대로 끝까지 돌린다(화면의 「대본 재생」과 같은 순서). → (상태, 화면, 걸음마다의 기록)."""
     script, T = scripts()[scene], tab("통화 글")
@@ -1329,6 +1411,8 @@ class Handler(SimpleHTTPRequestHandler):
             meta = json.loads((gaz.DIR / "meta.json").read_text(encoding="utf-8"))
             return self.send_json({"text": doc(), "scripts": scripts(), "mode": MODE, "done_m": L.DONE_M, "seoul": [gaz.lonlat(x, y) for x, y in G.seoul],
                                    "places": len(G.name), "roads": meta["roads"]})      # 가게(상가정보)까지 든 지명 표의 곳 수
+        if p == "/api/records":
+            return self.send_json({"records": records(), "next": NEXT})
         return super().do_GET()
 
     def do_POST(self):
@@ -1348,6 +1432,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(*save_alias(b))
             if p == "/api/trial":                # 사람이 해 보는 시험의 기록(숨은 조작 · ?trial=번호일 때만 화면에 단추)
                 return self.send_json(*save_trial(b))
+            if p == "/api/records":              # 상담 기록: 확인받은 통화 쌓기 · 처리 상태 바꾸기 · 처음 상태로
+                return self.send_json(*save_record(b))
             if p == "/api/view":                 # 상태 그대로 다시 엮는다(엔진 답을 기다릴 때)
                 st, view = turn(b.get("state") or {}, {})
                 return self.send_json({"state": st, "view": view})

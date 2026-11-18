@@ -22,6 +22,8 @@ EXPECT = {
     "roadkill": {"scope": "out", "to": "서울시설공단", "where": ["강변북로", "구리 방향"], "cite": None, "kind": "length", "r": 100},
     "stray": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안", "사슴우리", "스무 걸음"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
     "vendor": {"scope": "in", "to": "서울숲 관리사무소", "where": ["서울숲 안", "거울연못"], "cite": "서울특별시 도시공원 조례 제22조 제1항", "kind": "radius", "r": 50},      # 자리가 조례 답을 가르는 장면(11-15 동규)
+    "cat_street": {"scope": "in", "to": "동작구청 동물보호", "where": ["상도1동주민센터"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},      # 화면 장면 단추의 두 고양이 장면(11-17)
+    "cat_park": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
 }
 
 
@@ -92,6 +94,7 @@ def play(name, script, greeting):
     check_end(name, view, sizes)
     print(f"  ✓ {name}: 질문 {' → '.join(asked)} | 범위 {' → '.join(str(x) + 'm' for x in sizes)} | 코드 읽기 + 셈 가장 느린 차례 {slow:.0f}ms")
     print(f"      {view['summary']['where']} | {view['summary']['to']}")
+    return st
 
 
 def chips_only(first):
@@ -148,8 +151,41 @@ def alias():
     print("  ✓ 별명 저장: 저장 뒤 다음 통화에서 그 이름 하나로", view["radius"], "m")
 
 
+def records(done):
+    """상담 기록: 예시 기록은 넘길 곳 · 조례 안팎을 표에서 채워 오고, 위치를 확인받은 통화만 쌓이며, 처리 상태는 정해진 차례로만 바뀐다(되돌리기 없음)."""
+    d = call("/api/records")
+    nxt, samples = d["next"], [r for r in d["records"] if r["sample"]]
+    assert len(samples) >= 10 and all(r["to"] and "{" not in r["to"] and r["scope"] in ("in", "out") and r["point"] and r["go"] and r["range"] and r["status"] in nxt for r in samples), "예시 기록이 비었거나 표에서 채워지지 않음"
+    assert {r["status"] for r in samples} == set(nxt) and all((r["scope"] == "in") == bool(r["law"]) for r in samples), "예시 기록의 상태 · 조례 칸"
+    post = lambda body: call("/api/records", body)      # noqa: E731
+    def refused(body):
+        try:
+            post(body)
+        except urllib.error.HTTPError as e:
+            return e.code == 400
+        return False
+    st, _ = turn({"id": "check-rec-open"}, line={"who": "시민", "text": "강변북로에 고양이가 차에 치여서 죽어 있어요."})
+    assert refused({"op": "save", "state": st, "status": "filed"}), "위치를 확인받기 전 통화가 기록에 쌓임"
+    recs = post({"op": "save", "state": done, "status": "filed"})["records"]
+    top = recs[0]
+    assert top["id"] == done["id"] and not top["sample"] and top["status"] == "filed" and "서울시설공단" in top["to"] and top["go"] and top["point"], f"확인받은 통화가 맨 위에 쌓이지 않음 {top}"
+    recs = post({"op": "save", "state": done, "status": "sent"})["records"]
+    assert sum(r["id"] == done["id"] for r in recs) == 1 and recs[0]["status"] == "sent" and [x["status"] for x in recs[0]["log"]] == ["filed", "sent"], "같은 통화가 두 건이 되거나 넘김이 안 적힘"
+    assert refused({"op": "status", "id": done["id"], "status": "filed"}), "넘긴 기록을 접수됨으로 되돌림"
+    for s in ("recall", "doing", "closed"):
+        assert post({"op": "status", "id": done["id"], "status": s})["records"][0]["status"] == s, s
+    assert all(refused({"op": "status", "id": done["id"], "status": s}) for s in nxt), "끝난 기록의 상태가 바뀜"
+    first = next(r for r in samples if r["status"] == "filed")
+    assert refused({"op": "status", "id": first["id"], "status": "doing"}), "넘기기 전에 처리 중으로 바뀜"
+    recs = post({"op": "reset"})["records"]
+    assert all(r["sample"] for r in recs) and next(r for r in recs if r["id"] == first["id"])["status"] == "filed", "처음 상태로 되돌리지 못함"
+    print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로")
+
+
 def main():
-    env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(Path(os.environ.get("TMPDIR", "/tmp")) / f"call-check-alias-{os.getpid()}.json")}
+    tmp = Path(os.environ.get("TMPDIR", "/tmp"))
+    env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
+           "CALL_RECORD_FILE": str(tmp / f"call-check-records-{os.getpid()}.json")}
     server = subprocess.Popen([sys.executable, str(HERE / "server.py")], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
         for _ in range(150):
@@ -165,16 +201,17 @@ def main():
         html = urllib.request.urlopen(BASE + "/", timeout=5).read().decode("utf-8")
         assert 'id="ask"' in html and "call.js" in html
         greeting = next(r[1] for t in text["text"]["sections"]["통화 글"]["tables"] for r in t["rows"] if r[0] == "인사")
-        for name in EXPECT:
-            play(name, text["scripts"][name], greeting)
+        ends = {name: play(name, text["scripts"][name], greeting) for name in EXPECT}
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         alias()
+        records(ends["roadkill"])
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
         server.wait(timeout=5)
         Path(env["CALL_ALIAS_FILE"]).unlink(missing_ok=True)
+        Path(env["CALL_RECORD_FILE"]).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
