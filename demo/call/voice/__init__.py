@@ -4,6 +4,7 @@
   CALL_DIRECT=1  직접 통화(배포 판: 방문자가 민원인이 되어 글을 치거나 말하고, 상담사 말은 화면으로만)   direct.py
 """
 import os
+import sys
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1] / "web"
@@ -31,8 +32,9 @@ def add_script(Handler, name):
 
 def attach(Handler):
     if os.environ.get("CALL_VOICE") == "1":
-        from . import hub
+        from . import heard, hub
         hub.attach(Handler)
+        heard.attach(sys.modules[Handler.__module__])      # 저장된 답 방식에서만: 받아쓴 글에 대한 읽기(영상 · heard.py)
     if os.environ.get("CALL_DIRECT") == "1":
         from . import direct
         direct.attach(Handler)

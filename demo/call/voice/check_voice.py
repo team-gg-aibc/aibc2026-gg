@@ -12,6 +12,7 @@
      일레븐랩스: 지명을 알려 주면 줄을 새로 열어 keyterms로 넘긴다.
   ⑤ 일레븐랩스 음성 합성: 통화에서 읽어 달라고 한 글만 만들고, 만든 소리는 남겨 다시 쓴다(가짜 서버와).
   ⑥ 휴대폰이 먼저 거는 통화: 방이 「기다림」으로 열리고 한 화면만 받는다. 휴대폰은 글로만 붙어(받아쓰기 없음) 친 글을 보내고, 상담사 말을 받는다.
+  ⑦ 영상용으로 받아 둔 「받아쓴 글의 읽기」(heard.py): 받아쓴 글 · 띄어쓰기와 부호를 바꾼 글 · 대본 글 모두 저장된 읽기를 찾고 대본 순서대로 묻는다.
 """
 import base64
 import hashlib
@@ -357,6 +358,9 @@ def main():
     check_rtzr()                                          # ④
     check_eleven()
     check_tts()                                           # ⑤
+    r = subprocess.run([sys.executable, str(HERE / "heard.py"), "--check"], capture_output=True, text=True, env={**os.environ, "OPENBLAS_NUM_THREADS": "1"})      # ⑦
+    assert r.returncode == 0, "받아쓴 글의 저장된 읽기: " + (r.stdout + r.stderr)[-800:]
+    print("\n".join(ln for ln in r.stdout.splitlines() if "✓" in ln))
     print("음성 통화 점검 통과")
 
 
