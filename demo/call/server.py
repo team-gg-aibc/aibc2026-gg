@@ -738,6 +738,11 @@ def understood(st):
         elif got.get("type"):
             got["type"] = fit_type(got["type"], things)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
         matter.update(got)
+    fix = st.get("fix")
+    if isinstance(fix, str) and fix in TYPES:             # 상담사가 고친 일(57번 6, 11-18)이 읽은 일을 이긴다. 동물의 일은 살았는지도 그 일에 맞춘다
+        matter["type"] = fix
+        if fix in ("stray", "carcass"):
+            matter["alive"] = fix == "stray"
     if matter.get("move"):                                # 「조금 지나서」의 폭은 걷는 중인지 차 안인지로(통화 어디에서 말했든)
         clues = [dict(c, move=matter["move"]) if c["t"] == "past" and c.get("how") == "조금" else c for c in clues]
     if matter.get("alive") is not None and matter.get("type") in (None, "carcass", "stray"):
@@ -1063,10 +1068,12 @@ def build(st, extra=None):
     exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆"))
     pin = {"at": gaz.lonlat(*anc["p"]) if exact else parts["center"], "exact": exact, "label": (line or "").split(", ", 1)[-1]} if done and not handoff else None      # 솔직한 끝에는 핀을 찍지 않는다(받는 사람이 「거기」로 읽는다)
     summary["point"] = "{1:.5f}, {0:.5f}".format(*pin["at"]) if pin else None
+    summary["said"] = next((t["said"] for t in st["turns"] if t.get("said") and (t.get("model") or t.get("code") or {}).get("clues")), None)      # 민원인이 위치를 처음 말한 문장 그대로(57번 5가)
     summary["bunji"] = bunji_of(pin, handoff and line, L.place_class(R)[0] if pin else None)      # 자동차전용도로 위는 방음벽 너머 가게가 가까워도 번지가 아니다
     bj = summary["bunji"] and " / ".join(x for x in (summary["bunji"]["text"], summary["bunji"]["road"]) if x)
-    rows = [(S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"]), (S["일"], summary["matter"]), (S["찾아가는 말"], summary["go"]) if summary["go"] else (S["위치"], summary["where"]), (S["번지수"], bj), (S["좌표"], summary["point"]),
-            (S["범위"], summary["size"]), (S["담당 부서"], summary["to"]), (S["근거"], " · ".join(summary["cites"]) or None), (S["말 그대로"], summary["said_place"])]
+    rows = [(S["일"], summary["matter"]), (S["번지수"], bj), (S["찾아가는 말"], summary["go"]) if summary["go"] else (S["위치"], summary["where"]), (S["민원인 말"], summary["said"]),      # 받는 사람의 차례: 무슨 일 → 번지수 → 찾아가는 말(57번 5다)
+            (S["범위"], summary["size"]), (S["좌표"], summary["point"]), (S["담당 부서"], summary["to"]), (S["근거"], " · ".join(summary["cites"]) or None), (S["말 그대로"], summary["said_place"]),
+            (S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"]), (S["연락처"], S["연락처 값"])]
     summary["copy"] = "\n".join(f"{k}: {v}" for k, v in rows if v)
     pts, cell = L.heat(R) if R else ([], L.STEP)
     cands = []
@@ -1144,7 +1151,8 @@ def _mark_stall(st, R):
 def turn(st, ev):
     """통화에 줄 하나 · 단추 하나가 더해지거나(①까지), 마지막 말을 모델로 다시 읽는다(②) → (새 상태, 화면에 보일 것)."""
     st = {"id": str(st.get("id") or "call"), "lines": list(st.get("lines") or [])[-80:], "turns": list(st.get("turns") or [])[-40:], "history": list(st.get("history") or []),
-          "labels": list(st.get("labels") or []), "asked_log": list(st.get("asked_log") or [])[-40:], "confirmed": bool(st.get("confirmed")), "shown": st.get("shown")}
+          "labels": list(st.get("labels") or []), "asked_log": list(st.get("asked_log") or [])[-40:], "confirmed": bool(st.get("confirmed")), "shown": st.get("shown"),
+          "fix": st["fix"] if isinstance(st.get("fix"), str) and st["fix"] in TYPES else None}
     extra = {"read_how": None, "read_sec": 0}
     line, chip = ev.get("line"), ev.get("set")
     if ev.get("phase") == "model":                        # ② 마지막 말을 Solar로 다시 읽는다
@@ -1221,6 +1229,9 @@ def turn(st, ev):
         st["lines"].append({"who": "상담사", "text": M["찍음 글"], "via": "pin"})
         st["turns"].append({"said": None, "asked": None, "code": {"clues": [{"t": "pt", "p": [round(px, 1), round(py, 1)], "r": 60.0, "label": M["찍은 곳"]}], "matter": {}}, "model": None})
         extra = {"read_how": "pin", "read_sec": 0}
+    elif isinstance(ev.get("fix"), str) and ev["fix"] in TYPES:      # 상담사가 화면이 읽은 「일」을 고름(57번 6): 통화 글 · 단서 · 질문 기록은 그대로
+        st["fix"] = ev["fix"]
+        extra = {"read_how": "fix", "read_sec": 0}
     elif isinstance(chip, dict):
         st["lines"].append({"who": "시민", "text": str(ev.get("label") or "")[:80], "via": "chip"})
         got = {"clues": list(chip.get("clues") or []), "matter": chip.get("matter") or {}, "confirm": chip.get("confirm"), "drop": [str(x)[:60] for x in chip.get("drop") or []][:3]}
@@ -1470,7 +1481,7 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/text":
             meta = json.loads((gaz.DIR / "meta.json").read_text(encoding="utf-8"))
             return self.send_json({"text": doc(), "scripts": scripts(), "mode": MODE, "done_m": L.DONE_M, "seoul": [gaz.lonlat(x, y) for x, y in G.seoul],
-                                   "places": len(G.name), "roads": meta["roads"]})      # 가게(상가정보)까지 든 지명 표의 곳 수
+                                   "places": len(G.name), "roads": meta["roads"], "types": {k: v["name"] for k, v in TYPES.items()}})      # 가게(상가정보)까지 든 지명 표의 곳 수
         if p == "/api/records":
             return self.send_json({"records": records(), "next": NEXT})
         return super().do_GET()

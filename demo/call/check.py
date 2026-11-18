@@ -188,6 +188,19 @@ def records(done):
     print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로")
 
 
+def fix_and_copy(done):
+    """「일」 고치기(57번 6): 상담사가 고른 일이 읽은 일을 이기고 통화 글 · 단서 · 질문 기록은 그대로다. 복사 글(57번 5)은 받는 사람의 차례(일 → 번지수 → 찾아가는 말)에 민원인이 한 말 · 연락처 줄."""
+    view = call("/api/view", {"state": done})["view"]
+    rows = [x.split(": ", 1)[0] for x in view["summary"]["copy"].split("\n")]
+    assert rows[:4] == ["일", "번지수", "찾아가는 말", "민원인이 한 말"] and rows[-1] == "민원인 연락처", f"복사 글 차례 {rows}"
+    assert view["summary"]["said"].startswith("상도1동 주민센터 근처 골목") and "010" not in view["summary"]["copy"], view["summary"]["said"]
+    st, fixed = turn(done, fix="carcass")
+    assert fixed["read_how"] == "fix" and fixed["matter"]["type"] == "carcass" and fixed["route"]["scope"] == "out" and "청소" in fixed["route"]["hit"]["to"], (fixed["matter"], fixed["route"])
+    assert st["lines"] == done["lines"] and st["asked_log"] == done["asked_log"] and fixed["radius"] == view["radius"], "일 고치기가 통화 글 · 질문 기록 · 범위를 바꿈"
+    assert turn(done, fix="없는일")[0]["fix"] is None and turn({**done, "fix": ["stray"]}, fix=None)[0]["fix"] is None, "표에 없는 일을 받음"
+    print("  ✓ 일 고치기: 유기 동물 → 동물 사체로 고르면 넘길 곳이 청소 쪽 · 6종 밖으로, 통화 글 · 범위는 그대로 · 복사 글은 일 → 번지수 → 찾아가는 말 차례")
+
+
 def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 원문 · 넘길 곳 표)과 글자로 맞는지. 원본이 바뀌었는데 tools/build_refs.py를 다시 돌리지 않았으면 여기서 걸린다
     d = json.loads(urllib.request.urlopen(BASE + "/refs.json", timeout=5).read().decode("utf-8"))
     ords = {o["name"]: o for o in json.loads((HERE.parents[1] / "engine" / "data" / "ordinances.json").read_text(encoding="utf-8"))}
@@ -215,7 +228,10 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
                 assert any(x["where"] == a["label"] + " " + re.sub(r"\s*\([^)]*관련\)\s*$", "", a["title"]) for a in o["annexes"]), f"참고 자료: {k} 표 이름 {x['where']}가 별표 제목과 다름"
                 words |= {x["head"], x["unit"]} | ({x["more"]} if x.get("more") else set())
                 assert x["head"] in R and all(len(R[x["head"]].split(" · ")) == len(row) for row in x["rows"]), f"참고 자료: {k} 표 머리 「{R.get(x['head'])}」의 칸 수가 원문 표와 다름"
-    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거"}, "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름"}}
+    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거",
+                                          "민원인 말", "연락처", "연락처 값", "일 고치기", "일 고치기 설명", "일 고침 표시"},      # 61번 화면 고침 묶음에서 새로 쓴 말
+            "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름", "답 펼치기", "답 접기", "답 복사", "답 기다림", "답 지난 시간", "답 보통 시간", "초안 표시"},
+            "통화 글": {"받기 안내", "다음 전화", "기록 보기", "가상 흐름"}, "이렇게 물어보세요": {"화면 설명", "끝 안내"}}
     for sec, keys in need.items():
         assert keys <= rows(sec), f"문구 파일 {sec} 표에 없는 말: {keys - rows(sec)}"
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
@@ -247,6 +263,7 @@ def main():
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         alias()
+        fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         print("통화로 위치 좁히기 점검 통과")
     finally:
