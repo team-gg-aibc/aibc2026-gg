@@ -296,7 +296,7 @@ def fuzzy_in_range(said, R, found, kinds=None):
         idx = names[key]
         i = idx[0]
         o = {"p": [round(float(G.x[i]), 1), round(float(G.y[i]), 1)], "name": G.name[i], "kind": G.kind[i], "n": 1, "after": after, "by": "≈" + tok, "fuzzy": True, "said": raw}
-        if "twins" in L.ON:                               # (twins · 53번) 그 이름이 범위 안 여러 곳이면 첫 곳 하나로 잇지 않는다(「논현역」 = 역 + 버스 정류장 여럿)
+        if "twinsfz" in L.ON:                             # (twinsfz, 기본 끔 · 53번) 그 이름이 범위 안 여러 곳이면 첫 곳 하나로 잇지 않는다(「논현역」 = 역 + 버스 정류장 여럿)
             ps = []
             for k in idx:
                 if all(math.hypot(G.x[k] - q[0], G.y[k] - q[1]) > 40 for q in ps):
@@ -326,7 +326,15 @@ def fuzzy_in_range(said, R, found, kinds=None):
             body = gaz.BLDG_TAIL.sub("", tok)
             spot = _body_spot(body, names) if best[0] < 0.8 and body != tok and len(body) >= 3 else None
             if best[0] >= 0.8:
-                out.append(link(best[1], raw, gaz.norm(said[b:b + 14]), tok))
+                o = link(best[1], raw, gaz.norm(said[b:b + 14]), tok)
+                rest = gaz.norm(said[b:b + 12]) if "fuzzy2" in L.ON else ""
+                for ln in range(min(8, len(rest)), 1, -1):    # (fuzzy2) 머리만 비슷하게 이었는데 뒷말이 더 있다(「천호엮 5번 출구 바로 앞」): 이은 이름 + 뒷말이 지명 표에 그대로 있으면 그 이름으로(역 한가운데가 아니라 그 출구)
+                    new = best[1] + rest[:ln]
+                    if new in G.ix and len(G.ix[new]) <= 6:
+                        n = G._mention(new, raw, False, rest[ln:])
+                        o = {"key": n["key"], "name": n["name"], "kind": n["kinds"][0], "n": n["n"], "after": n["after"], "own": n["after"], "fuzzy": True, "said": raw}
+                        break
+                out.append(o)
             elif spot:
                 out.append(_spot(spot, raw, gaz.norm(said[b:b + 14]), tok))
             else:
@@ -375,6 +383,17 @@ def _tag_drive(read, said):
         for c in read.get("clues") or []:
             if c.get("t") == "at" and "k" in c and L.resolve(c["k"])["roads"] and not len(L.resolve(c["k"])["x"]):
                 c["drive"] = True
+
+
+def _tag_finer(read, asked):
+    """(finerkeep, 기본 끔 · 53번) 「바로 앞에 뭐가 보이세요?」에 댄 이름은 Solar가 다시 읽은 뒤에도 눈앞의 것(40m)으로 둔다.
+    코드 읽기는 그렇게 읽는데(「가까이」), 뚜렷한 단서가 아니라서 Solar가 「근처」(100m)로 다시 읽으면 그 규칙이 사라졌다. 그래서 실제 호출 길에서는 범위가 150 → 120 → 100m로만 줄어 끝내 좁혀지지 않았다."""
+    if "finerkeep" in L.ON and (asked or {}).get("id") == "finer":
+        for c in read.get("clues") or []:
+            if c.get("t") == "at" and "k" in c and not c.get("how"):
+                c["how"] = "가까이"
+            elif c.get("t") == "pt" and c.get("r") == L.SIG["근처"] and not c.get("sure"):
+                c["r"] = L.SIG["가까이"]
 
 
 def _tag_station(read, asked):
@@ -1347,11 +1366,13 @@ def turn(st, ev):
             R = L.infer(clues) if clues else None
             known = "\n".join([f"- 일: {TYPES[matter['type']]['name']}" for _ in [0] if matter.get("type")] + [f"- {c.get('label') or c.get('k')}" for c in clues]) or "없음"
             asked = last.get("asked") or {}
-            read, how, sec = model_read(st, shortlist(last["said"], R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
+            said_m = FILLER.sub(" ", last["said"]) if "fillerlist" in L.ON else last["said"]      # (fillerlist, 기본 끔 · 53번) Solar에 줄 이름 목록도 군말을 지운 말에서 찾는다: 안 그러면 코드가 군말을 지우고 찾은 이름(「카페동네 어… 그… 궁동점」)이 목록에 없어, Solar가 다시 읽으면 그 단서가 사라진다
+            read, how, sec = model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
                 _tag_station(read, asked)
+                _tag_finer(read, asked)
                 _tag_drive(read, last.get("said") or "")
                 if asked.get("id") == "check":
                     read["confirm"] = (last.get("code") or {}).get("confirm")      # 열린 확인은 코드가 거리로 가린 것을 쓴다(Solar의 확인 칸은 「맞습니까」에만)
