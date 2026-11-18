@@ -33,6 +33,7 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_REPLAY_SEC` | 저장된 답 방식에서 엔진 답을 보이기 전 기다리는 최대 초 | 2 |
 | `CALL_NO_ENGINE` | 값이 있으면 엔진을 부르지 않는다(가상 통화로 잴 때) | 없음 |
 | `CALL_ON` · `CALL_OFF` | 질문 고르기 규칙을 켜고 끈다(견주어 잴 때만). 기본값은 `locate.py`의 `DEFAULT_ON` | 비움 |
+| `CALL_LOCCAP` | 한 통화에 묻는 위치 질문의 상한(11/18에 8 → 10. 앞 값으로 재려면 `8`) | 10 |
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
 | `CALL_ALIAS_FILE` | 상담사가 저장한 별명 파일 | `data/aliases_local.json`(git 무시) |
 | `CALL_TRIAL_FILE` | 사람이 해 보는 시험의 기록 파일 | `data/trials_local.jsonl`(git 무시) |
