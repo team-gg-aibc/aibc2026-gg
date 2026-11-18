@@ -50,6 +50,7 @@ sys.path.insert(0, str(HERE))
 SOLAR = "--solar" in sys.argv
 ARG = lambda name, default: type(default)(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default   # noqa: E731
 N, LIE, DUNNO, YES, SOUND = ARG("--n", 30), ARG("--lie", 0.0), ARG("--dunno", 0.0), ARG("--yes", 0.0), ARG("--sound", 0.0)
+LOOSE, SEE = ARG("--loose", 1.0), ARG("--see", 1.0)      # (53번) 거리 말이 헐거운 시민: --loose 2면 24m까지 「바로 앞」 · 50m까지 「옆」. --see 2면 120m(길 위 80m) 안의 이름까지 「근처」로 댄다. 기본 1 = 전과 같다
 if "--model" in sys.argv:
     os.environ["CALL_MODEL"] = sys.argv[sys.argv.index("--model") + 1]
 os.environ["CALL_MODE"] = "live" if SOLAR else "code"
@@ -197,7 +198,7 @@ def mismatch(view, hist0):
     return out
 
 
-HOW = lambda d: "바로 앞이에요" if d <= 12 else "옆이에요" if d <= 25 else "근처예요"   # noqa: E731
+HOW = lambda d: "바로 앞이에요" if d <= 12 * LOOSE else "옆이에요" if d <= 25 * LOOSE else "근처예요"   # noqa: E731
 
 
 def inside(c):
@@ -281,6 +282,40 @@ NICK_A = ["은행나무", "빨간지붕", "파란대문", "큰느티나무", "�
 NICK_B = ["골목", "쉼터", "언덕길", "샘터", "마당", "계단길"]
 
 
+def crossdir(c):
+    """(--crossdir) 길 위 시민이 말할 「A에서 B 가는 방향」: A = 타고 가는 길 60m 안, 뒤쪽 800m 안의 가장 가까운 교차로 · 역(자동차전용도로는 나들목 · 다리 · 터널),
+    B = 앞쪽 2km 안의 가장 가까운 같은 종류. 둘 다 있을 때만 → (A, B) 또는 None. 시민이 보는 세상(W)에서 고른다."""
+    x, y, h = c["x"], c["y"], c.get("head") or [0, 0]
+    kinds = ("나들목", "다리", "터널") if c["cat"] == "자동차전용도로" else ("교차로", "역")
+    line = np.vstack([G.road_xy(i) for i, r in enumerate(G.roads) if r["name"] == c.get("road")] or [np.array([[x, y]])])
+    cand = [i for i in near(x, y, 2000, lambda i: W.kind[i] in kinds and VISIBLE(i)) if float(np.hypot(line[:, 0] - W.x[i], line[:, 1] - W.y[i]).min()) <= 60]
+    along = lambda i: (W.x[i] - x) * h[0] + (W.y[i] - y) * h[1]      # noqa: E731
+    behind = [i for i in cand if -800 <= along(i) < -30]
+    ahead = [i for i in cand if 30 < along(i) and W.name[i] not in [W.name[j] for j in behind[:1]]]
+    return (W.name[behind[0]], W.name[ahead[0]]) if behind and ahead else None
+
+
+def route_share(c, st, out):
+    """(--route · 49번) 한 점까지 못 갔어도 넘길 곳이 정해졌나: 마지막 범위의 가능성 가운데 같은 넘길 곳으로 가는 몫(0~1)과 그것이 참 위치의 넘길 곳과 같은가."""
+    clues, matter = S.understood(st)
+    R = L.infer(clues) if clues else None
+    if R is None or not matter.get("type"):
+        return
+    x, y, w = L._sample(R)
+    keep = np.argsort(-w)[:300]
+    by, memo = {}, {}
+    for j in keep:
+        px, py = float(x[j]), float(y[j])
+        key = (L.place_class({"cx": px, "cy": py, "on_road": R["on_road"], "ctx": R["ctx"]}), L._area_at(G.gu, px, py))
+        if key not in memo:
+            memo[key] = S.route_of(matter, {"cx": px, "cy": py, "on_road": R["on_road"], "ctx": R["ctx"]})["hit"]["to"]
+        by[memo[key]] = by.get(memo[key], 0.0) + float(w[j])
+    top = max(by, key=by.get)
+    truth_ = {"cx": c["x"], "cy": c["y"], "on_road": c["cat"] in ON_ROAD, "ctx": {"roads": [i for i, r in enumerate(G.roads) if r["name"] == c.get("road")][:1]}}
+    want = S.route_of({"type": c["type"], "animal": "개" if c["type"] in ("stray", "carcass") else None}, truth_)["hit"]["to"]
+    out.update(route_share=round(by[top] / sum(by.values()), 3), route_top_right=top == want)
+
+
 def first_words(c):
     if c.get("first"):                                    # 사례가 정해 준 첫 말(tools/defect_set.py, 11-16)
         return c["first"]
@@ -291,6 +326,8 @@ def first_words(c):
     if c.get("style") == "소리 비슷한 이름":
         c = {**c, **{k: sound_noise(c.get(k), c, 0.3) for k in ("dong", "gu", "brand", "exit", "park", "road")}}
     c = {**c, **{k: sound_noise(c.get(k), c) for k in ("dong", "gu", "brand", "exit", "park", "road")}} if SOUND else c
+    if "--crossdir" in sys.argv and c["cat"] in ON_ROAD and (cd := crossdir(c)):
+        return f"{c['road']} {cd[0]}에서 {cd[1]} 가는 방향인데요, {SAY[c['type']]}"      # (--crossdir · 49번) 구청 인터뷰의 말투: 방금 지난 교차로 · 나들목에서 앞에 있는 곳 쪽
     place = {"골목 · 상가 길": f"{c.get('dong')} 쪽인데요", "프랜차이즈 둘레": f"{c.get('gu')}인데요, {c.get('brand')} {HOW(c.get('ad', 0))}",
              "역 출구 둘레": f"{c.get('exit')} {({'바로 앞이에요': '바로 앞', '옆이에요': '옆', '근처예요': '근처'})[HOW(c.get('ad', 0))]}인데요", "공원 안": f"{c.get('park')} 쪽인데요",
              "자동차전용도로": f"{c.get('road')} 타고 가는 중인데요", "큰길": f"{c.get('road')} 타고 가는 중인데요"}[c["cat"]]
@@ -499,7 +536,7 @@ def truth(c, q, view, rng, st):
         return f"{say(W.name[st_[0]])} 근처예요" if st_ else "역은 잘 모르겠어요"
     # where · mark · finer: 60m 안에 보이는 가장 가까운 간판 · 건물(이미 말한 것은 빼고)
     pred = (lambda i: VISIBLE(i) and W.kind[i] in gaz.ROADSIDE) if c["cat"] == "자동차전용도로" else VISIBLE     # 자동차전용도로에서는 차에서 보이는 큰 표지만
-    seen = [i for i in near(x, y, 40 if road else 60, pred) if W.name[i] not in view["chips"] and not any(W.name[i] in ch for ch in view["chips"])]
+    seen = [i for i in near(x, y, (40 if road else 60) * SEE, pred) if W.name[i] not in view["chips"] and not any(W.name[i] in ch for ch in view["chips"])]
     if seen:
         d = math.hypot(W.x[seen[0]] - x, W.y[seen[0]] - y)
         return f"{say(W.name[seen[0]])} {HOW(d)}"
@@ -582,6 +619,8 @@ def run(c, rng, solar=None):
         want = S.route_of({"type": c["type"], "animal": "개" if c["type"] in ("stray", "carcass") else None}, truth_)["hit"]["to"]
         out["dept_ok"] = bool(view["route"]) and view["route"]["hit"]["to"] == want
     out["end"] = out.get("end") or ("점" if out.get("hit") else "틀린 확정" if out.get("bad") else "솔직한 끝" if handoff else "못 끝냄")
+    if "--route" in sys.argv:
+        route_share(c, st, out)
     if c.get("style"):
         gone = [x for x in (c.get("wrong") if c.get("retracted") else None, c.get("flipped")) if x]     # 시민이 실제로 거둔 말만
         mis += [(len(log), "거둔 말이 단서에 남음: " + x) for x in gone if any(gaz.norm(x) in gaz.norm(ch) for ch in view["chips"])]
