@@ -311,7 +311,7 @@ function renderRange() {
   if (V && (V.heard || []).length) h += `<p class="drop heard">${esc(fill(R['알아들음'], { 들은: V.heard.map((x) => `${x.said} → ${x.as}`).join(', ') }))}</p>`;      // 비슷한 이름으로 이은 것(11-15)
   if (V && (V.unfound || []).length) h += `<p class="drop">${esc(fill(R['못 찾음'], { 이름: V.unfound.join(', ') }))}</p>`;      // 끝내 못 찾은 이름(조용히 넘어가지 않게)
   h += `<p class="foot"><button type="button" class="outline pinbtn" data-act="pin" aria-pressed="${!!ui.pin}"${S && S.lines.length > 1 ? '' : ' disabled'}>${esc(G[ui.pin ? '찍기 켜짐' : '찍기'])}</button><span class="lg"><i></i>${esc(G['후보 범위'])}</span><span class="lg"><i class="pin"></i>${esc(G['정해진 자리'])}</span><span class="lg"><i class="mk"></i>${esc(G['표지'])}</span>`
-    + `<span class="note">${esc(fill(G['시연 구역'], { 장소: (META.places || 0).toLocaleString() }))}</span><span class="note">${esc(G['출처'])}</span><span>${esc(G['지도 저작권'])}</span>${R['시연 표시 켬'] === '켬' ? `<span class="demo">${esc(R['시연 표시'])}</span>` : ''}</p>`;
+    + `<span class="note">${esc(fill(G['시연 구역'], { 장소: (META.places || 0).toLocaleString() }))}</span><span class="note">${esc(G['출처'])}</span><span>${esc(G['지도 저작권'])}</span>${P.get('heights') === 'off' ? '' : `<span>${esc(G['건물 높이 출처'])}</span>`}${R['시연 표시 켬'] === '켬' ? `<span class="demo">${esc(R['시연 표시'])}</span>` : ''}</p>`;
   $('range').innerHTML = h;
 }
 function engineLine(e) {
