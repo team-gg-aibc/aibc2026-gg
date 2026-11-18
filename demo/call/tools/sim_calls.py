@@ -521,7 +521,7 @@ def run(c, rng, solar=None):
         c["wrong"] = wrong_name(c, [])
     mis = []
     before = []
-    for _ in range(ARG("--turns", 12)):                  # 한 통화의 주고받기 상한(재 보기용, 기본 12)
+    for _ in range(ARG("--turns", L.LOCCAP + 4)):        # 한 통화의 주고받기 상한: 위치 질문 상한 + 4(상한 8이면 12 · 10이면 14, 47번에서 잰 그대로)
         hist0 = len(st.get("history") or [])
         st, fast = S.turn(st, {"line": {"who": "시민", "text": said}})
         for true, heard in c.pop("pend", []):             # (--sound) 틀리게 말한 이름이 이 차례에 새 단서로 이어졌나: 참 이름을 담은 새 칩이 있으면 「이음」
