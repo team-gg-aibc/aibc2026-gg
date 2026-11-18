@@ -686,12 +686,13 @@ def _candidates(x, y, w, radius, kinds=None):
     return [int(idx[j]) for j in picked], parts + [max(0.0, 1 - sum(parts))]
 
 
-LOCQ = ("zone", "between", "passed", "mark", "finer", "near", "dir", "station", "ago", "seen", "either", "which", "lampno", "from", "next", "mark_again", "dist", "closest", "again", "alike")
+LOCQ = ("zone", "between", "passed", "mark", "finer", "near", "dir", "station", "ago", "seen", "either", "which", "lampno", "from", "next", "mark_again", "dist", "closest", "again", "alike", "addr")
 # 질문마다 (시민이 모를 몫, 묻고 답하는 데 드는 초). 조사 세션의 시작값(20 마-B3)에서 옮김. 실제 통화로 맞춘 값이 아니다
 Q_COST = {"zone": (0.1, 8), "dir": (0.1, 8), "near": (0.1, 8), "seen": (0.1, 8), "between": (0.15, 10), "either": (0.15, 10), "ago": (0.2, 10), "station": (0.2, 8),
-          "passed": (0.3, 12), "mark": (0.3, 12), "finer": (0.3, 12), "lampno": (0.7, 20), "from": (0.2, 10), "next": (0.15, 8), "dist": (0.1, 8), "closest": (0.2, 10), "alike": (0.1, 10)}
+          "passed": (0.3, 12), "mark": (0.3, 12), "finer": (0.3, 12), "lampno": (0.7, 20), "from": (0.2, 10), "next": (0.15, 8), "dist": (0.1, 8), "closest": (0.2, 10), "alike": (0.1, 10), "addr": (0.5, 12)}
 OFF = set(filter(None, os.environ.get("CALL_OFF", "").split(",")))   # 견주어 잴 때 끌 것: either,seen,which,ago,min,score (평소에는 비워 둔다)
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend"     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone"     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]
 
@@ -810,6 +811,9 @@ def questions(R, clues, matter, asked=()):
     miss |= {q for q in LOCQ if list(asked).count(q + "!") >= 2}      # 두 번 물어 두 번 다 못 얻은 질문은 이 통화에서 더 묻지 않는다
     if "softnot" in ON and sum(1 for a in ids if a == "either") >= 3:
         miss.add("either")                                # 둘 중 고르기는 한 통화에 세 번까지
+    if "seenonce" in ON:                                  # (seenonce, 기본 끔 · 47번 방법 1) 시민 둘레는 통화 내내 같다: 「안 보여요」 · 「번호 못 봤어요」를 한 번 들은 열린 질문은 다시 묻지 않는다
+        blind = set(matter.get("blind") or ())
+        miss |= ({"mark", "finer", "mark_again"} if blind & {"mark", "finer", "mark_again"} else set()) | (blind & {"lampno"})
     if zone and "zone" in miss:
         zone = None
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지
@@ -823,6 +827,9 @@ def questions(R, clues, matter, asked=()):
     if not loc:                                           # 사다리: 넓으면 가까운 역 → 간판 · 건물 이름 → (좁혀지면) 바로 앞의 것 → 둘 중 고르기 → 보이는 것의 종류 → 「바로 앞인지」
         r = R["r"]     # 넓을 때 역 · 간판을 둘 다 모른다고 하면 범위째 확인하기 전에 둘 중 고르기 · 보이는 것을 묻는다(11-15 극한 세트)
         order = ["station", "mark", "either", "seen"] if r > 1500 else ["mark", "station", "either"] if r > 900 else ["mark", "either", "seen"] if r > 250 else ["finer", "either", "seen", "near"]
+        if "addrq" in ON and not R["on_road"] and "addr" not in ids and not _area_at(G.parks, R["cx"], R["cy"]):     # (addrq, 기본 끔 · 47번 방법 2) 간판 · 건물 이름을 못 댔으면 건물 주소판(도로명 + 번호)을 한 번 묻는다. 길 위(운전 중) · 공원 안은 묻지 않는다
+            k = next(n for n, qid in enumerate(order) if qid in ("mark", "finer"))
+            order = order[:k + 1] + ["addr"] + order[k + 1:]
         if "closest" in ON and r > 250 and _area_at(G.parks, R["cx"], R["cy"]):
             order = ["mark", "closest", "either", "seen"]    # 넓은 공원: 이름을 떠올리기보다 보기에서 고르기(33번 2-4)
         if "dist" in ON and r <= 250 and ("distall" in ON or _area_at(G.parks, R["cx"], R["cy"])):
@@ -833,7 +840,8 @@ def questions(R, clues, matter, asked=()):
             order = ["lampno"] + order                    # 공원 안, 이름으로 못 좁혔고 그 범위에 번호를 아는 가로등이 있으면 기둥 번호를(33번 2-6). 지금 자료로는 서울숲 · 어린이대공원뿐
         make = {"near": lambda: _q_near(R, clues), "either": lambda: _q_either(R, x, y, w, clues), "seen": lambda: _q_seen(R, x, y, w, clues), "from": lambda: _q_from(R, x, y, w, clues),
                 "dist": lambda: _q_dist(R, clues), "closest": lambda: _q_closest(R, x, y, w, clues),
-                "lampno": lambda: {"id": "lampno", "bits": math.log2(max(1.0, r / 15.0)), "options": []}}
+                "lampno": lambda: {"id": "lampno", "bits": math.log2(max(1.0, r / 15.0)), "options": []},
+                "addr": lambda: {"id": "addr", "bits": math.log2(max(1.0, r / 15.0)), "options": []}}
         ask = lambda qid: make[qid]() if qid in make else _q_marks(R, x, y, w, qid, clues)   # noqa: E731
         loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R)), [])
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)     # 「아니요」로 되돌아온 뒤에는 다시 센다
@@ -850,7 +858,7 @@ def questions(R, clues, matter, asked=()):
             return conds + [{"id": "which", "bits": None, "options": [{"label": lab, "set": {"drop": [lab]}} for lab in said] + [{"word": "잘 모르겠음", "set": {"clues": []}}]}]
         if not loc and "mark" not in miss:                 # 짚을 말이 하나뿐이면 같은 자리를 다시 되묻지 않고, 보이는 것을 새로 묻는다
             loc = [q for q in [_q_marks(R, x, y, w, "mark", clues)] if q]
-    if (n_loc >= 8 or not (loc or zone)) and not (rejected and sum(1 for a in asked if a in ("confirm!", "check!")) < 3 and loc):
+    if (n_loc >= LOCCAP or not (loc or zone)) and not (rejected and sum(1 for a in asked if a in ("confirm!", "check!")) < 3 and loc):
         sz = size_of(R)
         stalled = ("stallend" in ON and any((a or "").endswith("!") and a[:-1] in LOCQ for a in list(asked)[-3:])
                    and sz["m"] <= (400 if sz["kind"] == "length" else 150))      # (stallend) 마지막 위치 질문들이 범위를 못 줄였는데 남은 범위가 좁은 구간: 틀릴 수 있는 구간을 「맞습니까」로 받지 않고 솔직한 끝(넓은 범위째 확인은 그대로, 11-16 갈래 2)
@@ -1164,7 +1172,7 @@ def _q_from(R, x, y, w, clues):
     for name, u, d in dirs:
         dd = min(max(0.5 * d, 20.0), 45.0)
         lab = f"{name}" if name in ("공원 바깥 쪽", "공원 한가운데 쪽") else f"{name} 쪽"
-        clue = ({"t": "cone", "o": [round(ax, 1), round(ay, 1)], "v": [round(u[0], 3), round(u[1], 3)], "sure": True, "label": f"{anc[1]} → {lab}"} if wide and "dist" in ON
+        clue = ({"t": "cone", "o": [round(ax, 1), round(ay, 1)], "v": [round(u[0], 3), round(u[1], 3)], "sure": True, "label": f"{anc[1]} → {lab}"} if (wide or "fromcone" in ON) and "dist" in ON     # (fromcone, 기본 끔 · 47번) 「쪽」은 방향이지 거리가 아니다: 표지에서 20~45m 한 점 대신 부채꼴로(1118 #58)
                 else {"t": "pt", "p": [round(ax + u[0] * dd, 1), round(ay + u[1] * dd, 1)], "r": 22.0, "sure": True, "label": f"{anc[1]} → {lab}"})
         opts.append({"label": lab, "set": {"clues": [clue], "dir": {"o": [ax, ay], "v": [round(u[0], 3), round(u[1], 3)]}, "matter": {"toward": lab.removesuffix(" 쪽")} if wide else {}}})
     return {"id": "from", "bits": _bits(parts) * 0.75, "name": anc[1], "options": opts + [{"word": "잘 모르겠음", "set": {"clues": []}}]}

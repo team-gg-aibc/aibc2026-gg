@@ -297,7 +297,7 @@ def first_words(c):
     return f"{place}, {SAY[c['type']]}"
 
 
-SEC = {"check": 10, "next": 8, "lampno": 20, "side": 8, "lane": 8, "went": 8, "plate": 12, "what": 8, "alive": 8, "leash": 8, "zone": 8, "confirm": 8, "dir": 8, "between": 10, "passed": 12, "mark": 12, "finer": 12, "station": 8, "near": 8, "seen": 8, "either": 10, "ago": 10, "which": 10, "where": 12, "from": 10, "again": 12, "alike": 10}
+SEC = {"check": 10, "next": 8, "lampno": 20, "side": 8, "lane": 8, "went": 8, "plate": 12, "what": 8, "alive": 8, "leash": 8, "zone": 8, "confirm": 8, "dir": 8, "between": 10, "passed": 12, "mark": 12, "finer": 12, "station": 8, "near": 8, "seen": 8, "either": 10, "ago": 10, "which": 10, "where": 12, "from": 10, "again": 12, "alike": 10, "addr": 12}
 
 
 def answer(c, q, view, rng, st, turn=0):
@@ -426,6 +426,14 @@ def truth(c, q, view, rng, st):
     if qid == "lampno":                                   # 세 통에 한 통만 번호를 읽을 수 있다고 본다(달리는 차에서는 읽기 어렵다)
         lamps = sorted((math.hypot(lx - x, ly - y), no) for no, lx, ly in W.lamps.values() if abs(lx - x) < 60 and abs(ly - y) < 60)
         return f"기둥에 {lamps[0][1]} 이라고 적혀 있어요" if lamps and (c["id"] // len(CATS)) % 3 == 0 else "번호는 못 봤어요"      # 묶음마다 세 통에 한 통(11-15 전에는 c["id"] % 3이라 자동차전용도로는 한 번도 읽지 않았다)
+    if qid == "addr":                                     # (addrq) 건물 주소판: 걷는 사람이 20m 안 건물의 주소판을 두 통에 한 통 읽는다고 본다(가정 — 사람 시험으로 맞출 값). 받아 적기가 틀리는 통화는 번호 끝을 2 틀리게(옆 건물)
+        a = S.nearest_addr(*gaz.lonlat(x, y)) if not road else None
+        if a and a["m"] <= 20 and (c["id"] // len(CATS)) % 2 == 1:
+            said_ = a["road"].split(" ", 1)[-1]
+            if c["noisy"]:
+                said_ = re.sub(r"(\d+)$", lambda m: str(int(m.group(1)) + 2), said_)
+            return f"건물 주소판에 {said_} 이라고 적혀 있어요"
+        return "운전 중이라 못 봤어요" if road else "주소판은 못 봤어요"
     if qid == "lane":
         return "갓길 쪽이에요" if c["type"] == "carcass" else "차로 위예요"
     if qid == "went":
@@ -513,7 +521,7 @@ def run(c, rng, solar=None):
         c["wrong"] = wrong_name(c, [])
     mis = []
     before = []
-    for _ in range(12):
+    for _ in range(ARG("--turns", L.LOCCAP + 4)):        # 한 통화의 주고받기 상한: 위치 질문 상한 + 4(상한 8이면 12 · 10이면 14, 47번에서 잰 그대로)
         hist0 = len(st.get("history") or [])
         st, fast = S.turn(st, {"line": {"who": "시민", "text": said}})
         for true, heard in c.pop("pend", []):             # (--sound) 틀리게 말한 이름이 이 차례에 새 단서로 이어졌나: 참 이름을 담은 새 칩이 있으면 「이음」
