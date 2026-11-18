@@ -55,6 +55,7 @@ usage = {"read": 0, "ask": 0, "engine": 0, "tokens_in": 0, "tokens_out": 0}
 
 if MODE == "live":
     from engine import config, pipeline, upstage                # noqa: E402  엔진 코드는 고치지 않고 불러다 쓴다
+    from engine.flow2 import plain                              # noqa: E402  줄인 안내 말도 엔진 쉬운 말 단계와 같은 검사(accept)로 거른다
     ENGINE_CFG = config.load(os.environ.get("ENGINE_CONFIG") or str(ROOT / "eval" / "configs" / "release.json"))
     READ_CFG = {**ENGINE_CFG, "chat_model": MODEL, "temperature": 0.0, "reasoning_effort": None}
 
@@ -810,9 +811,11 @@ def _run_engine(key, said, tname, place, job, question=None):
     res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=place, 일=tname)
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
+    word = "정보"                                         # 엔진 쉬운 말 단계가 쓴 결론 낱말(네 · 아니요 · 정보). 판단 기록에 없으면 「정보」
     try:                                                  # ② 엔진
         resp, tr = pipeline.answer(res["ask"], ENGINE_CFG)
         read = (tr.get("flow2") or {}).get("read") or {}
+        word = ((tr.get("flow2") or {}).get("plain") or {}).get("word") or word
         res.update(response=resp, reason=tr.get("reason"),
                    evidence=[{"label": e.get("label", ""), "quote": e.get("quote", "")} for e in read.get("evidence") or [] if isinstance(e, dict)])
         usage["tokens_in"] += sum(c.get("in", 0) for c in tr.get("calls") or [])
@@ -827,8 +830,10 @@ def _run_engine(key, said, tname, place, job, question=None):
         res["say"] = card["answer"].strip()
     elif card["answer"]:                                  # ③ 아직 길면 통화에서 읽을 한두 문장으로 줄이기(Solar). 못 줄이면 엔진 답 그대로 보인다
         try:
-            res["say"] = _solar(SAY_PROMPT, (f"[시민이 물은 것]\n{question}\n\n" if question else "") + f"[답]\n{card['answer']}", _schema("say", {"say": {"type": "string"}}))["say"].strip()[:220]
+            new = _solar(SAY_PROMPT, (f"[시민이 물은 것]\n{question}\n\n" if question else "") + f"[답]\n{card['answer']}", _schema("say", {"say": {"type": "string"}}))["say"].strip()[:220]
             usage["ask"] += 1
+            why = plain.accept(new, card["answer"], word, [chunks().get(c["label"], {}).get("text", "") for c in card["citations"]])   # 없던 숫자 · 결론 낱말 바뀜 · 「정해져 있지 않다」 빠짐 · 길어짐이면 버린다
+            res["say"], res["say_drop"] = (None, why) if why else (new, None)      # 버리면 화면은 엔진 답을 그대로 읽는다(e.say || e.answer)
         except Exception as e:  # noqa: BLE001
             print(f"안내 말 줄이기 실패: {type(e).__name__}", file=sys.stderr)
     if recording is not None and not res["error"]:
