@@ -274,9 +274,8 @@ body:not(.view-records) #reclist { display: none; }
 /* 「살았나 · 죽었나 × 자리」 표: 같은 일 다른 자리 표를 넓힌 것. 지금 통화의 줄만 칠한다 */
 .same.fate table { table-layout: fixed; font-size: 12px; }
 .same.fate col.c1 { width: 58px; } .same.fate col.c2 { width: 92px; } .same.fate col.c3 { width: 74px; }
-.same.fate th, .same.fate td { padding: 5px 5px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; color: var(--text); width: auto; background: none; font-weight: 500; }
-.same.fate tr.hd th { color: var(--sub); font-size: 11px; font-weight: 700; border-top: 0; padding-top: 2px; }
+.same.fate tr:first-child > * { border-top: 0; }
+.same.fate th, .same.fate td { padding: 4px 5px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; color: var(--text); width: auto; background: none; font-weight: 500; }
 .same.fate th[rowspan] { color: var(--ink); font-weight: 800; }
 .same.fate tr.here td { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .same.fate .badge { font-size: 10.5px; padding: 0 6px; margin-left: 2px; }
-.same.fate .fnote { margin: 4px 0 0; color: var(--sub); font-size: 11px; }

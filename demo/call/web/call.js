@@ -68,7 +68,7 @@ function resetCall() {
   runId++; seq++; clearTimeout(pollT); voiceN = 0; ui.t0 = 0; ui.t1 = 0; ui.answered = false; ui.holdAns = false; ui.openSame = false; ui.askQ = null;
   S = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines: [], turns: [] };
   V = null;
-  Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null });
+  Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null, fateOpen: undefined });
   renderAll();
 }
 async function send(body, hold) {   // 서버에 한 번 보내고 받은 상태로 갈아 끼운다(hold: 받은 뒤 화면에 올리기 전에 기다릴 것)
@@ -318,14 +318,15 @@ function engineLine(e) {
   return e.how === 'saved' ? fill(M['미리 받은 답'], { 초: e.sec }) : fill(M['지금 만든 답'], { 초: e.sec });
 }
 function fateTable(r) {      // 「살았나 · 죽었나 × 자리」: 조례 6종 안팎과 넘길 곳은 표(routes.json)의 줄 그대로, 지금 통화의 줄을 칠한다
+  // 자리 · 크기: 옛 「같은 일이 다른 자리였다면」 표 자리 그대로. 그 표가 펼쳐져 보이던 일(동물 사체)만 펼치고, 표가 없던 일(유기 동물)은 한 줄로 접어 둔다(누르면 펼침). 다른 칸은 옮기지 않는다(11-18 동규)
   const M = K('일의 종류와 갈림'), F = K('일의 종류와 갈림', '살았나 죽었나'), cur = F[r.class] || r.class;
   const row = (f, i, all) => `<tr class="${f.here ? 'here' : ''}">${i ? '' : `<th rowspan="${all.length}">${esc(F[f.alive ? '살아 있음' : '죽음'])}</th>`}`
     + `<td>${esc(f.class ? F[f.class] : F['어디서든'])}${f.here ? ` <span class="badge in">${esc(f.class ? M['지금 자리'] : fill(F['지금 자리 글'], { 자리: cur }))}</span>` : ''}</td>`
     + `<td>${esc(f.scope === 'in' ? fill(F['6종 안 줄'], { 조례: (f.law || '').replace(/^서울특별시\s*/, '') }) : F['6종 밖 줄'])}</td>`
     + `<td>${esc(f.to)} <span class="badge ${f.basis === '확인' ? 'sure' : 'guess'}">${esc(F[f.basis === '확인' ? '확인' : '추측'])}</span></td></tr>`;
   const part = (alive) => r.fate.filter((f) => f.alive === alive).map(row).join('');
-  return `<details class="same fate" open><summary>${esc(F['제목'])}</summary><table><colgroup><col class="c1"><col class="c2"><col class="c3"><col></colgroup>`
-    + `<tr class="hd"><th></th><th>${esc(F['자리'])}</th><th>${esc(F['조례'])}</th><th>${esc(F['넘길 곳'])}</th></tr>${part(true)}${part(false)}</table><p class="fnote">${esc(F['꼬리'])}</p></details>`;
+  return `<details class="same fate"${(ui.fateOpen ?? r.others.length > 1) ? ' open' : ''}><summary title="${esc(F['꼬리'])}">${esc(F['제목'])}</summary><table><colgroup><col class="c1"><col class="c2"><col class="c3"><col></colgroup>`
+    + `${part(true)}${part(false)}</table></details>`;      // 머리줄 · 설명 줄 없이(설명은 제목에 마우스를 올리면): 옛 표 크기 안에
 }
 function nearBox() {      // 접수 카드 안 「이 자리 둘레 지난 기록」: 그때 넘긴 위치와 처리 상태. 누르면 상담 기록 화면에서 연다
   const near = nearRecs();
@@ -393,7 +394,7 @@ function renderSide() {   // 접수 카드 한 장: 받은 곳 · 처음 접수�
       : e.citations.length && V.matter.law ? fill(M['엔진 참고'], { 조항: e.citations.map((c) => c.label).join(' · ') }) : CTL() ? `${M['엔진 확인 불가']} (${engineLine(e)})` : M['엔진 확인 불가'];
     if (M['6종 밖 엔진 표시'] === '켬' || CTL()) h += `<p class="eng">${esc(t)}</p>` + (e.status === 'ready' ? asked : '');
   }
-  if (V && V.matter && V.matter.ask && !V.confirmed && h.length > h0) { const ans = h.slice(h0); h = h.slice(0, h0).replace('</dl>', '</dl>' + ans); }     // 시민이 규정을 물은 통화에서는 답 칸을 카드 위쪽으로 올린다. 위치를 확인받으면(답은 이미 읽음) 제자리(아래)로: 넘길 곳 · 살았나 표가 스크롤 없이 보이게(11-18)
+  if (V && V.matter && V.matter.ask && h.length > h0) { const ans = h.slice(h0); h = h.slice(0, h0).replace('</dl>', '</dl>' + ans); }     // 시민이 규정을 물은 통화에서는 답 칸을 카드 위쪽으로 올린다
   h += `<div class="sumbtn"><button type="button" class="outline" data-act="copy"${s.where ? '' : ' disabled'}>${esc(U['복사'])}</button>`
     + (CTL() && V && V.confirmed && V.pin ? `<button type="button" class="outline" data-act="alias">${esc(U['별명 저장'])}</button>` : '')      // 별명 저장은 숨은 조작 화면에서만(본 화면에 둘지는 동규가 정함)
     + (CTL() && TRIAL && S && S.lines.length ? `<button type="button" class="outline" data-act="trial">${esc(U['시험 기록'])} ${esc(TRIAL)}</button>` : '')      // 사람이 해 보는 시험(?trial=번호)에서만
@@ -625,6 +626,7 @@ document.addEventListener('click', async (ev) => {
   }
 });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'k-text' && !ev.isComposing) { ev.preventDefault(); document.querySelector('[data-act="send"]').click(); } });
+document.addEventListener('toggle', (ev) => { if (ev.target.classList && ev.target.classList.contains('fate')) ui.fateOpen = ev.target.open; }, true);      // 살았나 표를 펼치거나 접은 것은 카드를 다시 그려도 그대로
 document.addEventListener('change', async (ev) => {
   if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); await recPost({ op: 'save', state: S, status: ui.status }); renderTop(); renderSide(); }
   else if (ev.target.name === 'rstatus' && ui.rec) { await recPost({ op: 'status', id: ui.rec, status: ev.target.value }); renderTop(); renderRecList(); renderRecCard(); renderMap(); }
