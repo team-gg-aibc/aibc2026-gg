@@ -190,8 +190,8 @@ def shortlist(said, R, asked_id=None, prior=()):
         st_of = lambda k: re.match(r"^(.+역)(\d+번출구)?$", k or "")       # noqa: E731
         base = next((st_of(o["key"]).group(1) for o in reversed(out) if st_of(o.get("key"))), None) or next((st_of(k).group(1) for k in reversed(list(prior)) if st_of(k)), None)
         for mm in dict.fromkeys(m_.group() for m_ in re.finditer(r"(?<!\d)\d{1,2}번출구", t)):     # 찾은 역 출구 이름이 덮지 못한 출구 번호(역 이름이 틀리게 받아쓰인 「숭실데입구역 3번 출구」도 잇는다)
-            if any((o.get("key") or "").endswith(mm) and (o.get("key") or "") != mm for o in out):
-                continue                                  # 이미 역과 함께 읽혔다
+            if any(mm in (o.get("key") or "") and (o.get("key") or "") != mm for o in out):
+                continue                                  # 이미 역과 함께 읽혔다. 다른 이름 속의 출구 번호(버스 정류장 「대모산입구역 2번출구 앞」)도 따로 읽지 않는다(60번: 600통에서 그 정류장 이름을 출구로 또 읽어 좁혀진 틀린 자리를 되말했다)
             pos = t.rfind(mm) + len(mm)
             out = [o for o in out if o.get("key") != mm]  # 역을 모르면 「3번출구」라는 가게(노원구)로 읽지 않는다. ponytail: 그 가게가 참 자리인 통화는 못 받는다
             new = base + mm if base else None
