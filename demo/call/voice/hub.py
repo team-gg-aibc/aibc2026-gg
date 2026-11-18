@@ -246,19 +246,13 @@ def _api(h, body):
 
 def attach(Handler):
     """server.py의 Handler에 /api/voice/… 를 얹고, 첫 화면에 voice.js를 끼운다. 기존 파일(index.html · call.js)은 그대로 둔다."""
+    from . import add_script
+    add_script(Handler, "voice.js")
     get, post = Handler.do_GET, Handler.do_POST
 
     def do_GET(self):
-        p = self.path.split("?")[0]
-        if p.startswith("/api/voice/"):
+        if self.path.split("?")[0].startswith("/api/voice/"):
             return _api(self, b"")
-        if p in ("/", "/index.html"):
-            body = (WEB / "index.html").read_text(encoding="utf-8").replace("</body>", '<script src="voice.js"></script>\n</body>').encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            return self.wfile.write(body)
         return get(self)
 
     def do_POST(self):

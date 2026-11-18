@@ -1505,8 +1505,8 @@ class Handler(SimpleHTTPRequestHandler):
         return self.send_json({"error": "없는 길"}, 404)
 
 
-if os.environ.get("CALL_VOICE") == "1":      # 음성 통화(받아쓰기 · 읽어 주기)는 끌 수 있는 스위치. 기본 끔이고, 끄면 voice/는 읽히지도 않는다
-    __import__("voice.hub").hub.attach(Handler)
+if os.environ.get("CALL_VOICE") == "1" or os.environ.get("CALL_DIRECT") == "1":      # 음성 통화 · 직접 통화(배포 판)는 끌 수 있는 스위치. 기본 끔이고, 끄면 voice/는 읽히지도 않는다
+    __import__("voice").attach(Handler)
 
 if __name__ == "__main__":
     if "--lines" in sys.argv:

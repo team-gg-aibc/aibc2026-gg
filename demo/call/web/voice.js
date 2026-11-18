@@ -169,7 +169,7 @@
     const ringing = () => st.alive && st.joined && !st.picked;
     function draw() {
       bar.innerHTML = st.alive ? (ringing() ? `<button type="button" class="on" data-mic="pick">${esc(T.pick)}</button>` : '') + `<button type="button"${ringing() ? '' : ' class="on"'} data-mic="hang">${esc(T.hang)}</button>`
-        : [['here', T.here], ['phone', T.phone]].concat(SCRIPTS[ui.scene] ? [['script', T.script]] : []).map(([id, name]) => `<button type="button" data-mic="${id}">${esc(name)}</button>`).join('');
+        : (window.DIRECT ? [['here', T.here]] : [['here', T.here], ['phone', T.phone]].concat(SCRIPTS[ui.scene] ? [['script', T.script]] : [])).map(([id, name]) => `<button type="button" data-mic="${id}">${esc(name)}</button>`).join('');      // 직접 통화(배포 판)는 방문자의 마이크만
       box.textContent = st.state ? `${T[info.stt]} · ${st.state}` + (st.heard ? ` · ${T.heard.replace('{초}', st.heard.toFixed(1))}` : '') + (st.ask === 'agent' && st.alive && !st.taken ? ` · ${T.agent}` : '') : '';
       document.body.classList.toggle('voice-wait', st.alive && !st.joined);      // 거는 사람이 들어오기 전에는 「전화가 왔습니다」를 보이지 않는다
       const link = st.alive && st.how === 'phone' && !st.joined ? `${T.link}: ${location.origin}/dial.html?room=${st.room}` : '';      // 거는 사람이 들어올 때까지 받아 적기 칸의 알림 자리에
@@ -184,12 +184,13 @@
     function say(s) { st.state = s; draw(); }
     function onEvent(e) {      // 받아쓴 글: 도중 글은 받아 적기 칸에 흐르고, 확정 글 뒤 잠깐 조용하면 한 차례로 끊어 통화 길에 넣는다
       clearTimeout(st.gapT);
+      if (window.DIRECT) window.DIRECT.heard();      // 직접 통화: 말하는 동안은 읽지 않게 알린다
       if (e.final) { st.text = `${st.text} ${e.text}`.trim(); st.gapT = setTimeout(commit, info.gap_ms / fast()); }
       ui.typing = { who: '시민', text: e.final ? st.text : `${st.text} ${e.text}`.trim() }; renderTyping(); emit();
     }
     function commit() {
       const t = st.text; st.text = ''; st.spoken = null;      // 같은 질문이 다시 떠도 읽어 주게
-      if (t && st.alive) queue(() => citizen(t, 'voice'));
+      if (t && st.alive) { if (window.DIRECT) window.DIRECT.said(t, 'voice'); else queue(() => citizen(t, 'voice')); }      // 직접 통화(배포 판)면 차례는 direct.js가 다룬다
     }
     async function poll2() {
       while (st.alive) {
@@ -208,7 +209,7 @@
       if (!st.alive || st.picked) return;
       st.picked = true; say(T.listen);
       vapi(`pick?room=${st.room}`, {}).catch(() => {});
-      drive();
+      if (!window.DIRECT) drive();      // 직접 통화에서는 읽어 주지 않는다(상담사 말은 direct.js가 대화창에만 올린다)
     }
     function terms() {      // 지금 나올 법한 지명: 질문의 보기 · 가능성이 큰 곳 · 이미 나온 단서. 받아쓰기가 미리 알려 주기를 받으면 쓴다(일레븐랩스 keyterms)
       const q = ui.askQ, names = [].concat(q ? q.options.map((o) => o.label) : [], ((V && V.cands) || []).map((c) => c.name), S ? S.turns.flatMap((t) => cluesOf(t).map((c) => c.label || '')) : []);
@@ -257,7 +258,7 @@
       if (st.alive) return;
       let code = sessionStorage.getItem('voice-code') || '';
       if (info.code && !code) { code = window.prompt(T.code) || ''; sessionStorage.setItem('voice-code', code); }
-      resetCall();
+      if (!window.DIRECT) resetCall();      // 직접 통화에서는 글로 하던 통화를 이어 말로 할 수 있게 지우지 않는다
       try { st.room = (await vapi('room', { code })).room; } catch (e) { sessionStorage.removeItem('voice-code'); return say(String(e.message)); }
       Object.assign(st, { alive: true, how, since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', busy: false, spoken: null, said1: false, caller: null, ask: ASK, taken: false, approved: false, waitApprove: false });
       say(how === 'phone' ? T.wait : T.listen);
@@ -307,7 +308,7 @@
       return dialPage(info);
     }
     if (!info || !info.on) return;
-    while (!DOC) await sleep(50);      // call.js가 문구를 다 받은 뒤에
+    while (!window.CALL) await sleep(50);      // call.js가 시작을 다 마친 뒤에(그 전의 통화는 call.js가 한 번 더 비운다)
     loadText(DOC);
     deskPage(info);
   })();

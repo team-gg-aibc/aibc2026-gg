@@ -36,6 +36,19 @@ OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_MODE=saved CALL_PORT=8780 python3 demo/
 
 환경 변수는 `hub.py` 맨 위 표에 있다. 받아쓰기는 `CALL_VOICE_STT=fake|elevenlabs|whisper|rtzr`, 읽어 주기는 `CALL_VOICE_TTS=none|elevenlabs|browser`로 고른다. 일레븐랩스 열쇠는 `~/.config/gg-team/elevenlabs.env`의 `ELEVENLABS_API_KEY`(목소리: AI는 「나의 우주」·LLMOps 시연 영상의 '따뜻한', 시민 역은 '부드러운'). 리턴제로 열쇠는 `~/.config/gg-team/rtzr.env`의 `RTZR_CLIENT_ID` · `RTZR_CLIENT_SECRET`이고(값은 찍지 않는다) `websockets` 꾸러미(11 이상)가 있어야 한다.
 
+## 직접 통화 (배포 판, `CALL_DIRECT=1`)
+
+```bash
+# 실제 호출(배포 판 기본). 팀 열쇠를 환경 변수로만 넣는다(엔진이 레포 .env를 읽지 않게). 마이크까지: CALL_VOICE=1 CALL_VOICE_STT=elevenlabs
+UPSTAGE_API_KEY=… ENGINE_CONFIG=eval/configs/release.json CALL_DIRECT=1 CALL_DIRECT_CODE=… CALL_PORT=8781 python3 demo/call/server.py
+```
+
+- 방문자가 민원인이 된다. 대화창 아래 칸에 글을 치거나, 음성 스위치를 함께 켜면 「이 기기 마이크로 통화」로 말한다.
+- 상담사 쪽은 화면으로만: 화면이 고른 다음 말을 상담사 말풍선으로 바로 올린다(읽어 주지 않는다). 민원인이 조례를 물었으면 조례 답이 올 때까지 기다렸다가 상담사 말로 올린다(「조례 근거 답」 칸의 글과 같다). 위치를 확인받으면 끝인사로 끝난다.
+- 차례가 어긋나면: 답을 만드는 동안 들어온 말(친 글 · 받아쓴 마디)은 모아 두었다가, 이번 답은 버리고 이번 말과 합쳐 그 차례를 처음부터 다시 읽는다. 받아쓴 마디는 1초 더 기다렸다 읽는다(말 중간 쉼으로 갈린 마디를 한 번에).
+- 열쇠 보호의 자리: 접근 코드(맞히면 표를 쿠키로 준다, 표가 없으면 POST /api/… 는 403) · 민원인의 말 수 상한(표마다 · 모두, 넘으면 429와 문구 파일의 글). `direct.py` 맨 위 표.
+- 점검: `python3 demo/call/voice/check_direct.py`(서버 쪽, 열쇠 없이).
+
 ## 화면 요소와 잇는 자리
 
 화면 요소(누가 말하는 중 · 넘겨받기 · 접수 전 확인)는 `window.VOICE`가 있을 때만 쓴다(음성 스위치가 켜졌을 때).
