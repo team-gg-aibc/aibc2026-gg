@@ -179,7 +179,7 @@
     let c = null, t0 = 0, tick = 0, quietRing = () => {}, shaking = false, nopick = 0, redraw = () => {};
     $('d-name').textContent = T.dialName; $('d-lead').textContent = room || info.direct ? T.dialLead : T.noroom; $('d-stt').textContent = info.direct ? '' : T[info.stt];
     $('d-text').placeholder = T.say; $('d-send').textContent = T.send; $('d-mic').textContent = T.micOn;
-    set('idle', ''); btn.disabled = !room && !info.direct;
+    set('idle', ''); btn.disabled = true;      // 누르는 일을 다 붙인 뒤(맨 아래)에 켠다: 망이 느리면 먼저 켜진 단추의 첫 누름이 버려졌다(배포 세션 11/19)
     if (info.direct) {      // 직접 통화: 표(쿠키)를 받는다. 접근 코드가 있으면 묻는다
       const d = await fetch('/api/direct/info').then((r) => r.json()).catch(() => ({}));
       if (d.on && !d.pass) {
@@ -213,6 +213,7 @@
       if (v && c) { const li = bubble('me', v); c.text(v).catch(() => { li.classList.add('fail'); li.insertAdjacentHTML('beforeend', `<i>${esc(T.notsent)}</i>`); }); $('d-text').value = ''; redraw(); }
     };
     $('d-mic').onclick = async () => { if (!c) return; try { await c.enableMic(); $('d-mic').disabled = true; } catch { $('d-said').textContent = T.nomic; } };
+    btn.disabled = !room && !info.direct;
   }
 
   // ---- 상담 화면: 화면 쪽(+ 이 기기 마이크 · 대본이면 소리 쪽도 함께)
