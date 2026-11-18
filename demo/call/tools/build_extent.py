@@ -6,7 +6,7 @@
 
 - 면: 지명 표를 만든 그 파일(Seoul.osm.geojson.xz)의 이름 있는 면. 가운데 점은 build_gazetteer.py와 같은 셈(가장 긴 고리의 꼭짓점 평균)이라 지명 표의 줄과 글자까지 맞는다. 맞는 줄이 없는 면은 버린다.
 - 역: 면이 아니라 점이지만 출구들이 100~200m에 퍼져 있다. 같은 지명 표의 「○○역 N번 출구」 가운데 가장 먼 것까지를 크기로 적는다(새 자료 없음).
-- 공원 · 다리 · 터널 · 동네는 넣지 않는다(공원은 경계가 areas.json에 따로 있고, 다리 · 터널은 길 위의 표지로 쓴다).
+- 종류는 KEEP(학교 · 시장 · 병원 · 마트 · 체육시설 · 터미널 · 관공서 · 문화시설 · 볼거리 · 경찰 · 소방서)와 역만. 공원은 경계가 areas.json에 따로 있고, 다리 · 터널은 길 위의 표지로 쓴다.
 - 먼 가장자리가 MIN_M보다 가까운 것은 적지 않는다(한 점으로 봐도 되는 크기).
 자료: © OpenStreetMap contributors, ODbL 1.0.
 """
@@ -25,7 +25,9 @@ import build_gazetteer as B        # noqa: E402
 OUT = HERE / "data" / "seoul"
 KX, KY = 88200.0, 111000.0
 MIN_M = 30.0
-SKIP = {"공원", "다리", "터널", "동네", "산", "역", "역 출구", "정류장", "나들목", "교차로"}
+KEEP = {"학교", "시장", "병원", "마트", "체육시설", "터미널", "관공서", "문화시설", "볼거리", "경찰", "소방서"}     # 사람들이 「○○ 앞」으로 대는 공공 표지 꼴의 넓은 곳(+ 역은 출구로 따로).
+# 이름 있는 건물 · 아파트 동 · 주차장 · 사무실 · 종교시설 · 숙박은 뺀다: 크기가 커도(코엑스 222m) 주차장 · 아파트 동과 가를 표시가 자료에 없고,
+# 600통에서 넓은 주차장(「올림픽공원 남2문주차장」 85m)을 넓게 읽자 틀리게 답한 시민의 말에 끌려 틀린 확정이 하나 났다(60번 4절)
 
 
 def seg_d(ax, ay, bx, by):
@@ -55,7 +57,7 @@ def main(src):
                 continue
             lon, lat = sum(x for x, _ in ring) / len(ring), sum(y for _, y in ring) / len(ring)
             name, kind = " ".join((p.get("name") or "").split()), B.kind_of(p, g["type"])
-            if not kind or kind in SKIP or not name:
+            if kind not in KEEP or not name:
                 continue
             pts = [((x - lon) * KX, (y - lat) * KY) for x, y in ring]
             far = max(math.hypot(x, y) for x, y in pts)
