@@ -106,6 +106,7 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/seoul/road_nodes.tsv.gz` | 국가교통정보센터 표준노드링크(2026-11-11판) |
 | `data/extra_places.json` | 지도 자료에 이름이 없어 팀이 손으로 더한 시연 장소 |
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
+| `web/heights/index.json` · `cells/*.json` · `hi.geojson` | 서울 전체 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 칸(확대 14 지도 타일, 약 1.9km 네모)마다 파일 하나이고 화면은 보이는 칸만 읽는다(172칸 · 68,197채 · 3.9MB). 지도 타일보다 실제가 높은 건물만 담는다. 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 이 자료의 높이는 잰 값이 아니라 층수 × 3.5m다. 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap(2026-11-15판 타일). 원본 CSV(약 410MB)와 지도 타일(287장, 41MB)은 레포 밖에 두고 `tools/make_heights.py`로 만든다(약 2분) |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |
 
 자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 접수 카드 「참고 자료」 칸의 값 `web/refs.json`은 `tools/build_refs.py`가 조례 원문(`engine/data/ordinances.json`) · `data/routes.json`에서 그대로 뽑아 만들고(손으로 고치지 않는다), `check.py`가 원본과 글자로 대조한다. 그 칸에 함께 보이는 사람이 쓴 글(표 머리 · 단위 · 「없음」 줄 · 갈래 · 처리 기관 줄)은 문구 파일 A-05의 「참고 자료」 표에 있고, `refs.json`에는 그 항목 이름만 있다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
