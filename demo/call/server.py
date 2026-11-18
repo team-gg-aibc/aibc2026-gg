@@ -170,7 +170,7 @@ def shortlist(said, R, asked_id=None, prior=()):
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 국가지점번호"], 번호=label), "kind": "지점번호", "n": 1, "after": "", "by": "#" + label, "sure": True})
     for no, px, py in G.lamp_in(said):                    # 가로등 기둥의 관리번호를 읽어 줬다: 그 기둥 하나를 가리킨다
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 가로등"], 번호=no), "kind": "지점번호", "n": 1, "after": "", "by": "#" + no, "sure": True, "r": G.lamp_err.get(no, 12.0)})
-    for label, px, py in (addr_in(said, R) if "addrq" in L.ON and (asked_id == "addr" or ADDR_CUE.search(said)) else ()):     # (addrq · 47번 방법 2) 건물 주소판(도로명 + 번호)을 읽어 줬다: 그 건물 하나
+    for label, px, py in (addr_in(said, R) if ("addrq" in L.ON or "addrread" in L.ON) and (asked_id == "addr" or ADDR_CUE.search(said)) else ()):     # (addrq · 47번 방법 2) 건물 주소판(도로명 + 번호)을 읽어 줬다: 그 건물 하나
         out.append({"p": [round(px, 1), round(py, 1)], "name": fill(tab("위치 범위")["단서 · 주소판"], 주소=label), "kind": "지점번호", "n": 1, "after": "", "by": "@" + label, "sure": True, "r": 20.0})     # 「@」 = 주소. 「#」(가로등 · 지점번호)과 달리 시설물 번호 칸에는 넣지 않는다
     t = gaz.norm(said)
     if R is not None:                                     # 종류만 말했으면 지금 범위 안의 그런 곳 가운데 가능성이 큰 세 곳까지
@@ -1140,7 +1140,7 @@ def addr_in(said, R=None):
         elif not hits and "addrline" in L.ON:             # (addrline, 기본 끔 · 53번) 주소 표에 없는 건물번호: 같은 길의 아는 번호 사이로 어림한다
             g = addr_guess(m.group(1), int(m.group(2).split("-")[0]), box)
             if g:
-                out.append((f"{m.group(1)} {m.group(2)}(어림)", g[0], g[1]))
+                out.append((f"{m.group(1)} {m.group(2)}쯤", g[0], g[1]))
     return out
 
 
