@@ -54,7 +54,7 @@ for f, _ in delays:
     cmd += ["-i", f"demo/call/web/{f}"]
 flt = ";".join(f"[{n + 1}:a]adelay={d}|{d}[a{n}]" for n, (_, d) in enumerate(delays)) + ";" + "".join(f"[a{n}]" for n in range(len(delays))) + f"amix=inputs={len(delays)}:normalize=0[a]"
 enc = ["-c:v", "libx264", "-crf", "27", "-preset", "medium", "-pix_fmt", "yuv420p", "-r", "30", "-movflags", "+faststart"]
-name = {"roadkill": "로드킬", "stray": "유기견", "vendor": "공원노점"}[scene]
+name = {"cat_street": "다친고양이-골목", "cat_park": "다친고양이-공원", "roadkill": "로드킬", "stray": "유기견", "vendor": "공원노점"}.get(scene, scene)      # 표에 없는 장면은 장면 이름 그대로
 if delays:
     subprocess.run(cmd + ["-filter_complex", flt, "-map", "0:v", "-map", "[a]"] + enc + ["-c:a", "aac", "-b:a", "96k", str(out_dir / f"시연-{name}-소리.mp4")], check=True)
 subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{cut:.3f}", "-to", f"{end:.3f}", "-i", str(video)] + enc + ["-an", str(out_dir / f"시연-{name}-자막만.mp4")], check=True)
