@@ -320,15 +320,25 @@ def check_phone_text():
     assert d["joined"] is True and d["heard_sec"] == 0, d
     assert code_of(f"/api/voice/claim?room={room}", {}) == 200 and code_of(f"/api/voice/claim?room={room}", {}) == 409, "한 통화를 두 화면이 받음"
     assert room not in call("/api/voice/waiting")["rooms"]
-    call(f"/api/voice/text?room={room}", {"text": "  상도1동 주민센터   근처예요 "})
+    assert call(f"/api/voice/poll?room={room}")["busy"] == 0, "아무도 받지 않았는데 받은 통화가 있다고 함"
+    other = call("/api/voice/room", {})["room"]                                      # 다른 통화를 받은 화면이 있으면: 휴대폰이 「다른 통화 중」을 고르게 받은 통화 수를 준다
+    call(f"/api/voice/pick?room={other}", {})
+    assert call(f"/api/voice/poll?room={room}")["busy"] == 1
+    call(f"/api/voice/end?room={other}", {})
+    call(f"/api/voice/text?room={room}", {"text": "  상도1동 주민센터   근처예요 ", "id": "a1"})
+    call(f"/api/voice/text?room={room}", {"text": "  상도1동 주민센터   근처예요 ", "id": "a1"})      # 망이 끊겨 다시 보낸 같은 글은 한 번만
     call(f"/api/voice/text?room={room}", {"text": ""})                               # 빈 글은 넣지 않는다
+    call(f"/api/voice/text?room={room}", {"text": "가" * 800, "id": "a2"})             # 직접 통화가 아니면 500자에서 자른다(끄면 그대로)
     ev = call(f"/api/voice/desk?room={room}")["events"]
-    assert ev == [{"final": True, "text": "상도1동 주민센터 근처예요", "typed": True}], ev
-    n = call(f"/api/voice/ask?room={room}", {"text": "바로 앞에 뭐가 보이세요?"})["n"]  # 상담사 말 → 휴대폰
-    assert [x["text"] for x in call(f"/api/voice/audio?room={room}&says=0", raw=b"")["says"]] == ["바로 앞에 뭐가 보이세요?"] and n == 1
+    assert ev == [{"final": True, "text": "상도1동 주민센터 근처예요", "typed": True}, {"final": True, "text": "가" * 500, "typed": True}], ev
+    n = call(f"/api/voice/ask?room={room}", {"text": "바로 앞에 뭐가 보이세요?"})["n"]  # 상담사 말 → 휴대폰(글로만 붙은 휴대폰은 본문 없는 GET poll로)
+    assert [x["text"] for x in call(f"/api/voice/poll?room={room}&says=0")["says"]] == ["바로 앞에 뭐가 보이세요?"] and n == 1
+    assert [x["text"] for x in call(f"/api/voice/audio?room={room}&says=0", raw=b"")["says"]] == ["바로 앞에 뭐가 보이세요?"]
+    info = call("/api/voice/info")
+    assert (info["poll_ms"], info["pick_sec"]) == (250, 20), info
     assert call("/api/voice/info")["direct"] is False
     call(f"/api/voice/end?room={room}", {})
-    print("  ✓ 휴대폰이 먼저 거는 통화: 기다림 → 한 화면만 받음 · 글로만 붙음 · 친 글이 확정 글로 · 상담사 말이 휴대폰으로")
+    print("  ✓ 휴대폰이 먼저 거는 통화: 기다림 → 한 화면만 받음 · 글로만 붙음 · 친 글이 확정 글로(다시 보낸 글은 한 번만) · 받은 통화 수 · 상담사 말이 휴대폰으로(GET poll)")
 
 
 def main():

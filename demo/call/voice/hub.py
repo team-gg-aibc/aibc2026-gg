@@ -17,7 +17,9 @@
 | CALL_VOICE_CODE | 값이 있으면 통화를 열 때 이 접근 코드를 받는다(밖에 내놓을 때) | 없음 |
 | CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper · elevenlabs는 300) |
 | ELEVENLABS_CITIZEN_VOICE_ID | 「대본을 음성 길로」에서 시민 역 목소리(tts_lines.py --citizen이 만든다) | 「나의 우주」의 '부드러운' |
-| CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수 | 4 · 600 · 40 |
+| CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수(0 = 제한 없음) | 4 · 600 · 40. 직접 통화와 함께면 20 · 1800 · 0(정상 이용을 막지 않게, 동규 11/19) |
+| CALL_VOICE_POLL_MS | 통화 중 양쪽이 서버에 묻는 간격(소리 쪽은 이 간격으로 소리 토막을 올린다) | 250. 직접 통화와 함께면 600(요청 수를 줄인다) |
+| CALL_VOICE_PICK_SEC | 휴대폰이 건 통화를 이만큼 아무도 받지 않으면 휴대폰이 「다른 통화 중」 · 「받을 사람 없음」을 띄우고 끊는다(직접 통화) | 20 |
 """
 import hashlib
 import hmac
@@ -43,9 +45,12 @@ ASK = "agent" if os.environ.get("CALL_VOICE_ASK") == "agent" else "ai"      # �
 STT = stt.pick()
 DIRECT = os.environ.get("CALL_DIRECT") == "1"      # 직접 통화(배포 판)와 함께 켜졌나: 휴대폰은 읽어 주기 없이 상담사 말을 글로만 보인다
 GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name in ("whisper", "elevenlabs") else 900))      # 이 둘은 확정 글이 이미 조용함을 기다린 뒤에 온다
-MAX_ROOMS = int(os.environ.get("CALL_VOICE_MAX_ROOMS", "4"))             # 리턴제로 무료는 스트리밍 5줄까지(문서)
-ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC", "600"))
-OPENS_PER_HOUR = int(os.environ.get("CALL_VOICE_OPENS_PER_HOUR", "40"))
+MAX_ROOMS = int(os.environ.get("CALL_VOICE_MAX_ROOMS") or (20 if DIRECT else 4))          # 리턴제로 무료는 스트리밍 5줄까지(문서). 직접 통화는 글로만 붙는 방이 대부분이라 넉넉히
+ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC") or (1800 if DIRECT else 600))
+OPENS_PER_HOUR = int(os.environ.get("CALL_VOICE_OPENS_PER_HOUR") or (0 if DIRECT else 40)) or 10**9
+POLL_MS = int(os.environ.get("CALL_VOICE_POLL_MS") or (600 if DIRECT else 250))
+PICK_SEC = int(os.environ.get("CALL_VOICE_PICK_SEC") or 20)
+TEXT_MAX = int(os.environ.get("CALL_DIRECT_SAID_MAX") or 2000) if DIRECT else 500           # 휴대폰이 친 글 한 줄(직접 통화는 서버가 한 차례에 읽는 자 수와 같게)
 IDLE_SEC = 90                                                            # 양쪽 다 이만큼 소식이 없으면 방을 닫는다
 rooms, opens, lock = {}, [], threading.Lock()
 
@@ -175,7 +180,8 @@ def _api(h, body):
     u = urlsplit(h.path)
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
-        return h.send_json({"on": True, "direct": DIRECT, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
+        return h.send_json({"on": True, "direct": DIRECT, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC,
+                            "poll_ms": POLL_MS, "pick_sec": PICK_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
     if p == "line":
@@ -202,7 +208,7 @@ def _api(h, body):
             r["last"] = time.time()
     if not r:
         return h.send_json({"error": "끝난 통화입니다."}, 404)
-    text = " ".join(str(b.get("text", "")).split())[:500]
+    text = " ".join(str(b.get("text", "")).split())[:TEXT_MAX]
     if p == "claim":                            # 화면 쪽: 기다리는 통화를 받는다(한 화면만)
         with lock:
             if not r["waiting"]:
@@ -212,7 +218,11 @@ def _api(h, body):
     if p == "join" and q.get("text") == "1":    # 소리 쪽이 글로만 붙는다(받아쓰기를 열지 않는다)
         r["caller"] = True
         return h.send_json({"ok": True, "stt": None})
-    if p == "text":                             # 소리 쪽: 민원인이 친 글 한 줄(받아쓰기를 거치지 않고 확정 글로)
+    if p == "text":                             # 소리 쪽: 민원인이 친 글 한 줄(받아쓰기를 거치지 않고 확정 글로). id: 망이 끊겨 다시 보낸 같은 글은 한 번만
+        sent = r.setdefault("ids", set())
+        if text and str(b.get("id", "")) in sent:
+            return h.send_json({"ok": True, "again": True})
+        sent.add(str(b.get("id", "")) or secrets.token_hex(4))
         if text:
             r["caller"] = True
             r["events"].append({"final": True, "text": text, "typed": True})
@@ -224,11 +234,12 @@ def _api(h, body):
             print(f"받아쓰기를 열지 못함: {type(e).__name__}")
             return h.send_json({"error": "받아쓰기에 닿지 못했습니다."}, 502)
         return h.send_json({"ok": True, "stt": STT.name})
-    if p == "audio":                            # 소리 쪽: 소리 한 토막(없어도 됨)을 넣고, 읽어 줄 말을 받아 간다
-        if body and r["stt"]:
+    if p in ("audio", "poll"):                  # 소리 쪽: 소리 한 토막(없어도 됨)을 넣고, 읽어 줄 말을 받아 간다. poll = 글로만 붙은 휴대폰(GET, 본문 없음)
+        if body and r["stt"] and p == "audio":
             feed(r, body)
         r["played"] = max(r["played"], _int(q, "played", 0, 10**6, 0))
-        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"], "picked": r["picked"], "cut": r["cut"]})
+        busy = 0 if r["picked"] else sum(1 for x in rooms.values() if x["picked"])      # 아직 아무도 안 받았으면: 받은 통화가 몇인가(휴대폰이 「다른 통화 중」인지 「받을 사람 없음」인지 고른다)
+        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"], "picked": r["picked"], "cut": r["cut"], "busy": busy})
     if p == "fake":                             # 소리 쪽(가짜 받아쓰기일 때만 뜻이 있다): 이 글을 「말한다」
         if r["stt"] and text:
             r["stt"].speak(text)

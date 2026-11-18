@@ -41,6 +41,7 @@ MODE = "saved" if os.environ.get("CALL_MODE") == "saved" else "code" if os.envir
 PORT = int(os.environ.get("CALL_PORT", "8772"))
 MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 · 물음 간추리기에 쓰는 Solar 대화 모델
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
+SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -1406,7 +1407,7 @@ def turn(st, ev):
                     _mark_stall(st, R)
     elif isinstance(line, dict) and str(line.get("text", "")).strip():
         who = "상담사" if line.get("who") == "상담사" else "시민"
-        text = str(line["text"]).strip()[:500]
+        text = str(line["text"]).strip()[:SAID_MAX]
         st["lines"].append({"who": who, "text": text, "via": str(line.get("via") or "")[:10]})
         if who == "시민":                                  # ① 코드가 먼저 읽는다
             t0 = time.perf_counter()

@@ -8,10 +8,11 @@
 'use strict';
 (() => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const SETTLE = 1000;      // 받아쓴 글이 이만큼 멎어야 읽고 · 상담사 말을 올린다(말 중간 쉼으로 갈린 마디를 한 번에). ponytail: 실제 사람 말로 맞춘 값이 아니다
+  let SETTLE = 3000;        // 받아쓴 말이 이만큼 멎어야 읽고 · 상담사 말을 올린다(말 중간 쉼으로 갈린 마디를 한 번에). 동규 11/19 「3초 정도」, 서버 CALL_DIRECT_SETTLE_MS로 바꾼다. 글은 보내기를 누르면 바로
+  let SAID_MAX = 2000, INPUT_MAX = 1000;      // 서버가 한 차례에 읽는 자 수 · 입력 칸 자 수(서버 CALL_DIRECT_SAID_MAX · CALL_DIRECT_INPUT_MAX)
   const LAW_WAIT = 45000;   // 조례 답을 기다리는 가장 긴 때. 넘으면 「확인 불가」 말을 올린다
   // 화면 글은 문구 파일(docs/content/A-05_통화위치좁히기.md 「직접 통화」 절)에서만
-  const NAMES = { input: '입력 칸', send: '보내기', note: '안내', code: '접근 코드 묻기', badcode: '접근 코드 틀림', limit: '상한', failed: '읽지 못함' };
+  const NAMES = { input: '입력 칸', send: '보내기', note: '안내', code: '접근 코드 묻기', badcode: '접근 코드 틀림', limit: '상한', failed: '읽지 못함', left: '남은 글자', toolong: '입력 칸 넘침', cut: '앞부분만 읽음' };
   const T = {};
   const st = { busy: false, buf: [], via: 'type', posted: new Set(), merged: 0, turns: 0, heard: 0 };
 
@@ -53,11 +54,12 @@
   }
   async function turn() {
     if (ui.ended) { resetCall(); st.posted.clear(); }      // 끝난 통화 뒤의 말은 새 통화로
-    let text = st.buf.splice(0).join(' ');
+    let text = st.buf.splice(0).join(' '), cut = false;
     for (;;) {
       const snap = { S: S && JSON.parse(JSON.stringify(S)), V, askQ: ui.askQ };      // 이 차례 앞의 상태: 합쳐 다시 읽을 때 돌아갈 자리
       st.turns++;
-      const ok = await ask(text, st.via);      // ① 코드 읽기 → ② Solar 다시 읽기(실제 호출일 때)
+      cut = text.length > SAID_MAX;      // 서버는 앞 SAID_MAX자로 답한다. 보내는 글도 거기까지(합친 글이 아주 길어도 본문이 커지지 않게), 답한 뒤 알린다
+      const ok = await ask(text.slice(0, SAID_MAX), st.via);      // ① 코드 읽기 → ② Solar 다시 읽기(실제 호출일 때)
       if (!ok) return fail();
       await waitLaw();
       await quiet();      // 답을 올리기 전에 민원인이 아직 말하는 중이면 그 마디를 기다렸다 합친다
@@ -70,6 +72,7 @@
     }
     showBuf();
     await reply();
+    if (cut) { const m = fill(T.cut, { N: SAID_MAX.toLocaleString() }); note(m); if (window.VOICE && window.VOICE.relay) window.VOICE.relay(m); }      // 조용히 자르지 않는다(이 차례의 다른 알림 뒤에 남게 마지막에)
   }
   async function waitLaw() {      // 조례를 물었고 엔진이 찾는 중이면 답이 올 때까지(그동안 말이 더 들어오면 멈추고 합치러 간다)
     const t0 = Date.now();
@@ -90,17 +93,24 @@
   async function fail() {      // 서버가 받지 않았다: 상한 · 표 없음이면 그 글을, 아니면 「읽지 못함」
     st.buf.length = 0;
     const { d } = await japi('/api/direct/info');
-    note(!d.pass ? T.code : d.used >= d.max || d.left_all <= 0 ? T.limit : T.failed);
+    const m = !d.pass ? T.code : d.used >= d.max || d.left_all <= 0 ? T.limit : T.failed;
+    note(m);
+    if (window.VOICE && window.VOICE.relay) window.VOICE.relay(m);      // 휴대폰으로 건 통화면 휴대폰에도 같은 안내를
   }
 
   // ---- 화면: 대화창 아래 입력칸(새로 끼운다. call.js의 입력칸은 숨은 조작 화면 것이라 건드리지 않는다)
   function mount() {
-    document.head.insertAdjacentHTML('beforeend', '<style>.d-say{display:flex;gap:6px}.d-say input{flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel-solid);color:var(--ink);font-size:14px}.d-note{margin:0;color:var(--sub);font-size:11.5px}body.direct #k-ctl input,body.direct #k-ctl [data-act="send"],body.direct .ask .opts{display:none!important}</style>');
-    document.querySelector('#talk footer').insertAdjacentHTML('afterbegin', `<form class="d-say" id="d-say"><input id="d-text" type="text" maxlength="300" autocomplete="off" aria-label="${esc(T.input)}" placeholder="${esc(T.input)}"><button type="submit" class="primary">${esc(T.send)}</button></form><p class="d-note">${esc(T.note)}</p>`);
+    document.head.insertAdjacentHTML('beforeend', '<style>.d-note{display:flex;justify-content:space-between;gap:8px}.d-note .warn{color:var(--bad,#c0392b)}.d-say{display:flex;gap:6px}.d-say input{flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel-solid);color:var(--ink);font-size:14px}.d-note{margin:0;color:var(--sub);font-size:11.5px}body.direct #k-ctl input,body.direct #k-ctl [data-act="send"],body.direct .ask .opts{display:none!important}</style>');
+    document.querySelector('#talk footer').insertAdjacentHTML('afterbegin', `<form class="d-say" id="d-say"><input id="d-text" type="text" maxlength="${INPUT_MAX}" autocomplete="off" aria-label="${esc(T.input)}" placeholder="${esc(T.input)}"><button type="submit" class="primary">${esc(T.send)}</button></form><p class="d-note"><span>${esc(T.note)}</span><span id="d-left" aria-live="polite"></span></p>`);
+    const el = document.getElementById('d-text'), out = document.getElementById('d-left');      // 남은 글자. 붙여 넣은 글이 넘쳐 잘리면 그렇게 알린다(조용히 자르지 않게)
+    const left = (cut) => { out.textContent = cut ? fill(T.toolong, { N: INPUT_MAX.toLocaleString() }) : fill(T.left, { N: (INPUT_MAX - el.value.length).toLocaleString() }); out.classList.toggle('warn', !!cut); };
+    el.addEventListener('paste', (ev) => { const add = (ev.clipboardData && ev.clipboardData.getData('text')) || ''; const cut = el.value.length - (el.selectionEnd - el.selectionStart) + add.length > INPUT_MAX; setTimeout(() => left(cut), 0); });
+    el.addEventListener('input', (ev) => { if (ev.inputType !== 'insertFromPaste') left(false); });
+    left(false);
     document.getElementById('d-say').addEventListener('submit', (ev) => {      // 답을 기다리는 동안에도 받는다(모아 두었다 합친다)
       ev.preventDefault();
       const el = document.getElementById('d-text'), v = el.value.trim();
-      if (v) { el.value = ''; said(v, 'type'); }
+      if (v) { el.value = ''; left(false); said(v, 'type'); }
     });
     document.addEventListener('click', (ev) => {      // 「전화가 왔습니다 · 받기」: 직접 통화에서는 상담사 인사를 올리고 입력칸으로
       if (ui.scene === 'free' && ev.target.closest('#lines [data-act="play"]')) {
@@ -115,6 +125,7 @@
   (async () => {
     const info = (await japi('/api/direct/info')).d;
     if (!info.on) return;
+    SETTLE = info.settle_ms || SETTLE; SAID_MAX = info.said_max || SAID_MAX; INPUT_MAX = info.input_max || INPUT_MAX;
     while (!window.CALL) await sleep(50);      // call.js가 시작을 다 마친 뒤에(문구를 받은 뒤 참고 자료 · 상담 기록을 받고 통화를 한 번 더 비운다. 그 전에 시작하면 첫 말이 지워진다)
     loadText(DOC);
     document.body.classList.add('direct');

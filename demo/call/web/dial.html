@@ -30,6 +30,8 @@
   #d-mic[hidden] { display: none; }
   form { display: flex; gap: 8px; width: min(100%, 420px); margin: 0 0 22px; }
   form[hidden] { display: none; }      /* 통화 중일 때만 보인다 */
+  #d-left { width: min(100%, 420px); margin: 0 0 4px; text-align: right; font-size: 12px; color: var(--sub); } #d-left[hidden] { display: none; } #d-left.warn { color: #ffb4b6; }
+  #d-log li.fail { opacity: .6; } #d-log li i { display: block; font-size: 12px; font-style: normal; }
   input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: #111a29; color: #fff; font-size: 16px; }
   form button { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: #fff; font-size: 15px; }
   #d-call { width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--go); color: #04121a; font-size: 14px; font-weight: 700; }
@@ -50,6 +52,7 @@
   <ol id="d-log" aria-live="polite"></ol>
 </div>
 <button type="button" id="d-mic" hidden></button>
+<p id="d-left" hidden></p>
 <form id="d-form" hidden><input id="d-text" type="text" maxlength="300" autocomplete="off"><button id="d-send"></button></form>
 <button type="button" id="d-call" disabled></button>
 <script src="voice.js"></script>
