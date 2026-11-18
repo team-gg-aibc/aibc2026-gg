@@ -455,7 +455,7 @@ def code_read(said, asked, short, R):
             if (a.get("own") or a["after"]).startswith("에서") and re.match(r"^(쪽으로|쪽|으로|로)?(가는|향하는|가던|가고|가다가)", b["after"]) and a["key"] != b["key"] and ("crossone" not in L.ON or (one(a["key"]) and one(b["key"]))):
                 read["clues"] = [c for c in read["clues"] if not (c.get("k") in (a["key"], b["key"]) and c["t"] in ("at", "toward"))]
                 read["clues"] += [{"t": "past", "k": a["key"], "how": "모름", "flat": True, "label": a["name"], "sure": True}, {"t": "before", "k": b["key"], "how": "모름", "flat": True, "label": b["name"], "sure": True},     # flat: A와 B 사이 어디쯤인지는 말하지 않았다(A 바로 뒤에 무게를 두면 첫 말만으로 좁은 구간이 되어 틀린 확정이 늘었다)
-                                  {"t": "between", "k": [a["key"], b["key"]], "label": f"{a['name']} ~ {b['name']} 사이", "sure": True}]
+                                  {"t": "between", "k": [a["key"], b["key"]], "label": fill(tab("위치 범위")["단서 · 사이"], 이름=a["name"], 끝=b["name"]), "sure": True}]
                 break
     for kind in G.categories(said):
         if not any(m.get("kind") == kind for m in short):
@@ -683,7 +683,7 @@ def speech_fix(said, read, short, clues):
             if p and 1 <= mins <= 20:
                 ring = WALK_M * mins
                 read["clues"] = [c for c in read["clues"] if k0(c) != m["key"]] + [{"t": "pt", "p": [round(p[0], 1), round(p[1], 1)], "ring": ring, "r": max(40.0, 0.45 * ring), "e": 0.25, "walk": True, "sure": True,
-                                                                               "label": f"{m['name']}에서 걸어서 {mins:g}분쯤"}]
+                                                                               "label": fill(tab("위치 범위")["단서 · 걸어서 몇 분"], 이름=m["name"], 분=f"{mins:g}")}]
                 skip.append(m["key"])
     road_talk = any(c.get("t") == "at" and "k" in c and L.resolve(c["k"])["roads"] and not len(L.resolve(c["k"])["x"]) for c in list(clues) + read["clues"])
     if "fromto" in on and not road_talk:                  # 「A에서 B 가는 방향이요」(걷는 사람): A 둘레(450m 안 고르게) 가운데 A에서 B 쪽으로 난 부채꼴
@@ -695,7 +695,7 @@ def speech_fix(said, read, short, clues):
                 if d >= 150:
                     read["clues"] = [c for c in read["clues"] if k0(c) not in (a["key"], b["key"])] + [
                         {"t": "at", "k": a["key"], "how": "쪽", "label": a["name"], "sure": True},
-                        {"t": "cone", "o": [round(pa[0], 1), round(pa[1], 1)], "v": [round((pb[0] - pa[0]) / d, 3), round((pb[1] - pa[1]) / d, 3)], "sure": True, "label": f"{a['name']} → {b['name']} 쪽"}]
+                        {"t": "cone", "o": [round(pa[0], 1), round(pa[1], 1)], "v": [round((pb[0] - pa[0]) / d, 3), round((pb[1] - pa[1]) / d, 3)], "sure": True, "label": fill(tab("위치 범위")["단서 · 가는 방향"], 이름=a["name"], 쪽=b["name"])}]
                     skip.append(b["key"])
                     break
     if "facil" in on:                                     # 「○○동인데요, 주민센터 앞이에요」: 동 이름 없이 말한 흔한 시설을 지금 범위 안에서 찾는다
@@ -722,7 +722,7 @@ def speech_fix(said, read, short, clues):
                 read["clues"].append({"t": rel, "p": p, "how": hw if hw in L.DIST else "모름", "label": G.name[i], "sure": True, "e": 0.2} if rel in ("past", "before") else {"t": "pt", "p": p, "r": sig, "e": 0.2, "sure": True, "label": G.name[i]})
             else:
                 read["clues"].append({"t": "anyof", "ps": [[round(float(G.x[i]), 1), round(float(G.y[i]), 1)] for _, i in idx], "r": max(sig, 250.0) if rel in ("past", "before") else sig, "sure": True,
-                                      "label": f"{word}({' · '.join(G.name[i] for _, i in idx[:3])} 가운데)"})
+                                      "label": fill(tab("위치 범위")["단서 · 여럿 가운데 하나"], 낱말=word, 이름들=" · ".join(G.name[i] for _, i in idx[:3]))})
             read["unfound"] = [u for u in read.get("unfound") or [] if word not in gaz.norm(u)]
             if any(k0(c) == word for c in read["clues"]):
                 read["clues"] = [c for c in read["clues"] if k0(c) != word]
@@ -1156,7 +1156,7 @@ def addr_in(said, R=None):
         elif not hits and "addrline" in L.ON:             # (addrline, 기본 끔 · 53번) 주소 표에 없는 건물번호: 같은 길의 아는 번호 사이로 어림한다
             g = addr_guess(m.group(1), int(m.group(2).split("-")[0]), box)
             if g:
-                out.append((f"{m.group(1)} {m.group(2)}쯤", g[0], g[1]))
+                out.append((fill(tab("위치 범위")["단서 · 주소 어림"], 주소=f"{m.group(1)} {m.group(2)}"), g[0], g[1]))
     return out
 
 
