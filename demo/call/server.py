@@ -308,11 +308,11 @@ def fuzzy_in_range(said, R, found, kinds=None):
         ws = list(re.finditer(r"[가-힣A-Za-z0-9]+", said))
         for w1, w2 in zip(ws, ws[1:]):
             tok = gaz.norm(w1.group() + gaz.ENDS.sub("", w2.group()))
-            if said[w1.end():w2.start()].strip() or len(tok) < 5 or tok in G.ix or any(a < w2.end() and w1.start() < b for a, b in used) or VERB_END.search(w1.group()):
-                continue
+            if said[w1.end():w2.start()].strip() or len(tok) < 5 or tok in G.ix or any(a < w2.end() and w1.start() < b for a, b in used) or VERB_END.search(w1.group()) or REL_TOK.match(w2.group()) or any("key" in o and tok in o["key"] for o in found):
+                continue                                  # 뒷낱말이 자리 말(「여의도공원 안이요」의 안)이면 붙이지 않는다: 붙이면 버스 정류장 「여의도공원앞」에 이어졌다(11-18 씨앗 1114 #100)
             head = gaz.ear(tok)[:1]
             best = max(((gaz.similar(tok, key, True), key) for key in names if gaz.ear(key)[:1] == head and abs(len(key) - len(tok)) <= 1 and gaz.same_digits(tok, key)), default=(0, None))
-            if best[0] >= 0.9:
+            if best[0] >= 0.9 and best[1] != gaz.norm(w1.group()):      # 앞낱말만으로 이미 그 이름이면(「보라매공원 X-게임장」의 보라매공원) 붙여서 얻은 것이 없다
                 out.append(link(best[1], said[w1.start():w2.end()], gaz.norm(said[w2.end():w2.end() + 14]), tok))
                 used.append((w1.start(), w2.end()))
     for raw, forms, a, b in gaz.phrases(said):
@@ -344,6 +344,7 @@ def fuzzy_in_range(said, R, found, kinds=None):
     return out[:2]
 
 
+REL_TOK = re.compile(r"^(안|앞|옆|뒤|밖|위|밑|쪽|근처|건너|맞은편|사이|부근|주변|인근|바깥|입구|출구|정문|후문)(쪽|편)?(이|에|으|로|인|입|예|요|은|는|도|고|라|가|$)")      # 이름 뒤에 온 자리 말(이름의 일부가 아니다)
 PLACE_WORDS = set("""앞 옆 뒤 근처 쪽 건너편 맞은편 사이 안쪽 바깥 골목 골목길 길 도로 큰길 집 집앞 우리집 저희집 동네 여기 거기 저기 지금 방금 아까 출구 입구 번 정문 후문 사거리 삼거리 교차로
 인도 차도 횡단보도 정류장 버스정류장 역 지하철역 아파트 단지 공원 다리 위 아래 밑 부근 주변 인근 쪽으로 방향 가는 중 거 것 데 곳 저 제가 그 이 네 예 아 음 어 좀 혹시 그런데 근데 그리고""".split())
 
@@ -666,7 +667,6 @@ def speech_fix(said, read, short, clues):
             here = {m["key"] for m in keyed if m["key"] in head or gaz.norm(m["said"]) in head} - {m["key"] for m in keyed if m["key"] in tail or gaz.norm(m["said"]) in tail}
             if here and any(m["key"] not in here for m in keyed):
                 read["clues"] = [c for c in read["clues"] if k0(c) not in here]
-                read["matter"]["away"] = True
                 skip += list(here)
     if "notbut" in on:                                    # 「농협이 아니라 주민센터 앞이에요」 · 「○○ 말고 △△ 옆이에요」: 앞 차례에 댄 그 이름을 거둔다
         for mm in re.finditer(r"([가-힣A-Za-z0-9]{2,}?)(?:이|가|은|는)?\s*(?:아니라|아니고|아니구|말고)", said):
@@ -832,7 +832,9 @@ def model_read(st, short, known):
     ch = raw.get("choice") or ""
     if ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts):
         s = opts[int(ch[1:]) - 1]["set"]
-        read["clues"] += [c for c in s.get("clues", []) if not any(x.get("label") == c.get("label") for x in read["clues"])]
+        said_n, named = gaz.norm(turn_["said"]), "choicekeep" in L.ON and bool(short)      # (choicekeep) 시민이 다른 이름을 댔는데(「동부간선진입교 조금 지나서」) Solar가 말하지 않은 보기(「상계교 방금 지남」)를 고르면 그 「지남 · 못 미침」 단서는 넣지 않는다(씨앗 1201 #17, 600m 틀린 확정)
+        read["clues"] += [c for c in s.get("clues", []) if not any(x.get("label") == c.get("label") for x in read["clues"])
+                          and not (named and c.get("t") in ("past", "before") and gaz.norm(str(c.get("label") or "").split(" → ")[0]) not in said_n)]
         read["matter"].update(s.get("matter") or {})
         read["drop"] += list(s.get("drop") or [])
         if "confirm" in s:
@@ -1316,7 +1318,7 @@ def _merge(code, model):
     model = dict(model, clues=[c for c in model.get("clues") or [] if str(c.get("k") or "").split("|")[0] not in skip])
     if "choicekeep" in L.ON:                              # (choicekeep, 기본 끔 · 53번) 「○○ 지나고 1분쯤 됐어요」: 코드는 시민이 말한 정도(1분쯤 · 조금)로 읽어 두는데, Solar가 보기를 고르면 그 보기에 미리 든 「방금 지남」 단서가 다시 들어와 이겼다(47번 pastfix가 실제 호출 길에서 풀리던 일). 같은 표지의 「지났다 · 못 미쳤다」를 코드가 뚜렷이 읽었으면 보기 단서는 버린다
         nl = lambda c: gaz.norm(str(c.get("label") or c.get("k") or "").split(" → ")[0])      # noqa: E731
-        model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("past", "before") and nl(c) and any(x.get("t") == c["t"] and nl(x) == nl(c) for x in sure))])
+        model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("past", "before") and nl(c) and any(x.get("t") == c["t"] and nl(x) and (nl(c) in nl(x) or nl(x) in nl(c)) for x in sure))])      # 이름이 겹치는 것도(시민은 「상계교 나가는 길 조금 지나서」라고 했는데 Solar가 다리 「상계교 방금 지남」을 더 넣어 600m 틀린 확정, 씨앗 1201 #17)
     same = lambda a, b: (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a.get("label") and a.get("label") == b.get("label"))   # noqa: E731
     return dict(model, clues=sure + [c for c in model.get("clues") or [] if not any(same(c, x) for x in sure)])
 
