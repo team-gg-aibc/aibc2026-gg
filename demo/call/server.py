@@ -369,6 +369,15 @@ def code_read(said, asked, short, R):
         if sure or m.get("sure") or (fixed and "key" in m):
             read["clues"][-1]["sure"] = True              # 고쳐 말한 바로 뒤의 이름은 뚜렷하다: Solar가 「아님」을 엉뚱한 이름에 붙여도 코드 것을 쓴다(11-15 「성수대교 아니고 영동대교 남단」)
         fixed = False
+    if "crossdir" in L.ON:                                # (crossdir, 기본 끔 · 49번) 「A 사거리에서 B 가는 방향」: A 근처 + B 쪽이 아니라 A를 지나 B로 가는 길 구간(구청 인터뷰의 말투)
+        keyed = [m for m in short if "key" in m]
+        for a, b in zip(keyed, keyed[1:]):
+            one = lambda k: (lambda r: len(r["x"]) >= 1 and not r["roads"] and float(np.ptp(r["x"]) + np.ptp(r["y"])) <= 150)(L.resolve(k))     # noqa: E731  한 곳에 모인 이름(나들목 · 분기점처럼 여러 점에 걸친 이름은 어느 점인지 몰라 「사이」로 읽지 않는다)
+            if (a.get("own") or a["after"]).startswith("에서") and re.match(r"^(쪽으로|쪽|으로|로)?(가는|향하는|가던|가고|가다가)", b["after"]) and a["key"] != b["key"] and ("crossone" not in L.ON or (one(a["key"]) and one(b["key"]))):
+                read["clues"] = [c for c in read["clues"] if not (c.get("k") in (a["key"], b["key"]) and c["t"] in ("at", "toward"))]
+                read["clues"] += [{"t": "past", "k": a["key"], "how": "모름", "flat": True, "label": a["name"], "sure": True}, {"t": "before", "k": b["key"], "how": "모름", "flat": True, "label": b["name"], "sure": True},     # flat: A와 B 사이 어디쯤인지는 말하지 않았다(A 바로 뒤에 무게를 두면 첫 말만으로 좁은 구간이 되어 틀린 확정이 늘었다)
+                                  {"t": "between", "k": [a["key"], b["key"]], "label": f"{a['name']} ~ {b['name']} 사이", "sure": True}]
+                break
     for kind in G.categories(said):
         if not any(m.get("kind") == kind for m in short):
             read["clues"].append({"t": "cat", "c": kind, "label": fill(tab("위치 범위")["단서 · 종류 보임"], 종류=kind)})
@@ -998,7 +1007,7 @@ def build(st, extra=None):
     parts = L.describe(R, clues) if R else None
     anc = L.anchor(R, clues) if done else None
     line = where_line(parts, done, matter, anc) if parts else None
-    blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
+    blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON or "lamponce2" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
     qs = L.questions(R, clues, dict(matter, blind=blind) if blind else matter, st["asked_log"])
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
@@ -1100,7 +1109,7 @@ def _reject(R):
 def _log_id(asked, read, prev):
     """시민이 답한 질문을 적어 둘 이름. 위치를 좁히려고 물었는데 새 단서를 못 얻었거나, 확인에 「아니요」면 끝에 !를 붙인다(같은 질문을 되풀이하지 않게)."""
     qid = (asked or {}).get("id")
-    same = lambda c: (c.get("t"), c.get("k") or c.get("label"), tuple(c["p"]) if isinstance(c.get("p"), list) and c["p"] and not isinstance(c["p"][0], list) else None)      # noqa: E731
+    same = lambda c: (c.get("t"), (tuple(c["k"]) if isinstance(c.get("k"), list) else c.get("k")) or c.get("label"), tuple(c["p"]) if isinstance(c.get("p"), list) and c["p"] and not isinstance(c["p"][0], list) else None)      # noqa: E731
     known = {same(c) for c in prev}
     new = [c for c in read.get("clues") or [] if same(c) not in known] + list(read.get("drop") or [])     # 이미 가진 표지를 다시 댄 것(「노량대교 지나고 조금 뒤」)은 새 단서가 아니다: 같은 질문을 곧바로 또 묻지 않게(11-15)
     if qid in L.PIN_KEYS and (read.get("matter") or {}).get(qid) is None:

@@ -811,6 +811,10 @@ def questions(R, clues, matter, asked=()):
     miss |= {q for q in LOCQ if list(asked).count(q + "!") >= 2}      # 두 번 물어 두 번 다 못 얻은 질문은 이 통화에서 더 묻지 않는다
     if "softnot" in ON and sum(1 for a in ids if a == "either") >= 3:
         miss.add("either")                                # 둘 중 고르기는 한 통화에 세 번까지
+    if "lamponce" in ON and "lampno" in ids:
+        miss.add("lampno")                                # (lamponce, 기본 끔 · 49번) 가로등 번호는 한 통화에 한 번: 이미 지나온 기둥은 다시 볼 수 없다
+    if "lamponce2" in ON and "lampno" in (matter.get("blind") or ()):
+        miss.add("lampno")                                # (lamponce2, 기본 끔 · 49번) 「번호 못 봤어요」를 들었을 때만 다시 안 묻는다(「모르겠어요」는 다시 물으면 답할 수 있다)
     if "seenonce" in ON:                                  # (seenonce, 기본 끔 · 47번 방법 1) 시민 둘레는 통화 내내 같다: 「안 보여요」 · 「번호 못 봤어요」를 한 번 들은 열린 질문은 다시 묻지 않는다
         blind = set(matter.get("blind") or ())
         miss |= ({"mark", "finer", "mark_again"} if blind & {"mark", "finer", "mark_again"} else set()) | (blind & {"lampno"})
@@ -834,6 +838,8 @@ def questions(R, clues, matter, asked=()):
             order = ["mark", "closest", "either", "seen"]    # 넓은 공원: 이름을 떠올리기보다 보기에서 고르기(33번 2-4)
         if "dist" in ON and r <= 250 and ("distall" in ON or _area_at(G.parks, R["cx"], R["cy"])):
             order = ["dist", "finer", "either", "seen"]  # 표지까지 얼마나 떨어졌는지를 「바로 앞에 뭐가 보이세요?」보다 먼저(33번 2-2). 공원 안에서만(distall이면 어디서나)
+        if "closest2" in ON and 80 < r <= 250 and _area_at(G.parks, R["cx"], R["cy"]) and sum(1 for c in clues if c["t"] == "closest") == 1:
+            order = ["closest"] + order                   # (closest2) 첫 판으로 줄어든 범위 안의 것 넷으로 한 번 더
         if r <= 150 and ids.count("from") < 2 and "from" not in OFF:     # 이름 하나 둘레로 좁혀졌으면 「그 표지에서 어느 쪽」을 먼저(같은 말 「○○ 근처」만 거듭되지 않게)
             order = ["from"] + order
         if "parknum" in ON and r > 100 and "mark" in ids and "lampno" not in ids and _area_at(G.parks, R["cx"], R["cy"]) and _lamps_within(R["cx"], R["cy"], R["r_cover"]):
@@ -1090,8 +1096,8 @@ def _q_dist(R, clues):
 
 def _q_closest(R, x, y, w, clues):
     """(CALL_ON=closest) 넓은 공원 안: 범위 안의 눈에 띄는 큰 것 넷을 내밀고 「어디가 가장 가까우세요?」(33번 2-4). 한 통화에 한 번."""
-    if any(c["t"] == "closest" for c in clues):
-        return None
+    if sum(1 for c in clues if c["t"] == "closest") >= (2 if "closest2" in ON else 1):
+        return None                                       # (closest2, 기본 끔 · 49번) 좁혀진 범위에서 한 번 더(더 작은 것들로)
     picked, parts = _candidates(x, y, w, max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None)
     keep = []
     for i in picked:
@@ -1210,23 +1216,27 @@ def _q_next(R, x, y, w, clues):
     best = None
     for i in _places_in(x.min() - 60, y.min() - 60, x.max() + 60, y.max() + 60, 8000):
         nm = G.name[i]
-        if G.kind[i] not in (("다리", "나들목", "터널", "육교") + (("교차로", "역", "역 출구", "정류장", "주유소") if "drive" in ON else ())) or not 3 <= len(nm) <= 16 or gaz.norm(nm) in said or gaz.GENERIC.match(nm.replace(" ", "")):
+        ramp = "nextramp" in ON and G.kind[i] == "진출입로" and getattr(G, "rp0", 0) <= i < getattr(G, "rp1", 0) and not (     # (nextramp, 기본 끔 · 49번) 같은 방향의 나가는 길 · 들어오는 길도 가르는 표지로(표지판으로 보인다)
+            "ramp2" in ON and sum(1 for c in clues if c.get("flat") and ("나가는 길" in (c.get("label") or "") or "들어오는 길" in (c.get("label") or ""))) >= 2)     # (ramp2) 진출입로로 묻는 것은 한 통화 두 번까지
+        if ramp and float(G.rhead[i - G.rp0] @ np.asarray(h)) < 0.5:
+            continue                                      # 맞은편 차로의 나가는 길은 보이지 않는다
+        if not ramp and (G.kind[i] not in (("다리", "나들목", "터널", "육교") + (("교차로", "역", "역 출구", "정류장", "주유소") if "drive" in ON else ())) or not 3 <= len(nm) <= 16) or gaz.norm(nm) in said or gaz.GENERIC.match(nm.replace(" ", "")):
             continue
         same = resolve(gaz.norm(nm))
-        if int((np.hypot(same["x"] - G.x[i], same["y"] - G.y[i]) < 1500).sum()) > 1:
-            continue                                      # 같은 이름이 둘레에 여럿(분기점의 갈래 · 긴 터널): 어느 것을 지났는지 묻기 어렵다
+        if not ramp and int((np.hypot(same["x"] - G.x[i], same["y"] - G.y[i]) < 1500).sum()) > 1:
+            continue                                      # 같은 이름이 둘레에 여럿(분기점의 갈래 · 긴 터널): 어느 것을 지났는지 묻기 어렵다(진출입로는 방향으로 이미 갈랐다)
         dr = np.hypot(rxy[:, 0] - G.x[i], rxy[:, 1] - G.y[i])
         if dr.min() > 60:
             continue                                      # 본선 위(차로 지나며 보는 것)만
         px, py = rxy[int(dr.argmin())]
         p = float(w[(x - px) * h[0] + (y - py) * h[1] > 0].sum())
         if best is None or abs(p - 0.5) < abs(best[0] - 0.5):
-            best = (p, nm, [round(float(px), 1), round(float(py), 1)])
+            best = (p, nm, [round(float(px), 1), round(float(py), 1)], ramp)
     if not best or not 0.15 < best[0] < 0.85:
         return None
-    p, nm, pt = best
+    p, nm, pt, ramp = best
     express = any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
-    e = {} if express else {"e": 0.15}                    # 큰길에서는 지났는지 · 아직인지를 틀리게 말할 몫을 크게(33번 5-2)
+    e = {} if express and not (ramp and "rampsoft" in ON) else {"e": 0.15}     # (rampsoft, 기본 끔 · 49번) 나가는 길을 지났는지는 다리만큼 또렷하지 않다: 틀리게 말할 몫을 큰길과 같게                    # 큰길에서는 지났는지 · 아직인지를 틀리게 말할 몫을 크게(33번 5-2)
     return {"id": "next", "bits": _bits([p, 1 - p]), "name": nm,
             "options": [{"label": f"{nm} 지났음", "set": {"clues": [dict({"t": "past", "p": pt, "flat": True, "label": nm}, **e)]}},
                         {"label": f"{nm} 아직", "set": {"clues": [dict({"t": "before", "p": pt, "flat": True, "label": nm}, **e)]}}]}
