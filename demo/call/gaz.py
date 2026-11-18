@@ -19,6 +19,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 DIR = HERE / "data" / "seoul"
+ON = set(filter(None, os.environ.get("CALL_ON", "").split(",")))      # 켠 스위치. locate.py가 기본값(DEFAULT_ON)까지 넣은 것으로 다시 정한다(gaz.ON = ON)
 LON0, LAT0, KX, KY = 127.0, 37.55, 88200.0, 111000.0
 HIGH = {"역", "역 출구", "다리", "공원", "나들목", "터널", "교차로", "학교", "병원", "관공서", "마트", "볼거리", "터미널", "선착장", "동네", "산", "시장",
         "경찰", "소방서", "체육시설", "문화시설", "육교", "길", "자치구", "동", "별명"}          # 이름만 들어도 장소로 볼 종류
@@ -415,7 +416,7 @@ class Gazetteer:
         if key in STOP or key in CATEGORY or GENERIC.match(key) or key.isdigit():      # 숫자뿐인 이름(「8-15」)은 번호를 읽어 준 말과 헷갈려 받지 않는다
             return False
         if self.shop_only(refs) and key not in ALIAS_KEYS:            # 상가정보에만 있는 가게 이름은 바로 뒤에 「앞 · 옆 · 간판 · 보여 …」가 올 때만(「갤러리」 · 「가로등」 같은 흔한 낱말)
-            return len(key) >= 3 and key not in COMMON and bool((SHOP_AFTER2 if "hasjanha" in os.environ.get("CALL_ON", "") else SHOP_AFTER).match(after))
+            return len(key) >= 3 and key not in COMMON and bool((SHOP_AFTER2 if "hasjanha" in ON else SHOP_AFTER).match(after))
         kinds = {self.ref_kind(r) for r in refs[:40]}
         if kinds & HIGH or self.brand_like(key) or key in ALIAS_KEYS:
             return len(key) >= 3 or key in ALIAS_KEYS or key == "cu" or bool(kinds & {"자치구", "역"})
@@ -427,7 +428,7 @@ class Gazetteer:
         name = self.name[r0[1]] if r0[0] == "p" else self.roads[r0[1]]["name"] if r0[0] == "r" else {"park": self.parks, "gu": self.gu, "dong": self.dong}[r0[0]][r0[1]]["name"]
         if len(refs) > 1 and r0[0] == "p" and self.brand[r0[1]]:
             name = self.brand[r0[1]]
-        kinds = sorted({self.ref_kind(r) for r in refs[:60]}, key=(lambda k: (k not in HIGH, k not in ("자치구", "동", "공원"), k)) if "kindorder" in os.environ.get("CALL_ON", "") else (lambda k: k not in HIGH))
+        kinds = sorted({self.ref_kind(r) for r in refs[:60]}, key=(lambda k: (k not in HIGH, k not in ("자치구", "동", "공원"), k)) if "kindorder" in ON else (lambda k: k not in HIGH))
         # (kindorder, 기본 끔 · 53번) 눈에 띄는 종류가 둘 이상이면 차례가 파이썬 해시 씨앗에 따라 달라져, 같은 말이 프로세스마다 다르게 읽혔다(49번 1125 #56). 구 · 동 · 공원을 먼저, 나머지는 글자 차례로
         return {"key": key, "said": said, "name": name, "kinds": kinds[:3], "n": len(refs), "fuzzy": fuzzy, "after": after}
 
