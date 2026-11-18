@@ -1,0 +1,293 @@
+{
+ "note": "접수 카드 「참고 자료」 칸의 값. tools/build_refs.py가 만든다(손으로 고치지 않는다). check.py가 원본과 대조한다. head · unit · more · key · code는 문구 파일 A-05 「참고 자료」 표의 항목 이름",
+ "gal_source": "소관 · 처리 기관 조사의 조항-갈래 표(2026-11-11)",
+ "types": {
+  "carcass": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {
+     "class": "자동차전용도로"
+    },
+    {
+     "class": "한강공원"
+    },
+    {
+     "class": "시 공원"
+    },
+    {
+     "class": "공원"
+    },
+    {},
+    {}
+   ]
+  },
+  "stray": {
+   "scope": "in",
+   "law": "서울특별시 동물보호 조례",
+   "routes": [
+    {}
+   ]
+  },
+  "smoking": {
+   "scope": "in",
+   "law": "서울특별시 금연환경 조성 및 간접흡연 피해방지조례",
+   "routes": [
+    {
+     "class": "한강공원"
+    },
+    {}
+   ]
+  },
+  "park_use": {
+   "scope": "in",
+   "law": "서울특별시 도시공원 조례",
+   "routes": [
+    {
+     "class": "한강공원",
+     "scope": "out"
+    },
+    {
+     "class": "시 공원"
+    },
+    {}
+   ]
+  },
+  "vendor": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {
+     "class": "한강공원",
+     "scope": "out"
+    },
+    {
+     "class": "시 공원",
+     "scope": "in",
+     "law": "서울특별시 도시공원 조례"
+    },
+    {
+     "class": "공원",
+     "scope": "in",
+     "law": "서울특별시 도시공원 조례"
+    },
+    {}
+   ]
+  },
+  "bike": {
+   "scope": "in",
+   "law": "서울특별시 자전거이용 활성화에 관한 조례",
+   "routes": [
+    {
+     "class": "한강공원"
+    },
+    {}
+   ]
+  },
+  "parking": {
+   "scope": "in",
+   "law": null,
+   "routes": [
+    {
+     "class": "자동차전용도로"
+    },
+    {}
+   ]
+  },
+  "road": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {
+     "class": "자동차전용도로"
+    },
+    {}
+   ]
+  },
+  "light": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {
+     "class": "자동차전용도로"
+    },
+    {}
+   ]
+  },
+  "litter": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {
+     "class": "자동차전용도로"
+    },
+    {
+     "class": "한강공원"
+    },
+    {}
+   ]
+  },
+  "noise": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {}
+   ]
+  },
+  "other": {
+   "scope": "out",
+   "law": null,
+   "routes": [
+    {}
+   ]
+  }
+ },
+ "refs": {
+  "parking": [
+   {
+    "kind": "table",
+    "where": "별표 1 공영주차장 주차요금표",
+    "head": "주차 요금표 머리",
+    "unit": "주차 요금표 단위",
+    "rows": [
+     [
+      "1급지",
+      "500",
+      "5,000",
+      "400",
+      "28,000"
+     ],
+     [
+      "2급지",
+      "250",
+      "4,000",
+      "250",
+      "18,000"
+     ],
+     [
+      "3급지",
+      "150",
+      "3,000",
+      "150",
+      "10,000"
+     ]
+    ],
+    "more": "주차 요금표 더",
+    "law": "서울특별시 주차장 설치 및 관리 조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171833"
+   },
+   {
+    "kind": "quote",
+    "where": "별표 1 ※",
+    "text": "개별주차장 요금은 해당 급지 주차요금에 공시지가 변수를 곱하여 산정한다.",
+    "law": "서울특별시 주차장 설치 및 관리 조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171833"
+   },
+   {
+    "kind": "quote",
+    "where": "제6조 주차요금 및 가산금 ①",
+    "text": "시장이 설치한 노상주차장 및 노외주차장(이하 \"공영주차장\"이라 한다)의 주차요금은 별표 1과 같다. 다만, 하역주차구획의 주차요금은 해당 지역여건 등을 고려하여 시장이 따로 정하는 경우에는 그러하지 아니하다.",
+    "law": "서울특별시 주차장 설치 및 관리 조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171833"
+   },
+   {
+    "kind": "quote",
+    "where": "별표 1 비고 3",
+    "text": "급지는 다음 각 목과 같이 도시철도역 접근성 및 환승역·비환승역을 기준으로 선정한다.",
+    "law": "서울특별시 주차장 설치 및 관리 조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171833"
+   },
+   {
+    "kind": "absent",
+    "key": "주차 과태료 없음"
+   },
+   {
+    "kind": "gal",
+    "code": "P1"
+   }
+  ],
+  "smoking": [
+   {
+    "kind": "text",
+    "where": "제10조 과태료 부과ㆍ징수 등 ①",
+    "text": "시장은 제5조제4항을 위반하여 금연구역에서 흡연을 한 사람은 10만원의 과태료를 부과ㆍ징수한다.",
+    "law": "서울특별시 금연환경 조성 및 간접흡연 피해방지조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171803"
+   },
+   {
+    "kind": "gal",
+    "code": "S2"
+   }
+  ],
+  "park_use": [
+   {
+    "kind": "quote",
+    "where": "제23조 과태료 부과ㆍ징수 등 ①",
+    "text": "시장이 법 제56조에 따라 과태료를 부과하는 기준은 영 제51조제1항 별표 4와 같다.",
+    "law": "서울특별시 도시공원 조례",
+    "effective": "2026-07-13",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2147709"
+   },
+   {
+    "kind": "absent",
+    "key": "공원 과태료 없음"
+   },
+   {
+    "kind": "gal",
+    "code": "K3"
+   }
+  ],
+  "vendor": [
+   {
+    "kind": "quote",
+    "where": "제23조 과태료 부과ㆍ징수 등 ①",
+    "text": "시장이 법 제56조에 따라 과태료를 부과하는 기준은 영 제51조제1항 별표 4와 같다.",
+    "law": "서울특별시 도시공원 조례",
+    "effective": "2026-07-13",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2147709"
+   },
+   {
+    "kind": "absent",
+    "key": "공원 과태료 없음"
+   },
+   {
+    "kind": "gal",
+    "code": "K3"
+   }
+  ],
+  "bike": [
+   {
+    "kind": "table",
+    "where": "별표 자전거주차장 요금표",
+    "head": "자전거 요금표 머리",
+    "unit": "자전거 요금표 단위",
+    "rows": [
+     [
+      "주차요금",
+      "200",
+      "1,000",
+      "15,000"
+     ]
+    ],
+    "law": "서울특별시 자전거이용 활성화에 관한 조례",
+    "effective": "2026-10-01",
+    "url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171767"
+   },
+   {
+    "kind": "gal",
+    "code": "C3"
+   }
+  ],
+  "stray": [
+   {
+    "kind": "gal",
+    "code": "A3"
+   }
+  ]
+ }
+}

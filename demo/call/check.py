@@ -7,6 +7,7 @@
         단추만 눌러도, 대본에 없는 말(코드만으로 읽음)로도 끝까지 가는지 본다.
 """
 import json
+import re
 import os
 import subprocess
 import sys
@@ -22,6 +23,8 @@ EXPECT = {
     "roadkill": {"scope": "out", "to": "서울시설공단", "where": ["강변북로", "구리 방향"], "cite": None, "kind": "length", "r": 100},
     "stray": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안", "사슴우리", "스무 걸음"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
     "vendor": {"scope": "in", "to": "서울숲 관리사무소", "where": ["서울숲 안", "거울연못"], "cite": "서울특별시 도시공원 조례 제22조 제1항", "kind": "radius", "r": 50},      # 자리가 조례 답을 가르는 장면(11-15 동규)
+    "cat_street": {"scope": "in", "to": "동작구청 동물보호", "where": ["상도1동주민센터"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},      # 화면 장면 단추의 두 고양이 장면(11-17)
+    "cat_park": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
 }
 
 
@@ -52,10 +55,15 @@ def check_end(name, view, sizes):
     assert view["done"] and view["confirmed"] and view["question"] is None, f"{name}: 끝나지 않음"
     assert view["size"]["kind"] == e["kind"] and view["radius"] <= e["r"], f"{name}: 찾아갈 수 있을 만큼 좁혀지지 않음 {view['size']}"
     r, s = view["route"], view["summary"]
+    assert not (r["class_name"] and any(r["class_name"] in o["to"] for o in r["others"] if not o["here"])), f"{name}: 같은 일 다른 자리 표에 지금 자리 이름이 다른 줄로 샘 {r['others']}"      # 강변북로 위인데 「강변북로 관리사무소」(11-18)
     assert r["scope"] == e["scope"] and e["to"] in r["hit"]["to"], f"{name}: 갈림 · 넘길 곳이 다름 {r['scope']} {r['hit']['to']}"
     assert all(w in s["where"] for w in e["where"]), f"{name}: 위치 한 줄 {s['where']}"
     assert s["point"] and s["matter"] and e["to"] in s["to"] and s["go"] and view["pin"] and all(k in s["copy"] for k in ("민원을 받은 곳", "처음 접수한 담당자", "찾아가는 말", "번지수", "지도 좌표", "일", "처리할 담당 부서")), f"{name}: 접수 카드 {s}"
     assert view["answer_box"]["안내"]["name"] and view["answer_box"]["근거"]["name"] and view["heat"]["pts"] and len(view["heat"]["pts"]) <= 2500, f"{name}: 추천 답 칸 이름 · 지도에 그릴 점"
+    if r.get("fate"):       # 동물의 일: 「살았나 · 죽었나 × 자리」 표(11-18). 표의 줄 그대로, 지금 통화의 줄 하나만 칠함
+        f, dead = r["fate"], [x for x in r["fate"] if not x["alive"]]
+        assert sum(x["here"] for x in f) == 1 and {x["alive"] for x in f} == {True, False} and all(x["to"] and "{" not in x["to"] and (x["scope"] == "in") == x["alive"] for x in f), f"{name}: 살았나 표 {f}"
+        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "추측"), ("자동차전용도로", "추측")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
     eng = view["engine"]
     assert eng["status"] == "ready" and not eng["error"] and eng["ask"], f"{name}: 엔진 {eng}"
     if e["cite"]:       # 6종 안: 근거 조항이 붙은 추천 답
@@ -92,6 +100,7 @@ def play(name, script, greeting):
     check_end(name, view, sizes)
     print(f"  ✓ {name}: 질문 {' → '.join(asked)} | 범위 {' → '.join(str(x) + 'm' for x in sizes)} | 코드 읽기 + 셈 가장 느린 차례 {slow:.0f}ms")
     print(f"      {view['summary']['where']} | {view['summary']['to']}")
+    return st
 
 
 def chips_only(first):
@@ -148,8 +157,74 @@ def alias():
     print("  ✓ 별명 저장: 저장 뒤 다음 통화에서 그 이름 하나로", view["radius"], "m")
 
 
+def records(done):
+    """상담 기록: 예시 기록은 넘길 곳 · 조례 안팎을 표에서 채워 오고, 위치를 확인받은 통화만 쌓이며, 처리 상태는 정해진 차례로만 바뀐다(되돌리기 없음)."""
+    d = call("/api/records")
+    nxt, samples = d["next"], [r for r in d["records"] if r["sample"]]
+    assert len(samples) >= 10 and all(r["to"] and "{" not in r["to"] and r["scope"] in ("in", "out", "cand") and r["point"] and r["go"] and r["range"] and r["status"] in nxt for r in samples), "예시 기록이 비었거나 표에서 채워지지 않음"
+    assert {r["status"] for r in samples} == set(nxt) and all((r["scope"] == "in") == bool(r["law"]) for r in samples), "예시 기록의 상태 · 조례 칸"
+    post = lambda body: call("/api/records", body)      # noqa: E731
+    def refused(body):
+        try:
+            post(body)
+        except urllib.error.HTTPError as e:
+            return e.code == 400
+        return False
+    st, _ = turn({"id": "check-rec-open"}, line={"who": "시민", "text": "강변북로에 고양이가 차에 치여서 죽어 있어요."})
+    assert refused({"op": "save", "state": st, "status": "filed"}), "위치를 확인받기 전 통화가 기록에 쌓임"
+    recs = post({"op": "save", "state": done, "status": "filed"})["records"]
+    top = recs[0]
+    assert top["id"] == done["id"] and not top["sample"] and top["status"] == "filed" and "서울시설공단" in top["to"] and top["go"] and top["point"], f"확인받은 통화가 맨 위에 쌓이지 않음 {top}"
+    recs = post({"op": "save", "state": done, "status": "sent"})["records"]
+    assert sum(r["id"] == done["id"] for r in recs) == 1 and recs[0]["status"] == "sent" and [x["status"] for x in recs[0]["log"]] == ["filed", "sent"], "같은 통화가 두 건이 되거나 넘김이 안 적힘"
+    assert refused({"op": "status", "id": done["id"], "status": "filed"}), "넘긴 기록을 접수됨으로 되돌림"
+    for s in ("recall", "doing", "closed"):
+        assert post({"op": "status", "id": done["id"], "status": s})["records"][0]["status"] == s, s
+    assert all(refused({"op": "status", "id": done["id"], "status": s}) for s in nxt), "끝난 기록의 상태가 바뀜"
+    first = next(r for r in samples if r["status"] == "filed")
+    assert refused({"op": "status", "id": first["id"], "status": "doing"}), "넘기기 전에 처리 중으로 바뀜"
+    recs = post({"op": "reset"})["records"]
+    assert all(r["sample"] for r in recs) and next(r for r in recs if r["id"] == first["id"])["status"] == "filed", "처음 상태로 되돌리지 못함"
+    print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로")
+
+
+def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 원문 · 넘길 곳 표)과 글자로 맞는지. 원본이 바뀌었는데 tools/build_refs.py를 다시 돌리지 않았으면 여기서 걸린다
+    d = json.loads(urllib.request.urlopen(BASE + "/refs.json", timeout=5).read().decode("utf-8"))
+    ords = {o["name"]: o for o in json.loads((HERE.parents[1] / "engine" / "data" / "ordinances.json").read_text(encoding="utf-8"))}
+    types = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
+    sp = lambda s: re.sub(r"\s+", " ", re.sub(r"\s*<(개정|신설)[^>]*>", "", s))      # noqa: E731
+    for k, v in d["types"].items():
+        assert v["scope"] == types[k]["scope"] and v["routes"] == [{kk: r[kk] for kk in ("class", "scope", "law") if kk in r} for r in types[k]["routes"]], f"참고 자료: {k}의 갈래가 routes.json과 다름(tools/build_refs.py를 다시 돌릴 것)"
+    rows = lambda sec: {r[0] for t in text["text"]["sections"].get(sec, {"tables": []})["tables"] for r in t["rows"]}      # noqa: E731
+    R = {r[0]: r[1] for t in text["text"]["sections"].get("참고 자료", {"tables": []})["tables"] if t["head"][0] == "항목" for r in t["rows"]}
+    n, words = 0, set()      # words = refs.json이 가리키는 문구 파일 「참고 자료」 항목(사람이 쓴 글은 refs.json이 아니라 문구 파일에, PR #114 리뷰)
+    for k, items in d["refs"].items():
+        assert k in types and items, f"참고 자료: 표에 없는 일 {k}"
+        for x in items:
+            n += 1
+            if not x.get("law"):
+                assert x["kind"] in ("gal", "absent") and set(x) == {"kind", "code" if x["kind"] == "gal" else "key"}, f"참고 자료: {k} {x}(글은 문구 파일에, refs.json에는 이름만)"
+                words |= {f"갈래 {x['code']}", f"처리 기관 {x['code']}"} if x["kind"] == "gal" else {x["key"]}
+                continue
+            o = ords[x["law"]]
+            whole = sp(" ".join([a["text"] for a in o["articles"]] + [a["text"] for a in o["annexes"]]))
+            assert x["effective"] == o["effective_date"] and x["url"] == o["source_url"], f"참고 자료: {k} 시행일 · 주소"
+            ok = all(c in whole for row in x["rows"] for c in row) if x["kind"] == "table" else sp(x["text"]) in whole
+            assert ok, f"참고 자료: {k} {x['where']}가 조례 원문과 다름"
+            if x["kind"] == "table":      # 표 이름은 원문 별표 제목 · 머리 칸 수는 원문 표의 칸 수와 같아야 한다
+                assert any(x["where"] == a["label"] + " " + re.sub(r"\s*\([^)]*관련\)\s*$", "", a["title"]) for a in o["annexes"]), f"참고 자료: {k} 표 이름 {x['where']}가 별표 제목과 다름"
+                words |= {x["head"], x["unit"]} | ({x["more"]} if x.get("more") else set())
+                assert x["head"] in R and all(len(R[x["head"]].split(" · ")) == len(row) for row in x["rows"]), f"참고 자료: {k} 표 머리 「{R.get(x['head'])}」의 칸 수가 원문 표와 다름"
+    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거"}, "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름"}}
+    for sec, keys in need.items():
+        assert keys <= rows(sec), f"문구 파일 {sec} 표에 없는 말: {keys - rows(sec)}"
+    print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
+
+
 def main():
-    env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(Path(os.environ.get("TMPDIR", "/tmp")) / f"call-check-alias-{os.getpid()}.json")}
+    tmp = Path(os.environ.get("TMPDIR", "/tmp"))
+    env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
+           "CALL_RECORD_FILE": str(tmp / f"call-check-records-{os.getpid()}.json")}
     server = subprocess.Popen([sys.executable, str(HERE / "server.py")], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
         for _ in range(150):
@@ -163,18 +238,22 @@ def main():
             raise AssertionError("서버가 15초 안에 뜨지 않음")
         assert text["mode"] == "saved" and set(text["scripts"]) >= set(EXPECT) and text["places"] > 100000 and len(text["seoul"]) > 100
         html = urllib.request.urlopen(BASE + "/", timeout=5).read().decode("utf-8")
-        assert 'id="ask"' in html and "call.js" in html
+        assert 'id="ask"' in html and 'id="law"' in html and "call.js" in html      # 조례 근거 답 칸(말할 것 띠, 11-18 확정)
+        buttons = [r[0] for t in text["text"]["sections"]["통화 장면"]["tables"] for r in t["rows"]]
+        assert buttons == ["cat_street", "free"], f"장면 단추는 한 장면과 직접 통화만 {buttons}"      # 다른 대본은 주소로만(11-18)
         greeting = next(r[1] for t in text["text"]["sections"]["통화 글"]["tables"] for r in t["rows"] if r[0] == "인사")
-        for name in EXPECT:
-            play(name, text["scripts"][name], greeting)
+        refs(text)
+        ends = {name: play(name, text["scripts"][name], greeting) for name in EXPECT}
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         alias()
+        records(ends["roadkill"])
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
         server.wait(timeout=5)
         Path(env["CALL_ALIAS_FILE"]).unlink(missing_ok=True)
+        Path(env["CALL_RECORD_FILE"]).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
