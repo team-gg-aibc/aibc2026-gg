@@ -70,4 +70,4 @@ ENGINE_CONFIG=eval/configs/release.json .venv/bin/uvicorn engine.server:app --ho
 | `engine/` | 엔진(검색 → 질문 분석 → 조례 확정 → 조례 읽기 · 답 쓰기 → 구절 관문 → 질문 대조 → 출력). 자세히는 `engine/README.md` · `docs/engine/flow2.md` |
 | `eval/` | 평가셋 · 점수 재는 도구 · 실험 설정(`eval/configs/`) |
 | `docs/` | 기획 · 규칙(`docs/engine/scoring-rules.md`) · 결정 · 회의 |
-| `demo/` | 시연 화면 |
+| `demo/` | 시연 화면. 통화로 위치 좁히기는 [`demo/call/README.md`](demo/call/README.md) |

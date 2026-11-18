@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>통화로 위치 좁히기 (시연)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="call.css">
+</head>
+<body data-tone="dark">
+<!-- 120 상담사가 통화 중에 보는 화면. 지도가 화면 전체이고 칸이 그 위에 떠 있다(3판 담당자 화면의 생김새를 따름).
+     글자는 모두 /api/text(docs/content/A-05_통화위치좁히기.md)에서 채운다. 시민에게 보이는 화면은 없다.
+     배치는 관제 화면 꼴: 어두운 바탕 · 지도가 화면 전체 · 왼쪽 통화 기록 · 지도 위 추천 질문 · 오른쪽 접수 카드 · 아래 좁혀진 과정 -->
+<div id="map" aria-hidden="true"></div>
+<p id="map-failed" class="map-failed" hidden></p>
+
+<header class="top">
+  <h1 id="t-title"></h1>
+  <span class="who" id="t-who"></span>
+  <ol class="steps4" id="t-steps" aria-label="진행"></ol>
+  <p class="live" id="t-mode" role="status"></p>
+  <span class="grow"></span>
+  <div class="seg" role="group" id="t-scene"></div>
+  <div class="seg" role="group" id="t-tone"></div>
+</header>
+
+<section class="talk glass" id="talk" aria-labelledby="k-title">
+  <header><h2 id="k-title"></h2><p class="lead" id="k-lead"></p></header>
+  <ol class="lines" id="lines" aria-live="polite"></ol>
+  <p class="notice" id="notice" role="alert" hidden></p>
+  <footer>
+    <div class="seg wide" role="group" id="k-input" aria-label=""></div>
+    <div class="ctl" id="k-ctl"></div>
+  </footer>
+</section>
+
+<section class="ask glass" id="ask" aria-labelledby="a-title" aria-live="polite"></section>
+<section class="range glass" id="range" aria-labelledby="r-title"></section>
+<aside class="side glass" id="side"></aside>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+<script src="call.js"></script>
+</body>
+</html>
