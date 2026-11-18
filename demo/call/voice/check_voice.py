@@ -94,7 +94,9 @@ def check_fake(text):
     room = call("/api/voice/room", {})["room"]
     assert call(f"/api/voice/desk?room={room}")["joined"] is False
     assert call(f"/api/voice/join?room={room}&rate=48000", {})["stt"] == "fake"
-    call(f"/api/voice/audio?room={room}", raw=bytes(4800))                    # 소리 0.05초(48kHz 16비트): 마이크 → 서버 길
+    assert call(f"/api/voice/audio?room={room}", raw=bytes(4800))["picked"] is False      # 소리 0.05초(48kHz 16비트): 마이크 → 서버 길. 아직 받지 않았다(거는 쪽은 연결음)
+    call(f"/api/voice/pick?room={room}", {})                                 # 상담 화면이 받는다
+    assert call(f"/api/voice/audio?room={room}", raw=b"")["picked"] is True
     seen = {"since": 0, "says": 0, "partials": 0}
 
     def hear(said, q):
@@ -181,6 +183,9 @@ def check_rtzr():
     wss = serve(ws, "127.0.0.1", PORT + 2)
     threading.Thread(target=wss.serve_forever, daemon=True).start()
     from voice import stt
+    for said, want in [("상도 일동 주민센터 근처 골목이에요", "상도 1동 주민센터 근처 골목이에요"), ("숭실대입구역 삼번 출구에서 오 분쯤", "숭실대입구역 3번 출구에서 오 분쯤"), ("이호선 타고 이동 중이에요", "2호선 타고 이동 중이에요"),
+                       ("십이번 출구 앞, 일동이 다 모였어요", "12번 출구 앞, 일동이 다 모였어요")]:      # 받아쓴 글의 한글 숫자: 지명에 쓰이는 꼴만 숫자로, 다른 말은 그대로
+        assert stt.digits(said) == want, (said, stt.digits(said))
     stt.RTZR_API, stt.RTZR_ENV = f"http://127.0.0.1:{PORT + 1}", Path("/nonexistent")      # 진짜 주소 · 진짜 열쇠 파일은 건드리지 않는다(환경 변수가 아니라 불러온 모듈의 값을 직접 바꾼다)
     stt._tok.update(v=None, until=0)
     os.environ.update(RTZR_CLIENT_ID="점검용-아이디", RTZR_CLIENT_SECRET="점검용-비밀")

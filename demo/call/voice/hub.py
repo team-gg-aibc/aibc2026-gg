@@ -9,10 +9,11 @@
 
 | 환경 변수 | 뜻 | 기본 |
 | CALL_VOICE | 1이면 켠다 | 끔 |
-| CALL_VOICE_STT | fake(대본 글 · 친 글을 흘림) · rtzr(리턴제로) | 열쇠가 있으면 rtzr, 없으면 fake |
+| CALL_VOICE_STT | fake(대본 글 · 친 글을 흘림) · whisper(이 컴퓨터 안의 받아쓰기, 가입 없음) · rtzr(리턴제로) | 리턴제로 열쇠가 있으면 rtzr, 없으면 fake |
 | CALL_VOICE_TTS | 읽어 주기. none(소리 없이 글 길이만큼 기다림) · browser(기기에 든 읽어 주기). web/voice/tts/에 미리 만든 파일이 있으면 그것이 먼저 | none |
+| CALL_VOICE_ASK | 질문을 누가 말하나. ai(화면이 띄운 질문을 읽어 준다) · agent(상담사가 직접 말한다. 읽어 주지 않는다). 주소 ?ask= 로도 바꾼다 | ai |
 | CALL_VOICE_CODE | 값이 있으면 통화를 열 때 이 접근 코드를 받는다(밖에 내놓을 때) | 없음 |
-| CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 |
+| CALL_VOICE_GAP_MS | 확정 글 뒤 이만큼 조용하면 한 차례로 끊는다 | 900 (whisper는 300) |
 | CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수 | 4 · 600 · 40 |
 """
 import hashlib
@@ -30,12 +31,13 @@ from . import stt
 WEB = Path(__file__).resolve().parents[1] / "web"
 CODE = os.environ.get("CALL_VOICE_CODE", "")
 TTS = "browser" if os.environ.get("CALL_VOICE_TTS") == "browser" else "none"
-GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS", "900"))
+ASK = "agent" if os.environ.get("CALL_VOICE_ASK") == "agent" else "ai"      # 질문을 누가 말하나: ai = 화면이 띄운 질문을 읽어 준다 · agent = 상담사가 직접 말한다(읽어 주지 않는다)
+STT = stt.pick()
+GAP_MS = int(os.environ.get("CALL_VOICE_GAP_MS") or (300 if STT.name == "whisper" else 900))      # 로컬 받아쓰기는 확정 글이 이미 0.7초의 조용함을 기다린 뒤에 온다
 MAX_ROOMS = int(os.environ.get("CALL_VOICE_MAX_ROOMS", "4"))             # 리턴제로 무료는 스트리밍 5줄까지(문서)
 ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC", "600"))
 OPENS_PER_HOUR = int(os.environ.get("CALL_VOICE_OPENS_PER_HOUR", "40"))
 IDLE_SEC = 90                                                            # 양쪽 다 이만큼 소식이 없으면 방을 닫는다
-STT = stt.pick()
 rooms, opens, lock = {}, [], threading.Lock()
 
 
@@ -49,7 +51,7 @@ def open_room():
         if len(rooms) >= MAX_ROOMS or len(opens) >= OPENS_PER_HOUR:
             return None
         rid = secrets.token_hex(3)
-        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False}
+        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False}
         opens.append(now)
         return rid
 
@@ -114,7 +116,7 @@ def _api(h, body):
     u = urlsplit(h.path)
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
-        return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
+        return h.send_json({"on": True, "stt": STT.name, "tts": TTS, "ask": ASK, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
     try:
@@ -147,7 +149,7 @@ def _api(h, body):
         if body and r["stt"]:
             feed(r, body)
         r["played"] = max(r["played"], _int(q, "played", 0, 10**6, 0))
-        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"]})
+        return h.send_json({"says": says(r, _int(q, "says", 0, 10**6, 0)), "down": r["down"], "picked": r["picked"]})
     if p == "fake":                             # 소리 쪽(가짜 받아쓰기일 때만 뜻이 있다): 이 글을 「말한다」
         if r["stt"] and text:
             r["stt"].speak(text)
@@ -158,6 +160,9 @@ def _api(h, body):
         since = _int(q, "since", 0, 10**6, 0)
         ev = r["events"][since:]
         return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"]})
+    if p == "pick":                             # 화면 쪽: 전화를 받았다(거는 쪽의 연결음이 그친다)
+        r["picked"] = True
+        return h.send_json({"ok": True})
     if p == "ask":                              # 화면 쪽: 이 말을 읽어 달라
         if text:
             r["says"].append(text)
