@@ -9,6 +9,8 @@
   ⑤ 열쇠(UPSTAGE_API_KEY · ELEVENLABS_API_KEY)가 어느 응답에도 실리지 않는다(가짜 값을 넣고 응답 글을 뒤진다).
   ⑥ 민원인 글: 켜면 한 차례 2,000자까지 읽고(끄면 500 그대로), 규정 찾기의 빠른 길이 원래 정규식과 같은 답을 내며 꾸민 2,000자에서도 빠르다.
   ⑦ 실제 호출로 켜면서 접근 코드가 없으면 서버가 뜨지 않고, CALL_DIRECT_OPEN=1이면 코드 없이 뜬다.
+  ⑧ 실제 호출 판에서도 장면 재생은 저장된 답(server.py CALL_SAVED_FIRST, 기본 켬): 장면마다 Upstage를 한 번도 부르지 않고(부르면 실패하게 막아 둠)
+     차례마다 저장된 답 판(CALL_MODE=saved로 같은 장면)과 같다. CALL_SAVED_FIRST=0이면 부르러 간다(main과 같음).
 """
 import http.cookiejar
 import json
@@ -67,6 +69,39 @@ def stop(p):
 turn = lambda o, who="시민", text="마포구인데요, 스타벅스 앞 가로등이 꺼져 있어요": req(o, "/api/turn", {"state": {"id": "d"}, "line": {"who": who, "text": text}})
 LONG = ("집 앞 골목에 고양이가 다쳐서 웅크리고 있어요. 상도1동 주민센터 근처예요. " * 60)[:2400]
 said_len = lambda o: len(json.loads(turn(o, text=LONG)[1])["state"]["lines"][-1]["text"])
+
+
+SAVED_FIRST_RUN = r'''
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import server as S
+def boom(*a, **k):
+    raise RuntimeError("Upstage를 불렀다")
+if S.MODE == "live":
+    S.upstage.chat = S.upstage.embed = boom
+out = {}
+for scene in (S.scripts() if sys.argv[2] == "all" else [sys.argv[2]]):
+    st, view, steps = S.play(scene)
+    out[scene] = {"reads": sorted({s["read"] for s in steps}), "steps": [(s["said"], s["next"], s["m"]) for s in steps], "where": view["summary"].get("where"),
+                  "engine": (view.get("engine") or {}).get("how"), "answer": (view.get("engine") or {}).get("answer")}
+print(json.dumps(out, ensure_ascii=False))
+'''
+
+
+def check_saved_first():
+    env = {**os.environ, "CALL_MODE": "", "UPSTAGE_API_KEY": FAKE_KEY, "CALL_REPLAY_SEC": "0", "OPENBLAS_NUM_THREADS": "1"}
+    r = subprocess.run([sys.executable, "-c", SAVED_FIRST_RUN, str(HERE.parent), "all"], capture_output=True, text=True, timeout=300, env=env)
+    assert r.returncode == 0, r.stderr[-800:]
+    got = json.loads(r.stdout.strip().splitlines()[-1])
+    r = subprocess.run([sys.executable, "-c", SAVED_FIRST_RUN, str(HERE.parent), "all"], capture_output=True, text=True, timeout=300, env={**env, "CALL_MODE": "saved"})
+    want = json.loads(r.stdout.strip().splitlines()[-1])
+    bad = {k: v for k, v in got.items() if v["reads"] != ["saved"] or {x: v[x] for x in ("steps", "where", "answer")} != {x: want[k][x] for x in ("steps", "where", "answer")}}
+    assert len(got) >= 6 and not bad, ("실제 호출 판의 장면 재생이 저장된 답과 다름", bad)
+    scene = next(iter(got))
+    r = subprocess.run([sys.executable, "-c", SAVED_FIRST_RUN, str(HERE.parent), scene], capture_output=True, text=True, timeout=300, env={**env, "CALL_SAVED_FIRST": "0"})
+    off = json.loads(r.stdout.strip().splitlines()[-1])[scene] if r.returncode == 0 else {"reads": ["(멈춤)"]}
+    assert "saved" not in off["reads"], ("CALL_SAVED_FIRST=0인데 저장된 답을 씀", off)
+    return got
 
 
 def check_rule():
@@ -147,6 +182,8 @@ def main():
     finally:
         stop(p)
     print("  ✓ 실제 호출 + 접근 코드 없음 → 서버가 뜨지 않음 · CALL_DIRECT_OPEN=1이면 코드 없이 표를 줌")
+    got = check_saved_first()                                                              # ⑧
+    print(f"  ✓ 실제 호출 판의 장면 재생 {len(got)}개: Upstage 0번, 차례마다 저장된 답 판과 같음(엔진 답 {sorted({v['engine'] for v in got.values()}, key=str)}) · CALL_SAVED_FIRST=0이면 부르러 감")
     p = server(CALL_DIRECT="1", CALL_DIRECT_CODE="맞는-코드", CALL_VOICE="1")              # ③
     try:
         o = opener()
