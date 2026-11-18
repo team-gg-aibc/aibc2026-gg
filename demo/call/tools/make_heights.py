@@ -1,6 +1,7 @@
 """서울 전체 건물의 실제 높이 자료를 만든다 → web/heights/index.json · cells/<x>-<y>.json (화면 web/heights.js가 보이는 칸만 읽음)
 
 자료: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」(서울 열린데이터광장 OA-15944, 공공누리 제1유형) CSV. 원본(약 410MB)은 레포에 넣지 않는다.
+      이 자료의 「건물높이」는 잰 높이가 아니라 모든 줄이 층수 × 3.5m다(674,769줄 모두). 그래서 여기서 말하는 실제 높이 = 서울시 자료의 층수로 셈한 높이다.
     python3 -I demo/call/tools/make_heights.py <원본 csv> <지도 타일을 받아 둘 폴더(레포 밖)>
     python3 -I demo/call/tools/make_heights.py <원본 csv> <타일 폴더> --rings   대본 건물 띠(hi.geojson)도 다시 만든다(서버: CALL_MODE=saved CALL_PORT=8775 python3 demo/call/server.py. 다른 주소면 --rings=http://…)
     python3 -I demo/call/tools/make_heights.py --test                          자료 없이 식 · 풀기만 점검
@@ -120,9 +121,13 @@ class Maker:
         self.url = v.read_text(encoding="utf-8").strip()
 
     @staticmethod
-    def _get(url):
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "make_heights", "Accept-Encoding": "gzip"}), timeout=60) as r:
-            b = r.read(); return gzip.decompress(b) if r.headers.get("Content-Encoding") == "gzip" else b
+    def _get(url, tries=4):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "make_heights", "Accept-Encoding": "gzip"}), timeout=60) as r:
+                b = r.read(); return gzip.decompress(b) if r.headers.get("Content-Encoding") == "gzip" else b
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as e:      # 받다 끊기면 잠깐 쉬고 다시(없는 타일 404는 그대로 올린다)
+            if isinstance(e, urllib.error.HTTPError) or tries <= 1: raise
+            time.sleep(3); return Maker._get(url, tries - 1)
 
     @lru_cache(maxsize=120)
     def pieces(self, tx, ty):      # 타일 한 장의 건물 조각 → [(바닥 모양(m), 높이, 바닥 높이, 'in' 칸 안 · 'cross' 경계에 걸침 · 'out' 이웃 칸 것)]
@@ -143,7 +148,7 @@ class Maker:
         return out
 
     @lru_cache(maxsize=12)
-    def buildings(self, tx, ty):      # 이 칸의 건물 → [(바닥 모양(m), 타일 높이, 바닥 높이, 덧그릴 실제 높이 또는 None)]
+    def buildings(self, tx, ty):      # 이 칸의 건물 → [(바닥 모양(m), 타일 높이, 바닥 높이, 덧그릴 실제 높이 또는 None, 이은 서울시 높이 또는 None)]
         from shapely import STRtree, points
         from shapely.ops import unary_union
         near = [p for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy for p in self.pieces(tx + dx, ty + dy) if p[3] == "cross"]
@@ -163,7 +168,7 @@ class Maker:
         kept = [w for i, w in enumerate(whole) if i not in drop]
         inside = [self.seoul.contains(k[0].centroid) for k in kept]; self.stat["서울 밖(칸에 같이 든 건물, 아래 집계에서 뺌)"] += inside.count(False)
         rows = [r for dx in (-1, 0, 1) for dy in (-1, 0, 1) for r in self.pts.get((tx + dx, ty + dy), [])]
-        if not rows or not kept: return [(q, h, h0, None) for q, h, h0 in kept]
+        if not rows or not kept: return [(q, h, h0, None, None) for q, h, h0 in kept]
         ptree = STRtree(points([r[:2] for r in rows]))
         def judge(geoms, hs):      # 바닥 모양마다 → (집계 이름, 실제 높이 또는 None)
             cand = defaultdict(list)
@@ -191,7 +196,7 @@ class Maker:
             elif real <= h + TALLER: st["타일과 같음"] += 1
             elif q.area >= HUGE[0] and real - h > HUGE[1]: st["바닥이 아주 넓어 덧그리지 않음(탑 + 낮은 기단)"] += 1
             else: st["실제가 더 높아 덧그림"] += 1; st["3m 넘게 높아짐"] += real - h >= 3; sh = round(real, 1)      # noqa: E702
-            out.append((q, h, h0, sh))
+            out.append((q, h, h0, sh, real))
         return out
 
 
@@ -237,7 +242,7 @@ def make_rings(mk, url):      # 표지가 든 건물의 지붕 둘레 띠(높이
             hit = [b for dx in (-1, 0, 1) for dy in (-1, 0, 1) for b in mk.buildings(tx + dx, ty + dy) if b[0].buffer(4).contains(pt)]
             if not hit or any(r["properties"]["name"] == label for r in rings):      # 두 장면이 같은 곳을 물으면 띠는 하나(겹치면 깜빡인다)
                 continue
-            q, h, _, sh = min(hit, key=lambda b: b[0].distance(pt))
+            q, h, _, sh, _ = min(hit, key=lambda b: b[0].distance(pt))
             rings.append({"type": "Feature", "properties": {"name": label, "scene": sc, "at": [round(lon, 6), round(lat, 6)], "h": sh or h},
                           "geometry": mapping(ll6(q.buffer(WIDEN + 1.2, join_style=2).difference(q.buffer(WIDEN * 0.5, join_style=2)).simplify(0.2)))})
     (OUT / "hi.geojson").write_text(json.dumps({"type": "FeatureCollection", "source": SOURCE, "features": rings}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -249,7 +254,7 @@ def main(src, cache, rings=None):
     for old in (OUT / "cells").glob("*.json"): old.unlink()
     for n, (tx, ty) in enumerate(sorted(pts, key=lambda c: (c[1], c[0]))):      # 서울시 점이 있는 칸만, 줄(위도) 차례로 — 이웃 타일을 다시 풀지 않게
         (ox, oy) = (round(v, 6) for v in cell_ll(tx, ty + 1)); rows = []
-        for q, h, h0, sh in mk.buildings(tx, ty):
+        for q, h, h0, sh, _ in mk.buildings(tx, ty):
             if sh is None: continue
             g = q.buffer(WIDEN, join_style=2).simplify(0.3)
             rows += [[num(sh), num(h), num(h0), *encode(p, ox, oy)] for p in (g.geoms if g.geom_type == "MultiPolygon" else [g]) if not p.is_empty]
