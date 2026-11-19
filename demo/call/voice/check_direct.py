@@ -11,6 +11,7 @@
   ⑦ 실제 호출로 켜면서 접근 코드가 없으면 서버가 뜨지 않고, CALL_DIRECT_OPEN=1이면 코드 없이 뜬다.
   ⑧ 실제 호출 판에서도 장면 재생은 저장된 답(server.py CALL_SAVED_FIRST, 기본 켬): 장면마다 Upstage를 한 번도 부르지 않고(부르면 실패하게 막아 둠)
      차례마다 저장된 답 판(CALL_MODE=saved로 같은 장면)과 같다. CALL_SAVED_FIRST=0이면 부르러 간다(main과 같음).
+  ⑨ 상담 기록은 표마다: 남이 확인받은 통화는 안 보이고(표 없으면 예시만), 상태 바꾸기 · 처음 상태로는 자기 것만, 기록 파일에 쓰지 않는다. 별명 저장은 막는다.
 """
 import http.cookiejar
 import json
@@ -104,6 +105,40 @@ def check_saved_first():
     return got
 
 
+def confirmed_state(o, scene="vendor"):
+    """대본대로 /api/turn을 불러 위치를 확인받은 통화 상태를 만든다(저장된 답 방식)."""
+    script = json.loads(req(o, "/api/text")[1])["scripts"][scene]
+    st = json.loads(req(o, "/api/turn", {"state": {"id": f"rec-{scene}-{random.random()}"}, "line": {"who": "상담사", "text": "무엇을 도와드릴까요?"}})[1])["state"]
+    said = script["처음"]
+    for _ in range(10):
+        st = json.loads(req(o, "/api/turn", {"state": st, "line": {"who": "시민", "text": said}})[1])["state"]
+        r = json.loads(req(o, "/api/turn", {"state": st, "phase": "model"})[1])
+        st, v = r["state"], r["view"]
+        if v["confirmed"]:
+            return st
+        st = json.loads(req(o, "/api/turn", {"state": st, "line": {"who": "상담사", "text": v["question"]["say"]}})[1])["state"]
+        said = script[v["question"]["id"]]
+    raise AssertionError(f"{scene}: 확인받지 못함")
+
+
+def check_records(tmp):
+    a, b, none = opener(), opener(), opener()
+    for x in (a, b):
+        assert req(x, "/api/direct/enter", {})[0] == 200
+    st = confirmed_state(a)
+    assert req(a, "/api/records", {"op": "save", "state": st, "status": "filed"})[0] == 200
+    mine = lambda x: [r["id"] for r in json.loads(req(x, "/api/records")[1])["records"] if not r.get("sample")]
+    assert mine(a) == [st["id"]] and mine(b) == [] and mine(none) == [], ("남의 상담 기록이 보임", mine(a), mine(b), mine(none))
+    recs, nxt = (lambda d: (d["records"], d["next"]))(json.loads(req(b, "/api/records")[1]))
+    smp = next(r for r in recs if r.get("sample") and nxt.get(r["status"]))
+    assert req(b, "/api/records", {"op": "status", "id": smp["id"], "status": nxt[smp["status"]][0]})[0] == 200
+    status_a = next(r["status"] for r in json.loads(req(a, "/api/records")[1])["records"] if r["id"] == smp["id"])
+    assert status_a == smp["status"], "남이 바꾼 예시 기록의 상태가 보임"
+    assert req(b, "/api/records", {"op": "reset"})[0] == 200 and mine(a) == [st["id"]], "남의 「처음 상태로」가 내 기록을 지움"
+    assert req(a, "/api/alias", {"name": "점검", "at": [127, 37.5]})[0] == 403, "직접 통화에서 별명 저장이 열림"
+    assert not tmp.exists(), "기록 파일에 썼다"
+
+
 def check_rule():
     sys.path.insert(0, str(HERE.parent))
     from voice.direct import _Rule
@@ -188,6 +223,14 @@ def main():
     print("  ✓ 실제 호출 + 접근 코드 없음 → 서버가 뜨지 않음 · CALL_DIRECT_OPEN=1이면 코드 없이 표를 줌")
     got = check_saved_first()                                                              # ⑧
     print(f"  ✓ 실제 호출 판의 장면 재생 {len(got)}개: Upstage 0번, 차례마다 저장된 답 판과 같음(엔진 답 {sorted({v['engine'] for v in got.values()}, key=str)}) · CALL_SAVED_FIRST=0이면 부르러 감")
+    tmp = Path(os.environ.get("TMPDIR", "/tmp")) / f"call-direct-records-{os.getpid()}.json"      # ⑨
+    p = server(CALL_DIRECT="1", CALL_RECORD_FILE=str(tmp))
+    try:
+        check_records(tmp)
+        print("  ✓ 상담 기록: 표마다 따로(남이 확인받은 통화 · 바꾼 상태 안 보임, 표 없으면 예시만) · 처음 상태로는 자기 것만 · 파일에 안 씀 · 별명 저장 막음")
+    finally:
+        stop(p)
+        tmp.unlink(missing_ok=True)
     p = server(CALL_DIRECT="1", CALL_DIRECT_CODE="맞는-코드", CALL_VOICE="1")              # ③
     try:
         o = opener()

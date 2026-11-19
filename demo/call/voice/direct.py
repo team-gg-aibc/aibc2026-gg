@@ -10,6 +10,8 @@
               실제 배포에서 Upstage 호출을 세고 막는 것은 앞에 둔 문지기(다시 읽기 · 엔진 셈, 레포 밖)다. 판 안 상한의 기본은 「제한 없음」(동규 11/19).
   통화방      음성 스위치와 함께면 /api/voice/… 는 info 말고는 GET도 표가 있어야 하고, 한 통화(방)는 그 방을 연 표와 받은(claim) 표만 읽고 쓴다(hub.py).
   글 길이     /api/turn · /api/view 에 실려 오는 통화 상태(화면이 들고 있는 줄 · 차례의 말)도 SAID_MAX자로 잘라 server.py에 넘긴다.
+  상담 기록   표마다 따로(서버 메모리에만, 파일에 쓰지 않는다): 방문자는 예시 기록 + 자기가 확인받은 통화만 보고, 상태 바꾸기 · 처음 상태로도 자기 것만.
+              표 없는 GET /api/records는 예시 기록만. 별명 저장(/api/alias)은 모든 방문자의 위치 읽기를 바꾸므로 막는다.
 열쇠(UPSTAGE_API_KEY · ELEVENLABS_API_KEY)는 서버 환경에만 있고, 어느 응답에도 실리지 않는다.
 실제 호출 방식으로 켜면서 접근 코드가 없으면 서버가 뜨지 않는다(열쇠를 모르는 새 열어 두지 않게). 코드 없이 여는 정식 방식은 CALL_DIRECT_OPEN=1
 (앞에 문지기를 둘 때 · 11/22 평가자용 주소. 그때의 보호는 문지기가 맡는다).
@@ -45,7 +47,8 @@ LAW_WAIT_MS = int(os.environ.get("CALL_DIRECT_LAW_WAIT_MS") or 80000)      # 조
 MAX_TURNS = int(os.environ.get("CALL_DIRECT_MAX_TURNS", "0")) or 10**9      # 0 = 제한 없음(기본). 현장 테스트는 앞에 둔 문지기가 막는다
 MAX_ALL = int(os.environ.get("CALL_DIRECT_MAX_ALL", "0")) or 10**9
 COOKIE = "gg_call"
-passes, used, lock = {}, {"all": 0}, threading.Lock()      # 표 → 넣은 민원인의 말 수. ponytail: 서버 메모리에만(다시 띄우면 0). 여러 서버로 늘리면 밖의 저장소로
+passes, used, lock = {}, {"all": 0}, threading.Lock()
+stores, tls = {}, threading.local()      # 표 → 그 방문자의 상담 기록({"added", "log"}, server.py records_local.json과 같은 꼴). tls.store = 이 요청이 쓰는 것      # 표 → 넣은 민원인의 말 수. ponytail: 서버 메모리에만(다시 띄우면 0). 여러 서버로 늘리면 밖의 저장소로
 
 
 def _pass(h):
@@ -77,6 +80,31 @@ class _Rule:
         return None
 
 
+def _records_by_pass(mod):
+    """server.py의 기록 읽기 · 쓰기(_local · _write_local)를 「이 요청의 표의 기록」으로 바꿔 끼운다. 요청 밖(tls.store 없음)에서는 원래대로."""
+    read, write = mod._local, mod._write_local
+
+    def _local():
+        d = getattr(tls, "store", None)
+        return read() if d is None else {"added": list(d["added"]), "log": {k: list(v) for k, v in d["log"].items()}}
+
+    def _write_local(d):
+        if getattr(tls, "store", None) is None:
+            return write(d)
+        tls.store.update(added=list(d["added"]), log=dict(d["log"]))
+    mod._local, mod._write_local = _local, _write_local      # ponytail: server.py의 이름(_local · _write_local)에 기대어 바꾼다. 표마다 메모리에만(다시 띄우면 비워짐)
+
+
+def _with_store(t, fn, keep):
+    """표 t의 기록을 이 요청의 기록으로 놓고 fn()을 부른다. keep이 아니면(표 없음) 빈 기록을 쓰고 남기지 않는다."""
+    with lock:
+        tls.store = stores.setdefault(t, {"added": [], "log": {}}) if keep else {"added": [], "log": {}}
+    try:
+        return fn()
+    finally:
+        tls.store = None
+
+
 def _cut(st):
     """화면이 보낸 통화 상태의 줄 글 · 차례의 말을 SAID_MAX자로 자른다 → 고쳤으면 True."""
     if not isinstance(st, dict):
@@ -95,7 +123,8 @@ def attach(Handler):
     if mod.MODE == "live" and not CODE and not OPEN:
         raise SystemExit("직접 통화를 실제 호출로 켜려면 접근 코드(CALL_DIRECT_CODE)를 주거나, 앞에 문지기를 두고 코드 없이 열 때는 CALL_DIRECT_OPEN=1을 준다")
     mod.SAID_MAX = SAID_MAX                            # 한 차례 글(스위치를 끄면 server.py의 500 그대로)
-    mod.RULE_Q = _Rule(mod.RULE_Q)                     # ponytail: server.py의 이름(MODE · SAID_MAX · RULE_Q)에 기대어 바꾼다. 이름이 바뀌면 check_direct가 깨져 알린다
+    mod.RULE_Q = _Rule(mod.RULE_Q)
+    _records_by_pass(mod)                     # ponytail: server.py의 이름(MODE · SAID_MAX · RULE_Q)에 기대어 바꾼다. 이름이 바뀌면 check_direct가 깨져 알린다
     add_script(Handler, "direct.js")
     get, post = Handler.do_GET, Handler.do_POST
 
@@ -103,6 +132,9 @@ def attach(Handler):
         p = self.path.split("?")[0]
         if p == "/api/direct/info":
             return self.send_json(_info(_pass(self)))
+        if p == "/api/records":                          # 상담 기록: 예시 + 이 표의 것만(표가 없으면 예시만)
+            t = _pass(self)
+            return _with_store(t, lambda: get(self), bool(t))
         if p.startswith("/api/voice/") and p != "/api/voice/info":      # 통화방 길(방 이름 · 민원인 글 · 상담사 말)은 표가 있어야. 방 단위는 hub.py가 본다
             self.direct_pass = _pass(self)
             if not self.direct_pass:
@@ -138,6 +170,10 @@ def attach(Handler):
         t = self.direct_pass = _pass(self)
         if not t:
             return self.send_json({"error": "need_code", "need_code": True}, 403)
+        if p == "/api/alias":                            # 별명은 모든 방문자의 위치 읽기를 바꾼다: 배포 판에서는 받지 않는다
+            return self.send_json({"error": "no_alias"}, 403)
+        if p == "/api/records":                          # 쌓기 · 상태 바꾸기 · 처음 상태로: 이 표의 기록에서만
+            return _with_store(t, lambda: post(self), True)
         if p in ("/api/turn", "/api/view") and 0 < n < 600_000:      # 본문은 server.py가 다시 읽으니 읽은 뒤 되돌려 둔다
             raw = self.rfile.read(n)
             try:
