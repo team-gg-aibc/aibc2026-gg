@@ -317,7 +317,7 @@ def check_phone_text():
     assert call(f"/api/voice/desk?room={room}")["joined"] is False
     assert call(f"/api/voice/join?room={room}&text=1", {})["stt"] is None            # 글로만 붙는다
     d = call(f"/api/voice/desk?room={room}")
-    assert d["joined"] is True and d["heard_sec"] == 0, d
+    assert d["joined"] is True and d["heard_sec"] == 0 and 0 <= d["caller_quiet"] < 5 and "caller_quiet" in d, d      # 휴대폰의 마지막 소식에서 지난 초(끊기 없이 사라지면 상담 화면이 마친다)
     assert code_of(f"/api/voice/claim?room={room}", {}) == 200 and code_of(f"/api/voice/claim?room={room}", {}) == 409, "한 통화를 두 화면이 받음"
     assert room not in call("/api/voice/waiting")["rooms"]
     assert call(f"/api/voice/poll?room={room}")["busy"] == 0, "아무도 받지 않았는데 받은 통화가 있다고 함"
@@ -335,7 +335,7 @@ def check_phone_text():
     assert [x["text"] for x in call(f"/api/voice/poll?room={room}&says=0")["says"]] == ["바로 앞에 뭐가 보이세요?"] and n == 1
     assert [x["text"] for x in call(f"/api/voice/audio?room={room}&says=0", raw=b"")["says"]] == ["바로 앞에 뭐가 보이세요?"]
     info = call("/api/voice/info")
-    assert (info["poll_ms"], info["pick_sec"]) == (250, 20), info
+    assert (info["poll_ms"], info["pick_sec"], info["caller_gone_sec"]) == (250, 20, 75), info
     assert call("/api/voice/info")["direct"] is False
     call(f"/api/voice/end?room={room}", {})
     print("  ✓ 휴대폰이 먼저 거는 통화: 기다림 → 한 화면만 받음 · 글로만 붙음 · 친 글이 확정 글로(다시 보낸 글은 한 번만) · 받은 통화 수 · 상담사 말이 휴대폰으로(GET poll)")

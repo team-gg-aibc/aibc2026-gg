@@ -262,6 +262,7 @@
           if (d.joined && !st.joined) { st.joined = true; if (st.how === 'phone' && !window.DIRECT) say(T.ring); else pickup(); }      // 직접 통화는 AI 상담이라 바로 받는다      // 휴대폰이 걸어 오면 「받기」를 기다린다. 한 기기면 바로 받는다
           if (d.down) say(T.down);
           if (st.picked) d.events.forEach(onEvent);
+          if (st.joined && d.caller_quiet > (info.caller_gone_sec || 75)) return hang(T.lost);      // 휴대폰이 끊기 없이 사라짐(창을 닫음 · 망이 오래 끊김): 이 탭이 다음 통화를 받게
           draw();
         } catch (e) {
           if (!st.alive) return;

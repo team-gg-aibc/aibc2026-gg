@@ -20,6 +20,7 @@
 | CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수(0 = 제한 없음) | 4 · 600 · 40. 직접 통화와 함께면 20 · 1800 · 0(정상 이용을 막지 않게, 동규 11/19) |
 | CALL_VOICE_POLL_MS | 통화 중 양쪽이 서버에 묻는 간격(소리 쪽은 이 간격으로 소리 토막을 올린다) | 250. 직접 통화와 함께면 600(요청 수를 줄인다) |
 | CALL_VOICE_PICK_SEC | 휴대폰이 건 통화를 이만큼 아무도 받지 않으면 휴대폰이 「다른 통화 중」 · 「받을 사람 없음」을 띄우고 끊는다(직접 통화) | 20 |
+| CALL_VOICE_CALLER_GONE_SEC | 소리 쪽(휴대폰)이 이만큼 아무 소식이 없으면 상담 화면이 통화를 마친다(끊기 없이 창을 닫은 휴대폰). 휴대폰은 망이 끊겨도 60초까지 다시 묻으니 그보다 길게 | 75 |
 """
 import hashlib
 import hmac
@@ -50,6 +51,7 @@ ROOM_SEC = int(os.environ.get("CALL_VOICE_ROOM_SEC") or (1800 if DIRECT else 600
 OPENS_PER_HOUR = int(os.environ.get("CALL_VOICE_OPENS_PER_HOUR") or (0 if DIRECT else 40)) or 10**9
 POLL_MS = int(os.environ.get("CALL_VOICE_POLL_MS") or (600 if DIRECT else 250))
 PICK_SEC = int(os.environ.get("CALL_VOICE_PICK_SEC") or 20)
+CALLER_GONE_SEC = int(os.environ.get("CALL_VOICE_CALLER_GONE_SEC") or 75)
 TEXT_MAX = int(os.environ.get("CALL_DIRECT_SAID_MAX") or 2000) if DIRECT else 500           # 휴대폰이 친 글 한 줄(직접 통화는 서버가 한 차례에 읽는 자 수와 같게)
 IDLE_SEC = 90                                                            # 양쪽 다 이만큼 소식이 없으면 방을 닫는다
 rooms, opens, lock = {}, [], threading.Lock()
@@ -181,7 +183,7 @@ def _api(h, body):
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
         return h.send_json({"on": True, "direct": DIRECT, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC,
-                            "poll_ms": POLL_MS, "pick_sec": PICK_SEC})
+                            "poll_ms": POLL_MS, "pick_sec": PICK_SEC, "caller_gone_sec": CALLER_GONE_SEC})
     if p == "say":
         return _say(h, q.get("text", "")[:500])
     if p == "line":
@@ -206,6 +208,8 @@ def _api(h, body):
         r = rooms.get(q.get("room", ""))
         if r:
             r["last"] = time.time()
+            if p in ("join", "audio", "poll", "text", "fake"):
+                r["caller_at"] = r["last"]          # 소리 쪽(휴대폰)의 마지막 소식: 끊기 없이 사라지면 상담 화면이 안다
     if not r:
         return h.send_json({"error": "끝난 통화입니다."}, 404)
     text = " ".join(str(b.get("text", "")).split())[:TEXT_MAX]
@@ -249,7 +253,8 @@ def _api(h, body):
             r["stt"].pump()
         since = _int(q, "since", 0, 10**6, 0)
         ev = r["events"][since:]
-        return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"] or r["caller"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"]})
+        return h.send_json({"events": ev, "next": since + len(ev), "joined": bool(r["stt"] or r["caller"]), "played": r["played"], "heard_sec": round(r["stt"].heard / r["bps"], 2) if r["stt"] else 0, "down": r["down"],
+                            "caller_quiet": round(time.time() - r["caller_at"], 1) if r.get("caller_at") else 0})
     if p == "cut":                              # 화면 쪽: 상담사가 넘겨받았다 → 소리 쪽이 읽던 말을 끊는다
         r["cut"] += 1
         return h.send_json({"ok": True})
