@@ -1,7 +1,7 @@
 <!-- README decision pending 2 (English name): default = "Call Locate", taken from the repository folder name call-locate. Pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph and the "Ordinance engine (scored API)" section. -->
 <h1 align="center">Call Locate (통화로 위치 좁히기)</h1>
 
-<h3 align="center">We narrow down where it happened through the call, find what to do in the ordinance text, and fill both into one screen.</h3>
+<h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
 <p align="center">General complaint lines such as 120 cannot get the caller's location from the phone call alone, so the call agent has to hear the place in words. This screen reads location clues from what the caller says, shrinks the candidate area on the map, and shows one next question that splits that area best. When the place is fixed, the intake card gets one line the field worker can read to find the spot, the lot number of the nearest building, and the office to hand the case to. If the case falls under one of the six Seoul ordinances, the team's ordinance Q&A engine shows an answer with the cited articles on the same screen.</p>
 
