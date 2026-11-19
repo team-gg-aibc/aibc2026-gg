@@ -217,6 +217,7 @@
     btn.disabled = !room && !info.direct;
   }
 
+
   // ---- 상담 화면: 화면 쪽(+ 이 기기 마이크 · 대본이면 소리 쪽도 함께)
   function deskPage(info) {
     const ASK = Q.get('ask') === 'agent' || Q.get('ask') === 'ai' ? Q.get('ask') : info.ask;
@@ -307,7 +308,7 @@
         if (V.matter && V.matter.ask && V.engine && !ui.answered) {      // 시민이 규정을 물었으면 조례 답을 한 번 읽는다(대본 재생과 같은 순서)
           ui.answered = true;
           while (st.alive && V.engine && V.engine.status === 'running') { await sleep(400); await poll(); }
-          await agentSay((V.engine && (V.engine.say || V.engine.answer)) || K('일의 종류와 갈림')['엔진 확인 불가 말']);
+          await agentSay(V.engine && (V.engine.say || V.engine.answer) ? lawSay(V.engine.say || V.engine.answer) : K('일의 종류와 갈림')['엔진 확인 불가 말']);
           continue;
         }
         if (V.confirmed) {
