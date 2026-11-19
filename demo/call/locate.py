@@ -163,6 +163,30 @@ def _sigma(c, kinds):
     return SIG.get(how, 100.0)
 
 
+BIG_M = float(os.environ.get("CALL_BIGM", "60"))     # (bigplace) 이보다 작은 곳은 한 점으로 본다. 60 = 확정한 점이 60m 넘게 어긋날 수 있는 크기(가상 통화가 「한 점」으로 세는 한계와 같게). 견주어 잴 때 CALL_BIGM=40
+
+
+def _exts(r, sig):
+    """(bigplace, 기본 켬 · 60번) 이름의 점마다 그 장소의 크기(m, gaz.ext). BIG_M보다 작거나 지금 폭으로 선 범위(90%가 드는 반지름 = 폭 × 2.1)가 그 장소를 다 덮으면 0. 하나도 없으면 None.
+    점-반지름 방법(58번 표 1의 19번)대로 기준 대상의 크기를 범위에 더한다: 학교 · 시장 · 큰 건물 · 역처럼 넓은 곳은 그 크기 안을 고르게 보고, 「바로 앞」의 폭은 그 밖에서부터 센다.
+    ponytail: 장소를 원으로 어림한다(길쭉한 학교는 실제보다 넓게 잡힌다). 더 좁히려면 면의 테두리까지의 거리로."""
+    if "bigplace" not in ON or not r.get("ids") or len(r["ids"]) > 40:
+        return None
+    e, lim = G.ext[r["ids"]], max(2.1 * sig, BIG_M)
+    return np.where(e > lim, e, 0.0) if (e > lim).any() else None
+
+
+def _big(i):
+    """(bigplace) 장소 i를 가리키는 단서(pt)에 붙일 크기 칸. 크기 표에 없는 곳(한 점으로 봐도 되는 곳)은 빈 칸."""
+    return {"ext": round(float(G.ext[i]), 1)} if "bigplace" in ON and G.ext[i] > 0 else {}
+
+
+def _flat(c, sig=None):
+    """(bigplace) 단서(pt)가 가리킨 장소의 크기(m). _exts와 같은 규칙으로, 작거나 그 폭으로 선 범위가 다 덮으면 0."""
+    e = c.get("ext", 0)
+    return e if e > max(2.1 * (c.get("r", 100.0) if sig is None else sig), BIG_M) else 0
+
+
 def _context(clues):
     """단서들에서 먼저 정해 둘 것: 지금 말하는 길, 표지의 자리(길 위로 당겨 붙임), 가는 방향."""
     roads = []
@@ -274,7 +298,7 @@ def _support(n, c, ctx):
         if c.get("walk"):                                 # (walkmin · 53번) 「○○에서 걸어서 N분」의 고리: 600m로 자르면 먼 쪽이 잘린다
             rad = min(c["ring"] + 2.5 * c.get("r", 100), 1800)
             return discs(c["p"][0], c["p"][1], rad, 1 if rad <= 700 else 2), "fine"
-        return discs(c["p"][0], c["p"][1], min((c.get("ring") or 0) + 3 * c.get("r", 100), 600)), "fine"
+        return discs(c["p"][0], c["p"][1], min((c.get("ring") or 0) + 3 * c.get("r", 100), 600) + _flat(c)), "fine"
     if t == "anyof":                                      # (facil · 53번) 동 이름 없이 말한 시설: 지금 범위 안의 그런 곳 가운데 하나
         ps = np.asarray(c["ps"], float)
         return discs(ps[:, 0], ps[:, 1], min(3 * c.get("r", 100), 600)), "fine"
@@ -294,7 +318,8 @@ def _support(n, c, ctx):
             elif c.get("how") == "쪽":
                 parts.append(discs(r["x"], r["y"], AROUND[0] + 2 * AROUND[1], 2))
             else:
-                parts.append(discs(r["x"], r["y"], min(3 * sig, 900), 1 if sig <= 200 else 2))
+                e = _exts(r, sig)
+                parts.append(discs(r["x"], r["y"], min(3 * sig, 900) + (float(e.max()) if e is not None else 0), 1 if sig <= 200 else 2))
         for a in r["areas"]:
             x0, y0, x1, y1 = area_of(a)["box"]
             n_cells = (x1 - x0 + 500) * (y1 - y0 + 500) / STEP ** 2
@@ -335,6 +360,9 @@ def _like(n, c, keys, x, y, ctx):
     t = c["t"]
     if t == "pt":
         s = c.get("r", 100.0)
+        if _flat(c):                                      # (bigplace) 넓은 장소를 가리킨 답: 그 크기 안은 고르게, 밖은 폭 s로
+            d = np.maximum(0.0, np.hypot(x - c["p"][0], y - c["p"][1]) - c["ext"])
+            return np.exp(-(d - (c.get("ring") or 0.0)) ** 2 / (2 * s * s))
         if c.get("ring") is not None:                     # 「○○에서 스무 걸음쯤」: 표지 둘레의 고리(33번 2-2)
             return np.exp(-(np.hypot(x - c["p"][0], y - c["p"][1]) - c["ring"]) ** 2 / (2 * s * s))
         return np.exp(-((x - c["p"][0]) ** 2 + (y - c["p"][1]) ** 2) / (2 * s * s))
@@ -361,9 +389,15 @@ def _like(n, c, keys, x, y, ctx):
             out = np.maximum(out, _lookup(keys, road_keys(i), np.ones(len(road_keys(i)))))
         if len(r["x"]):
             sig = _road_sig(_sigma(c, r["kinds"]), r["kinds"], ctx)
-            pad = 3 * sig
+            ext = None if c.get("how") == "쪽" else _exts(r, sig)
+            pad = 3 * sig + (float(ext.max()) if ext is not None else 0)
             m = (r["x"] > x.min() - pad) & (r["x"] < x.max() + pad) & (r["y"] > y.min() - pad) & (r["y"] < y.max() + pad)
-            if m.any() and c.get("how") == "쪽" and m.sum() <= 40:      # 「○○ 쪽」: 그 자리에 봉우리를 두지 않고 둘레를 고르게(그 자리로 찍지 않는다)
+            if m.any() and ext is not None:                    # (bigplace) 넓은 장소: 그 크기 안은 고르게, 밖은 지금 폭으로(「○○초등학교 바로 앞」이 담장 밖에 선 자리를 덮게)
+                d = np.full(len(x), 1e9)
+                for a, b, e in zip(r["x"][m], r["y"][m], ext[m]):
+                    d = np.minimum(d, np.maximum(0.0, np.hypot(x - a, y - b) - e))
+                out = np.maximum(out, np.exp(-d ** 2 / (2 * sig * sig)))
+            elif m.any() and c.get("how") == "쪽" and m.sum() <= 40:      # 「○○ 쪽」: 그 자리에 봉우리를 두지 않고 둘레를 고르게(그 자리로 찍지 않는다)
                 d = np.full(len(x), 1e9)
                 for a, b in zip(r["x"][m], r["y"][m]):
                     d = np.minimum(d, np.hypot(x - a, y - b))
@@ -712,7 +746,8 @@ SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,
              ",twins,fuzzy2,lamponce2"                    # 같은 이름이 둘레에 또 있으면 한 지점으로 좁히지 않기 + 머리만 비슷하게 이은 이름에 뒷말 맞추기(「천호엮 5번 출구」 → 천호역 5번 출구. 둘은 묶어서만) + 가로등 번호 「못 봤어요」 뒤 다시 안 묻기(49번)
              ",addrread,addrline"                         # 주소를 말하면 읽기(묻지는 않는다) + 주소 표에 없는 건물번호를 같은 길의 번호 사이로 어림
              ",fillerlist,finerkeep,choicekeep")          # Solar가 다시 읽을 때 코드 읽기의 규칙 셋이 풀리던 것(실제 호출 길)
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀린 글 넷 + 큰 장소의 넓이(11-19 동규, 60번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]
@@ -900,7 +935,7 @@ KIND_WORD = {"역 출구": "지하철 출구", "정류장": "버스 정류장", 
 
 def anchor(R, clues):
     """확정 문장의 기준이 될 「이름 붙은 한 점」: 시민이 말한 표지 가운데 가장 가까운 것(80m 안), 없으면 눈에 띄는 가까운 곳(60m 안).
-    → {name, p, d, tight} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다."""
+    → {name, p, d, tight, ext} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다. ext = (bigplace) 그 표지가 넓은 장소면 그 크기(m), 아니면 0 — 넓은 장소의 「바로 앞」은 p가 아니다."""
     x, y, ctx, said = R["cx"], R["cy"], R["ctx"], []
     for n, c in enumerate(clues):
         lab = c.get("name") or c.get("label") or ""
@@ -910,7 +945,8 @@ def anchor(R, clues):
         if "twinsanchor" in ON and "p" in c and lab and not (c.get("sure") and c.get("name")) and not lab.startswith(("가로등", "국가지점번호")) and twins(lab.split(" → ")[0], c["p"], np.array([x]), np.array([y]), 300.0):
             continue                                      # (twinsanchor, 기본 끔 · 53번) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다. twins에서 떼어 냈다: 공원 안에서 확인 문장의 기준 이름이 시민에게 안 보이는 것으로 바뀌어 맞는 자리에 「아니요」를 받았다
         if "p" in c and lab:
-            said.append((math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight))
+            e = _flat(c)                                      # (bigplace) 넓은 장소를 「바로 앞」이라고 한 단서면 그 크기만큼은 「그 장소 앞」으로 친다(「근처」처럼 넓게 말한 단서는 전처럼 그 한 점까지의 거리)
+            said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, _flat(c, SIG["바로"])))
         elif "k" in c:
             r = resolve(c["k"])
             if 0 < len(r["x"]) <= 40 and not r["areas"] and not _pk(r):
@@ -920,10 +956,12 @@ def anchor(R, clues):
                 full = G.name[r["ids"][j]] if r.get("ids") else lab
                 if len(r["x"]) > 1 and gaz.norm(full) != gaz.norm(lab) and gaz.norm(lab) in gaz.norm(full):
                     lab = full                                 # 같은 상표가 여럿이면 지점 이름까지 되말한다(「BYC 바로 앞」 → 「BYC 천호점 바로 앞」: 4.7km 떨어진 다른 지점으로 확정한 일, 11-14 밤)
-                said.append((math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight))
+                ext = _exts(r, _sigma(c, r["kinds"])) if c["t"] == "at" else None
+                e = float(ext[j]) if ext is not None else 0
+                said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0))
     best = min(said, default=None)
     if best and best[0] <= 80:
-        return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3]}
+        return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3], "ext": best[4]}
     idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R)]
     if "twinsanchor" in ON:
         idx = [i for i in idx if not twins(G.brand[i] or G.name[i], (G.x[i], G.y[i]), np.array([x]), np.array([y]), 300.0)]
@@ -967,10 +1005,10 @@ def _pin_questions(R, clues, matter):
         labels = [f"{w} 쪽" for w in kw] if len(set(kw)) == len(kw) else [f"{G.name[i]} {w} 쪽" for i, w in zip(same, kw)]
         if len(set(labels)) == len(labels):
             return [{"id": "same", "bits": None, "name": anc["name"], "options": [
-                {"label": lab, "set": {"matter": {"same": G.name[i]}, "clues": [{"t": "pt", "p": [round(float(G.x[i]), 1), round(float(G.y[i]), 1)], "r": SIG["바로"], "sure": True, "name": G.name[i], "label": f"{G.name[i]} ({w})"}]}}
+                {"label": lab, "set": {"matter": {"same": G.name[i]}, "clues": [dict({"t": "pt", "p": [round(float(G.x[i]), 1), round(float(G.y[i]), 1)], "r": SIG["바로"], "sure": True, "name": G.name[i], "label": f"{G.name[i]} ({w})"}, **_big(i))]}}
                 for i, w, lab in zip(same, kw, labels)] + [{"word": "잘 모르겠음", "set": {"matter": {"same": "모름"}}}]}]
     if anc and not R["on_road"] and not anc["tight"] and matter.get("side") is None:       # 그 표지의 바로 앞인지 · 옆인지 · 건너편인지
-        tight = lambda word, r: {"t": "pt", "p": anc["p"], "r": r, "sure": True, "name": anc["name"], "label": f"{anc['name']} {word}"}   # noqa: E731
+        tight = lambda word, r: dict({"t": "pt", "p": anc["p"], "r": r, "sure": True, "name": anc["name"], "label": f"{anc['name']} {word}"}, **({"ext": anc["ext"]} if anc.get("ext") else {}))   # noqa: E731
         out.append({"id": "side", "bits": None, "name": anc["name"], "options": [
             {"word": "바로 앞", "set": {"matter": {"side": "앞"}, "clues": [tight("바로 앞", 8.0)]}}, {"word": "바로 옆", "set": {"matter": {"side": "옆"}, "clues": [tight("바로 옆", 14.0)]}},
             {"word": "길 건너편", "set": {"matter": {"side": "건너편"}}}, {"word": "조금 떨어짐", "set": {"matter": {"side": "근처"}}}]})
@@ -1099,21 +1137,21 @@ def _q_near(R, clues):
     best = None
     for c in clues:
         if c["t"] == "pt" and c.get("r", 100.0) > SIG["바로"] and c.get("label") and not c["label"].endswith(" 쪽"):
-            px, py = np.array([c["p"][0]]), np.array([c["p"][1]])
+            px, py, ext = np.array([c["p"][0]]), np.array([c["p"][1]]), [{"ext": c["ext"]} if c.get("ext") else {}]
         elif c["t"] == "at" and c.get("how") != "바로" and "k" in c:
             r = resolve(c["k"])
             if not len(r["x"]) or r["areas"] or r["roads"] or any(k in KIND_SIG for k in r["kinds"]) or _pk(r):
                 continue                                   # 역 · 동네처럼 넓은 것에는 「바로 앞」을 묻지 않는다
-            px, py = r["x"], r["y"]
+            px, py, ext = r["x"], r["y"], [_big(i) for i in r["ids"]]
         else:
             continue
         d = np.hypot(px - R["cx"], py - R["cy"])
         j = int(np.argmin(d))
         if d[j] <= R["r"] + 50 and (best is None or d[j] < best[0]):
-            best = (float(d[j]), c.get("dist_of") or c.get("label") or G.display(c["k"]), [round(float(px[j]), 1), round(float(py[j]), 1)])     # 거리 답(「○○에서 쉰 걸음쯤」)은 표지 이름으로(CALL_ON=dist): 아니면 같은 질문이 꼬리를 문다
+            best = (float(d[j]), c.get("dist_of") or c.get("label") or G.display(c["k"]), [round(float(px[j]), 1), round(float(py[j]), 1)], ext[j])     # 거리 답(「○○에서 쉰 걸음쯤」)은 표지 이름으로(CALL_ON=dist): 아니면 같은 질문이 꼬리를 문다
     if not best:
         return None
-    return {"id": "near", "bits": 1.0, "name": best[1], "options": [{"word": "바로 앞", "set": {"clues": [{"t": "pt", "p": best[2], "r": SIG["바로"], "name": best[1], "label": best[1] + " 바로 앞"}]}},
+    return {"id": "near", "bits": 1.0, "name": best[1], "options": [{"word": "바로 앞", "set": {"clues": [dict({"t": "pt", "p": best[2], "r": SIG["바로"], "name": best[1], "label": best[1] + " 바로 앞"}, **best[3])]}},
                                                                        {"word": "조금 떨어짐", "set": {"clues": []}}]}
 
 
@@ -1336,6 +1374,7 @@ def _q_marks(R, x, y, w, qid, clues):
         i = picked[n]
         p = [round(float(G.x[i]), 1), round(float(G.y[i]), 1)]
         clue = {"t": "past", "p": p, "how": "바로", "label": G.name[i]} if qid == "passed" else {"t": "pt", "p": p, "r": SIG["바로"] if qid == "finer" else 300.0 if qid == "station" else SIG["근처"], "label": G.name[i]}
+        clue.update(_big(i) if qid != "passed" else {})      # (bigplace) 보기로 내민 넓은 장소의 크기
         opts.append({"label": G.name[i], "kind": G.kind[i], "set": {"clues": [clue]}})
     bits = _bits(parts) * 0.75 if keep else 0.0           # 시민이 그 표지를 못 봤을 몫(4분의 1)을 뺀다
     if open_q:                                            # 이름 하나를 대면 그 둘레(90%가 드는 반지름)까지 준다고 보고 어림한다
@@ -1455,6 +1494,18 @@ def selftest():
     assert Rs["r"] > 5000 and Rt["r"] < 400, (Rs["r"], Rt["r"])
     pts, cell = heat(R1)
     assert len(pts) <= 2500 and cell >= STEP
+    # (bigplace) 넓은 곳의 「바로 앞」은 그 크기만큼 넓게 서고, 작은 곳은 그대로다. 넓은 곳에는 한가운데 점에 핀을 찍지 않는다
+    had = "bigplace" in ON
+    big, small = [{"t": "at", "k": k("서울문창초등학교"), "how": "바로"}], [{"t": "at", "k": k("상도1동주민센터"), "how": "바로"}]
+    ON.discard("bigplace")
+    r0, s0 = infer(big)["r"], infer(small)["r"]
+    ON.add("bigplace")
+    Rg, s1 = infer(big), infer(small)["r"]
+    ext = float(G.ext[resolve(k("서울문창초등학교"))["ids"][0]])
+    assert r0 <= DONE_M < ext < Rg["r"] < ext + 60 and s0 == s1 and not is_done(Rg), (r0, ext, Rg["r"], s0, s1)
+    a = anchor(Rg, big)
+    assert a["ext"] == ext and a["d"] == 0 and anchor(infer(small), small)["ext"] == 0, a
+    ON.add("bigplace") if had else ON.discard("bigplace")
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
 
