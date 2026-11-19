@@ -1,8 +1,9 @@
+<!-- README decision pending 2 (English name): default = "Call Locate", taken from the repository folder name call-locate. Pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph and the "Ordinance engine (scored API)" section. -->
 <h1 align="center">Call Locate (통화로 위치 좁히기)</h1>
 
-<h3 align="center">A screen for Seoul's 120 call center that narrows down a spoken location during the call<br>and fills in the handoff office and the ordinance basis on the intake card</h3>
+<h3 align="center">We narrow down where it happened through the call, find what to do in the ordinance text, and fill both into one screen.</h3>
 
-<p align="center">General complaint lines such as 120 cannot get the caller's location from the phone call alone, so the call agent has to hear the place in words. This screen reads location clues from what the citizen says, shrinks the candidate area on the map, and shows one next question that splits that area best. When the place is fixed, the intake card gets one line the field worker can read to find the spot, the lot number of the nearest building, and the office to hand the case to. If the case falls under one of the six Seoul ordinances, the team's ordinance Q&A engine shows an answer with the cited articles on the same screen.</p>
+<p align="center">General complaint lines such as 120 cannot get the caller's location from the phone call alone, so the call agent has to hear the place in words. This screen reads location clues from what the caller says, shrinks the candidate area on the map, and shows one next question that splits that area best. When the place is fixed, the intake card gets one line the field worker can read to find the spot, the lot number of the nearest building, and the office to hand the case to. If the case falls under one of the six Seoul ordinances, the team's ordinance Q&A engine shows an answer with the cited articles on the same screen.</p>
 
 <p align="center">
   This is Team GG's repository for the Upstage track, "Public law Q&A AI with Upstage AI Studio", of the 2026 AI Bootcamp Competition. It holds two things: the <b>ordinance Q&A engine</b> (<code>engine/</code>, the API the contest scores) and the <b>demo screen</b> built on it (<code>demo/call/</code>). To run the demo without an API key, follow <a href="#getting-started">Getting started</a>.
@@ -34,18 +35,18 @@
 ## Screens
 
 > [!NOTE]
-> The service and these screenshots are in Korean. The call is a made-up call the team wrote. It is not a real complaint or a real person, and the agent's name tag is "상담사 A" (Agent A). The scripted scene was played in "saved answers" mode: the team ran the script once with real calls, saved the Upstage model responses, and replays them for the same words.
+> The service and these screenshots are in Korean. The call is a made-up call the team wrote. It is not a real complaint or a real person, the agent's name tag is "상담사 A" (Agent A), and the caller's phone number ("민원인 연락처") is made up with the middle digits hidden. The bottom left of the screen also says "This call and question flow is a made-up flow the team built from public material and the ordinance text. It is not connected to the 120 standard consultation database." The scripted scene was played in "saved answers" mode: the team ran the script once with real calls, saved the Upstage model responses, and replays them for the same words.
 
 <p align="center">
-  <img src="docs/img/readme/call-narrowing.png" alt="The agent screen during a call. The call text is on the left, the next question and the ordinance answer are at the top center, the map shows a candidate area with a radius of about 210 m, and the intake card is on the right." width="100%">
+  <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 210 m and landmarks to ask about, and the intake card is on the right." width="100%">
   <br>
-  <b>During the call.</b> The citizen says "It's an alley near the Sangdo 1-dong community center, on the way up from Sangdo Station. I don't know the lot number." The candidate area shrinks to a radius of about 210 m, and the next question appears in "지금 물을 말" (What to ask now). The citizen asked "Who comes to take it?", so the "조례 근거 답" (Ordinance answer) box shows the engine's answer and cited articles (Animal Protection Ordinance, Article 10(1), and others).
+  <b>During the call.</b> The caller says "It's an alley near the Sangdo 1-dong community center, on the way up from Sangdo Station. I don't know the lot number." The candidate area shrinks to a radius of about 210 m, and the next question appears in "지금 물을 말" (What to ask now) with landmark names to pick from. The caller asked "Who comes to take it?", so the "조례 근거 답" (Ordinance answer) box shows a draft the engine made from the ordinance and the cited articles (Animal Protection Ordinance, Article 10(1), and others). Even before the place is fixed, the intake card already shows "민원인이 한 말" (what the caller said).
 </p>
 
 <p align="center">
-  <img src="docs/img/readme/call-handoff.png" alt="The agent screen after the call. The map has a fixed pin, and the intake card on the right shows the lot number, the office in charge, past records nearby, the status, and a reference table." width="100%">
+  <img src="docs/img/readme/call-handoff.png" alt="The light agent screen after the call. The map has a fixed pin, the next-question box shows the closing words, the bottom left has Take next call and View records buttons, and the intake card on the right shows the lot number, the office in charge, past records nearby, the status, and a reference table." width="100%">
   <br>
-  <b>After the call.</b> "Right in front of the Sangdo 1-dong community center" shrinks the area to a radius of about 40 m. The screen reads the place back ("Dongjak-gu, Sangdo 1-dong, right in front of the Sangdo 1-dong community center, is that right?"), and the citizen says yes, so the place is fixed. The intake card now shows the lot number "near 437 Sangdo-dong, Dongjak-gu (nearest building, about 10 m)" and the office "Dongjak-gu Office animal protection team · the animal shelter the district office designated". At the bottom, a reference table shows how the handoff changes with "alive or dead, and where it is".
+  <b>After the call.</b> "Right in front of the Sangdo 1-dong community center" shrinks the area to a radius of about 40 m. The screen reads the place back ("Dongjak-gu, Sangdo 1-dong, right in front of the Sangdo 1-dong community center, is that right?"), and the caller says yes, so the place is fixed. The intake card now shows the lot number "near 437 Sangdo-dong, Dongjak-gu (nearest building, about 10 m)" and the office "Dongjak-gu Office animal protection team · the animal shelter the district office designated". At the bottom, a reference table shows how the handoff changes with "alive or dead, and where it is". The "What to ask now" box shows the closing words, and the bottom left shows "다음 전화 받기" (Take next call) and "상담 기록 보기" (View records) buttons.
 </p>
 
 ## Why we built it
@@ -56,17 +57,18 @@ Some complaints depend on the location (an injured animal, a dead animal on the 
 | --- | --- |
 | The law lets only the special numbers 119, 122, and 112 get the caller's location from the call. 120 is not one of them. To get a location, 120 needs the caller's separate consent | Act on the Protection, Use, etc. of Location Information, Article 15(1) and Article 29, and its Enforcement Decree, Article 29 |
 | In 2025, 120 handled 6,443,378 consultations. Phone calls were the largest channel at 3,310,889 (51.4%) | Seoul 120 Dasan Call Foundation, reply to an information disclosure request (2026-11-17) |
-| Field workers find places by lot number, but callers describe them like "from the ○○ intersection toward ○○", so the field worker has to guess. If they cannot find it, they call the citizen back | One phone call with a road complaint officer at a district office (2026-11-17). This is one person's account, and "they call back" was an answer to a question we asked first |
+| Field workers find places by lot number, but callers describe them like "from the ○○ intersection toward ○○", so the field worker has to guess. If they cannot find it, they call the caller back | One phone call with a road complaint officer at a district office (2026-11-17). This is one person's account, and "they call back" was an answer to a question we asked first |
 
 So we narrow down the place during the call. Once the place is fixed, the district office and team to hand the case to and the lot number follow, and if the case falls under the six ordinances, the engine answers with the cited articles. Each source and how to use it carefully is in the [evidence notes](docs/call-locate/근거.md) (Korean).
 
 ## Features
 
-- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped.
+- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped. Fixes for real speech are also on by default: "a few minutes' walk", saying where you are now apart from where you saw it, "not X but Y", "across from", "from A toward B", giving only an exit number, naming a brand and its branch separately, giving an address, and more (`SPEECH_ON` in `demo/call/locate.py`).
 - ❓ **Shows only one next question.** It computes which question splits the remaining candidates most evenly. Questions that change the handoff office (is the animal alive, is it inside a park or on the street) come first.
-- 📍 **Reads the place back before fixing it.** When the area is within a 50 m radius (a 200 m stretch on a road), it asks "…is that right?" and drops the pin only after the citizen says yes.
-- 🗂️ **Fills the intake card.** It writes a line for finding the spot, the lot number of the nearest building with its distance, map coordinates, and the office in charge. The office line also says whether it was "confirmed in official guidance" or is "not yet confirmed (a guess)".
-- 📜 **Adds the ordinance answer.** If the case falls under the six ordinances, the engine's answer and cited articles stay in the same box during the whole call. Clicking an article number shows the article text, effective date, and source link in that box.
+- 📍 **Reads the place back before fixing it.** When the area is within a 50 m radius (a 200 m stretch on a road), it asks "…is that right?" and drops the pin only after the caller says yes.
+- 🗂️ **Fills the intake card.** It writes a line for finding the spot, the lot number of the nearest building with its distance, map coordinates, and the office in charge. The office line also says whether it was "confirmed in official guidance" or is "not yet confirmed (a guess)". If the agent picks a different case type in "일" (Case), the screen keeps the call text and the area and decides the office and whether the six ordinances apply again.
+- 📜 **Adds the ordinance answer.** If the case falls under the six ordinances, a draft the engine made from the ordinance and the cited articles stay in the same box during the whole call. Clicking an article number shows the article text, effective date, and source link in that box. The screen tells the agent not to read the draft as is but to judge and explain in their own words, and the answer and cited articles can be copied.
+- 🏙️ **Draws map buildings at their real height.** 68,197 Seoul buildings that are taller in reality than in the map tiles are redrawn with heights from Seoul's building data, and the buildings in the script get a roof outline. The heights in Seoul's data are not measured; they are floors × 3.5 m. Add `?heights=off` to the address to turn this off.
 - 🗒️ **Keeps consultation records.** Calls with a confirmed place are saved, and past records nearby (within 400 m) appear on the intake card and the map. The status has five steps: received, handed to the office, in progress, not found on site / call back, and done.
 - 🙅 **Says when it does not know.** The engine answers "확인 불가" (cannot confirm) when it finds no basis. The screen writes what is missing as it is, for example "the six Seoul ordinances have no article on handling animal carcasses", "not yet confirmed (a guess)", or "no lot number (inside a park)".
 
@@ -74,10 +76,10 @@ So we narrow down the place during the call. Once the place is fixed, the distri
 
 Four steps at the top of the screen show where the call is.
 
-1. **Hear the situation.** The citizen's words come in one line at a time. In the demo, they come from a script or are typed in.
+1. **Hear the situation.** The caller's words come in one line at a time. In the demo, they come from a script or are typed in.
 2. **Narrow down the place.** For each line, code reads names and relations and shows the area and the next question right away. Then solar-pro4 reads the same line again into fixed fields and corrects it. If the case is one to ask the ordinances about, the screen writes a question for the engine once the case type and place type are known, and gets the ordinance answer.
-3. **Confirm.** When the area is small enough, the screen reads the place back. If the citizen says no, it lowers the chance of that spot and keeps narrowing.
-4. **Hand off.** From the fixed place it decides the office and the lot number and fills the intake card. When the call ends, the case goes to the top of the records with the status "handed to the office".
+3. **Confirm.** When the area is small enough, the screen reads the place back. If the caller says no, it lowers the chance of that spot and keeps narrowing.
+4. **Hand off.** From the fixed place it decides the office and the lot number and fills the intake card. A case with a confirmed place is saved to the records, and the agent sets the status to "handed to the office" (the scripted scene shows it as already chosen). When the call ends, "Take next call" and "View records" buttons appear.
 
 The demo does not file or send anything for real. The status changes only inside the screen.
 
@@ -87,11 +89,11 @@ Every model call is a single call that returns fixed fields (JSON), and code dec
 
 ```mermaid
 flowchart LR
-  Say["Citizen's words (text)"] --> Find["Find names · read relations<br>code + place list"]
+  Say["Caller's words (text)"] --> Find["Find names · read relations<br>code + place list"]
   Find --> Read["Read again<br>solar-pro4"]
   Read --> Narrow["Compute area · pick next question<br>code"]
   Narrow -.->|next question| Say
-  Narrow -->|when narrow enough| Confirm["Read back to confirm<br>code + citizen's yes"]
+  Narrow -->|when narrow enough| Confirm["Read back to confirm<br>code + caller's yes"]
   Confirm --> Route["Handoff office · lot number<br>handoff table · address list"]
   Narrow -->|when case and place type are known| Ask["Write the question<br>solar-pro4"]
   Ask --> Engine["Ordinance engine<br>solar-embedding-2-query · solar-pro4"]
@@ -236,16 +238,18 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 ### Narrowing the location
 
-All of these come from simulated calls. In a simulated call, code picks a true location in Seoul, and a simulated citizen answers the screen's questions with what can be seen from that spot. We have not measured with real people speaking yet.
+<!-- Numbers to update at the Friday/Saturday number check: the table and the two lines below, and "What you should know" 2. Current values are "우리 측정" in docs/call-locate/README.md (11-18) -->
+
+All of these come from simulated calls. In a simulated call, code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. We have not measured with real people speaking yet.
 
 | What we measured | Result |
 | --- | --- |
-| Calls narrowed to one point | When the citizen answers what they see, 418 of 600 calls (69.7%) were narrowed to one point, and 0 calls were fixed at a wrong place. Before our fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes. We found four causes and fixed them |
-| When the citizen makes mistakes | With 10% wrong answers and 10% "I don't know": 395 calls (65.8%) and 1 wrong fix. With 10% wrong answers and a citizen who easily says yes to a wrong place: 413 calls (68.8%) and 5 wrong fixes |
+| Calls narrowed to one point | When the caller answers what they see, 418 of 600 calls (69.7%) were narrowed to one point, and 0 calls were fixed at a wrong place. Before our fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes. We found four causes and fixed them |
+| When the caller makes mistakes | With 10% wrong answers and 10% "I don't know": 395 calls (65.8%) and 1 wrong fix. With 10% wrong answers and a caller who easily says yes to a wrong place: 413 calls (68.8%) and 5 wrong fixes |
 | How close the lot number is | Median distance from the true location to the nearest lot number: 18 m in alleys and shopping streets, 25 m around station exits, 39 m on main roads. Share more than 100 m away: 48% on motorways, 80% inside parks |
 
 - The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. A call has 6.6 exchanges on average.
-- "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the citizen confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
+- "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the caller confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
 - The details and conditions are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
 
 ## Getting started
@@ -271,7 +275,7 @@ Open <http://127.0.0.1:8772> and press "받기" (Answer) or Enter to play the ma
 
 In "직접 통화" (Live call, keyboard `0`) you can type any place in Seoul. For example: "마포구인데요, 스타벅스 앞 가로등이 꺼져 있어요" (It's Mapo-gu, the streetlight in front of Starbucks is out) → "합정역 근처예요" (It's near Hapjeong Station). In saved-answers mode, words that are not in the script are read by code only, without a model.
 
-The browser loads map tiles (OpenFreeMap), the map library (MapLibre GL, from unpkg), and fonts (Pretendard and Do Hyeon) from the internet. The server fetches nothing from outside.
+The browser loads map tiles (OpenFreeMap) and the map library (MapLibre GL, from unpkg) from the internet. The font (IBM Plex Sans KR) is in the repository at `demo/call/web/fonts/`. The server fetches nothing from outside. The screen is light by default; add `?tone=dark` to the address for a dark screen.
 
 ### 2. With an Upstage API key
 
@@ -334,10 +338,11 @@ The demo's other environment variables are in [`demo/call/README.md`](demo/call/
 
 ## What you should know
 
-1. **The demo calls are made up.** The call scripts and question wording are a made-up flow the team wrote. The complaint types were chosen from public material (Seoul's field complaint handling standard), and the ordinance answers come from the ordinance text. The screen is not connected to 120's standard consultation database. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
+<!-- README decision pending 4 (standard consultation database sentence): default = the same words as the screen text (the "가상 흐름" row in docs/content/A-05). Change both together -->
+1. **The demo calls are made up.** This call and question flow is a made-up flow the team built from public material and the ordinance text, and it is not connected to the 120 standard consultation database (the bottom left of the screen says the same). The team wrote the call scripts and question wording, and chose the complaint types from Seoul's field complaint handling standard. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
 2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured yet.
 3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 11 were confirmed in official guidance or the ordinance text, and 19 are guesses. The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
-4. **The only models the service uses for its decisions are Upstage models.** The only outside model API that the engine and the demo server call is Upstage's. The browser only loads map tiles, the map library, and fonts.
+4. **The only models the service uses for its decisions are Upstage models.** The only outside model API that the engine and the demo server call is Upstage's. The browser loads only map tiles and the map library from outside.
 
 ## Limitations
 
@@ -366,7 +371,9 @@ Some evidence is still missing. We filed an information disclosure request for t
 | Motorway interchange and tunnel names (`road_nodes.tsv.gz`) | National Transport Information Center standard node-link data (2026-11-11) |
 | A few demo places (`demo/call/data/extra_places.json`) | Added by hand by the team because the map data had no name for them |
 | Saved answers (`demo/call/data/saved.json`) | Upstage model and engine responses saved from running the scripted scenes with real calls |
+| Building heights (`demo/call/web/heights/`) | Seoul Metropolitan Government, "서울시 건물 태양에너지 등급도(2018년)" (Seoul building solar energy grade map, 2018), Seoul Open Data Plaza OA-15944, KOGL Type 1 (attribution). Heights are not measured; they are floors × 3.5 m. Footprints: © OpenStreetMap contributors · OpenFreeMap tiles |
 | Map tiles (screen) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors (shown at the bottom of the screen) |
+| Font (`demo/call/web/fonts/`) | IBM Plex Sans KR 1.1.0, © 2017 IBM Corp., SIL Open Font License 1.1 (`demo/call/web/fonts/OFL.txt`) |
 
 The original data is not in the repository; only the reduced tables are. The scripts that rebuild them are `demo/call/tools/osm_fetch.py` and `build_*.py`.
 
@@ -377,7 +384,7 @@ All of these documents are in Korean.
 | What you want to know | Document |
 | --- | --- |
 | How to run and click through the demo, scene addresses, environment variables | [`demo/call/README.md`](demo/call/README.md) |
-| An introduction and measurements for first-time readers | [`docs/call-locate/README.md`](docs/call-locate/README.md) |
+| An introduction to the service and its measurements | [`docs/call-locate/README.md`](docs/call-locate/README.md) |
 | Evidence that the problem is real, with sources | [`docs/call-locate/근거.md`](docs/call-locate/근거.md) |
 | The words on the screen and the call scripts (the source of all screen text) | [`docs/content/A-05_통화위치좁히기.md`](docs/content/A-05_통화위치좁히기.md) |
 | How to run the engine, its files, and its logs | [`engine/README.md`](engine/README.md) |
@@ -409,6 +416,7 @@ docs/                # Introduction, evidence, screen text, engine docs, decisio
 
 </details>
 
+<!-- README decision pending 1 (license): default = no license section (the repository has no LICENSE file). If one is chosen, add a "## License" section here and keep the "Data sources and terms" table as is -->
 ## Team
 
 Team GG · 2026 AI Bootcamp Competition, Upstage track "Public law Q&A AI with Upstage AI Studio"
