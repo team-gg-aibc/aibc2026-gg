@@ -10,11 +10,12 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let SETTLE = 3000;        // 받아쓴 말이 이만큼 멎어야 읽고 · 상담사 말을 올린다(말 중간 쉼으로 갈린 마디를 한 번에). 동규 11/19 「3초 정도」, 서버 CALL_DIRECT_SETTLE_MS로 바꾼다. 글은 보내기를 누르면 바로
   let SAID_MAX = 2000, INPUT_MAX = 1000;      // 서버가 한 차례에 읽는 자 수 · 입력 칸 자 수(서버 CALL_DIRECT_SAID_MAX · CALL_DIRECT_INPUT_MAX)
-  const LAW_WAIT = 45000;   // 조례 답을 기다리는 가장 긴 때. 넘으면 「확인 불가」 말을 올린다
+  let LAW_WAIT = 80000;   // 조례 답을 기다리는 가장 긴 때: 엔진 마감(75초, scoring-rules 4절)보다 조금 길게. 넘으면 「확인 불가」 말을 올리되, 늦게 온 답도 올린다(lateLaw)
   // 화면 글은 문구 파일(docs/content/A-05_통화위치좁히기.md 「직접 통화」 절)에서만
   const NAMES = { input: '입력 칸', send: '보내기', note: '안내', code: '접근 코드 묻기', badcode: '접근 코드 틀림', limit: '상한', failed: '읽지 못함', left: '남은 글자', toolong: '입력 칸 넘침', cut: '앞부분만 읽음' };
   const T = {};
-  const st = { busy: false, buf: [], via: 'type', posted: new Set(), merged: 0, turns: 0, heard: 0 };
+  const st = { busy: false, buf: [], via: 'type', posted: new Set(), late: new Set(), lawT: {}, merged: 0, turns: 0, heard: 0 };      // posted = 조례 답을 실제로 올린 물음(답이 왔을 때만)
+  const lawKey = () => (V && V.matter && V.matter.ask) || null;      // 민원인이 물은 규정 물음: 엔진이 찾는 동안에도 바뀌지 않는 열쇠
 
   function loadText(doc) {
     const t = (((doc && doc.sections && doc.sections['직접 통화']) || {}).tables || []).find((x) => x.head[0] === '항목'), rows = t ? Object.fromEntries(t.rows.map((r) => [r[0], r[1]])) : {};
@@ -53,7 +54,7 @@
     } finally { st.busy = false; }
   }
   async function turn() {
-    if (ui.ended) { resetCall(); st.posted.clear(); }      // 끝난 통화 뒤의 말은 새 통화로
+    if (ui.ended) { resetCall(); st.posted.clear(); st.late.clear(); st.lawT = {}; }      // 끝난 통화 뒤의 말은 새 통화로
     let text = st.buf.splice(0).join(' '), cut = false;
     for (;;) {
       const snap = { S: S && JSON.parse(JSON.stringify(S)), V, askQ: ui.askQ };      // 이 차례 앞의 상태: 합쳐 다시 읽을 때 돌아갈 자리
@@ -74,16 +75,31 @@
     await reply();
     if (cut) { const m = fill(T.cut, { N: SAID_MAX.toLocaleString() }); note(m); if (window.VOICE && window.VOICE.relay) window.VOICE.relay(m); }      // 조용히 자르지 않는다(이 차례의 다른 알림 뒤에 남게 마지막에)
   }
-  async function waitLaw() {      // 조례를 물었고 엔진이 찾는 중이면 답이 올 때까지(그동안 말이 더 들어오면 멈추고 합치러 간다)
-    const t0 = Date.now();
-    while (V && V.matter && V.matter.ask && V.engine && V.engine.status === 'running' && !st.buf.length && Date.now() - t0 < LAW_WAIT) { await sleep(200); showBuf(); }
+  async function waitLaw() {      // 조례를 물었고 엔진이 찾는 중이면 답이 올 때까지(그동안 말이 더 들어오면 멈추고 합치러 간다). 그동안 화면은 「답변을 생성하는 중」 그대로
+    const key = lawKey();
+    if (!key || !V.engine || V.engine.status !== 'running') return;
+    st.lawT[key] = st.lawT[key] || Date.now();      // 기다림은 물음마다 처음 본 때부터 센다(차례가 합쳐져도 늘지 않게)
+    while (V && V.engine && V.engine.status === 'running' && lawKey() === key && !st.buf.length && Date.now() - st.lawT[key] < LAW_WAIT) { await sleep(200); showBuf(); }
+  }
+  async function lateLaw(key) {      // 마감을 넘겨 안내를 올린 뒤에도 엔진 답이 오면 그 답을 올린다(같은 통화 · 끝나기 전에만)
+    const sid = S && S.id;
+    for (const t0 = Date.now(); Date.now() - t0 < 300000;) {
+      await sleep(1000);
+      if (!S || S.id !== sid || ui.ended || st.posted.has(key)) return;
+      if (st.busy || lawKey() !== key || !V.engine) continue;
+      if (V.engine.status === 'running') { await poll(); continue; }
+      const e = V.engine;
+      st.posted.add(key); st.busy = true;
+      try { if (e.say || e.answer) await post(e.say || e.answer); while (st.buf.length) await turn(); } finally { st.busy = false; }      // 그새 들어온 말은 이어서 읽는다
+      return;
+    }
   }
   async function reply() {      // 상담사 말: (조례를 물었으면) 조례 답 → 다음에 물을 말, 위치를 확인받았으면 끝인사
-    const M = K('일의 종류와 갈림'), C = K('통화 글'), e = V && V.engine, key = e && (e.ask || e.question || (V.matter && V.matter.ask));
-    if (V && V.matter && V.matter.ask && e && key && !st.posted.has(key)) {
-      st.posted.add(key);
-      await post((e.status !== 'running' && (e.say || e.answer)) || M['엔진 확인 불가 말']);
-    }
+    const M = K('일의 종류와 갈림'), C = K('통화 글'), e = V && V.engine, key = lawKey();
+    if (key && e && !st.posted.has(key)) {
+      if (e.status !== 'running') { st.posted.add(key); await post(e.say || e.answer || M['엔진 확인 불가 말']); }      // 답이 왔다(근거를 못 찾았으면 그 말)
+      else if (Date.now() - (st.lawT[key] || Date.now()) >= LAW_WAIT && !st.late.has(key)) { st.late.add(key); await post(M['엔진 확인 불가 말']); lateLaw(key); }      // 마감을 넘김: 안내를 올리고 늦은 답은 따로
+    }      // 아직 찾는 중이고 마감 전이면(말이 더 들어와 일찍 나온 차례) 조례 답은 다음 차례에
     if (V && V.confirmed) {
       await post(V.summary && V.summary.to ? fill(C['맺음말'], { '넘길 곳': V.summary.to.replace(/ · /g, ', ') }) : C['맺음말 넘길 곳 모름']);
       ui.ended = true; renderTalk();
@@ -125,7 +141,7 @@
   (async () => {
     const info = (await japi('/api/direct/info')).d;
     if (!info.on) return;
-    SETTLE = info.settle_ms || SETTLE; SAID_MAX = info.said_max || SAID_MAX; INPUT_MAX = info.input_max || INPUT_MAX;
+    SETTLE = info.settle_ms || SETTLE; SAID_MAX = info.said_max || SAID_MAX; INPUT_MAX = info.input_max || INPUT_MAX; LAW_WAIT = info.law_wait_ms || LAW_WAIT;
     while (!window.CALL) await sleep(50);      // call.js가 시작을 다 마친 뒤에(문구를 받은 뒤 참고 자료 · 상담 기록을 받고 통화를 한 번 더 비운다. 그 전에 시작하면 첫 말이 지워진다)
     loadText(DOC);
     document.body.classList.add('direct');

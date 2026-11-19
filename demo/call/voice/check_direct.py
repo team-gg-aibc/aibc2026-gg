@@ -133,14 +133,15 @@ def main():
         assert "direct.js" in html and "voice.js" not in html
         assert turn(o)[0] == 403 and req(o, "/api/view", {"state": {}})[0] == 403 and req(o, "/api/alias", {"name": "점검", "at": [127, 37.5]})[0] == 403, "표 없이 POST가 됨"
         info = json.loads(req(o, "/api/direct/info")[1])
-        assert info == {"on": True, "code": False, "pass": False, "used": 0, "max": 2, "left_all": 3, "said_max": 2000, "input_max": 1000, "settle_ms": 3000}, info
+        assert info == {"on": True, "code": False, "pass": False, "used": 0, "max": 2, "left_all": 3, "said_max": 2000, "input_max": 1000, "settle_ms": 3000, "law_wait_ms": 80000}, info
         assert req(o, "/api/direct/enter", {})[0] == 200 and json.loads(req(o, "/api/direct/info")[1])["pass"] is True
-        for who in ("시민", "상담사", "시민"):
+        for who in ("시민", "상담사", None):                                              # who가 없는 줄도 민원인으로 센다(server.py가 그렇게 읽으니)
             c, b = turn(o, who)
             assert c == 200, (who, c, b[:200])
             seen.append(b)
         c, b = turn(o)
-        assert c == 429 and json.loads(b).get("limit") is True, (c, b[:200])                # 표 하나에 민원인의 말 둘까지(상담사 줄은 안 셈)
+        assert c == 429 and json.loads(b).get("limit") is True, (c, b[:200])                # 표 하나에 민원인의 말 둘까지(상담사 줄은 안 셈, who 없는 줄은 셈)
+        assert turn(o, "x")[0] == 429, "who를 다른 값으로 바꿔 상한을 건너뜀"
         assert turn(o, "상담사")[0] == 200
         o2 = opener()
         req(o2, "/api/direct/enter", {})
@@ -152,7 +153,7 @@ def main():
         assert not any(FAKE_KEY in b or FAKE_EL in b for b in seen), "열쇠가 응답에 실렸다"
         print("  ✓ 직접 통화: 표 없이는 403 · 표를 받으면 됨 · 민원인의 말을 표마다(2) · 모두(3) 세어 429 · 상담사 줄은 안 셈 · 열쇠는 어느 응답에도 없음")
         info = json.loads(req(o, "/api/direct/info")[1])
-        assert (info["said_max"], info["input_max"], info["settle_ms"]) == (2000, 1000, 3000), info
+        assert (info["said_max"], info["input_max"], info["settle_ms"], info["law_wait_ms"]) == (2000, 1000, 3000, 80000), info
     finally:
         stop(p)
     p = server(CALL_DIRECT="1")                                                              # ⑥

@@ -3,17 +3,17 @@
 전화처럼 걸고 받는 길이다. 말을 받아써서 통화 글로 넣고, 화면이 띄운 질문을 읽어 준다. 위치 좁히기 · 질문 고르기 · 조례 답은 건드리지 않는다.
 
 - **기본은 끔이다.** 끄면 이 폴더는 읽히지도 않고, 화면 · 점검(`check.py`)은 그대로다.
-- 받아쓰기 · 음성 합성은 업스테이지 모델이 아니다(일레븐랩스든 이 컴퓨터 안의 Whisper든 리턴제로든). 대회 규칙(「서비스에 들어가는 모델은 업스테이지 제공 모델」)에 대한 운영사무국 답을 기다리는 동안에는 스위치로만 켠다. 채점 받는 엔진(`engine/`)과 섞이지 않는다.
+- **받아쓰기 · 음성 합성은 업스테이지 모델이 아니다**(일레븐랩스 · 이 컴퓨터 안의 Whisper · 리턴제로). 그래서 **개발 실험용**이고, 대회 규칙(「서비스에 들어가는 모델은 업스테이지 제공 모델」, `docs/decisions.md` 10-26 · 11-19)에 대한 운영사무국 답이 올 때까지 **배포 · 채점에는 쓰지 않는다**. 현장 테스트 · 평가자 판은 글로만 돈다(받아쓰기 · 읽어 주기 스위치를 비워 두면 바깥 모델을 부르지 않는다). 아래 일레븐랩스 한 세트는 **시연 영상을 만들 때만 쓰는 도구**이고, 서비스가 부르는 모델이 아니다(운영사무국에 물어 둠).
 - 진짜 전화번호는 없다. 휴대폰 브라우저가 전화기 노릇을 한다(보이스톡처럼 주소를 열어 「전화 걸기」).
 
 ## 켜는 법 (레포 맨 위에서)
 
 ```bash
-# 영상에 찍는 한 세트(동규 11/18: AI 음성이 묻는 꼴, 받아쓰기 · 음성은 일레븐랩스). 열쇠 ~/.config/gg-team/elevenlabs.env
+# 시연 영상을 만들 때만(서비스가 부르는 모델이 아님 · 운영사무국 답 전까지 배포에 안 씀): AI 음성이 묻는 한 세트, 받아쓰기 · 음성은 일레븐랩스. 열쇠 ~/.config/gg-team/elevenlabs.env
 OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/tts_lines.py --citizen cat_street      # 처음 한 번: 시민 역 소리 파일(web/voice/citizen/)
 OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_VOICE_STT=elevenlabs CALL_VOICE_TTS=elevenlabs CALL_MODE=saved CALL_PORT=8780 python3 demo/call/server.py
 #   → http://127.0.0.1:8780/?scene=cat_street 에서 「대본을 음성 길로」(사람이 말하려면 「이 기기 마이크로 통화」)
-# 사람이 말로, 가입 없이: 이 컴퓨터 안의 받아쓰기(가입 · 돈 없음, 소리가 밖으로 안 나감. 애플 실리콘 맥 + mlx_whisper + 받아 둔 turbo 모델)
+# 개발 실험용 — 사람이 말로, 가입 없이: 이 컴퓨터 안의 받아쓰기(가입 · 돈 없음, 소리가 밖으로 안 나감. 애플 실리콘 맥 + mlx_whisper + 받아 둔 turbo 모델)
 OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_VOICE_STT=whisper CALL_MODE=saved CALL_PORT=8780 python3 demo/call/server.py
 # 열쇠 · 모델 없이 흐름만: 가짜 받아쓰기(대본 글 · 친 글을 소리 대신 흘린다)
 OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_MODE=saved CALL_PORT=8780 python3 demo/call/server.py
@@ -39,7 +39,7 @@ OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_MODE=saved CALL_PORT=8780 python3 demo/
 ## 직접 통화 (배포 판, `CALL_DIRECT=1`)
 
 ```bash
-# 실제 호출(배포 판 기본). 팀 열쇠를 환경 변수로만 넣는다(엔진이 레포 .env를 읽지 않게). 마이크까지: CALL_VOICE=1 CALL_VOICE_STT=elevenlabs
+# 실제 호출(배포 판 기본). 팀 열쇠를 환경 변수로만 넣는다(엔진이 레포 .env를 읽지 않게). 배포 판은 글로만 — 받아쓰기 · 읽어 주기는 운영사무국 답 전까지 켜지 않는다
 UPSTAGE_API_KEY=… ENGINE_CONFIG=eval/configs/release.json CALL_DIRECT=1 CALL_DIRECT_CODE=… CALL_PORT=8781 python3 demo/call/server.py
 # 앞에 문지기를 두고 접근 코드 없이 열 때(mini 현장 테스트 · 11/22 평가자용): CALL_DIRECT_CODE를 비우고 CALL_DIRECT_OPEN=1. 둘 다 없으면 실제 호출 판은 뜨지 않는다
 ```

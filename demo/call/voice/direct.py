@@ -22,6 +22,7 @@
 | CALL_DIRECT_OPEN | 1이면 접근 코드 없이 연다(누구나 표를 받는다). 저장된 답 방식은 이것 없이도 열린다 | 끔 |
 | CALL_DIRECT_SAID_MAX · CALL_DIRECT_INPUT_MAX | 서버가 한 차례에 읽는 민원인 글 자 수 · 입력 칸 자 수 | 2000 · 1000 |
 | CALL_DIRECT_SETTLE_MS | 받아쓴 말이 이만큼 멎어야 읽는다(말로 할 때만. 글은 보내기를 누르면 바로). 동규 11/19: 3초 | 3000 |
+| CALL_DIRECT_LAW_WAIT_MS | 조례 답을 기다리는 가장 긴 때. 넘으면 「근거를 찾지 못했습니다」를 올리되 늦게 온 답도 올린다 | 80000(엔진 마감 75초보다 길게) |
 | CALL_DIRECT_MAX_TURNS | 표 하나가 넣을 수 있는 민원인의 말 수 | 0 = 제한 없음 |
 | CALL_DIRECT_MAX_ALL | 서버를 띄운 동안 모두 합친 민원인의 말 수 | 0 = 제한 없음 |
 """
@@ -40,6 +41,7 @@ OPEN = os.environ.get("CALL_DIRECT_OPEN") == "1"
 SAID_MAX = int(os.environ.get("CALL_DIRECT_SAID_MAX") or 2000)
 INPUT_MAX = int(os.environ.get("CALL_DIRECT_INPUT_MAX") or 1000)
 SETTLE_MS = int(os.environ.get("CALL_DIRECT_SETTLE_MS") or 3000)
+LAW_WAIT_MS = int(os.environ.get("CALL_DIRECT_LAW_WAIT_MS") or 80000)      # 조례 답을 기다리는 가장 긴 때(엔진 마감 75초보다 조금 길게)
 MAX_TURNS = int(os.environ.get("CALL_DIRECT_MAX_TURNS", "0")) or 10**9      # 0 = 제한 없음(기본). 현장 테스트는 앞에 둔 문지기가 막는다
 MAX_ALL = int(os.environ.get("CALL_DIRECT_MAX_ALL", "0")) or 10**9
 COOKIE = "gg_call"
@@ -54,7 +56,7 @@ def _pass(h):
 
 def _info(t):
     return {"on": True, "code": bool(CODE), "pass": bool(t), "used": passes.get(t, 0) if t else 0, "max": MAX_TURNS, "left_all": max(0, MAX_ALL - used["all"]),
-            "said_max": SAID_MAX, "input_max": INPUT_MAX, "settle_ms": SETTLE_MS}
+            "said_max": SAID_MAX, "input_max": INPUT_MAX, "settle_ms": SETTLE_MS, "law_wait_ms": LAW_WAIT_MS}
 
 
 class _Rule:
@@ -147,7 +149,7 @@ def attach(Handler):
                 self.headers.replace_header("Content-Length", str(len(raw)))
             self.rfile = io.BytesIO(raw)
             line = (b.get("line") if isinstance(b, dict) and p == "/api/turn" else None) or {}
-            if isinstance(line, dict) and line.get("who") == "시민" and str(line.get("text", "")).strip():      # 민원인의 말 한 줄을 센다
+            if isinstance(line, dict) and line.get("who") != "상담사" and str(line.get("text", "")).strip():      # 민원인의 말 한 줄을 센다(server.py는 「상담사」가 아니면 모두 민원인으로 읽는다)
                 with lock:
                     if passes[t] >= MAX_TURNS or used["all"] >= MAX_ALL:
                         return self.send_json({"error": "limit", "limit": True}, 429)
