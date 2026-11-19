@@ -90,14 +90,19 @@
       if (V.engine.status === 'running') { await poll(); continue; }
       const e = V.engine;
       st.posted.add(key); st.busy = true;
-      try { if (e.say || e.answer) await post(e.say || e.answer); while (st.buf.length) await turn(); } finally { st.busy = false; }      // 그새 들어온 말은 이어서 읽는다
+      try { if (e.say || e.answer) await post(lawSay(e.say || e.answer)); while (st.buf.length) await turn(); } finally { st.busy = false; }      // 그새 들어온 말은 이어서 읽는다
       return;
     }
+  }
+  function lawSay(text) {      // 상담사가 소리 내 읽거나 말풍선에 올리는 조례 답: 첫 문장이 문구 파일의 「읽어 줄 때 빼는 첫 문장 끝」(「…에 신고하면 됩니다」 꼴)으로 끝나고 뒤에 문장이 남으면 그 문장을 뺀다(동규 11/19). 조례 칸 글 · 저장된 답 · 엔진은 그대로 · voice.js에 같은 것
+    const ends = String(K('일의 종류와 갈림')['읽어 줄 때 빼는 첫 문장 끝']).split('·').map((x) => x.trim()).filter((x) => x && !x.startsWith('['));
+    const m = String(text || '').match(/^([^.!?]*[.!?])\s+(\S[\s\S]*)$/);
+    return m && ends.some((x) => m[1].slice(0, -1).trim().endsWith(x)) ? m[2] : text;
   }
   async function reply() {      // 상담사 말: (조례를 물었으면) 조례 답 → 다음에 물을 말, 위치를 확인받았으면 끝인사
     const M = K('일의 종류와 갈림'), C = K('통화 글'), e = V && V.engine, key = lawKey();
     if (key && e && !st.posted.has(key)) {
-      if (e.status !== 'running') { st.posted.add(key); await post(e.say || e.answer || M['엔진 확인 불가 말']); }      // 답이 왔다(근거를 못 찾았으면 그 말)
+      if (e.status !== 'running') { st.posted.add(key); await post(e.say || e.answer ? lawSay(e.say || e.answer) : M['엔진 확인 불가 말']); }      // 답이 왔다(근거를 못 찾았으면 그 말)
       else if (Date.now() - (st.lawT[key] || Date.now()) >= LAW_WAIT && !st.late.has(key)) { st.late.add(key); await post(M['엔진 확인 불가 말']); lateLaw(key); }      // 마감을 넘김: 안내를 올리고 늦은 답은 따로
     }      // 아직 찾는 중이고 마감 전이면(말이 더 들어와 일찍 나온 차례) 조례 답은 다음 차례에
     if (V && V.confirmed) {
@@ -137,7 +142,7 @@
     }, true);
   }
 
-  window.DIRECT = { said, heard, greet, st };      // voice.js(받아쓴 마디) · 점검이 쓴다
+  window.DIRECT = { said, heard, greet, st, lawSay };      // voice.js(받아쓴 마디) · 점검이 쓴다
   (async () => {
     const info = (await japi('/api/direct/info')).d;
     if (!info.on) return;
