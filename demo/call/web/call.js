@@ -369,7 +369,7 @@ function scopeBadge() {
 function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾는 중 → 답. 조항(또는 「답 전문」)을 누르면 이 칸 안에서 조문으로 바뀌고 「← 답으로」로 돌아온다(새 창 없음)
   const el = $('law'); if (!el) return;
   const M = K('일의 종류와 갈림'), e = engNow(), r = V && V.route, sc = V && V.matter && V.matter.scope, say = ((V && V.answer_box) || {})['안내'] || { name: K('접수 카드', '쓰임')['안내'] };
-  const waiting = sc && sc !== 'out' && (!e || e.status === 'running');
+  const waiting = sc && sc !== 'out' && e && e.status === 'running';      // 엔진을 부른 뒤만(서버는 장소 종류가 정해져야 부른다). 부르기 전에는 「엔진 찾는 중」(위치를 더 좁히라는 안내)
   let revealing = '';      // 글자를 흘리는 중이면 지금 보일 앞부분
   ui.engT0 = waiting ? ui.engT0 || Date.now() : 0;      // 기다리기 시작한 때(지난 시간을 세는 기준). 엔진은 답을 한 번에 돌려주므로 남은 초는 모른다
   let h = `<div class="hd"><h2 id="w-title">${esc(M['답 칸 제목'])}</h2>${hasAns(e) ? `<span class="by">${esc(engineLine(e))}</span>` : ''}${scopeBadge()}`
@@ -381,7 +381,8 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
   } else {
     const q = e && (e.question || V.matter.ask);
     if (q && ui.cite == null) h += `<p class="cq"><b>${esc(M['시민 물음'])}</b>${esc(q)}</p>`;
-    if (waiting) h += `<p class="idle">${esc(M['답 기다림'])}</p><p class="wait2">${esc(fill(M['답 지난 시간'], { 초: ((Date.now() - ui.engT0) / 1000).toFixed(1) }))}${MODE === 'live' ? ` · ${esc(M['답 보통 시간'])}` : ''}</p><div class="skel" aria-busy="true"><i></i><i></i><i></i></div>`;
+    if (!e) h += `<p class="idle">${esc(M['엔진 찾는 중'])}</p><div class="skel" aria-busy="true"><i></i><i></i><i></i></div>`;      // PR #120 리뷰 P1
+    else if (waiting) h += `<p class="idle">${esc(M['답 기다림'])}</p><p class="wait2">${esc(fill(M['답 지난 시간'], { 초: ((Date.now() - ui.engT0) / 1000).toFixed(1) }))}${MODE === 'live' ? ` · ${esc(M['답 보통 시간'])}` : ''}</p><div class="skel" aria-busy="true"><i></i><i></i><i></i></div>`;
     else if (!e.answer) h += `<p class="idle">${esc(e.error === 'nosaved' ? M['저장된 답 없음'] : e.error ? M['엔진 못 부름'] : M['엔진 못 찾음'])}</p>`;
     else {
       const chips = (on) => [...new Set(e.citations.map((c) => c.law))].map((l) => `${esc(shortLaw(l))} ` + e.citations.map((c, i) => [c, i]).filter(([c]) => c.law === l).map(([c, i]) => `<button type="button" data-act="cite" data-i="${i}" class="${on === i ? 'on' : ''}" title="${esc(c.label)}">${esc(c.article)}</button>`).join('')).join(' ');      // 조례 이름은 한 번, 단추는 조항 번호만
