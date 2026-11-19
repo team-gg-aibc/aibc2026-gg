@@ -6,7 +6,8 @@
 'use strict';
 (function () {
   if (new URLSearchParams(location.search).get('heights') === 'off') return;
-  const COL = '#ff9f1c', PROPS = ['fill-extrusion-color', 'fill-extrusion-height', 'fill-extrusion-base', 'fill-extrusion-opacity', 'fill-extrusion-vertical-gradient'];
+  const col = () => getComputedStyle(document.body).getPropertyValue('--map-mark').trim();      // 대본 건물 띠의 색 = call.css의 --map-mark(화면 밝기마다)
+  const PROPS = ['fill-extrusion-color', 'fill-extrusion-height', 'fill-extrusion-base', 'fill-extrusion-opacity', 'fill-extrusion-vertical-gradient'];
   const PAIRS = [['own-b3d', 'own-hb3d'], ['own-roof', 'own-hroof']];
   const N = 2 ** 14, FROM = 13.5, MAX = 30;      // 칸 번호를 세는 확대(14), 이 확대부터 불러옴(건물이 또렷해지는 때), 지도에 올려 두는 칸 수
   const near = (a, b) => Math.hypot((a[0] - b[0]) * 88200, (a[1] - b[1]) * 111000);
@@ -14,6 +15,7 @@
   const far = (k, [cx, cy]) => Math.hypot(+k.split('-')[0] + 0.5 - cx, +k.split('-')[1] + 0.5 - cy);
   const ring = (a, o) => { const r = []; for (let i = 0, x = 0, y = 0; i < a.length; i += 2) r.push([o[0] + (x += a[i]) / 1e6, o[1] + (y += a[i + 1]) / 1e6]); r.push(r[0]); return r; };
   function copyPaint() {      // 화면 밝기를 바꾸면(applyTone) 타일 건물 층의 칠을 그대로 따른다
+    if (map.getLayer('own-hring') && map.getPaintProperty('own-hring', 'fill-extrusion-color') !== col()) map.setPaintProperty('own-hring', 'fill-extrusion-color', col());
     for (const [from, to] of PAIRS) for (const k of PROPS) {
       const v = map.getPaintProperty(from, k);
       if (v !== undefined && JSON.stringify(v) !== JSON.stringify(map.getPaintProperty(to, k))) map.setPaintProperty(to, k, v);
@@ -28,7 +30,7 @@
     map.on('styledata', copyPaint);
     // 대본 건물 강조: 지붕 둘레 띠(지붕 색은 덮지 않음). 표지와 같은 때에만 보인다 — 지금 질문이 물어보는 표지가 든 건물, 자리가 정해지면 그 자리 건물
     map.addLayer({ id: 'own-hring', type: 'fill-extrusion', source: 'own-hi', minzoom: 13, filter: ['in', ['get', 'name'], ['literal', []]],
-      paint: { 'fill-extrusion-color': COL, 'fill-extrusion-height': ['+', ['get', 'h'], 0.6], 'fill-extrusion-base': ['max', ['-', ['get', 'h'], 2.4], 0] } }, 'own-cloud');
+      paint: { 'fill-extrusion-color': col(), 'fill-extrusion-height': ['+', ['get', 'h'], 0.6], 'fill-extrusion-base': ['max', ['-', ['get', 'h'], 2.4], 0] } }, 'own-cloud');
     let last = '';
     setInterval(() => {
       const names = new Set(markers.map((m) => m.getElement().title).filter(Boolean));
