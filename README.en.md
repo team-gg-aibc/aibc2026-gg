@@ -63,11 +63,13 @@ So we narrow down the place during the call. Once the place is fixed, the distri
 
 ## Features
 
-- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped. Fixes for real speech are also on by default: "a few minutes' walk", saying where you are now apart from where you saw it, "not X but Y", "across from", "from A toward B", giving only an exit number, naming a brand and its branch separately, giving an address, and more (`SPEECH_ON` in `demo/call/locate.py`).
+- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped. Fixes for real speech are also on by default: "a few minutes' walk", saying where you are now apart from where you saw it, "not X but Y", "across from", "from A toward B", giving only an exit number, naming a brand and its branch separately, giving an address, and more (`SPEECH_ON` in `demo/call/locate.py`). It also handles speech-to-text mistakes: station names split or off by one letter, numbers written out in Korean words, particles after a name, and "no" (아니에요) to the inside-or-outside-the-park question (`STT_ON`).
 - ❓ **Shows only one next question.** It computes which question splits the remaining candidates most evenly. Questions that change the handoff office (is the animal alive, is it inside a park or on the street) come first.
 - 📍 **Reads the place back before fixing it.** When the area is within a 50 m radius (a 200 m stretch on a road), it asks "…is that right?" and drops the pin only after the caller says yes.
 - 🗂️ **Fills the intake card.** It writes a line for finding the spot, the lot number of the nearest building with its distance, map coordinates, and the office in charge. The office line also says whether it was "confirmed in official guidance" or is "not yet confirmed (a guess)". If the agent picks a different case type in "일" (Case), the screen keeps the call text and the area and decides the office and whether the six ordinances apply again.
 - 📜 **Adds the ordinance answer.** If the case falls under the six ordinances, a draft the engine made from the ordinance and the cited articles stay in the same box during the whole call. Clicking an article number shows the article text, effective date, and source link in that box. The screen tells the agent not to read the draft as is but to judge and explain in their own words, and the answer and cited articles can be copied.
+- 🏫 **Knows large places and intersection names.** For schools, stations, large stores and similar places bigger than 60 m, it adds their size to the area instead of treating them as one center point, and it does not drop a pin in their center. It understands 994 names of major intersections in Seoul (such as "강남역사거리").
+- ☎️ **Calls you turn on with a switch (off by default).** `CALL_DIRECT=1` is the direct call for the deployed version: a visitor plays the caller and types, and the next line the screen picked and the ordinance answer appear in the chat as the agent's words (with an access code and usage limits). `CALL_VOICE=1` is a voice call placed and answered from a phone browser; its speech-to-text and reading aloud are not Upstage models, so it is for development experiments and making the demo video only (see "What you should know" 4). Details are in [`demo/call/voice/README.md`](demo/call/voice/README.md) (Korean).
 - 🏙️ **Draws map buildings at their real height.** 68,197 Seoul buildings that are taller in reality than in the map tiles are redrawn with heights from Seoul's building data, and the buildings in the script get a roof outline. The heights in Seoul's data are not measured; they are floors × 3.5 m. Add `?heights=off` to the address to turn this off.
 - 🗒️ **Keeps consultation records.** Calls with a confirmed place are saved, and past records nearby (within 400 m) appear on the intake card and the map. The status has five steps: received, handed to the office, in progress, not found on site / call back, and done.
 - 🙅 **Says when it does not know.** The engine answers "확인 불가" (cannot confirm) when it finds no basis. The screen writes what is missing as it is, for example "the six Seoul ordinances have no article on handling animal carcasses", "not yet confirmed (a guess)", or "no lot number (inside a park)".
@@ -122,6 +124,7 @@ The table follows the five stages the contest notice asked teams to describe. We
 | Answer generation | Break the question into fields, read the full text of the chosen ordinance and write the answer, then rewrite it in plain words | `solar-pro4` |
 | Verification | Judge whether the remaining evidence really covers what the question asks. Three code gates add to this: choosing which ordinance to read, checking that the quoted phrase appears word for word in the article, and checking the output format | `solar-pro4` + code |
 | (Demo screen) read again · write the question · shorten for reading aloud | The purple boxes above. Only when the engine answer is longer than two sentences or 160 characters is it shortened to one or two sentences. The short version is dropped if it adds a number or changes the conclusion | `solar-pro4` |
+| (Voice switch `CALL_VOICE`, off by default) speech-to-text · reading aloud | For development experiments and making the demo video only. Not a model the service calls (see "What you should know" 4) | Not an Upstage model |
 
 <details>
 <summary><b>Stages in more detail (files and functions)</b></summary>
@@ -238,19 +241,20 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 ### Narrowing the location
 
-<!-- Numbers to update at the Friday/Saturday number check: the table and the two lines below, and "What you should know" 2. Current values are "우리 측정" in docs/call-locate/README.md (11-18) -->
+<!-- Numbers to update at the Friday/Saturday number check: the table, the lines below, and "What you should know" 2. Current values: 600 calls measured on 11-19 with the current defaults (six location-reading switches on, PR #123). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
 
 All of these come from simulated calls. In a simulated call, code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. We have not measured with real people speaking yet.
 
 | What we measured | Result |
 | --- | --- |
-| Calls narrowed to one point | When the caller answers what they see, 418 of 600 calls (69.7%) were narrowed to one point, and 0 calls were fixed at a wrong place. Before our fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes. We found four causes and fixed them |
-| When the caller makes mistakes | With 10% wrong answers and 10% "I don't know": 395 calls (65.8%) and 1 wrong fix. With 10% wrong answers and a caller who easily says yes to a wrong place: 413 calls (68.8%) and 5 wrong fixes |
+| Calls narrowed to one point | When the caller answers what they see, 421 of 600 calls (70.2%) were narrowed to one point, and 0 calls were fixed at a wrong place. On 11-18, before we found and fixed four causes of wrong fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes |
+| When the caller makes mistakes | With 10% wrong answers and 10% "I don't know": 398 calls (66.3%) and 0 wrong fixes. With 10% wrong answers and a caller who easily says yes to a wrong place: 417 calls (69.5%) and 5 wrong fixes |
 | How close the lot number is | Median distance from the true location to the nearest lot number: 18 m in alleys and shopping streets, 25 m around station exits, 39 m on main roads. Share more than 100 m away: 48% on motorways, 80% inside parks |
 
-- The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. A call has 6.6 exchanges on average.
+- Measured on 2026-11-19 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 6.5 exchanges on average.
+- The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases.
 - "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the caller confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
-- The details and conditions are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
+- Measurements up to 11-18 and how we fixed things are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
 
 ## Getting started
 
@@ -316,6 +320,7 @@ curl -s -X POST http://localhost:8000/ask -H 'Content-Type: application/json' -d
 | Runs the demo server in saved-answers mode and plays the scripted scenes, buttons only, places outside the script, saving a nickname, consultation records, and reference values to the end. Exit code 1 on failure | `OPENBLAS_NUM_THREADS=1 python3 demo/call/check.py` (port 8779, change with `CALL_CHECK_PORT`) | No |
 | Self-test of the location math | `python3 demo/call/locate.py` | No |
 | 30 simulated calls: number of exchanges, error of the fixed point, handoff office (code only, about 30 s) | `OPENBLAS_NUM_THREADS=1 python3 demo/call/tools/sim_calls.py` | No |
+| Server side of the voice call and direct call switches (off by default). Speech-to-text is fake, and outside services are replaced by fake servers on this computer | `OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/check_voice.py`, `OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/check_direct.py` | No |
 | Self-tests of the engine's response format and flow | `.venv/bin/python -m engine.contract --selftest`, `.venv/bin/python -m engine.flow2.flow --selftest` | No |
 | Score the 693 development questions (two runs) | `.venv/bin/python eval/run.py --config eval/configs/release.json --split dev --repeat 2` | Yes |
 
@@ -331,6 +336,8 @@ curl -s -X POST http://localhost:8000/ask -H 'Content-Type: application/json' -d
 | `CALL_MODE` | Demo: `saved` for saved answers, `code` for code only without a model, anything else for real calls | Real calls |
 | `CALL_PORT` | Demo port | 8772 |
 | `CALL_MODEL` | Model the demo uses to read lines and write the question | solar-pro4 |
+| `CALL_DIRECT` | `1` turns on the direct call (text) for the deployed version | Off |
+| `CALL_VOICE` | `1` turns on the voice call (development experiments and video making only, not a model the service calls) | Off |
 
 The demo's other environment variables are in [`demo/call/README.md`](demo/call/README.md) (Korean).
 
@@ -342,7 +349,7 @@ The demo's other environment variables are in [`demo/call/README.md`](demo/call/
 1. **The demo calls are made up.** This call and question flow is a made-up flow the team built from public material and the ordinance text, and it is not connected to the 120 standard consultation database (the bottom left of the screen says the same). The team wrote the call scripts and question wording, and chose the complaint types from Seoul's field complaint handling standard. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
 2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured yet.
 3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 11 were confirmed in official guidance or the ordinance text, and 19 are guesses. The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
-4. **The only models the service uses for its decisions are Upstage models.** The only outside model API that the engine and the demo server call is Upstage's. The browser loads only map tiles and the map library from outside.
+4. **The only models the service calls are Upstage models.** With the default settings, the only outside model API that the engine and the demo server call is Upstage's, and the browser loads only map tiles and the map library from outside. The repository also holds code for a voice call switch (`CALL_VOICE`, off by default). Its speech-to-text and reading aloud (ElevenLabs, Whisper running on this computer, Return Zero) are not Upstage models, so they are for development experiments and making the demo video only, and are not models the service calls. They are not used for deployment or scoring until the contest office answers ([`docs/decisions.md`](docs/decisions.md), 11-19, Korean).
 
 ## Limitations
 
@@ -368,7 +375,8 @@ Some evidence is still missing. We filed an information disclosure request for t
 | Shops · addresses (`shops.tsv.gz` · `addrs.tsv.gz`) | Public Data Portal 15083033, "소상공인시장진흥공단_상가(상권)정보_20260930" (small-business commercial data). No restriction on use |
 | Streetlight numbers (`lamps.tsv.gz`) | Public Data Portal streetlight locations (15107934 Seoul, 15070592 Gwangjin-gu, 15107876 Yeongdeungpo-gu, 15062578 Seodaemun-gu). No restriction on use |
 | Park restrooms (`park_toilets.tsv.gz`) | Seoul Open Data Plaza OA-22586, Seoul public restroom locations. KOGL Type 1 (attribution) |
-| Motorway interchange and tunnel names (`road_nodes.tsv.gz`) | National Transport Information Center standard node-link data (2026-11-11) |
+| Motorway interchange and tunnel names (`road_nodes.tsv.gz`) · major intersection names (`cross_nodes.tsv.gz`) | National Transport Information Center standard node-link data (2026-11-11) |
+| Sizes of large places (`extents.tsv.gz`) | © OpenStreetMap contributors, ODbL 1.0 (areas from the Seoul extract above) + station exits from the same place list |
 | A few demo places (`demo/call/data/extra_places.json`) | Added by hand by the team because the map data had no name for them |
 | Saved answers (`demo/call/data/saved.json`) | Upstage model and engine responses saved from running the scripted scenes with real calls |
 | Building heights (`demo/call/web/heights/`) | Seoul Metropolitan Government, "서울시 건물 태양에너지 등급도(2018년)" (Seoul building solar energy grade map, 2018), Seoul Open Data Plaza OA-15944, KOGL Type 1 (attribution). Heights are not measured; they are floors × 3.5 m. Footprints: © OpenStreetMap contributors · OpenFreeMap tiles |
