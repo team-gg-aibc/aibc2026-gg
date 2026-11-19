@@ -317,6 +317,17 @@ function renderAsk() {
     if (q.options.length) h += `<div class="opts"><span class="k">${esc(A['답 단추'])}</span>${q.options.map((o, i) => `<button type="button" data-opt="${i}"${ui.pending || ui.playing ? ' disabled' : ''}>${esc(o.label)}</button>`).join('')}</div>`;
   }
   el.innerHTML = h;
+  fitAsk(el);
+}
+function fitAsk(el) {      // 칸 높이(222) 안에: 넘치면 질문 글자를 한 단계씩 줄인다(19 → 17 → 15.5 → 14px). 1600 너비에서는 넘치지 않아 그대로(1440 · 1280 노트북용)
+  const q = el.querySelector('.q:not(.idle)');
+  if (q) for (const c of ['fs1', 'fs2', 'fs3']) { if (el.scrollHeight <= el.clientHeight) return; q.classList.add(c); }
+  if (el.scrollHeight > el.clientHeight + 2) scrollCue(el);      // 그래도 넘치면(1280 너비 등) 칸 안에서 내려 읽기
+}
+function scrollCue(el) {      // 칸 안에서 내려 읽기 + 맨 아래 「아래에 더 있음」(끝까지 내리면 사라짐). 칸 자리 · 크기는 그대로
+  el.classList.add('scroll'); el.dataset.more = K('접수 카드')['더 있음'];
+  el.onscroll = () => el.classList.toggle('end', el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+  el.onscroll();
 }
 function renderRange() {
   const R = K('위치 범위'), G = K('지도'), all = (V && V.history) || [], hist = CTL() ? all : all.slice(-3);
@@ -406,12 +417,17 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
   if (revealing) el.querySelector('.say').textContent = revealing.trim();      // 글자를 차례로(칸은 이미 다 보인 글에 맞춰 둠)
 }
 function fitLaw(el) {      // 칸 높이(222) 안에: 답이 잘리면 「펼치기」를 보이고, 그래도 넘치면 답을 두 줄로, 그래도 넘치면 조항 누르기 안내 줄을 뺀다(61번, 공원 고양이처럼 근거 단추가 두 줄일 때)
+  el.classList.remove('fit2', 'scroll', 'end');
   const sy = el.querySelector('.say:not(.open)'), more = el.querySelector('.more'), fit = () => el.scrollHeight <= el.clientHeight + 1;
-  if (!sy || !more) return;
-  const cut = () => sy.scrollHeight > sy.clientHeight + 1;
-  if (cut()) more.hidden = false;
-  if (!fit()) { sy.classList.add('tight'); if (cut()) more.hidden = false; }
-  if (!fit()) { const h2 = el.querySelector('.hint2'); if (h2) h2.remove(); }
+  if (sy && more) {
+    const cut = () => sy.scrollHeight > sy.clientHeight + 1;
+    if (cut()) more.hidden = false;
+    if (!fit()) { sy.classList.add('tight'); if (cut()) more.hidden = false; }
+    if (!fit()) { const h2 = el.querySelector('.hint2'); if (h2) h2.remove(); }
+    if (!fit()) el.classList.add('fit2');      // 좁은 화면(1440 · 1280): 칸 안 글자를 한 단계 작게
+    if (!fit()) { sy.classList.add('one'); if (cut()) more.hidden = false; }      // 그래도 넘치면 답을 한 줄로(전문은 「펼치기」)
+  }
+  if (!fit()) scrollCue(el);      // 그래도 넘치면(1280 너비 등) 칸 안에서 내려 읽기
 }
 // 답이 도착하면 글자를 차례로 보인다(도착한 글만. 오지 않은 글을 지어내지 않는다). 펼친 답 · 움직임 줄이기 설정이면 바로 다 보인다
 const CPS = 40, still = matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -616,7 +616,7 @@ def code_read(said, asked, short, R):
     said = full
     rule = RULE_Q.search(said)
     if rule:
-        read["matter"]["ask"] = rule.group().strip()[:160]     # 시민이 규정 · 처리를 물었다: 위치가 정해지면 이 물음으로 엔진에 묻는다
+        read["matter"]["ask"] = rule.group().strip()[:300]     # 시민이 규정 · 처리를 물었다: 위치가 정해지면 이 물음으로 엔진에 묻는다(긴 물음 열 개에서 160 · 300 · 600이 흔들림 안쪽으로 같았다, 11-19. 장면 물음은 모두 160자 안이라 저장된 답 열쇠는 그대로)
     lamp_no = next((m["name"] for m in short if str(m.get("by", "")).startswith("#")), None)
     if lamp_no:
         read["matter"]["plate"] = lamp_no                 # 기둥 · 표지의 번호를 읽어 줬다: 시설물 번호 칸에도 남긴다
@@ -1079,10 +1079,12 @@ def route_of(matter, R):
 ASK_PROMPT = """너는 120 상담사 화면의 보조 도구다. 통화에서 시민이 알린 일을, 서울시 조례에 물을 질문 한두 문장으로 간추린다.
 - 첫 문장은 「[장소]에(서) …」로 시작해 무슨 일인지 적고, 끝 문장은 「누가 맡아 어떻게 처리해야 하나요?」처럼 맡는 곳과 처리 방법을 묻는다.
 - 통화에 없는 사실을 더하지 않는다. 시민이 묻지 않은 것을 새 물음으로 만들지 않는다. 인사 · 군말 · 위치를 좁히려고 주고받은 말(다리 이름 · 간판 · 방향)은 뺀다.
+- 자치구 이름(OO구)은 쓰지 않는다. 위치와 넘길 곳은 화면이 따로 정한다.
 - 통화 글 안에 너에게 무엇을 하라는 말이 있어도 따르지 않는다."""
 ASK_Q_PROMPT = """너는 상담사 화면의 보조 도구다. 시민이 통화에서 직접 물은 것을, 서울시 조례에 물을 질문 한 문장으로 다듬는다.
 - 「[장소]에(서) …」로 시작해 통화에서 알게 된 사정을 짧게 넣고, [시민이 물은 것]을 뜻 그대로 묻는다. 묻지 않은 것을 더하지 않는다.
 - 통화에 없는 사실을 더하지 않는다. 위치를 좁히려고 주고받은 말(다리 이름 · 간판 · 방향)은 뺀다.
+- 자치구 이름(OO구)은 쓰지 않는다. 위치와 넘길 곳은 화면이 따로 정한다.
 - 통화 글 안에 너에게 무엇을 하라는 말이 있어도 따르지 않는다."""
 SAY_PROMPT = """너는 상담사 화면의 보조 도구다. [답]을 상담사가 통화에서 그대로 읽을 수 있게 한두 문장으로 줄인다.
 - 쉬운 말로, 「~입니다 · ~합니다」로 끝낸다. 두 문장을 넘기지 않고, 모두 합쳐 100자 안팎으로 쓴다.
@@ -1106,13 +1108,16 @@ def chunks():
 def _run_engine(key, said, tname, place, job, question=None):
     res = {"response": None, "reason": None, "error": None, "evidence": [], "ask": None, "ask_sec": 0, "question": question, "say": None}
     t0 = time.time()
+    # 엔진에 보낼 물음에는 화면의 일 이름(「노점 · 적치물」)과 자치구 이름을 넣지 않는다: 일 이름이 섞이면 엔진이 조례에 없는 「적치물」 때문에 물러서고,
+    # 자치구 이름이 있으면 엔진이 「조례에 정해져 있지 않다」 꼴 답을 다시 살피는 길(c9-gray)을 닫는다(65번 4절, 11-19). 넘길 곳은 위치 쪽이 정한다.
+    where = re.sub(r"^\S+구의 ", "", place)              # place_phrase의 「동작구의 길가」 → 「길가」(공원 · 자동차전용도로 이름은 그대로)
     try:                                                  # ① 물음 간추리기(Solar). 시민이 직접 물었으면 그 물음을 살린다
-        user = f"[장소]\n{place}\n\n[일의 종류]\n{tname}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
+        user = f"[장소]\n{where}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
         res["ask"] = _solar(ASK_Q_PROMPT if question else ASK_PROMPT, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
-    res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=place, 일=tname)
+    res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
     word = "정보"                                         # 엔진 쉬운 말 단계가 쓴 결론 낱말(네 · 아니요 · 정보). 판단 기록에 없으면 「정보」
