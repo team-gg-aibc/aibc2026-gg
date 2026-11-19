@@ -34,6 +34,11 @@ function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없�
   return tabs[key];
 }
 const SIT = () => K('상황별 안내', '상황');
+function lawSay(text) {      // 상담사가 소리 내 읽거나 말풍선에 올리는 조례 답(직접 통화 direct.js · 영상의 AI 음성 voice.js가 함께 쓴다): 첫 문장이 문구 파일의 「읽어 줄 때 빼는 첫 문장 끝」(「…에 신고하면 됩니다」 꼴)으로 끝나고 뒤에 문장이 남으면 그 문장을 뺀다(동규 11/19). 조례 칸 글 · 저장된 답 · 엔진은 그대로
+  const ends = String(K('일의 종류와 갈림')['읽어 줄 때 빼는 첫 문장 끝']).split('·').map((x) => x.trim()).filter((x) => x && !x.startsWith('['));
+  const m = String(text || '').match(/^([^.!?]*[.!?])\s+(\S[\s\S]*)$/);
+  return m && ends.some((x) => m[1].slice(0, -1).trim().endsWith(x)) ? m[2] : text;
+}
 const callerNo = () => { const t = K('발신 번호', '장면'); return ui.scene in t ? t[ui.scene] : ''; };      // 장면마다 정해 둔 가상 번호(문구 파일, 가운데를 가린 꼴). 직접 통화는 없음
 const scenes = () => ((DOC.sections['통화 장면'] || {}).tables || [{ rows: [] }])[0].rows.map(([id, name, desc]) => ({ id, name, desc }));
 

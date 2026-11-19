@@ -90,14 +90,14 @@
       if (V.engine.status === 'running') { await poll(); continue; }
       const e = V.engine;
       st.posted.add(key); st.busy = true;
-      try { if (e.say || e.answer) await post(e.say || e.answer); while (st.buf.length) await turn(); } finally { st.busy = false; }      // 그새 들어온 말은 이어서 읽는다
+      try { if (e.say || e.answer) await post(lawSay(e.say || e.answer)); while (st.buf.length) await turn(); } finally { st.busy = false; }      // 그새 들어온 말은 이어서 읽는다
       return;
     }
   }
   async function reply() {      // 상담사 말: (조례를 물었으면) 조례 답 → 다음에 물을 말, 위치를 확인받았으면 끝인사
     const M = K('일의 종류와 갈림'), C = K('통화 글'), e = V && V.engine, key = lawKey();
     if (key && e && !st.posted.has(key)) {
-      if (e.status !== 'running') { st.posted.add(key); await post(e.say || e.answer || M['엔진 확인 불가 말']); }      // 답이 왔다(근거를 못 찾았으면 그 말)
+      if (e.status !== 'running') { st.posted.add(key); await post(e.say || e.answer ? lawSay(e.say || e.answer) : M['엔진 확인 불가 말']); }      // 답이 왔다(근거를 못 찾았으면 그 말)
       else if (Date.now() - (st.lawT[key] || Date.now()) >= LAW_WAIT && !st.late.has(key)) { st.late.add(key); await post(M['엔진 확인 불가 말']); lateLaw(key); }      // 마감을 넘김: 안내를 올리고 늦은 답은 따로
     }      // 아직 찾는 중이고 마감 전이면(말이 더 들어와 일찍 나온 차례) 조례 답은 다음 차례에
     if (V && V.confirmed) {
