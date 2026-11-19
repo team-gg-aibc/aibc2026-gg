@@ -72,7 +72,7 @@ function resetCall() {
   S = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), lines: [], turns: [] };
   V = null;
   Object.assign(ui, { playing: false, paused: false, ended: false, pending: false, reading: false, model: '', typing: null, notice: '', status: null, copied: '', ms: null, fateOpen: undefined, cite: null,
-    engT0: 0, reveal: null, lawOpen: false, lawCopied: '', pin: false });
+    engT0: 0, reveal: null, lawOpen: false, lawCopied: '', pin: false, held: null });
   document.body.classList.remove('pinning');      // 찍기를 켠 채 새 통화로 가면 남던 것(64번 P07)
   renderAll();
 }
@@ -83,7 +83,8 @@ async function send(body, hold) {   // 서버에 한 번 보내고 받은 상태
     if (hold) await hold(d.view);
     if (my !== seq) return null;
     S = d.state; V = d.view;
-    if (V.confirmed && !ui.status) { ui.status = 'filed'; recPost({ op: 'save', state: S, status: 'filed' }).then(() => { renderTop(); renderSide(); }); }      // 위치를 확인받으면 접수됨 → 상담 기록에 쌓인다
+    // 「일」을 고쳐 확인이 풀렸다가 다시 확인받으면 그때의 상태 그대로 다시 저장한다(처리 기록은 서버가 그대로 둔다)
+    if (V.confirmed && !ui.status) { ui.status = ui.held || 'filed'; ui.held = null; recPost({ op: 'save', state: S, status: ui.status }).then(() => { renderTop(); renderSide(); }); }      // 위치를 확인받으면 접수됨 → 상담 기록에 쌓인다
     if ((V.confirmed || (V.question && V.question.id === 'handoff')) && ui.t0 && !ui.t1) ui.t1 = Date.now();      // 통화가 끝난 때(사람 시험의 걸린 시간)
     if (!V.confirmed) ui.status = null;
     return V;
@@ -745,7 +746,10 @@ document.addEventListener('change', async (ev) => {
   if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); await recPost({ op: 'save', state: S, status: ui.status }); renderTop(); renderSide(); }
   else if (ev.target.name === 'rstatus' && ui.rec) { await recPost({ op: 'status', id: ui.rec, status: ev.target.value }); renderTop(); renderRecList(); renderRecCard(); renderMap(); }
   else if (ev.target.id === 'rec-to') { ui.recTo = ev.target.value; renderRecList(); renderMap(); }
-  else if (ev.target.classList.contains('fix') && ev.target.value) { const k = ev.target.value; queue(() => turnReq({ fix: k })); }
+  else if (ev.target.classList.contains('fix') && ev.target.value) {      // 「일」 고치기. 이미 접수 · 넘긴 통화면 상담 기록도 새 일 · 새 담당 부서로 다시 저장한다(처리 기록은 그대로, PR #120 리뷰 P1)
+    const k = ev.target.value;      // 새 일에 더 물을 것(예: 동물 사체 · 도로 파손은 「차로 위입니까」)이 생기면 확인이 풀린다 → 다시 확인받을 때 그 상태로 다시 저장(send)
+    queue(async () => { ui.held = ui.status; await turnReq({ fix: k }); if (V && V.confirmed && ui.held) { ui.status = ui.held; ui.held = null; await recPost({ op: 'save', state: S, status: ui.status }); renderSide(); renderTop(); } });
+  }
 });
 
 (async function main() {

@@ -197,6 +197,22 @@ def fix_and_copy(done):
     st, fixed = turn(done, fix="carcass")
     assert fixed["read_how"] == "fix" and fixed["matter"]["type"] == "carcass" and fixed["route"]["scope"] == "out" and "청소" in fixed["route"]["hit"]["to"], (fixed["matter"], fixed["route"])
     assert st["lines"] == done["lines"] and st["asked_log"] == done["asked_log"] and fixed["radius"] == view["radius"], "일 고치기가 통화 글 · 질문 기록 · 범위를 바꿈"
+    # 확인 · 넘긴 뒤에 고쳐도 상담 기록이 새 일 · 새 담당 부서로(PR #120 리뷰 P1). 화면은 고친 뒤 같은 상태로 다시 저장한다.
+    # 새 일에 더 물을 것이 생기면(동물 사체 → 「차로 위입니까」) 확인이 풀리고, 답하고 다시 확인받은 뒤 저장한다. 처리 기록은 그대로
+    call("/api/records", {"op": "save", "state": done, "status": "filed"}); call("/api/records", {"op": "save", "state": done, "status": "sent"})
+    assert fixed["question"]["id"] == "lane" and not fixed["confirmed"], fixed["question"]
+    for _ in range(4):
+        q = fixed["question"]
+        if q is None:
+            break
+        opt = next(o for o in q["options"] if o["set"].get("confirm") is True) if q["id"] == "confirm" else q["options"][0]
+        st, fixed = turn(st, set=opt["set"], label=opt["label"])
+    rec = next(r for r in call("/api/records", {"op": "save", "state": st, "status": "sent"})["records"] if r["id"] == done["id"])
+    assert fixed["confirmed"] and rec["matter"].startswith("동물 사체") and "청소" in rec["to"] and [x["status"] for x in rec["log"]] == ["filed", "sent"], rec
+    st2, v2 = turn(done, fix="litter")      # 더 물을 것이 없는 일이면 확인이 그대로라 바로 다시 저장된다
+    rec2 = next(r for r in call("/api/records", {"op": "save", "state": st2, "status": "sent"})["records"] if r["id"] == done["id"])
+    assert v2["confirmed"] and rec2["matter"].startswith("쓰레기"), rec2
+    call("/api/records", {"op": "reset"})
     assert turn(done, fix="없는일")[0]["fix"] is None and turn({**done, "fix": ["stray"]}, fix=None)[0]["fix"] is None, "표에 없는 일을 받음"
     print("  ✓ 일 고치기: 유기 동물 → 동물 사체로 고르면 넘길 곳이 청소 쪽 · 6종 밖으로, 통화 글 · 범위는 그대로 · 복사 글은 일 → 번지수 → 찾아가는 말 차례")
 
