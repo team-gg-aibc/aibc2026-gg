@@ -422,7 +422,8 @@ function revealN(text, key) {      // key = 엔진 답(같은 답이면 펼치�
 }
 function lawCopyText(e) {      // 답 · 근거 조항 복사 글: 칸 이름(초안) → 민원인이 물은 것 → 엔진 답 전문 → 근거 조항(조항 · 시행일 · 인용 · 원문 주소)
   const M = K('일의 종류와 갈림'), q = e.question || (V.matter && V.matter.ask);
-  return [`${M['답 칸 제목']} — ${M['초안 표시']}`, q ? `${M['시민 물음']}: ${q}` : '', `${M['답 전문']}: ${e.answer}`, `${M['근거 조항']}:`,
+  const name = (((V && V.answer_box) || {})['안내'] || { name: K('접수 카드', '쓰임')['안내'] }).name;      // 칸 이름은 조례 칸 · 「쓰임」 표와 같은 이름(「조례에 적힌 것(초안)」)
+  return [`${M['답 칸 제목']} — ${name}`, q ? `${M['시민 물음']}: ${q}` : '', `${M['답 전문']}: ${e.answer}`, `${M['근거 조항']}:`,
     ...e.citations.map((c) => `- ${c.label} (${fill(M['시행'], { 날짜: c.effective })})${c.quotes.length ? ` 「${c.quotes.join(' … ')}」` : ''}${c.url ? ` ${c.url}` : ''}`)].filter(Boolean).join('\n');
 }
 function refBlock() {      // 참고 자료(범용): 일의 종류마다 다르다. 조례 원문의 값(web/refs.json) → 자리 · 상태에 따라 표(서버의 넘길 곳 표) → 처리 기관 한 줄. 보일 것이 없으면 칸이 없다
