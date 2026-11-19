@@ -188,6 +188,35 @@ def records(done):
     print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로")
 
 
+def fix_and_copy(done):
+    """「일」 고치기(57번 6): 상담사가 고른 일이 읽은 일을 이기고 통화 글 · 단서 · 질문 기록은 그대로다. 복사 글(57번 5)은 받는 사람의 차례(일 → 번지수 → 찾아가는 말)에 민원인이 한 말 · 연락처 줄."""
+    view = call("/api/view", {"state": done})["view"]
+    rows = [x.split(": ", 1)[0] for x in view["summary"]["copy"].split("\n")]
+    assert rows[:4] == ["일", "번지수", "찾아가는 말", "민원인이 한 말"] and rows[-2:] == ["민원을 받은 곳", "처음 접수한 담당자"], f"복사 글 차례 {rows}"
+    assert view["summary"]["said"].startswith("상도1동 주민센터 근처 골목") and "010" not in view["summary"]["copy"], view["summary"]["said"]
+    st, fixed = turn(done, fix="carcass")
+    assert fixed["read_how"] == "fix" and fixed["matter"]["type"] == "carcass" and fixed["route"]["scope"] == "out" and "청소" in fixed["route"]["hit"]["to"], (fixed["matter"], fixed["route"])
+    assert st["lines"] == done["lines"] and st["asked_log"] == done["asked_log"] and fixed["radius"] == view["radius"], "일 고치기가 통화 글 · 질문 기록 · 범위를 바꿈"
+    # 확인 · 넘긴 뒤에 고쳐도 상담 기록이 새 일 · 새 담당 부서로(PR #120 리뷰 P1). 화면은 고친 뒤 같은 상태로 다시 저장한다.
+    # 새 일에 더 물을 것이 생기면(동물 사체 → 「차로 위입니까」) 확인이 풀리고, 답하고 다시 확인받은 뒤 저장한다. 처리 기록은 그대로
+    call("/api/records", {"op": "save", "state": done, "status": "filed"}); call("/api/records", {"op": "save", "state": done, "status": "sent"})
+    assert fixed["question"]["id"] == "lane" and not fixed["confirmed"], fixed["question"]
+    for _ in range(4):
+        q = fixed["question"]
+        if q is None:
+            break
+        opt = next(o for o in q["options"] if o["set"].get("confirm") is True) if q["id"] == "confirm" else q["options"][0]
+        st, fixed = turn(st, set=opt["set"], label=opt["label"])
+    rec = next(r for r in call("/api/records", {"op": "save", "state": st, "status": "sent"})["records"] if r["id"] == done["id"])
+    assert fixed["confirmed"] and rec["matter"].startswith("동물 사체") and "청소" in rec["to"] and [x["status"] for x in rec["log"]] == ["filed", "sent"], rec
+    st2, v2 = turn(done, fix="litter")      # 더 물을 것이 없는 일이면 확인이 그대로라 바로 다시 저장된다
+    rec2 = next(r for r in call("/api/records", {"op": "save", "state": st2, "status": "sent"})["records"] if r["id"] == done["id"])
+    assert v2["confirmed"] and rec2["matter"].startswith("쓰레기"), rec2
+    call("/api/records", {"op": "reset"})
+    assert turn(done, fix="없는일")[0]["fix"] is None and turn({**done, "fix": ["stray"]}, fix=None)[0]["fix"] is None, "표에 없는 일을 받음"
+    print("  ✓ 일 고치기: 유기 동물 → 동물 사체로 고르면 넘길 곳이 청소 쪽 · 6종 밖으로, 통화 글 · 범위는 그대로 · 복사 글은 일 → 번지수 → 찾아가는 말 차례")
+
+
 def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 원문 · 넘길 곳 표)과 글자로 맞는지. 원본이 바뀌었는데 tools/build_refs.py를 다시 돌리지 않았으면 여기서 걸린다
     d = json.loads(urllib.request.urlopen(BASE + "/refs.json", timeout=5).read().decode("utf-8"))
     ords = {o["name"]: o for o in json.loads((HERE.parents[1] / "engine" / "data" / "ordinances.json").read_text(encoding="utf-8"))}
@@ -215,7 +244,12 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
                 assert any(x["where"] == a["label"] + " " + re.sub(r"\s*\([^)]*관련\)\s*$", "", a["title"]) for a in o["annexes"]), f"참고 자료: {k} 표 이름 {x['where']}가 별표 제목과 다름"
                 words |= {x["head"], x["unit"]} | ({x["more"]} if x.get("more") else set())
                 assert x["head"] in R and all(len(R[x["head"]].split(" · ")) == len(row) for row in x["rows"]), f"참고 자료: {k} 표 머리 「{R.get(x['head'])}」의 칸 수가 원문 표와 다름"
-    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거"}, "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름"}}
+    need = {"참고 자료": words, "접수 카드": {"참고 제목", "출처", "출처 표", "출처 조례", "출처 갈래", "같은 줄 묶음", "6종 같음", "단위", "갈래 줄", "더 있음", "위치 대기", "6종 밖 근거",
+                                          "민원인 말", "연락처", "가상 번호 표시", "번호 없음", "일 고치기", "일 고치기 설명", "일 고침 표시"},      # 61번 화면 고침 묶음에서 새로 쓴 말
+            "일의 종류와 갈림": {"답 대기", "조항 누르기", "답으로", "자리", "조례", "넘길 곳", "구 모름", "공원 모름", "답 펼치기", "답 접기", "답 복사", "답 기다림", "답 지난 시간", "답 보통 시간", "초안 표시"},
+            "통화 글": {"받기 안내", "다음 전화", "기록 보기", "가상 흐름"}, "이렇게 물어보세요": {"화면 설명", "끝 안내"}}
+    tel = {r[0]: r[1] for t in text["text"]["sections"].get("발신 번호", {"tables": []})["tables"] for r in t["rows"]}      # 가상 번호는 가운데를 가린 꼴로만(온전한 번호를 두지 않는다)
+    assert set(tel) >= set(EXPECT) | {"pothole"} and all(re.fullmatch(r"010-\*{4}-\d{4}", v) for v in tel.values()), f"발신 번호 표 {tel}"
     for sec, keys in need.items():
         assert keys <= rows(sec), f"문구 파일 {sec} 표에 없는 말: {keys - rows(sec)}"
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
@@ -247,6 +281,7 @@ def main():
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         alias()
+        fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         print("통화로 위치 좁히기 점검 통과")
     finally:
