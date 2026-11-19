@@ -217,11 +217,6 @@
     btn.disabled = !room && !info.direct;
   }
 
-  function lawSay(text) {      // 상담사가 소리 내 읽거나 말풍선에 올리는 조례 답: 첫 문장이 문구 파일의 「읽어 줄 때 빼는 첫 문장 끝」(「…에 신고하면 됩니다」 꼴)으로 끝나고 뒤에 문장이 남으면 그 문장을 뺀다(동규 11/19). 조례 칸 글 · 저장된 답 · 엔진은 그대로 · direct.js에 같은 것
-    const ends = String(K('일의 종류와 갈림')['읽어 줄 때 빼는 첫 문장 끝']).split('·').map((x) => x.trim()).filter((x) => x && !x.startsWith('['));
-    const m = String(text || '').match(/^([^.!?]*[.!?])\s+(\S[\s\S]*)$/);
-    return m && ends.some((x) => m[1].slice(0, -1).trim().endsWith(x)) ? m[2] : text;
-  }
 
   // ---- 상담 화면: 화면 쪽(+ 이 기기 마이크 · 대본이면 소리 쪽도 함께)
   function deskPage(info) {
