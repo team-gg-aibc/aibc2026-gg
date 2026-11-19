@@ -58,8 +58,9 @@ rooms, opens, lock = {}, [], threading.Lock()
 
 
 # ---- 방 (전화 회선도 이 셋을 부른다)
-def open_room(waiting=False):
-    """방을 연다 → 방 이름. 꽉 찼으면 None. waiting = 휴대폰이 먼저 건 통화(상담 화면이 와서 받을 때까지 기다린다)."""
+def open_room(waiting=False, owner=None):
+    """방을 연다 → 방 이름. 꽉 찼으면 None. waiting = 휴대폰이 먼저 건 통화(상담 화면이 와서 받을 때까지 기다린다).
+    owner = 연 표(직접 통화일 때 direct.py가 준다). 직접 통화에서는 연 표와 받은(claim) 표만 그 방을 읽고 쓴다."""
     now = time.time()
     with lock:
         _reap(now)
@@ -67,7 +68,8 @@ def open_room(waiting=False):
         if len(rooms) >= MAX_ROOMS or len(opens) >= OPENS_PER_HOUR:
             return None
         rid = secrets.token_hex(3)
-        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False, "cut": 0, "caller": False, "waiting": waiting}
+        rooms[rid] = {"at": now, "last": now, "stt": None, "events": [], "says": [], "played": 0, "down": False, "picked": False, "cut": 0, "caller": False, "waiting": waiting,
+                      "owners": {owner} if owner else set()}
         opens.append(now)
         return rid
 
@@ -149,7 +151,7 @@ def citizen_file(text):
 def _line(h, text):
     f = citizen_file(text)
     if not text or not f.is_file():
-        return h.send_json({"error": "시민 음성 파일 없음"}, 404)
+        return h.send_json({"error": "nofile"}, 404)
     body = f.read_bytes()
     h.send_response(200)
     h.send_header("Content-Type", "audio/wav")
@@ -161,7 +163,7 @@ def _line(h, text):
 def _say(h, text):
     f = tts_file(text, make=tts_name(text) in asked)
     if not f:
-        return h.send_json({"error": "음성 파일 없음"}, 404)
+        return h.send_json({"error": "nofile"}, 404)
     body = f.read_bytes()
     h.send_response(200)
     h.send_header("Content-Type", "audio/mpeg")
@@ -200,24 +202,29 @@ def _api(h, body):
             return h.send_json({"rooms": [rid for rid, r_ in rooms.items() if r_["waiting"]]})
     if p == "room":                             # 통화를 연다: 화면 쪽(휴대폰으로 걸기) 또는 휴대폰(from: phone, 상담 화면이 와서 받는다)
         if CODE and not hmac.compare_digest(str(b.get("code", "")).encode(), CODE.encode()):
-            return h.send_json({"error": "접근 코드가 다릅니다."}, 403)
-        rid = open_room(waiting=b.get("from") == "phone")
-        return h.send_json({"room": rid}) if rid else h.send_json({"error": "지금은 통화가 꽉 찼습니다. 잠시 뒤에 다시 해 주세요."}, 429)
+            return h.send_json({"error": "code"}, 403)
+        rid = open_room(waiting=b.get("from") == "phone", owner=getattr(h, "direct_pass", None))
+        return h.send_json({"room": rid}) if rid else h.send_json({"error": "full"}, 429)      # 화면 글은 화면이 문구 파일에서 고른다
     with lock:
         _reap(time.time())
         r = rooms.get(q.get("room", ""))
-        if r:
+        mine = r is not None and (not DIRECT or p == "claim" or getattr(h, "direct_pass", None) in r["owners"])      # 직접 통화: 연 표 · 받은 표만
+        if r and mine:
             r["last"] = time.time()
             if p in ("join", "audio", "poll", "text", "fake"):
                 r["caller_at"] = r["last"]          # 소리 쪽(휴대폰)의 마지막 소식: 끊기 없이 사라지면 상담 화면이 안다
     if not r:
-        return h.send_json({"error": "끝난 통화입니다."}, 404)
+        return h.send_json({"error": "gone"}, 404)
+    if not mine:
+        return h.send_json({"error": "not_yours"}, 403)
     text = " ".join(str(b.get("text", "")).split())[:TEXT_MAX]
     if p == "claim":                            # 화면 쪽: 기다리는 통화를 받는다(한 화면만)
         with lock:
             if not r["waiting"]:
-                return h.send_json({"error": "이미 받은 통화입니다."}, 409)
+                return h.send_json({"error": "taken"}, 409)
             r["waiting"] = False
+            if getattr(h, "direct_pass", None):
+                r["owners"].add(h.direct_pass)      # 받은 상담 화면도 이 방을 읽고 쓴다
         return h.send_json({"ok": True})
     if p == "join" and q.get("text") == "1":    # 소리 쪽이 글로만 붙는다(받아쓰기를 열지 않는다)
         r["caller"] = True
@@ -236,7 +243,7 @@ def _api(h, body):
             join(r, _int(q, "rate", 8000, 48000, 16000), q.get("enc") if q.get("enc") in ("MULAW", "ALAW") else "LINEAR16")
         except Exception as e:  # noqa: BLE001  받아쓰기에 닿지 못함(열쇠 · 망)
             print(f"받아쓰기를 열지 못함: {type(e).__name__}")
-            return h.send_json({"error": "받아쓰기에 닿지 못했습니다."}, 502)
+            return h.send_json({"error": "stt"}, 502)
         return h.send_json({"ok": True, "stt": STT.name})
     if p in ("audio", "poll"):                  # 소리 쪽: 소리 한 토막(없어도 됨)을 넣고, 읽어 줄 말을 받아 간다. poll = 글로만 붙은 휴대폰(GET, 본문 없음)
         if body and r["stt"] and p == "audio":
@@ -277,7 +284,7 @@ def _api(h, body):
             r["last"] = 0
             _reap(time.time())
         return h.send_json({"ok": True})
-    return h.send_json({"error": "없는 길"}, 404)
+    return h.send_json({"error": "no_route"}, 404)
 
 
 def attach(Handler):
@@ -299,7 +306,7 @@ def attach(Handler):
         except ValueError:
             n = 0
         if n > 1_000_000:                       # 0.25초 토막은 수십 KB다
-            return self.send_json({"error": "너무 큼"}, 413)
+            return self.send_json({"error": "too_big"}, 413)
         return _api(self, self.rfile.read(n) if n > 0 else b"")
 
     Handler.do_GET, Handler.do_POST = do_GET, do_POST

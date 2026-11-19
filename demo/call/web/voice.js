@@ -18,7 +18,7 @@
     fake: '받아쓰기 · 가짜', elevenlabs: '받아쓰기 · 일레븐랩스', whisper: '받아쓰기 · 이 컴퓨터 안', rtzr: '받아쓰기 · 리턴제로',
     listen: '상태 · 듣는 중', speak: '상태 · 읽어 주는 중', wait: '상태 · 거는 사람 기다림', ring: '상태 · 전화 옴', over: '상태 · 통화 끝', down: '상태 · 받아쓰기 끊김',
     hold: '상태 · 상담사가 말하는 중', agent: '상태 · 상담사가 직접 묻는 통화', taken: '상태 · 상담사가 넘겨받음', approve: '상태 · 접수 확인 기다림', heard: '상태 · 들어온 소리',
-    link: '안내 · 휴대폰 주소', nomic: '안내 · 마이크 못 씀', noline: '안내 · 민원인 역 소리 없음', code: '안내 · 접근 코드', shaky: '상태 · 연결 불안정', lost: '상태 · 연결 끊김',
+    link: '안내 · 휴대폰 주소', nomic: '안내 · 마이크 못 씀', noline: '안내 · 민원인 역 소리 없음', code: '안내 · 접근 코드', badcode: '안내 · 접근 코드 틀림', full: '안내 · 통화 꽉 참', shaky: '상태 · 연결 불안정', lost: '상태 · 연결 끊김',
     dialName: '휴대폰 · 이름', dialLead: '휴대폰 · 안내', noroom: '휴대폰 · 주소 없음', off: '휴대폰 · 꺼짐', dial: '휴대폰 · 전화 걸기', calling: '휴대폰 · 연결 중', talking: '휴대폰 · 통화 중', say: '휴대폰 · 말할 글', send: '휴대폰 · 말하기', micOn: '휴대폰 · 마이크 켜기', agentName: '휴대폰 · 상담사', meName: '휴대폰 · 나',
     left: '휴대폰 · 남은 글자', toolong: '휴대폰 · 입력 칸 넘침', notsent: '휴대폰 · 못 보냄', busy: '휴대폰 · 다른 통화 중', nodesk: '휴대폰 · 받을 사람 없음' };
   const T = {};
@@ -33,6 +33,7 @@
     if (!r.ok) throw Object.assign(new Error(d.error || r.status), { status: r.status });
     return d;
   }
+  const failText = (e) => (e.status === 403 ? T.badcode : e.status === 429 ? T.full : T.over);      // 서버는 오류 종류만 준다. 화면 글은 문구 파일에서
   // 망이 잠깐 끊긴 것(응답 없음 · 5xx · 408 · 429)은 간격을 늘려 다시 한다. 끝난 통화(404) · 막힘(403 · 413 · 415)은 바로 그만둔다
   const shaky = (e) => !e.status || e.status >= 500 || e.status === 408 || e.status === 429;
   const backoff = (k, ms) => sleep(Math.min(3000, ms * 2 ** k));
@@ -193,7 +194,7 @@
     btn.onclick = async () => {
       if (c) { const x = c; c = null; x.hangup(); return over(); }
       log.innerHTML = ''; $('d-said').textContent = '';
-      if (!room) { try { room = (await vapi('room', { from: 'phone' })).room; } catch (e) { return set('over', String(e.message)); } }      // 직접 통화: 상담 화면이 와서 받는다
+      if (!room) { try { room = (await vapi('room', { from: 'phone' })).room; } catch (e) { return set('over', failText(e)); } }      // 직접 통화: 상담 화면이 와서 받는다
       const mine = c = Caller(room, info, (s, text) => {
         if (c !== mine) return;      // 이미 끊은 통화의 소식
         if (s === 'picked') { quietRing(); clearTimeout(nopick); t0 = Date.now(); tick = setInterval(() => set('on', `${T.talking} ${mmss(Date.now() - t0)}`), 500); set('on', `${T.talking} 00:00`); $('d-form').hidden = false; $('d-left').hidden = !info.direct; $('d-mic').hidden = !info.direct || info.stt === 'fake'; $('d-text').focus(); }
@@ -329,7 +330,7 @@
       let code = sessionStorage.getItem('voice-code') || '';
       if (info.code && !code) { code = window.prompt(T.code) || ''; sessionStorage.setItem('voice-code', code); }
       if (!window.DIRECT) resetCall();      // 직접 통화에서는 글로 하던 통화를 이어 말로 할 수 있게 지우지 않는다
-      try { st.room = (await vapi('room', { code })).room; } catch (e) { sessionStorage.removeItem('voice-code'); return say(String(e.message)); }
+      try { st.room = (await vapi('room', { code })).room; } catch (e) { sessionStorage.removeItem('voice-code'); return say(failText(e)); }
       Object.assign(st, { alive: true, how, since: 0, played: 0, heard: 0, joined: false, picked: false, text: '', busy: false, spoken: null, said1: false, caller: null, ask: ASK, taken: false, approved: false, waitApprove: false });
       say(how === 'phone' ? T.wait : T.listen);
       if (how !== 'phone') {

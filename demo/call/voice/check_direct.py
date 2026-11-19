@@ -4,10 +4,10 @@
 
   ① 스위치를 끄면 직접 통화 길이 없다.
   ② 켜면 첫 화면에 direct.js가 끼워지고(음성도 켜면 voice.js 다음에), 표(쿠키) 없이는 POST /api/… 가 403, 표를 받으면 된다.
-  ③ 접근 코드가 있으면 맞혀야 표를 준다. 음성 길(/api/voice/room)도 표가 있어야 열린다.
+  ③ 접근 코드가 있으면 맞혀야 표를 준다. 음성 길은 GET까지 표가 있어야 열리고(info만 빼고), 한 통화는 연 표 · 받은 표만 읽는다(남의 통화 글을 못 읽는다).
   ④ 민원인의 말 수를 표마다 · 모두 세고, 상한을 넘으면 429. 상담사 줄은 세지 않는다.
   ⑤ 열쇠(UPSTAGE_API_KEY · ELEVENLABS_API_KEY)가 어느 응답에도 실리지 않는다(가짜 값을 넣고 응답 글을 뒤진다).
-  ⑥ 민원인 글: 켜면 한 차례 2,000자까지 읽고(끄면 500 그대로), 규정 찾기의 빠른 길이 원래 정규식과 같은 답을 내며 꾸민 2,000자에서도 빠르다.
+  ⑥ 민원인 글: 켜면 한 차례 2,000자까지 읽고(끄면 500 그대로), 화면이 보낸 통화 상태 속 말도 2,000자로 자르며, 규정 찾기의 빠른 길이 원래 정규식과 같은 답을 내고 꾸민 2,000자에서도 빠르다.
   ⑦ 실제 호출로 켜면서 접근 코드가 없으면 서버가 뜨지 않고, CALL_DIRECT_OPEN=1이면 코드 없이 뜬다.
   ⑧ 실제 호출 판에서도 장면 재생은 저장된 답(server.py CALL_SAVED_FIRST, 기본 켬): 장면마다 Upstage를 한 번도 부르지 않고(부르면 실패하게 막아 둠)
      차례마다 저장된 답 판(CALL_MODE=saved로 같은 장면)과 같다. CALL_SAVED_FIRST=0이면 부르러 간다(main과 같음).
@@ -161,6 +161,9 @@ def main():
         req(o, "/api/direct/enter", {})
         n = said_len(o)
         assert n == 2000, f"켜면 한 차례 2,000자까지 읽어야 함: {n}"
+        st = json.loads(req(o, "/api/turn", {"state": {"id": "c", "lines": [{"who": "시민", "text": "가" * 5000}], "turns": [{"said": "나" * 5000}]},
+                                              "line": {"who": "상담사", "text": "네"}})[1])["state"]
+        assert len(st["lines"][0]["text"]) == 2000 and len(st["turns"][0]["said"]) == 2000, "통화 상태 속 말이 잘리지 않음"
     finally:
         stop(p)
     p = server()
@@ -190,6 +193,8 @@ def main():
         html = req(o, "/")[1]
         assert html.index("voice.js") < html.index("direct.js"), "voice.js가 direct.js보다 먼저 끼워져야 함"
         assert req(o, "/api/voice/room", {})[0] == 403, "표 없이 음성 길이 열림"
+        assert [req(o, x)[0] for x in ("/api/voice/waiting", "/api/voice/desk?room=abcdef&since=0", "/api/voice/poll?room=abcdef")] == [403] * 3, "표 없이 통화방 GET이 열림"
+        assert req(o, "/api/voice/info")[0] == 200
         assert json.loads(req(o, "/api/direct/info")[1])["code"] is True
         assert req(o, "/api/direct/enter", {"code": "틀림"})[0] == 403 and turn(o)[0] == 403
         assert req(o, "/api/direct/enter", {"code": "맞는-코드"})[0] == 200 and turn(o)[0] == 200 and req(o, "/api/voice/room", {})[0] == 200
@@ -200,7 +205,18 @@ def main():
         req(o, f"/api/voice/join?room={room}&text=1", {})
         req(o, f"/api/voice/text?room={room}", {"text": LONG})
         assert len(json.loads(req(o, f"/api/voice/desk?room={room}")[1])["events"][0]["text"]) == 2000
-        print("  ✓ 접근 코드: 틀리면 표를 안 줌 · 맞히면 통화 · 음성 길이 열림")
+        desk, other = opener(), opener()                                                     # 같은 코드를 가진 다른 사람 둘: 상담 화면 · 남
+        for x in (desk, other):
+            assert req(x, "/api/direct/enter", {"code": "맞는-코드"})[0] == 200
+        assert room in json.loads(req(desk, "/api/voice/waiting")[1])["rooms"]
+        assert [req(desk, f"/api/voice/{x}?room={room}&since=0")[0] for x in ("desk", "poll")] == [403, 403], "받지 않은 표가 남의 통화를 읽음"
+        assert req(desk, f"/api/voice/text?room={room}", {"text": "끼어들기"})[0] == 403
+        assert req(desk, f"/api/voice/claim?room={room}", {})[0] == 200 and req(desk, f"/api/voice/desk?room={room}&since=0")[0] == 200, "받은 표가 못 읽음"
+        assert req(other, f"/api/voice/claim?room={room}", {})[0] == 409 and req(other, f"/api/voice/desk?room={room}&since=0")[0] == 403, "남이 받은 통화를 읽음"
+        assert req(o, f"/api/voice/poll?room={room}")[0] == 200, "건 표가 못 읽음"
+        for code, body in (req(other, f"/api/voice/claim?room={room}", {}), req(other, f"/api/voice/desk?room={room}"), req(opener(), "/api/voice/waiting")):
+            assert re.fullmatch(r'\{"error": "[a-z_]+"(, "need_code": true)?\}', body), ("서버 오류에 화면 글이 실림", body)
+        print("  ✓ 접근 코드: 틀리면 표를 안 줌 · 맞히면 통화 · 음성 길(GET까지)이 표를 거침 · 한 통화는 건 표 · 받은 표만 읽음 · 서버 오류는 종류만")
     finally:
         stop(p)
     print("직접 통화 서버 점검 통과")

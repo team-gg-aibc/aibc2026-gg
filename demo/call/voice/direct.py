@@ -6,6 +6,10 @@
   접근 코드   CALL_DIRECT_CODE가 있으면 POST /api/direct/enter 로 맞힌 사람에게만 표(쿠키)를 준다. 코드가 없으면 누구에게나 준다.
               표가 없으면 POST /api/… 는 모두 403(통화 읽기 · 엔진 · 별명 · 기록 · 음성 길까지).
   횟수 상한   민원인의 말 한 줄(POST /api/turn 에 민원인 줄)을 표마다 · 서버 전체로 센다. 넘으면 429.
+              **Upstage 호출을 막는 장치가 아니다**: 다시 읽기(phase=model)를 되풀이하거나 /api/view의 통화 id를 바꾸면 세지 않고 Solar · 엔진을 부를 수 있다.
+              실제 배포에서 Upstage 호출을 세고 막는 것은 앞에 둔 문지기(다시 읽기 · 엔진 셈, 레포 밖)다. 판 안 상한의 기본은 「제한 없음」(동규 11/19).
+  통화방      음성 스위치와 함께면 /api/voice/… 는 info 말고는 GET도 표가 있어야 하고, 한 통화(방)는 그 방을 연 표와 받은(claim) 표만 읽고 쓴다(hub.py).
+  글 길이     /api/turn · /api/view 에 실려 오는 통화 상태(화면이 들고 있는 줄 · 차례의 말)도 SAID_MAX자로 잘라 server.py에 넘긴다.
 열쇠(UPSTAGE_API_KEY · ELEVENLABS_API_KEY)는 서버 환경에만 있고, 어느 응답에도 실리지 않는다.
 실제 호출 방식으로 켜면서 접근 코드가 없으면 서버가 뜨지 않는다(열쇠를 모르는 새 열어 두지 않게). 코드 없이 여는 정식 방식은 CALL_DIRECT_OPEN=1
 (앞에 문지기를 둘 때 · 11/22 평가자용 주소. 그때의 보호는 문지기가 맡는다).
@@ -71,6 +75,18 @@ class _Rule:
         return None
 
 
+def _cut(st):
+    """화면이 보낸 통화 상태의 줄 글 · 차례의 말을 SAID_MAX자로 자른다 → 고쳤으면 True."""
+    if not isinstance(st, dict):
+        return False
+    hit = False
+    for key, field in (("lines", "text"), ("turns", "said")):
+        for x in st.get(key) or []:
+            if isinstance(x, dict) and isinstance(x.get(field), str) and len(x[field]) > SAID_MAX:
+                x[field], hit = x[field][:SAID_MAX], True
+    return hit
+
+
 def attach(Handler):
     from . import add_script
     mod = sys.modules[Handler.__module__]
@@ -82,8 +98,13 @@ def attach(Handler):
     get, post = Handler.do_GET, Handler.do_POST
 
     def do_GET(self):
-        if self.path.split("?")[0] == "/api/direct/info":
+        p = self.path.split("?")[0]
+        if p == "/api/direct/info":
             return self.send_json(_info(_pass(self)))
+        if p.startswith("/api/voice/") and p != "/api/voice/info":      # 통화방 길(방 이름 · 민원인 글 · 상담사 말)은 표가 있어야. 방 단위는 hub.py가 본다
+            self.direct_pass = _pass(self)
+            if not self.direct_pass:
+                return self.send_json({"error": "need_code", "need_code": True}, 403)
         return get(self)
 
     def do_POST(self):
@@ -98,7 +119,7 @@ def attach(Handler):
             except ValueError:
                 b = {}
             if CODE and not hmac.compare_digest(str(b.get("code", "") if isinstance(b, dict) else "").encode(), CODE.encode()):
-                return self.send_json({"error": "접근 코드가 다릅니다."}, 403)
+                return self.send_json({"error": "code"}, 403)
             t = _pass(self) or secrets.token_urlsafe(18)
             with lock:
                 passes.setdefault(t, 0)
@@ -112,20 +133,24 @@ def attach(Handler):
             return self.wfile.write(body)
         if not p.startswith("/api/"):
             return post(self)
-        t = _pass(self)
+        t = self.direct_pass = _pass(self)
         if not t:
-            return self.send_json({"error": "접근 코드가 필요합니다.", "need_code": True}, 403)
-        if p == "/api/turn" and 0 < n < 600_000:            # 민원인의 말 한 줄을 센다. 본문은 server.py가 다시 읽으니 읽은 뒤 되돌려 둔다
+            return self.send_json({"error": "need_code", "need_code": True}, 403)
+        if p in ("/api/turn", "/api/view") and 0 < n < 600_000:      # 본문은 server.py가 다시 읽으니 읽은 뒤 되돌려 둔다
             raw = self.rfile.read(n)
-            self.rfile = io.BytesIO(raw)
             try:
-                line = json.loads(raw.decode("utf-8")).get("line") or {}
-            except (ValueError, AttributeError):
-                line = {}
-            if isinstance(line, dict) and line.get("who") == "시민" and str(line.get("text", "")).strip():
+                b = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                b = None
+            if isinstance(b, dict) and _cut(b.get("state")):      # 통화 상태 속 말도 한 차례 글 길이까지
+                raw = json.dumps(b, ensure_ascii=False).encode("utf-8")
+                self.headers.replace_header("Content-Length", str(len(raw)))
+            self.rfile = io.BytesIO(raw)
+            line = (b.get("line") if isinstance(b, dict) and p == "/api/turn" else None) or {}
+            if isinstance(line, dict) and line.get("who") == "시민" and str(line.get("text", "")).strip():      # 민원인의 말 한 줄을 센다
                 with lock:
                     if passes[t] >= MAX_TURNS or used["all"] >= MAX_ALL:
-                        return self.send_json({"error": "쓸 수 있는 횟수를 다 썼습니다.", "limit": True}, 429)
+                        return self.send_json({"error": "limit", "limit": True}, 429)
                     passes[t] += 1
                     used["all"] += 1
         return post(self)
