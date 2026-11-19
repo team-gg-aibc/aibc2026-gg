@@ -24,7 +24,7 @@ OPENBLAS_NUM_THREADS=1 CALL_MODE=saved python3 demo/call/server.py
 OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python demo/call/server.py
 ```
 
-화면은 인터넷에서 지도 타일(OpenFreeMap), 지도 라이브러리(MapLibre, unpkg), 글꼴(Pretendard · 도현체, jsDelivr · Google Fonts)을 받는다. 서버는 바깥에서 받는 것이 없다.
+화면은 인터넷에서 지도 타일(OpenFreeMap)과 지도 라이브러리(MapLibre, unpkg)를 받는다. 글꼴(IBM Plex Sans KR)은 레포 안 `web/fonts/`에서 내보내 배포한 곳 · 영상 녹화에서 똑같이 보인다. 서버는 바깥에서 받는 것이 없다.
 
 | 환경 변수 | 뜻 | 기본 |
 |---|---|---|
@@ -33,7 +33,7 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_MODEL` | 단서 읽기 · 물음 간추리기에 쓰는 Solar 모델 | solar-pro4 |
 | `CALL_REPLAY_SEC` | 저장된 답 방식에서 엔진 답을 보이기 전 기다리는 최대 초 | 2 |
 | `CALL_NO_ENGINE` | 값이 있으면 엔진을 부르지 않는다(가상 통화로 잴 때) | 없음 |
-| `CALL_ON` · `CALL_OFF` | 질문 고르기 규칙을 켜고 끈다(견주어 잴 때만). 기본값은 `locate.py`의 `DEFAULT_ON` | 비움 |
+| `CALL_ON` · `CALL_OFF` | 질문 고르기 · 말 읽기 규칙을 켜고 끈다(견주어 잴 때만). 기본값은 `locate.py`의 `DEFAULT_ON`. 11/18에 실제 말투 고침 묶음(`SPEECH_ON`)을 더했다. 그 전 값으로 재려면 `CALL_ON=loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone` | 비움 |
 | `CALL_LOCCAP` | 한 통화에 묻는 위치 질문의 상한(11/18에 8 → 10. 앞 값으로 재려면 `8`) | 10 |
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
 | `CALL_ALIAS_FILE` | 상담사가 저장한 별명 파일 | `data/aliases_local.json`(git 무시) |
@@ -51,7 +51,7 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `/?view=records` · `&rec=R09` | 상담 기록 화면(그 기록을 열어 둔다) |
 
 - 화면의 장면 단추는 주 장면과 직접 통화만 보인다(11-18, 장면은 하나로). 다른 대본은 지우지 않았고 주소로 연다.
-- `auto`를 주면 열자마자 대본을 재생한다. 그 밖의 주소 옵션: `?speed=3` 빠르게 · `?stop=<질문 이름>` 그 질문에서 멈춤 · `?tone=light` 밝은 화면.
+- `auto`를 주면 열자마자 대본을 재생한다. 그 밖의 주소 옵션: `?speed=3` 빠르게 · `?stop=<질문 이름>` 그 질문에서 멈춤 · `?tone=dark` 어두운 화면(기본은 밝은 화면, 11-19 디자인 시안 A).
 - 「직접 통화」(키보드 `0`)에서는 서울의 아무 곳이나 글로 넣어 볼 수 있다. 예: 「마포구인데요, 스타벅스 앞 가로등이 꺼져 있어요」 → 「합정역 근처예요」.
 - `?voice=1`(또는 「목소리」 단추)은 영상용이다. `web/voice/<장면>-<번호>.mp3`가 있으면 틀고, 없으면 소리 없이 글 길이만큼 기다린다. 음성 파일은 레포에 없다. 화면은 파일을 틀기만 하고 모델을 부르지 않는다. 브라우저 받아쓰기 · 읽어 주기는 쓰지 않는다.
 
@@ -106,7 +106,9 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/seoul/road_nodes.tsv.gz` | 국가교통정보센터 표준노드링크(2026-11-11판) |
 | `data/extra_places.json` | 지도 자료에 이름이 없어 팀이 손으로 더한 시연 장소 |
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
+| `web/heights/index.json` · `cells/*.json` · `hi.geojson` | 서울 전체 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 칸(확대 14 지도 타일, 약 1.9km 네모)마다 파일 하나이고 화면은 보이는 칸만 읽는다(172칸 · 68,197채 · 3.9MB). 지도 타일보다 실제가 높은 건물만 담는다. 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 이 자료의 높이는 잰 값이 아니라 층수 × 3.5m다. 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap(2026-11-15판 타일). 원본 CSV(약 410MB)와 지도 타일(287장, 41MB)은 레포 밖에 두고 `tools/make_heights.py`로 만든다(약 2분) |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |
+| `web/fonts/IBMPlexSansKR-{Regular,SemiBold,Bold}.woff2` · `OFL.txt` | IBM Plex Sans KR 1.1.0(굵기 400 · 600 · 700), © 2017 IBM Corp., SIL Open Font License 1.1(`web/fonts/OFL.txt`, 글꼴 이름 「Plex」 예약). 받은 곳: github.com/IBM/plex 릴리스 `@ibm/plex-sans-kr@1.1.0`의 `packages/plex-sans-kr/fonts/complete/woff2/hinted/`(2026-11-19, git 해시가 저장소 기록과 같음을 확인). 글꼴 파일만 따로 팔지 않는 한 고치지 않고 함께 내보내도 된다 |
 
 자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 접수 카드 「참고 자료」 칸의 값 `web/refs.json`은 `tools/build_refs.py`가 조례 원문(`engine/data/ordinances.json`) · `data/routes.json`에서 그대로 뽑아 만들고(손으로 고치지 않는다), `check.py`가 원본과 글자로 대조한다. 그 칸에 함께 보이는 사람이 쓴 글(표 머리 · 단위 · 「없음」 줄 · 갈래 · 처리 기관 줄)은 문구 파일 A-05의 「참고 자료」 표에 있고, `refs.json`에는 그 항목 이름만 있다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
 
