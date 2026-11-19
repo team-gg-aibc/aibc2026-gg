@@ -41,6 +41,8 @@ MODE = "saved" if os.environ.get("CALL_MODE") == "saved" else "code" if os.envir
 PORT = int(os.environ.get("CALL_PORT", "8772"))
 MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 · 물음 간추리기에 쓰는 Solar 대화 모델
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
+SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
+SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -777,6 +779,12 @@ def read_key(st):
     return hashlib.sha1(json.dumps([said, (last.get("asked") or {}).get("id")], ensure_ascii=False).encode()).hexdigest()[:16]
 
 
+def saved_first(st):
+    """실제 호출 판: 지금까지의 말 전부 · 방금 물은 질문이 저장된 답과 정확히 같으면(장면 재생) 그 읽기 → (읽은 것, "saved", 초). 아니면 None(→ 실제 호출)."""
+    hit = MODE == "live" and SAVED_FIRST and recording is None and st["turns"] and saved["reads"].get(read_key(st))
+    return (hit["out"], "saved", hit["sec"]) if hit else None
+
+
 def _solar(system, user, schema):
     calls = []
     out = json.loads(upstage.chat([{"role": "system", "content": system}, {"role": "user", "content": user}], READ_CFG, calls, response_format=schema))
@@ -1069,7 +1077,7 @@ def engine_job(st, route, place, question=None):
         if job:
             return job
         job = jobs[(st["id"], key)] = {"res": None, "ready_at": 0}
-    if MODE == "live":
+    if MODE == "live" and not (key in saved["engine"] and saved_first(st)):      # 장면 재생이면 저장된 엔진 답(아래)
         said = [t["said"] for t in st["turns"] if t.get("said")]
         threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question), daemon=True).start()
     else:
@@ -1395,7 +1403,7 @@ def turn(st, ev):
             known = "\n".join([f"- 일: {TYPES[matter['type']]['name']}" for _ in [0] if matter.get("type")] + [f"- {c.get('label') or c.get('k')}" for c in clues]) or "없음"
             asked = last.get("asked") or {}
             said_m = FILLER.sub(" ", last["said"]) if "fillerlist" in L.ON else last["said"]      # (fillerlist, 기본 끔 · 53번) Solar에 줄 이름 목록도 군말을 지운 말에서 찾는다: 안 그러면 코드가 군말을 지우고 찾은 이름(「카페동네 어… 그… 궁동점」)이 목록에 없어, Solar가 다시 읽으면 그 단서가 사라진다
-            read, how, sec = model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
+            read, how, sec = saved_first(st) or model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
@@ -1414,7 +1422,7 @@ def turn(st, ev):
                     _mark_stall(st, R)
     elif isinstance(line, dict) and str(line.get("text", "")).strip():
         who = "상담사" if line.get("who") == "상담사" else "시민"
-        text = str(line["text"]).strip()[:500]
+        text = str(line["text"]).strip()[:SAID_MAX]
         st["lines"].append({"who": who, "text": text, "via": str(line.get("via") or "")[:10]})
         if who == "시민":                                  # ① 코드가 먼저 읽는다
             t0 = time.perf_counter()
@@ -1748,6 +1756,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "서버 오류"}, 500)
         return self.send_json({"error": "없는 길"}, 404)
 
+
+if os.environ.get("CALL_VOICE") == "1" or os.environ.get("CALL_DIRECT") == "1":      # 음성 통화 · 직접 통화(배포 판)는 끌 수 있는 스위치. 기본 끔이고, 끄면 voice/는 읽히지도 않는다
+    __import__("voice").attach(Handler)
 
 if __name__ == "__main__":
     if "--lines" in sys.argv:
