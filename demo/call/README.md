@@ -24,7 +24,7 @@ OPENBLAS_NUM_THREADS=1 CALL_MODE=saved python3 demo/call/server.py
 OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python demo/call/server.py
 ```
 
-화면은 인터넷에서 지도 타일(OpenFreeMap), 지도 라이브러리(MapLibre, unpkg), 글꼴(Pretendard · 도현체, jsDelivr · Google Fonts)을 받는다. 서버는 바깥에서 받는 것이 없다.
+화면은 인터넷에서 지도 타일(OpenFreeMap)과 지도 라이브러리(MapLibre, unpkg)를 받는다. 글꼴(IBM Plex Sans KR)은 레포 안 `web/fonts/`에서 내보내 배포한 곳 · 영상 녹화에서 똑같이 보인다. 서버는 바깥에서 받는 것이 없다.
 
 | 환경 변수 | 뜻 | 기본 |
 |---|---|---|
@@ -53,7 +53,7 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `/?view=records` · `&rec=R09` | 상담 기록 화면(그 기록을 열어 둔다) |
 
 - 화면의 장면 단추는 주 장면과 직접 통화만 보인다(11-18, 장면은 하나로). 다른 대본은 지우지 않았고 주소로 연다.
-- `auto`를 주면 열자마자 대본을 재생한다. 그 밖의 주소 옵션: `?speed=3` 빠르게 · `?stop=<질문 이름>` 그 질문에서 멈춤 · `?tone=light` 밝은 화면.
+- `auto`를 주면 열자마자 대본을 재생한다. 그 밖의 주소 옵션: `?speed=3` 빠르게 · `?stop=<질문 이름>` 그 질문에서 멈춤 · `?tone=dark` 어두운 화면(기본은 밝은 화면, 11-19 디자인 시안 A).
 - 「직접 통화」(키보드 `0`)에서는 서울의 아무 곳이나 글로 넣어 볼 수 있다. 예: 「마포구인데요, 스타벅스 앞 가로등이 꺼져 있어요」 → 「합정역 근처예요」.
 - `?voice=1`(또는 「목소리」 단추)은 영상용이다. `web/voice/<장면>-<번호>.mp3`가 있으면 틀고, 없으면 소리 없이 글 길이만큼 기다린다. 음성 파일은 레포에 없다. 화면은 파일을 틀기만 하고 모델을 부르지 않는다. 브라우저 받아쓰기 · 읽어 주기는 쓰지 않는다.
 
@@ -112,6 +112,7 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
 | `web/heights/index.json` · `cells/*.json` · `hi.geojson` | 서울 전체 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 칸(확대 14 지도 타일, 약 1.9km 네모)마다 파일 하나이고 화면은 보이는 칸만 읽는다(172칸 · 68,197채 · 3.9MB). 지도 타일보다 실제가 높은 건물만 담는다. 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 이 자료의 높이는 잰 값이 아니라 층수 × 3.5m다. 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap(2026-11-15판 타일). 원본 CSV(약 410MB)와 지도 타일(287장, 41MB)은 레포 밖에 두고 `tools/make_heights.py`로 만든다(약 2분) |
 | 지도 타일(화면) | © OpenFreeMap · © OpenMapTiles · © OpenStreetMap 기여자 (화면 아래에 표시) |
+| `web/fonts/IBMPlexSansKR-{Regular,SemiBold,Bold}.woff2` · `OFL.txt` | IBM Plex Sans KR 1.1.0(굵기 400 · 600 · 700), © 2017 IBM Corp., SIL Open Font License 1.1(`web/fonts/OFL.txt`, 글꼴 이름 「Plex」 예약). 받은 곳: github.com/IBM/plex 릴리스 `@ibm/plex-sans-kr@1.1.0`의 `packages/plex-sans-kr/fonts/complete/woff2/hinted/`(2026-11-19, git 해시가 저장소 기록과 같음을 확인). 글꼴 파일만 따로 팔지 않는 한 고치지 않고 함께 내보내도 된다 |
 
 자료를 다시 만드는 스크립트는 `tools/osm_fetch.py` · `tools/build_*.py`다. 접수 카드 「참고 자료」 칸의 값 `web/refs.json`은 `tools/build_refs.py`가 조례 원문(`engine/data/ordinances.json`) · `data/routes.json`에서 그대로 뽑아 만들고(손으로 고치지 않는다), `check.py`가 원본과 글자로 대조한다. 그 칸에 함께 보이는 사람이 쓴 글(표 머리 · 단위 · 「없음」 줄 · 갈래 · 처리 기관 줄)은 문구 파일 A-05의 「참고 자료」 표에 있고, `refs.json`에는 그 항목 이름만 있다. 원본은 레포 밖 빈 폴더에 받고 레포에는 줄인 표만 둔다.
 
@@ -129,3 +130,9 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 - 소리가 같은 이름이 둘 이상인 길 · 역 · 다리는 다른 단서로 갈리기 전에는 확정하지 않는다.
 - 통화 글은 콜센터의 받아 적기 도구가 만든 글을 넘겨받는다고 본다. 그 도구와 이어 본 적은 없고, 시연에서는 대본 재생 · 직접 입력으로 넣는다.
 - 실제 접수 · 전달은 하지 않는다. 접수 카드의 진행 상태는 화면 안에서만 바뀐다.
+
+## 음성 통화 · 직접 통화 (스위치, 기본 끔)
+
+`CALL_VOICE=1`로 띄우면 전화처럼 걸고 받는 길이 붙는다: 휴대폰 브라우저에서 「전화 걸기」 → 상담 화면에서 「받기」 → 말이 받아 적기 칸에 받아적히고 → 화면이 띄운 질문을 읽어 준다(`demo/call/voice/README.md`). 기본은 끔이고, 끄면 위에 적은 것과 같다. 받아쓰기 · 읽어 주기(일레븐랩스 · 이 컴퓨터 안의 Whisper · 리턴제로)는 업스테이지 모델이 아니라서 스위치로만 켜는 개발 실험 · 영상 제작용이고, 운영사무국 답이 올 때까지 배포 · 채점에는 쓰지 않는다(현장 테스트 · 평가자 판은 글로만, `docs/decisions.md` 11-19). 받아쓰기를 고르지 않으면 대본 글을 소리 대신 흘리는 가짜로 돈다.
+
+`CALL_DIRECT=1`로 띄우면 배포 판의 직접 통화가 붙는다: 방문자가 민원인이 되어 대화창 아래 칸에 글을 치거나(음성 스위치를 함께 켜면 마이크로 말할 수도 있지만 개발 실험용이다), 화면이 고른 다음 말과 조례 답이 상담사 말로 대화창에 바로 오른다(읽어 주지 않는다). 답을 만드는 동안 더 들어온 말은 합쳐 그 차례를 다시 읽는다. 접근 코드(`CALL_DIRECT_CODE`)와 횟수 상한(`CALL_DIRECT_MAX_TURNS` · `CALL_DIRECT_MAX_ALL`)이 있다. 자세한 것은 `demo/call/voice/direct.py` 맨 위.

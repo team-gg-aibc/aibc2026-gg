@@ -41,6 +41,8 @@ MODE = "saved" if os.environ.get("CALL_MODE") == "saved" else "code" if os.envir
 PORT = int(os.environ.get("CALL_PORT", "8772"))
 MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 · 물음 간추리기에 쓰는 Solar 대화 모델
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
+SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
+SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -852,6 +854,12 @@ def read_key(st):
     return hashlib.sha1(json.dumps([said, (last.get("asked") or {}).get("id")], ensure_ascii=False).encode()).hexdigest()[:16]
 
 
+def saved_first(st):
+    """실제 호출 판: 지금까지의 말 전부 · 방금 물은 질문이 저장된 답과 정확히 같으면(장면 재생) 그 읽기 → (읽은 것, "saved", 초). 아니면 None(→ 실제 호출)."""
+    hit = MODE == "live" and SAVED_FIRST and recording is None and st["turns"] and saved["reads"].get(read_key(st))
+    return (hit["out"], "saved", hit["sec"]) if hit else None
+
+
 def _solar(system, user, schema):
     calls = []
     out = json.loads(upstage.chat([{"role": "system", "content": system}, {"role": "user", "content": user}], READ_CFG, calls, response_format=schema))
@@ -1006,6 +1014,11 @@ def understood(st):
         elif got.get("type"):
             got["type"] = fit_type(got["type"], things)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
         matter.update(got)
+    fix = st.get("fix")
+    if isinstance(fix, str) and fix in TYPES:             # 상담사가 고친 일(57번 6, 11-18)이 읽은 일을 이긴다. 동물의 일은 살았는지도 그 일에 맞춘다
+        matter["type"] = fix
+        if fix in ("stray", "carcass"):
+            matter["alive"] = fix == "stray"
     if matter.get("move"):                                # 「조금 지나서」의 폭은 걷는 중인지 차 안인지로(통화 어디에서 말했든)
         clues = [dict(c, move=matter["move"]) if c["t"] == "past" and c.get("how") == "조금" else c for c in clues]
     if matter.get("alive") is not None and matter.get("type") in (None, "carcass", "stray"):
@@ -1139,7 +1152,7 @@ def engine_job(st, route, place, question=None):
         if job:
             return job
         job = jobs[(st["id"], key)] = {"res": None, "ready_at": 0}
-    if MODE == "live":
+    if MODE == "live" and not (key in saved["engine"] and saved_first(st)):      # 장면 재생이면 저장된 엔진 답(아래)
         said = [t["said"] for t in st["turns"] if t.get("said")]
         threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question), daemon=True).start()
     else:
@@ -1363,10 +1376,12 @@ def build(st, extra=None):
     exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆")) and not anc.get("ext")      # (bigplace) 넓은 장소의 「바로 앞」은 그 장소의 한가운데 점이 아니다: 범위의 가운데에 찍는다
     pin = {"at": gaz.lonlat(*anc["p"]) if exact else parts["center"], "exact": exact, "label": (line or "").split(", ", 1)[-1]} if done and not handoff else None      # 솔직한 끝에는 핀을 찍지 않는다(받는 사람이 「거기」로 읽는다)
     summary["point"] = "{1:.5f}, {0:.5f}".format(*pin["at"]) if pin else None
+    summary["said"] = next((t["said"] for t in st["turns"] if t.get("said") and (t.get("model") or t.get("code") or {}).get("clues")), None)      # 민원인이 위치를 처음 말한 문장 그대로(57번 5가)
     summary["bunji"] = bunji_of(pin, handoff and line, L.place_class(R)[0] if pin else None)      # 자동차전용도로 위는 방음벽 너머 가게가 가까워도 번지가 아니다
     bj = summary["bunji"] and " / ".join(x for x in (summary["bunji"]["text"], summary["bunji"]["road"]) if x)
-    rows = [(S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"]), (S["일"], summary["matter"]), (S["찾아가는 말"], summary["go"]) if summary["go"] else (S["위치"], summary["where"]), (S["번지수"], bj), (S["좌표"], summary["point"]),
-            (S["범위"], summary["size"]), (S["담당 부서"], summary["to"]), (S["근거"], " · ".join(summary["cites"]) or None), (S["말 그대로"], summary["said_place"])]
+    rows = [(S["일"], summary["matter"]), (S["번지수"], bj), (S["찾아가는 말"], summary["go"]) if summary["go"] else (S["위치"], summary["where"]), (S["민원인 말"], summary["said"]),      # 받는 사람의 차례: 무슨 일 → 번지수 → 찾아가는 말(57번 5다)
+            (S["범위"], summary["size"]), (S["좌표"], summary["point"]), (S["담당 부서"], summary["to"]), (S["근거"], " · ".join(summary["cites"]) or None), (S["말 그대로"], summary["said_place"]),
+            (S["받은 곳"], summary["from"]), (S["접수 담당자"], summary["by"])]      # 민원인 연락처 · 받은 때 · 진행 상태는 화면이 아는 값이라 화면이 붙인다
     summary["copy"] = "\n".join(f"{k}: {v}" for k, v in rows if v)
     pts, cell = L.heat(R) if R else ([], L.STEP)
     cands = []
@@ -1453,7 +1468,8 @@ def _mark_stall(st, R):
 def turn(st, ev):
     """통화에 줄 하나 · 단추 하나가 더해지거나(①까지), 마지막 말을 모델로 다시 읽는다(②) → (새 상태, 화면에 보일 것)."""
     st = {"id": str(st.get("id") or "call"), "lines": list(st.get("lines") or [])[-80:], "turns": list(st.get("turns") or [])[-40:], "history": list(st.get("history") or []),
-          "labels": list(st.get("labels") or []), "asked_log": list(st.get("asked_log") or [])[-40:], "confirmed": bool(st.get("confirmed")), "shown": st.get("shown")}
+          "labels": list(st.get("labels") or []), "asked_log": list(st.get("asked_log") or [])[-40:], "confirmed": bool(st.get("confirmed")), "shown": st.get("shown"),
+          "fix": st["fix"] if isinstance(st.get("fix"), str) and st["fix"] in TYPES else None}
     extra = {"read_how": None, "read_sec": 0}
     line, chip = ev.get("line"), ev.get("set")
     if ev.get("phase") == "model":                        # ② 마지막 말을 Solar로 다시 읽는다
@@ -1464,9 +1480,9 @@ def turn(st, ev):
             R = L.infer(clues) if clues else None
             known = "\n".join([f"- 일: {TYPES[matter['type']]['name']}" for _ in [0] if matter.get("type")] + [f"- {c.get('label') or c.get('k')}" for c in clues]) or "없음"
             asked = last.get("asked") or {}
-            said_m = FILLER.sub(" ", last["said"]) if "fillerlist" in L.ON else last["said"]
-            said_m = numfix(said_m) if "numword" in L.ON else said_m      # (numword) 받아쓰기가 한글로 적은 숫자도 같이 / (fillerlist, 53번) Solar에 줄 이름 목록도 군말을 지운 말에서 찾는다: 안 그러면 코드가 군말을 지우고 찾은 이름(「카페동네 어… 그… 궁동점」)이 목록에 없어, Solar가 다시 읽으면 그 단서가 사라진다
-            read, how, sec = model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
+            said_m = FILLER.sub(" ", last["said"]) if "fillerlist" in L.ON else last["said"]      # (fillerlist, 기본 끔 · 53번) Solar에 줄 이름 목록도 군말을 지운 말에서 찾는다: 안 그러면 코드가 군말을 지우고 찾은 이름(「카페동네 어… 그… 궁동점」)이 목록에 없어, Solar가 다시 읽으면 그 단서가 사라진다
+            said_m = numfix(said_m) if "numword" in L.ON else said_m      # (numword, 60번) 받아쓰기가 한글로 적은 숫자도 같이(코드 읽기와 같게)
+            read, how, sec = saved_first(st) or model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
@@ -1494,7 +1510,7 @@ def turn(st, ev):
                     _mark_stall(st, R)
     elif isinstance(line, dict) and str(line.get("text", "")).strip():
         who = "상담사" if line.get("who") == "상담사" else "시민"
-        text = str(line["text"]).strip()[:500]
+        text = str(line["text"]).strip()[:SAID_MAX]
         st["lines"].append({"who": who, "text": text, "via": str(line.get("via") or "")[:10]})
         if who == "시민":                                  # ① 코드가 먼저 읽는다
             t0 = time.perf_counter()
@@ -1543,6 +1559,9 @@ def turn(st, ev):
         st["lines"].append({"who": "상담사", "text": M["찍음 글"], "via": "pin"})
         st["turns"].append({"said": None, "asked": None, "code": {"clues": [{"t": "pt", "p": [round(px, 1), round(py, 1)], "r": 60.0, "label": M["찍은 곳"]}], "matter": {}}, "model": None})
         extra = {"read_how": "pin", "read_sec": 0}
+    elif isinstance(ev.get("fix"), str) and ev["fix"] in TYPES:      # 상담사가 화면이 읽은 「일」을 고름(57번 6): 통화 글 · 단서 · 질문 기록은 그대로
+        st["fix"] = ev["fix"]
+        extra = {"read_how": "fix", "read_sec": 0}
     elif isinstance(chip, dict):
         st["lines"].append({"who": "시민", "text": str(ev.get("label") or "")[:80], "via": "chip"})
         got = {"clues": list(chip.get("clues") or []), "matter": chip.get("matter") or {}, "confirm": chip.get("confirm"), "drop": [str(x)[:60] for x in chip.get("drop") or []][:3]}
@@ -1792,7 +1811,7 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/text":
             meta = json.loads((gaz.DIR / "meta.json").read_text(encoding="utf-8"))
             return self.send_json({"text": doc(), "scripts": scripts(), "mode": MODE, "done_m": L.DONE_M, "seoul": [gaz.lonlat(x, y) for x, y in G.seoul],
-                                   "places": len(G.name), "roads": meta["roads"]})      # 가게(상가정보)까지 든 지명 표의 곳 수
+                                   "places": len(G.name), "roads": meta["roads"], "types": {k: v["name"] for k, v in TYPES.items()}})      # 가게(상가정보)까지 든 지명 표의 곳 수
         if p == "/api/records":
             return self.send_json({"records": records(), "next": NEXT})
         return super().do_GET()
@@ -1826,6 +1845,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "서버 오류"}, 500)
         return self.send_json({"error": "없는 길"}, 404)
 
+
+if os.environ.get("CALL_VOICE") == "1" or os.environ.get("CALL_DIRECT") == "1":      # 음성 통화 · 직접 통화(배포 판)는 끌 수 있는 스위치. 기본 끔이고, 끄면 voice/는 읽히지도 않는다
+    __import__("voice").attach(Handler)
 
 if __name__ == "__main__":
     if "--lines" in sys.argv:

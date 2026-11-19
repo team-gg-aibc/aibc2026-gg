@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>전화 걸기 (시연)</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg: #0a111d; --text: #c9d6ea; --sub: #8fa0bb; --go: #2fd27a; --stop: #ff5a5f; --line: #33476a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; background: linear-gradient(180deg, #101c30, var(--bg) 60%); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; padding: max(48px, env(safe-area-inset-top)) 20px max(36px, env(safe-area-inset-bottom)); }
+  .who { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; text-align: center; width: min(100%, 420px); }
+  body[data-call="on"] .face { width: 56px; height: 56px; margin: 0 0 8px; } body[data-call="on"] .face svg { width: 26px; height: 26px; }      /* 통화 중에는 대화창에 자리를 준다 */
+  body { height: 100dvh; }
+  .face { width: 104px; height: 104px; border-radius: 50%; background: #1b2a44; display: grid; place-items: center; margin: 4vh 0 18px; position: relative; }
+  .face svg { width: 46px; height: 46px; fill: #dfe9fb; }
+  body[data-call="ring"] .face::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--go); animation: ring 1.5s ease-out infinite; }
+  @keyframes ring { from { transform: scale(1); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { body[data-call="ring"] .face::after { animation: none; } }
+  h1 { font-size: 24px; margin: 0; color: #fff; font-weight: 700; }
+  #d-state { min-height: 1.6em; margin: 6px 0 0; font-size: 17px; color: #fff; font-variant-numeric: tabular-nums; }
+  body[data-call="on"] #d-state { color: var(--go); }
+  .sub { color: var(--sub); font-size: 13px; margin: 10px 0 0; }
+  #d-said { margin: 14px 0 0; min-height: 1.5em; font-size: 16px; color: var(--text); }
+  #d-log { list-style: none; margin: 10px 0 0; padding: 0; width: 100%; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  #d-log li { max-width: 86%; padding: 8px 11px; border-radius: 14px; font-size: 15px; line-height: 1.45; background: #1b2a44; color: #e8eef8; align-self: flex-start; }
+  #d-log li.me { align-self: flex-end; background: #2fd27a; color: #04121a; }
+  #d-log li b { display: block; font-size: 11px; font-weight: 600; opacity: .7; margin-bottom: 2px; }
+  #d-mic { margin: 0 0 10px; padding: 8px 14px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: #fff; font-size: 14px; }
+  #d-mic[hidden] { display: none; }
+  form { display: flex; gap: 8px; width: min(100%, 420px); margin: 0 0 22px; }
+  form[hidden] { display: none; }      /* 통화 중일 때만 보인다 */
+  #d-left { width: min(100%, 420px); margin: 0 0 4px; text-align: right; font-size: 12px; color: var(--sub); } #d-left[hidden] { display: none; } #d-left.warn { color: #ffb4b6; }
+  #d-log li.fail { opacity: .6; } #d-log li i { display: block; font-size: 12px; font-style: normal; }
+  input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: #111a29; color: #fff; font-size: 16px; }
+  form button { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: #fff; font-size: 15px; }
+  #d-call { width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--go); color: #04121a; font-size: 14px; font-weight: 700; }
+  body[data-call="ring"] #d-call, body[data-call="on"] #d-call { background: var(--stop); color: #fff; }
+  #d-call:disabled { opacity: .35; }
+</style>
+</head>
+<body data-call="idle">
+<!-- 휴대폰에서 여는 화면(민원인): 상담 화면이 연 통화(?room=)에, 또는 직접 통화(배포 판)에서는 방 없이 걸어 상담 화면이 받는다. 전화 걸기 → 연결음 → 통화 중 → 끊기.
+     글을 치면 통화로 들어가고, 상담사 말은 대화창에 글로 뜬다. 마이크는 고를 때만.
+     음성 스위치(CALL_VOICE=1)가 켜졌을 때만 뜻이 있다. 가상 시연이고 실제 민원 접수가 아니다. 서버는 소리를 저장하지 않는다. 글자는 voice.js가 채운다. -->
+<div class="who">
+  <div class="face" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02z"/></svg></div>
+  <h1 id="d-name"></h1>
+  <p id="d-state" role="status"></p>
+  <p class="sub"><span id="d-lead"></span> <span id="d-stt"></span></p>
+  <p id="d-said" aria-live="polite"></p>
+  <ol id="d-log" aria-live="polite"></ol>
+</div>
+<button type="button" id="d-mic" hidden></button>
+<p id="d-left" hidden></p>
+<form id="d-form" hidden><input id="d-text" type="text" maxlength="300" autocomplete="off"><button id="d-send"></button></form>
+<button type="button" id="d-call" disabled></button>
+<script src="voice.js"></script>
+</body>
+</html>
