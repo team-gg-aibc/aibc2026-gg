@@ -70,10 +70,20 @@ if os.environ.get("SIM_WORLD"):                       # 시민이 보는 세상�
     W = gw.Gazetteer()
     os.environ.update(keep)
 elif any(os.environ.get(k, "1") == "0" for k in ("CALL_SHOPS", "CALL_NODES", "CALL_PARKNAMES", "CALL_RAMPS", "CALL_TOILETS")):       # 시민이 보는 세상은 늘 모든 자료가 든 지명 표(시민은 실제로 보이는 것을 말하고, 시스템은 자료에 넣은 것만 알아듣는다)
-    keep = {k: os.environ.get(k, "1") for k in ("CALL_SHOPS", "CALL_NODES", "CALL_PARKNAMES", "CALL_RAMPS", "CALL_TOILETS")}
-    os.environ.update(CALL_SHOPS="1", CALL_NODES="1", CALL_PARKNAMES="1", CALL_RAMPS="1", CALL_TOILETS="1")
+    keep = {k: os.environ.get(k, "1") for k in ("CALL_SHOPS", "CALL_NODES", "CALL_PARKNAMES", "CALL_RAMPS", "CALL_TOILETS")} | {"CALL_CROSS": os.environ.get("CALL_CROSS", "1")}
+    os.environ.update(CALL_SHOPS="1", CALL_NODES="1", CALL_PARKNAMES="1", CALL_RAMPS="1", CALL_TOILETS="1", CALL_CROSS="2" if os.environ.get("SIM_CROSS") else "0")
     W = gaz.Gazetteer()
     os.environ.update(keep)
+elif os.environ.get("SIM_CROSS"):                     # (60번) 교차로 이름을 대는 시민: 시민이 보는 세상에만 교차로 이름(tools/build_cross.py)을 넣는다. 시스템의 지명 표는 CALL_CROSS 그대로. 이 값이 없으면 기본 동작 그대로
+    keep = os.environ.get("CALL_CROSS", "1")
+    os.environ["CALL_CROSS"] = "2"
+    W = gaz.Gazetteer()
+    os.environ["CALL_CROSS"] = keep
+elif G.cross1 > G.cross0:                             # (60번) 시스템이 교차로 이름을 알아도 시민의 세상에는 넣지 않는다: 넣으면 가상 통화 숫자가 넣은 만큼 오른다(47번 「하지 말 것」). 시민이 교차로 이름을 대게 하려면 SIM_CROSS=1
+    keep = os.environ.get("CALL_CROSS")
+    os.environ["CALL_CROSS"] = "0"
+    W = gaz.Gazetteer()
+    os.environ.pop("CALL_CROSS") if keep is None else os.environ.update(CALL_CROSS=keep)
 else:
     W = G
 THINGS = ("화장실", "놀이터", "정자", "운동기구", "음수대", "분수")    # 이름 없이 종류로 말하는 것(「화장실 옆이에요」)

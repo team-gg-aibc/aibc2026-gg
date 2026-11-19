@@ -191,9 +191,9 @@ def shortlist(said, R, asked_id=None, prior=()):
     if "exitfix" in L.ON:                                 # (exitfix, 기본 끔 · 53번) 「2번 출구요. 아 잠깐만요, 3번이네요. 3번 출구 쪽이에요」: 출구 번호만 말하면 앞에 말한 역의 출구로 잇는다
         st_of = lambda k: re.match(r"^(.+역)(\d+번출구)?$", k or "")       # noqa: E731
         base = next((st_of(o["key"]).group(1) for o in reversed(out) if st_of(o.get("key"))), None) or next((st_of(k).group(1) for k in reversed(list(prior)) if st_of(k)), None)
-        for mm in dict.fromkeys(m_.group() for m_ in re.finditer(r"(?<!\d)\d{1,2}번출구", t) if not t[:m_.start()].endswith("역")):     # 역 이름에 붙지 않은 출구 번호
-            if any((o.get("key") or "").endswith(mm) and (o.get("key") or "") != mm for o in out):
-                continue                                  # 이미 역과 함께 읽혔다
+        for mm in dict.fromkeys(m_.group() for m_ in re.finditer(r"(?<!\d)\d{1,2}번출구", t)):     # 찾은 역 출구 이름이 덮지 못한 출구 번호(역 이름이 틀리게 받아쓰인 「숭실데입구역 3번 출구」도 잇는다)
+            if any(mm in (o.get("key") or "") and (o.get("key") or "") != mm for o in out):
+                continue                                  # 이미 역과 함께 읽혔다. 다른 이름 속의 출구 번호(버스 정류장 「대모산입구역 2번출구 앞」)도 따로 읽지 않는다(60번: 600통에서 그 정류장 이름을 출구로 또 읽어 좁혀진 틀린 자리를 되말했다)
             pos = t.rfind(mm) + len(mm)
             out = [o for o in out if o.get("key") != mm]  # 역을 모르면 「3번출구」라는 가게(노원구)로 읽지 않는다. ponytail: 그 가게가 참 자리인 통화는 못 받는다
             new = base + mm if base else None
@@ -204,7 +204,7 @@ def shortlist(said, R, asked_id=None, prior=()):
     if "branch" in L.ON:                                  # (branch, 기본 끔 · 53번) 「GS25 있잖아요, 한티역점. 그 옆이에요」: 상표와 지점 이름을 따로 말하면 그 지점 하나로 잇는다
         for n_, o in enumerate(out):
             for mm in re.finditer(r"[가-힣A-Za-z0-9]{2,12}점", said) if "key" in o and o["n"] > 3 else ():
-                new = o["key"] + gaz.norm(mm.group())
+                new = next((b + gaz.norm(mm.group()) for b in dict.fromkeys([o["key"], gaz.norm(o["name"])]) if b + gaz.norm(mm.group()) in G.ix), "")      # 줄임말 · 한글로 부른 상표(「지에스 이십오」)는 상표 이름(GS25)으로도 붙여 본다
                 if new in G.ix and len(G.ix[new]) <= 2:
                     tail = gaz.norm(said[mm.end():mm.end() + 20])
                     n = G._mention(new, new, False, o["after"] if relation(o.get("own", o["after"]))[2] else tail)
@@ -354,9 +354,14 @@ PLACE_WORDS = set("""앞 옆 뒤 근처 쪽 건너편 맞은편 사이 안쪽 �
 def told_of(said, short):
     """시민이 무슨 일인지 말했나 → 말한 그대로(짧게) 또는 빈 글. 찾은 지명 · 자리 말 · 인사를 빼고 낱말이 둘 넘게 남으면 일을 말한 것이다(「신림역 4번 출구 쪽 골목이에요」는 아니다)."""
     t = re.sub(r"여보세요|저기요|안녕하세요|수고하십니다", " ", said)
+    t = re.sub(r"(안이|아니)(에|예)요", " ", t) if "anizone" in L.ON else t      # (anizone, 60번) 「공원 아니에요」(받아쓰기가 적은 「공원 안이에요」)를 무슨 일인지 말한 낱말로 세지 않는다: 세면 「그 밖의 일」로 갈린다
     for m in short:
         for x in (m.get("said"), m.get("name")):
             t = t.replace(x, " ") if x and len(x) >= 2 else t
+            if "sttname" in L.ON and x and len(x) >= 2:      # (sttname, 60번) 받아쓰기가 이름을 띄어 적은 꼴(「거울 연못」)도 지운다: 안 지우면 「거울」 · 「연못」이 무슨 일을 말한 낱말로 세져 「그 밖의 일」로 갈린다
+                t = re.sub(r"\s*".join(map(re.escape, x.replace(" ", ""))), " ", t)
+    if "sttjosa" in L.ON:
+        t = re.sub(r"에요\b", "예요", t)                    # (sttjosa, 60번) 받아쓰기의 말끝 「거기에요」 · 「근처에요」(맞춤법은 「예요」)
     words = [w for w in re.findall(r"[가-힣A-Za-z]+", t) if len(gaz.JOSA.sub("", w)) >= 2 and gaz.JOSA.sub("", w) not in PLACE_WORDS]
     if len(words) < 2:
         return ""
@@ -411,7 +416,10 @@ def code_read(said, asked, short, R):
     """모델 없이 읽기: 이름 뒤의 말로 관계를 가리고, 지금 질문의 보기와 맞춰 보고, 무슨 일인지 낱말로 가른다."""
     read = {"clues": [], "matter": {}, "confirm": None, "outside": False, "unfound": unfound_of(said, short)}
     seen_cat, fixed = set(), False
+    zpark = gaz.norm((((asked or {}).get("options") or [{}])[0].get("label") or "").removesuffix(" 안")) if (asked or {}).get("id") == "zone" and "anizone" in L.ON else None
     for m in short:
+        if zpark and "key" in m and m["key"] in (zpark, "공원") and re.match(r"^(은|는|이|가)?아니(에|예)요", m["after"]):
+            continue                                      # (anizone, 60번) 「서울숲 안이신가요, 바깥 길이신가요?」의 답 「서울숲 아니에요」는 받아쓰기가 「서울숲 안이에요」를 적은 꼴일 수 있다: 서울숲을 거두지 않는다(안 · 밖은 아래 보기 고르기가 정한다)
         if "key" in m and (re.match(r"^.{0,3}(였나|이었나|이던가|인가|아닌가)", m["after"]) or UNSAID.match(m["after"])):
             if "notbut" in L.ON:
                 read["clues"] = [c for c in read["clues"] if c.get("k") != m["key"]]      # (notbut · 53번) 같은 말 앞쪽에서 이미 단서로 만든 그 이름도 거둔다(「X 앞이요. 아 잠깐만요, X가 아니라 Y예요」)
@@ -472,6 +480,9 @@ def code_read(said, asked, short, R):
         said = said[fx[-1].end():]                        # 보기를 댔다가 「아 아니다」로 고쳤으면 보기는 뒷말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」, 11-15). 이름을 고친 것(「동호대교였나? 아, 아니다」)은 이름 쪽 규칙이 맡는다
     if q.get("id") == "zone":
         pick = 0 if re.search(r"안이|안에|안쪽|안입|안인|공원 ?안", said) else 1 if re.search(r"밖|바깥|길가|도로|인도|차도", said) else None
+        if pick is None and "anizone" in L.ON and re.search(r"아니(에|예)요", said) and not re.search(r"아니(라|고|구)|말고|길이|거리|골목", said):
+            pick = 0                                      # (anizone, 60번) 「안이에요」와 「아니에요」는 소리가 같아 받아쓰기가 늘 틀린다(56번 9-4에서 20번). 둘 중 고르라는 물음에 「아니에요」만으로는 답이 안 된다: 「안」으로 읽고,
+            # 마지막 확인 문장이 「○○공원 안, …」을 되말하므로 틀렸으면 거기서 시민이 「아니요」라고 한다. 거꾸로 「바깥」으로 잘못 읽으면 확인 문장에 「바깥」이 없어 걸러지지 않는다
     elif q.get("id") == "alive":
         pick = 1 if re.search(ALIVE[0], said) else 0 if re.search(ALIVE[1], said) else None
     elif q.get("id") == "leash":
@@ -500,7 +511,7 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "next" and opts:
         pick = 1 if re.search(r"아직|안 ?나왔|안 ?지났|못 ?미쳤|전이에요|전이요", said) else 0 if re.search(r"지났|지나왔|넘었|통과|벌써", said) else None
     elif q.get("id") == "dist" and opts:                  # 「스무 걸음쯤이요」(33번 2-2)
-        steps = 2 if re.search(r"쉰|오십|[4-8]0 ?m|[4-8]0미터", said) else 1 if re.search(r"스무|이십|[1-3]0 ?m|[1-3]0미터", said) else 3 if re.search(r"멀리|보이기만|백 ?m|100", said) else None
+        steps = 2 if re.search(r"쉰|오십|[4-8]0 ?m|[4-8]0미터" + (r"|[4-8]0 ?걸음" if "numword" in L.ON else ""), said) else 1 if re.search((r"[1-3]0 ?걸음|" if "numword" in L.ON else "") + r"스무|이십|[1-3]0 ?m|[1-3]0미터", said) else 3 if re.search(r"멀리|보이기만|백 ?m|100", said) else None
         close = re.search(r"바로|코앞|앞이에요|앞이요", said) and not re.search(r"(바로 ?앞|코앞)[은는]? ?아니", said)
         pick = steps if steps is not None else 0 if close else 2 if re.search(r"꽤|좀 ?떨어", said) else 1 if re.search(r"몇 ?걸음|조금", said) else 3 if re.search(r"저기", said) else None   # 걸음 수를 댔으면 그것을 먼저(「스무 걸음쯤, 화장실 바로 앞」 · 「바로 앞은 아니고 스무 걸음」)
     elif q.get("id") == "near":
@@ -646,6 +657,42 @@ MINS = {"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "�
 WALK_M = 70.0 * 0.75      # 걸어서 1분에 곧은 거리로 얼마나 가나(m): 걸음 70m × 길이 굽은 몫 0.75. 33번 2-6(「입구에서 걸어서 몇 분」 설계)의 값을 그대로 쓴다. 짐작 — 통화 자료로 맞춘 값이 아니다
 
 
+FIX_MARK = re.compile(r"아[\s,]*아니다|아니[\s,]*아니|아[\s,]*잠깐만|다시 ?보니까|아[\s,]*죄송|거기 ?말고|거기가 ?아니라|거기 ?아니고")      # 고쳐 말한다는 표시(notbut)
+_NUM = r"(?:[일이삼사오육칠팔구]?백)?(?:[일이삼사오육칠팔구]?십)?[일이삼사오육칠팔구]?"
+
+
+def _num(word):
+    """한글 숫자(구백구십구까지) → 수. 숫자 꼴이 아니면 None."""
+    d, n, cur = dict(zip("일이삼사오육칠팔구", range(1, 10))), 0, 0
+    for ch in word:
+        if ch in d:
+            cur = d[ch]
+        elif ch == "백":
+            n, cur = n + (cur or 1) * 100, 0
+        elif ch == "십":
+            n, cur = n + (cur or 1) * 10, 0
+        else:
+            return None
+    return (n + cur) or None
+
+
+def numfix(said):
+    """(numword, 기본 켬 · 53번) 받아쓰기가 숫자를 한글로 적은 것을 숫자로: 「삼번 출구」 → 「3번 출구」, 「십사 번지」 → 「14 번지」는 늘,
+    「상도 일동」 · 「상도로 삼십칠길」 · 「종로 삼가」는 바꾼 이름(상도1동 · 상도로37길 · 종로3가)이 지명 표에 있을 때만 바꾼다(「주민 일동」 · 「이동」 같은 말을 건드리지 않게)."""
+    def always(m):
+        n = _num(m.group(1))
+        return f"{n}{m.group(2)}" if n else m.group()
+    said = re.sub(rf"(?<![가-힣])({_NUM})\s*(번\s*출구|번지)", always, said)
+    said = re.sub(r"(주민|문화|복지|치안) ?(센타|쎈터|쎈타)", r"\1센터", said)      # 받아쓰기의 「주민센타」(「카센타」 같은 가게 이름은 건드리지 않는다)
+
+    def checked(m):
+        n = _num(m.group(2))
+        new = f"{m.group(1)}{n}{m.group(3)}" if n else None
+        ok = new and (gaz.norm(new) in G.ix or any(k.startswith(gaz.norm(new)) for k in G.gram.get(gaz.ear_grams(gaz.norm(new)[:2]).pop(), ())[:400]))
+        return new if ok else m.group()
+    return re.sub(rf"([가-힣]{{2,8}}?)\s*({_NUM})\s*(동|길|가)(?![가-힣]{{0,1}}(?:다|요|고|서|는))", checked, said)
+
+
 def _one_spot(key):
     """이름 하나가 가리키는 한 곳 → (x, y) 또는 None. 역은 역 · 출구 점만 본다. 점들이 250m 넘게 퍼져 있으면 한 곳이 아니다."""
     r = L.resolve(key)
@@ -670,6 +717,15 @@ def speech_fix(said, read, short, clues):
             if here and any(m["key"] not in here for m in keyed):
                 read["clues"] = [c for c in read["clues"] if k0(c) not in here]
                 skip += list(here)
+    if "homeis" in on:                                    # 「집은 신림동이고, 본 데는 ○○ 앞이에요」: 「지금」이라는 말이 없어도 집 · 회사는 본 곳이 아니다
+        home = re.search(r"(집|회사|사무실|직장|가게)(은|는|이|가)\s*[^.?!,]{2,14}?(이고|이구|인데|이에요|예요|이라|고요|이고요|쪽이고|근처고|근처인데)", said)
+        seen = re.search(r"본 ?(데|곳|건|거|자리)|봤|보였", said[home.end():]) if home else None
+        if seen:
+            head, tail = gaz.norm(said[:home.end()]), gaz.norm(said[home.end():])
+            here = {m["key"] for m in keyed if m["key"] in head or gaz.norm(m["said"]) in head} - {m["key"] for m in keyed if m["key"] in tail or gaz.norm(m["said"]) in tail}
+            if here and any(m["key"] not in here for m in keyed):
+                read["clues"] = [c for c in read["clues"] if k0(c) not in here]
+                skip += list(here)
     if "notbut" in on:                                    # 「농협이 아니라 주민센터 앞이에요」 · 「○○ 말고 △△ 옆이에요」: 앞 차례에 댄 그 이름을 거둔다
         for mm in re.finditer(r"([가-힣A-Za-z0-9]{2,}?)(?:이|가|은|는)?\s*(?:아니라|아니고|아니구|말고)", said):
             w = gaz.norm(mm.group(1))
@@ -677,6 +733,19 @@ def speech_fix(said, read, short, clues):
             gone = [c.get("k") or c.get("label") for c in clues if c.get("t") in ("at", "pt", "past", "before") and hit(c)]
             if gone:
                 read["drop"] = list(read.get("drop") or []) + gone
+            later = gaz.norm(said[mm.end():])             # 한 말 안에서 「영등포농협 앞이요 … 농협이 아니라 주민센터 앞」: 앞쪽에서 이미 단서로 만든 그 이름도 거둔다(뒤에서 다시 말한 이름은 둔다)
+            here = [k0(c) for c in read["clues"] if hit(c) and k0(c) and k0(c) not in later]
+            if here:
+                read["clues"] = [c for c in read["clues"] if k0(c) not in here]
+                skip += here
+        fix = FIX_MARK.search(said)                       # 「X 앞이요 아 아니다 Y 앞이에요」: 고친다는 말 앞의 이름은, 뒤에 다른 이름이 있을 때만 거둔다(「앞이요. 아, 아니다 그 건너편이요」는 그대로)
+        if fix:
+            head, tail = gaz.norm(said[:fix.start()]), gaz.norm(said[fix.end():])
+            before = [m["key"] for m in keyed if m["key"] in head and m["key"] not in tail]
+            if before and any(m["key"] in tail for m in keyed):
+                read["clues"] = [c for c in read["clues"] if k0(c) not in before]
+                read["drop"] = list(read.get("drop") or []) + before
+                skip += before
     if "walkmin" in on and re.search(r"걸어|걸었|걸으|걷|도보", said):      # 「○○역 3번 출구에서 걸어서 5분쯤」: 그 표지에서 걸은 시간만큼 떨어진 고리
         for m in keyed:
             mm = re.match(r"^(에서부터|에서나와서|에서내려서|에서|부터|나와서|내려서).{0,5}?(\d+|십오|이십|다섯|한|일|두|이|세|삼|네|사|오|육|칠|팔|구|십)분", m["after"])
@@ -690,7 +759,7 @@ def speech_fix(said, read, short, clues):
     road_talk = any(c.get("t") == "at" and "k" in c and L.resolve(c["k"])["roads"] and not len(L.resolve(c["k"])["x"]) for c in list(clues) + read["clues"])
     if "fromto" in on and not road_talk:                  # 「A에서 B 가는 방향이요」(걷는 사람): A 둘레(450m 안 고르게) 가운데 A에서 B 쪽으로 난 부채꼴
         for a, b in zip(keyed, keyed[1:]):
-            if (re.match(r"^(에서|을나와서|를나와서|나와서)", a.get("own") or a["after"]) and re.match(r"^(쪽으로|쪽|으로|로)?(가는|향하는|가던|가고|가다가|올라가는|내려가는|걸어가는)", b["after"]) and a["key"] != b["key"]
+            if (re.match(r"^(사거리|오거리|삼거리|네거리|교차로|앞|쪽|근처|입구)?(에서|을나와서|를나와서|나와서)" if "fromcross" in on else r"^(에서|을나와서|를나와서|나와서)", a.get("own") or a["after"]) and re.match(r"^(쪽으로|쪽|으로|로)?(가는|향하는|가던|가고|가다가|올라가는|내려가는|걸어가는)", b["after"]) and a["key"] != b["key"]
                     and not any(c.get("walk") and c.get("label", "").startswith(a["name"]) for c in read["clues"])):
                 pa, pb = _one_spot(a["key"]), _one_spot(b["key"])
                 d = math.hypot(pb[0] - pa[0], pb[1] - pa[1]) if pa and pb else 0
@@ -700,6 +769,12 @@ def speech_fix(said, read, short, clues):
                         {"t": "cone", "o": [round(pa[0], 1), round(pa[1], 1)], "v": [round((pb[0] - pa[0]) / d, 3), round((pb[1] - pa[1]) / d, 3)], "sure": True, "label": fill(tab("위치 범위")["단서 · 가는 방향"], 이름=a["name"], 쪽=b["name"])}]
                     skip.append(b["key"])
                     break
+    if "jeom" in on:                                      # 「뚜레쥬르 숭실대입구역점 앞이에요」: 지도에는 「뚜레쥬르」로만 있는 가게를 사람은 지점 이름으로 부른다. 「○○역점」의 역은 「근처 100m」가 아니라 「쪽」(450m 안)으로 읽는다
+        for a, b in zip(keyed, keyed[1:]):
+            if a["n"] >= 2 and re.match(r"^점(앞|옆|뒤|근처|쪽|건너|맞은|바로|이|에|인|요|$)", b["after"]) and a["after"].startswith((b["key"], gaz.norm(b.get("said") or b["key"]))):
+                for c in read["clues"]:
+                    if k0(c) == b["key"] and c.get("t") == "at":
+                        c.update(how="쪽", sure=True)
     if "facil" in on:                                     # 「○○동인데요, 주민센터 앞이에요」: 동 이름 없이 말한 흔한 시설을 지금 범위 안에서 찾는다
         allc = [c for c in list(clues) + read["clues"] if k0(c) not in FACIL]      # 「도서관」이 그대로 이름으로 걸린 것(서울 곳곳의 「도서관」)은 빼고 범위를 본다
         Rn = L.infer(allc) if any(c.get("t") in ("at", "pt", "in", "between", "past", "before", "anyof") for c in allc) else None
@@ -1298,7 +1373,7 @@ def build(st, extra=None):
     summary["go"] = ". ".join([line] + [x for x in extra_go if x]) if done and line else None       # 현장에 나가는 사람이 이 한 줄만 읽고 찾아가게
     if handoff and line:
         summary["go"] = fill(S["넘김 찾아가는 말"], 위치=line.replace(" — ", ", ").split(", 자리 미확정")[0])
-    exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆"))
+    exact = bool(anc) and not R["on_road"] and (anc["tight"] or matter.get("side") in ("앞", "옆")) and not anc.get("ext")      # (bigplace) 넓은 장소의 「바로 앞」은 그 장소의 한가운데 점이 아니다: 범위의 가운데에 찍는다
     pin = {"at": gaz.lonlat(*anc["p"]) if exact else parts["center"], "exact": exact, "label": (line or "").split(", ", 1)[-1]} if done and not handoff else None      # 솔직한 끝에는 핀을 찍지 않는다(받는 사람이 「거기」로 읽는다)
     summary["point"] = "{1:.5f}, {0:.5f}".format(*pin["at"]) if pin else None
     summary["said"] = next((t["said"] for t in st["turns"] if t.get("said") and (t.get("model") or t.get("code") or {}).get("clues")), None)      # 민원인이 위치를 처음 말한 문장 그대로(57번 5가)
@@ -1344,6 +1419,9 @@ def _merge(code, model):
     if code.get("picked"):                                # 보기에서 고른 답은 코드가 읽은 그대로(Solar가 보기 이름 속 지명을 단서로 되살리지 않게)
         return dict(model, clues=code.get("clues") or [], drop=code.get("drop") or [])
     sure = [c for c in code.get("clues") or [] if c.get("sure")]
+    if "anizone" in L.ON and any(c.get("t") in ("in", "out") for c in sure):      # (anizone, 60번) 공원 안 · 밖은 코드가 고른 것을 쓴다: 받아쓰기가 「안이에요」를 「아니에요」로 적으면 Solar는 「바깥 길」을 골랐다(60-raw/zone-solar-off.json)
+        zone_a = {tuple(c["a"]) for c in sure if c.get("t") in ("in", "out")}
+        model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("in", "out") and tuple(c.get("a") or ()) in zone_a)])
     skip = set(code.get("skip") or ())                    # (53번 스위치들) 코드가 뜻을 정해 거둔 이름: Solar가 「근처」 · 「방향」으로 되살리지 않는다
     model = dict(model, clues=[c for c in model.get("clues") or [] if str(c.get("k") or "").split("|")[0] not in skip])
     if "choicekeep" in L.ON:                              # (choicekeep, 기본 끔 · 53번) 「○○ 지나고 1분쯤 됐어요」: 코드는 시민이 말한 정도(1분쯤 · 조금)로 읽어 두는데, Solar가 보기를 고르면 그 보기에 미리 든 「방금 지남」 단서가 다시 들어와 이겼다(47번 pastfix가 실제 호출 길에서 풀리던 일). 같은 표지의 「지났다 · 못 미쳤다」를 코드가 뚜렷이 읽었으면 보기 단서는 버린다
@@ -1403,10 +1481,20 @@ def turn(st, ev):
             known = "\n".join([f"- 일: {TYPES[matter['type']]['name']}" for _ in [0] if matter.get("type")] + [f"- {c.get('label') or c.get('k')}" for c in clues]) or "없음"
             asked = last.get("asked") or {}
             said_m = FILLER.sub(" ", last["said"]) if "fillerlist" in L.ON else last["said"]      # (fillerlist, 기본 끔 · 53번) Solar에 줄 이름 목록도 군말을 지운 말에서 찾는다: 안 그러면 코드가 군말을 지우고 찾은 이름(「카페동네 어… 그… 궁동점」)이 목록에 없어, Solar가 다시 읽으면 그 단서가 사라진다
+            said_m = numfix(said_m) if "numword" in L.ON else said_m      # (numword, 60번) 받아쓰기가 한글로 적은 숫자도 같이(코드 읽기와 같게)
             read, how, sec = saved_first(st) or model_read(st, shortlist(said_m, R, asked.get("id"), [c["k"] for c in clues if "k" in c]), known)
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
+                if "barename" in L.ON:                    # (barename, 기본 끔 · 53번) 「뚜레쥬르요.」처럼 이름만 답한 말: Solar가 그 이름을 지워도 코드가 읽은 단서를 둔다
+                    mine = [c for c in (last.get("code") or {}).get("clues") or [] if c.get("k")]
+                    rest = gaz.norm(FILLER.sub(" ", last["said"]))
+                    for c in mine:
+                        rest = rest.replace(str(c["k"]).split("|")[0], "").replace(gaz.norm(c.get("label") or ""), "")
+                    if mine and len(re.sub(r"(이?라니까요?|이?라고요|이에요|예요|이요|인데요|입니다|요)$", "", rest)) <= 1:
+                        have = {c.get("k") for c in read["clues"]}
+                        read["clues"] += [c for c in mine if c["k"] not in have]
+                        read["drop"] = [d for d in read.get("drop") or [] if d not in {str(c["k"]).split("|")[0] for c in mine}]
                 _tag_station(read, asked)
                 _tag_finer(read, asked)
                 _tag_drive(read, last.get("said") or "")
@@ -1430,6 +1518,7 @@ def turn(st, ev):
             R = L.infer(clues) if clues else None
             asked = st.get("shown")
             bare = FILLER.sub(" ", text)                 # 군말을 지운 말로 이름을 찾는다(11-15 극한 세트)
+            bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
