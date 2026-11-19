@@ -381,3 +381,11 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 #side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 0; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
 #side .sum .badge { font-size: 10.5px; padding: 0 7px; }
 @media (prefers-reduced-motion: reduce) { .lines .ring { animation: none; } }
+/* ---- 좁은 화면(노트북 1440 · 1280): 칸 자리 · 크기는 그대로, 글이 겹치거나 넘치지 않게만. 1600 화면에서는 켜지지 않는다(11-19) */
+@media (max-width: 1599px) {
+  .law .hd { flex-wrap: wrap; row-gap: 3px; } .law .hd h2 { flex: 1 0 auto; }      /* 머리줄: 제목은 줄지 않고, 배지 · 복사 단추가 자리가 모자라면 다음 줄로 */
+  .law .hd .badge { white-space: normal; line-height: 1.35; }      /* 긴 배지(「…근거 조항을 찾지 못함」)는 배지 안에서 줄을 바꿈 */
+}
+body:not(.view-records) #ask .q.fs1 { font-size: 17px !important; } body:not(.view-records) #ask .q.fs2 { font-size: 15.5px !important; } body:not(.view-records) #ask .q.fs3 { font-size: 14px !important; }      /* fitAsk: 넘칠 때만 */
+.law.fit2 .say { font-size: 12.5px; } .law.fit2 .lab, .law.fit2 .cq { font-size: 11px; } .law.fit2 .chips2 button { font-size: 10.5px; padding: 0 5px; } .law.fit2 .from { margin-top: 5px; padding-top: 4px; }      /* fitLaw: 넘칠 때만 */
+.law .say.one { -webkit-line-clamp: 1; }
