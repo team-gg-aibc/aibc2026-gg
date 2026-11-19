@@ -189,8 +189,8 @@ body:not(.ctl) .ask .q { font-size: 22px; line-height: 1.35; }
 .live.call.ring::before { background: #ffd166; }
 .live.call.over { opacity: .7; }
 @keyframes callblink { 50% { opacity: .25; } }
-.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: callblink 1.4s infinite; }
-.lines .ring button { animation: none; }
+.lines .ring { list-style: none; margin: 18px 6px; padding: 16px; border: 1px solid var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; animation: ringline 1.4s infinite; }
+@keyframes ringline { 50% { border-color: var(--line); } }      /* 테두리만 깜빡(64번 P13) */
 .range .undo { padding: 3px 10px; font-size: 12px; margin-left: 10px; }
 .range .foot .demo { margin-left: auto; opacity: .55; font-size: 11px; }
 
@@ -287,7 +287,7 @@ body:not(.view-records) #ask .q { font-size: 19px !important; line-height: 1.4 !
 .law { position: fixed; top: 56px; left: calc(358px + (100vw - 808px) * .485); right: 450px; height: 222px; z-index: 3; overflow: hidden; padding: 11px 14px 12px; border: 1.5px solid var(--accent); display: flex; flex-direction: column; gap: 0; }
 body.view-records .law { display: none; }
 .law .hd { display: flex; align-items: center; gap: 8px; } .law .hd h2 { margin: 0; font-size: 17px; color: var(--ink); flex: 1; }
-.law .hd .badge { font-size: 11px; padding: 0 8px; } .law .hd .fullbtn { padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 11px; font-weight: 700; } .law .by { color: var(--sub); font-size: 11px; }
+.law .hd .badge { font-size: 11px; padding: 0 8px; } .law .by { color: var(--sub); font-size: 11px; }
 .law .cq { margin: 6px 0 0; color: var(--text); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .law .cq b { color: var(--accent); margin-right: 6px; }
 .law .lab { margin: 6px 0 1px; color: var(--sub); font-size: 11px; }
 .law .say { margin: 0; color: var(--ink); font-size: 13.5px; font-weight: 600; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex: none; }      /* 긴 답은 세 줄까지(전문은 「답 전문」 단추) */
@@ -302,7 +302,6 @@ body.view-records .law { display: none; }
 .law .qtop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .law .qtop > button { padding: 1px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font-size: 11.5px; font-weight: 700; }
 .law .qv .lb { color: var(--ink); font-size: 12.5px; font-weight: 800; } .law .qv .lb span { color: var(--sub); font-weight: 500; font-size: 11px; margin-left: 6px; }
 .law .qv blockquote { margin: 0; padding: 5px 9px; border-left: 3px solid var(--accent); background: var(--panel-solid); color: var(--text); font-size: 12.5px; line-height: 1.5; border-radius: 0 6px 6px 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.law .qv .full { margin: 0; color: var(--ink); font-size: 12.5px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
 .law .qv a { color: var(--accent); font-size: 12px; font-weight: 700; }
 body:not(.ctl) .law .by { display: none; }
 /* 접수 카드(통화 화면): 덩어리마다 자리 · 높이 고정, 카드는 스크롤하지 않는다 */
@@ -345,3 +344,23 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 #side .s-ref blockquote { margin: 1px 0 0; padding: 3px 8px; border-left: 3px solid var(--accent); color: var(--ink); font-size: 12px; line-height: 1.45; }
 #side .s-ref .ab { margin: 0; color: var(--sub); font-size: 10.5px; line-height: 1.35; } #side .s-ref .gal { color: var(--text); }
 #side .s-ref .src { margin: auto 0 0; padding-top: 2px; border-top: 1px dashed var(--line); color: var(--sub); font-size: 10px; line-height: 1.3; }
+/* ---- 11-18 화면 고침 묶음(61번): 틀(칸 자리 · 크기)은 그대로, 칸 안의 글 · 단추만. 색 · 글꼴은 이미 있는 것만 쓴다 */
+.ask .note { margin: 6px 0 0; color: var(--sub); font-size: 12px; line-height: 1.45; }
+.ask .hd .badge { margin-left: auto; }
+.lines .ring-note { list-style: none; margin: -10px 6px 0; padding: 0 4px; color: var(--sub); font-size: 12px; }
+.lines .next { list-style: none; display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 4px; }
+.talk .flow { margin: 0; color: var(--sub); font-size: 11px; line-height: 1.4; }
+.law .hd .copy { padding: 1px 8px; font-size: 11px; } .law .hd .copied { color: var(--sub); font-size: 11px; white-space: nowrap; } .law .hd h2 { min-width: 0; white-space: nowrap; }
+.law .lab .draft { color: var(--text); }
+.law .wait2 { margin: 3px 0 0; color: var(--sub); font-size: 12px; font-variant-numeric: tabular-nums; }
+.law .say.open { display: block; -webkit-line-clamp: unset; flex: 1 1 auto; min-height: 0; overflow-y: auto; font-weight: 500; font-size: 12.5px; scrollbar-width: thin; }
+.law .cq, .law .lab, .law .from, .law .hint2, .law .more { flex: none; }      /* 답 칸의 줄은 줄어들지 않는다(넘치면 fitLaw가 답을 두 줄로) */
+.law .say.tight { -webkit-line-clamp: 2; }
+.law .more[hidden] { display: none; }
+.law .more { align-self: flex-start; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--accent); font-size: 11.5px; font-weight: 700; flex: none; }
+.lines .ring .no { display: block; margin-top: 2px; color: var(--sub); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#side .sum .sub2 { color: var(--sub); font-weight: 400; font-size: 11px; }
+#side .sum dd.said { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+#side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
+#side .sum .badge { font-size: 10.5px; padding: 0 7px; }
+@media (prefers-reduced-motion: reduce) { .lines .ring { animation: none; } }
