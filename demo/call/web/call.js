@@ -235,13 +235,13 @@ async function play() {
 
 // ---- 그리기
 function renderTop() {
-  const T = K('맨 위 띠'), step = V ? (ui.status === 'sent' ? 5 : V.step) : 1;
+  const T = K('맨 위 띠'), step = V ? V.step : 1;      // 넘긴 뒤에도 「넘기기」가 지금 단계(64번 Q5)
   $('t-title').textContent = T['화면 이름']; $('t-who').textContent = T['쓰는 사람'];
   const B = K('상담 기록');
   $('t-view').setAttribute('aria-label', B['화면 고르기']);
   $('t-view').innerHTML = [['call', '통화'], ['records', '기록']].map(([id, k]) => `<button type="button" data-view="${id}" aria-pressed="${ui.view === id}">${esc(B[k])}${id === 'records' && RECS.length ? `<b>${RECS.length}</b>` : ''}</button>`).join('');
   document.body.classList.toggle('view-records', ui.view === 'records');
-  $('t-steps').innerHTML = [1, 2, 3, 4].map((n) => `<li class="${n < step ? 'past' : n === step ? 'now' : ''}"><b>${n}</b>${esc(T['단계 ' + n])}</li>`).join('');
+  $('t-steps').innerHTML = [1, 2, 3, 4].map((n) => `<li class="${n < step ? 'past' : n === step ? 'now' : ''}"${n === step ? ' aria-current="step"' : ''}><b>${n}</b>${esc(T['단계 ' + n])}</li>`).join('');
   if (CTL()) { $('t-mode').textContent = T[{ saved: '저장된 답', code: '코드만', live: '실제 호출' }[MODE]]; $('t-mode').className = 'live ' + MODE; } else callStatus();
   $('t-scene').setAttribute('aria-label', T['장면 고르기']);
   $('t-scene').innerHTML = scenes().map((s) => `<button type="button" data-scene="${esc(s.id)}" aria-pressed="${s.id === ui.scene}" title="${esc(s.desc)}">${esc(s.name)}</button>`).join('');
@@ -318,7 +318,9 @@ function renderAsk() {
   }
   el.innerHTML = h;
 }
+const pinOk = () => !!(S && S.lines.length > 1 && !(V && V.confirmed));      // 확인받은 뒤에는 지도에서 찍기를 끈다(찍어도 자리 · 기록이 바뀌지 않았다, 64번 Q1)
 function renderRange() {
+  if (ui.pin && !pinOk()) { ui.pin = false; document.body.classList.remove('pinning'); }
   const R = K('위치 범위'), G = K('지도'), all = (V && V.history) || [], hist = CTL() ? all : all.slice(-3);
   const st = !V || !V.size ? '' : V.confirmed ? `<span class="badge done">${esc(R['확인받음'])}</span>` : V.done ? `<span class="badge done">${esc(R['다 좁혀짐'])}</span>` : `<span class="badge going">${esc(R['좁히는 중'])}</span>`;
   const first = hist.length ? hist[0].m : 1;
@@ -329,7 +331,7 @@ function renderRange() {
   if (V && V.doubt.length) h += `<p class="drop">${esc(fill(R['어긋난 말'], { 단서: V.doubt.join(', ') }))}</p>`;
   if (V && (V.heard || []).length) h += `<p class="drop heard">${esc(fill(R['알아들음'], { 들은: V.heard.map((x) => `${x.said} → ${x.as}`).join(', ') }))}</p>`;      // 비슷한 이름으로 이은 것(11-15)
   if (V && (V.unfound || []).length) h += `<p class="drop">${esc(fill(R['못 찾음'], { 이름: V.unfound.join(', ') }))}</p>`;      // 끝내 못 찾은 이름(조용히 넘어가지 않게)
-  h += `<p class="foot"><button type="button" class="outline pinbtn" data-act="pin" aria-pressed="${!!ui.pin}"${S && S.lines.length > 1 ? '' : ' disabled'}>${esc(G[ui.pin ? '찍기 켜짐' : '찍기'])}</button><span class="lg"><i></i>${esc(G['후보 범위'])}</span><span class="lg"><i class="pin"></i>${esc(G['정해진 자리'])}</span><span class="lg"><i class="mk"></i>${esc(G['표지'])}</span>`
+  h += `<p class="foot"><button type="button" class="outline pinbtn" data-act="pin" aria-pressed="${!!ui.pin}"${pinOk() ? '' : ' disabled'}>${esc(G[ui.pin ? '찍기 켜짐' : '찍기'])}</button><span class="lg"><i></i>${esc(G['후보 범위'])}</span><span class="lg"><i class="pin"></i>${esc(G['정해진 자리'])}</span><span class="lg"><i class="mk"></i>${esc(G['표지'])}</span>`
     + `<span class="note">${esc(fill(G['시연 구역'], { 장소: (META.places || 0).toLocaleString() }))}</span><span class="note">${esc(G['출처'])}</span><span>${esc(G['지도 저작권'])}</span>${P.get('heights') === 'off' ? '' : `<span>${esc(G['건물 높이 출처'])}</span>`}${R['시연 표시 켬'] === '켬' ? `<span class="demo">${esc(R['시연 표시'])}</span>` : ''}</p>`;
   $('range').innerHTML = h;
 }

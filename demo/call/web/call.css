@@ -44,7 +44,8 @@ h1, h2, .big { font-family: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic 
 .steps4 { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; align-items: center; }
 .steps4 li { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 4px; border-radius: 0; color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
 .steps4 li b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); font-size: 11px; }
-.steps4 li.now { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); } .steps4 li.now b { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.steps4 li { cursor: default; user-select: none; }      /* 눌리지 않는 진행 표시(64번 Q5): 칸 · 단추 꼴 대신 밑줄 */
+.steps4 li.now { color: var(--ink); font-weight: 800; box-shadow: inset 0 -2px 0 var(--accent); } .steps4 li.now b { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .steps4 li.past { color: var(--text); } .steps4 li.past b { background: var(--ok); color: var(--panel-solid); border-color: var(--ok); }
 .steps4 li + li::before { content: "▸"; margin-right: 6px; color: var(--sub); }
 .top .grow { flex: 1; }
