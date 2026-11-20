@@ -210,17 +210,25 @@ def resolve(key):
 
 def _dupshop(px, py, kinds, ids):
     """(dupshop · 82번) 가게 자료에 같은 지점 이름 · 같은 종류가 100m 안에 두 줄이면 한 가게로 본다(두 줄의 가운데 한 점).
-    「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21)."""
-    out = []                                              # [x, y, 종류, 번호, 합친 줄 수]
-    for x, y, k, i in zip(px, py, kinds, ids):
-        shop = G.shop0 <= i < G.shop1                     # 가게 자료 줄만(공원 안 이름 · 물가 테두리 점은 그 뒤에 붙어 있다)
-        j = next((o for o in out if G.shop0 <= o[3] < G.shop1 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
-                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if shop else None
-        if j is None:
-            out.append([x, y, k, i, 1])
-        else:
-            j[0], j[1], j[4] = (j[0] * j[4] + x) / (j[4] + 1), (j[1] * j[4] + y) / (j[4] + 1), j[4] + 1
-    return [o[0] for o in out], [o[1] for o in out], [o[2] for o in out], [o[3] for o in out]
+    「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21).
+    이름 · 종류로 먼저 묶어 같은 이름끼리만 견준다(점마다 모든 점과 견주면 「GS25」 3,596곳에 1.9초)."""
+    groups = {}
+    for n, i in enumerate(ids):
+        if G.shop0 <= i < G.shop1:                        # 가게 자료 줄만(공원 안 이름 · 물가 테두리 점은 그 뒤에 붙어 있다)
+            groups.setdefault((gaz.norm(G.name[i]), kinds[n]), []).append(n)
+    into = {}                                             # 합쳐지는 줄 → 남는 줄
+    for idx in groups.values():
+        keep = []
+        for n in idx:
+            j = next((k for k in keep if math.hypot(px[k] - px[n], py[k] - py[n]) <= 100), None)
+            (keep.append(n) if j is None else into.setdefault(j, []).append(n))
+    if not into:
+        return px, py, kinds, ids
+    px, py = list(px), list(py)
+    for j, ns in into.items():
+        px[j], py[j] = sum(px[k] for k in [j] + ns) / (len(ns) + 1), sum(py[k] for k in [j] + ns) / (len(ns) + 1)
+    gone = {n for ns in into.values() for n in ns}
+    return tuple([v for n, v in enumerate(lst) if n not in gone] for lst in (px, py, kinds, ids))
 
 
 def _near_map(px, py, sigma):
