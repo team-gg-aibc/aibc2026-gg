@@ -1011,10 +1011,12 @@ JUMP_M, JUMP_FROM = 2000.0, 1500.0       # (jumpguard) 범위 가운데가 이�
 FIXWORD = re.compile(r"아니|말고|잘못|틀렸|다른 ?데|사실은|정정")      # 고쳐 말하는 말: 이때는 멀리 옮겨 가도 받는다
 
 
-def _jumps(before, new, said):
+def _jumps(before, new, said, prev=""):
     """(jumpguard, 71번) 좁혀진 범위에서 새 단서를 더하니 가운데가 2km 넘게 옮겨 간다(현장: 「그 자리에 있어요」의 「자리에」 → 4.9km, 다시 넣기: 「병설유치원이요」 → 4km 다른 동)."""
-    if FIXWORD.search(said or ""):
-        return False
+    if FIXWORD.search(said or "") or re.search(r"아니|틀려|틀렸", prev or ""):
+        return False                                      # 고쳐 말함 · 바로 앞 말에서 「아니요」(되말을 물리고 새 자리를 댐)
+    if any(c.get("how") == "바로" or (c.get("t") == "pt" and c.get("r", 100.0) <= L.SIG["바로"]) for c in new):
+        return False                                      # 「팔각당 바로 앞이에요」처럼 또렷한 단서는 받는다: 첫 읽기가 틀렸을 때 바로잡는 길(이름만 댄 말로 튀는 것만 막음)
     R0 = L.infer(before)
     if R0 is None or R0["r"] > JUMP_FROM:
         return False
@@ -1031,7 +1033,9 @@ def understood(st):
             clues = [c for c in clues if c.get("k") != k and c.get("label") != k]
         if "jumpguard" in L.ON and t.get("said") and rd.get("clues") and clues:
             if t.get("jump_of") != ("model" if t.get("model") else "code"):     # 차례마다 읽기가 바뀔 때 한 번만 잰다
-                t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"])
+                k = next(n for n, x in enumerate(st["turns"]) if x is t)
+                said_before = next((x["said"] for x in reversed(st["turns"][:k]) if x.get("said")), "")     # 바로 앞 시민 말
+                t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"], said_before)
             if t.get("jump"):
                 continue                                  # (jumpguard, 기본 끔 · 71번) 이 말의 이름 하나로 범위가 수 km 옮겨 간다: 단서로 받지 않는다(일은 읽는다)
         for c in rd.get("clues") or []:
