@@ -1038,11 +1038,13 @@ NAME_Q = ("mark", "finer", "mark_again", "closest", "from", "station", "either",
 
 
 def _other_place(said, label, short):
-    """(choicebind, 79번) 시민이 그 보기의 이름은 말하지 않고, 코드가 지명 자료에서 찾은 다른 곳(한 자리를 가리키는 이름)을 댔나."""
+    """(choicebind, 79번) 시민이 그 보기는 말하지 않고, 코드가 지명 자료에서 찾은 다른 곳(한 자리를 가리키는 이름)만 댔나.
+    코드가 찾은 이름 가운데 하나라도 보기 이름과 이어지면(상표 · 줄임말 · 지점: 「스벅」 → 스타벅스 ↔ 「스타벅스 강남역점」) 보기를 말한 것으로 본다."""
     parts = [gaz.norm(re.sub(r" 쪽$", "", p)) for p in str(label or "").split(" ~ ")]
     said_n = gaz.norm(said)
     if not any(parts) or any(p and p in said_n for p in parts):
         return False
+    other = False
     for m in short:
         if "key" in m:
             r = L.resolve(m["key"])
@@ -1050,10 +1052,11 @@ def _other_place(said, label, short):
                 continue                                  # 구 · 동 · 역 · 길 같은 넓은 이름은 보기와 함께 말할 수 있다
         elif not str(m.get("by", "")).startswith("≈"):
             continue                                      # 종류만 말한 것(「편의점」)은 보기를 고르는 말일 수 있다
-        n = gaz.norm(m.get("key") or m["name"])
-        if n and not any(p and (n in p or p in n) for p in parts):
-            return True
-    return False
+        ns = {gaz.norm(x) for x in (m.get("key"), m.get("name")) if x}
+        if any(n and p and (n in p or p in n) for n in ns for p in parts):
+            return False                                  # 그 보기를 말했다(「롯데리아 옆 GS25요」 → 보기 「GS25 역삼점」)
+        other = other or bool(ns)
+    return other
 
 
 def model_read(st, short, known):
