@@ -1034,6 +1034,28 @@ def _solar(system, user, schema):
     return out
 
 
+NAME_Q = ("mark", "finer", "mark_again", "closest", "from", "station", "either", "passed", "between")      # (choicebind) 보기가 장소 이름인 질문
+
+
+def _other_place(said, label, short):
+    """(choicebind, 79번) 시민이 그 보기의 이름은 말하지 않고, 코드가 지명 자료에서 찾은 다른 곳(한 자리를 가리키는 이름)을 댔나."""
+    parts = [gaz.norm(re.sub(r" 쪽$", "", p)) for p in str(label or "").split(" ~ ")]
+    said_n = gaz.norm(said)
+    if not any(parts) or any(p and p in said_n for p in parts):
+        return False
+    for m in short:
+        if "key" in m:
+            r = L.resolve(m["key"])
+            if r["areas"] or r["roads"] or any(k in L.KIND_SIG for k in r["kinds"]):
+                continue                                  # 구 · 동 · 역 · 길 같은 넓은 이름은 보기와 함께 말할 수 있다
+        elif not str(m.get("by", "")).startswith("≈"):
+            continue                                      # 종류만 말한 것(「편의점」)은 보기를 고르는 말일 수 있다
+        n = gaz.norm(m.get("key") or m["name"])
+        if n and not any(p and (n in p or p in n) for p in parts):
+            return True
+    return False
+
+
 def model_read(st, short, known):
     """마지막 차례의 말을 Solar로 다시 읽는다 → (읽은 것 또는 None, 어떻게: live · saved · nosaved · failed, 걸린 초)."""
     turn_, key = st["turns"][-1], read_key(st)
@@ -1080,6 +1102,8 @@ def model_read(st, short, known):
         if m.get("fuzzy"):
             read["clues"][-1].update(e=L.WEAK, heard=m.get("said") or str(m.get("by", ""))[1:])
     ch = raw.get("choice") or ""
+    if "choicebind" in L.ON and ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts) and asked.get("id") in NAME_Q and _other_place(turn_["said"], opts[int(ch[1:]) - 1].get("label"), short):
+        ch = ""                                           # (choicebind, 79번) 시민은 보기에 없는 다른 곳의 이름을 댔는데 Solar가 보기 하나를 골랐다: 그 보기는 받지 않는다(동규 시험 통화 11-21: 「강남새로치과의원이 보여요」에 보기 「강남이룸안과의원」을 골라 700m 떨어진 곳 「바로 앞」으로 확정 질문)
     if ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts):
         s = opts[int(ch[1:]) - 1]["set"]
         said_n, named = gaz.norm(turn_["said"]), "choicekeep" in L.ON and bool(short)      # (choicekeep) 시민이 다른 이름을 댔는데(「동부간선진입교 조금 지나서」) Solar가 말하지 않은 보기(「상계교 방금 지남」)를 고르면 그 「지남 · 못 미침」 단서는 넣지 않는다(씨앗 1201 #17, 600m 틀린 확정)
