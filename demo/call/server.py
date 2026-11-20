@@ -1037,7 +1037,7 @@ def _solar(system, user, schema):
 NAME_Q = ("mark", "finer", "mark_again", "closest", "from", "station", "either", "passed", "between")      # (choicebind) 보기가 장소 이름인 질문
 
 
-def _other_place(said, label, short):
+def _other_place(said, label, short, qid=None):
     """(choicebind, 79번) 시민이 그 보기는 말하지 않고, 코드가 지명 자료에서 찾은 다른 곳(한 자리를 가리키는 이름)만 댔나.
     코드가 찾은 이름 가운데 하나라도 보기 이름과 이어지면(상표 · 줄임말 · 지점: 「스벅」 → 스타벅스 ↔ 「스타벅스 강남역점」) 보기를 말한 것으로 본다."""
     parts = [gaz.norm(re.sub(r" 쪽$", "", p)) for p in str(label or "").split(" ~ ")]
@@ -1048,8 +1048,8 @@ def _other_place(said, label, short):
     for m in short:
         if "key" in m:
             r = L.resolve(m["key"])
-            if r["areas"] or r["roads"] or any(k in L.KIND_SIG for k in r["kinds"]):
-                continue                                  # 구 · 동 · 역 · 길 같은 넓은 이름은 보기와 함께 말할 수 있다
+            if r["areas"] or r["roads"] or any(k in L.KIND_SIG and not (k == "역" and qid == "station" and "stationbind" in L.ON) for k in r["kinds"]):
+                continue                                  # 구 · 동 · 역 · 길 같은 넓은 이름은 보기와 함께 말할 수 있다. (stationbind, 79번) 「가까운 지하철역이 어디인가요?」에 댄 역 이름은 그 답이다: 다른 역 보기를 고른 Solar를 받지 않는다(80번 p08 「방이역이요」 → 보기 「거여역」 3번 중 1번)
         elif not str(m.get("by", "")).startswith("≈"):
             continue                                      # 종류만 말한 것(「편의점」)은 보기를 고르는 말일 수 있다
         ns = {gaz.norm(x) for x in (m.get("key"), m.get("name")) if x}
@@ -1057,6 +1057,17 @@ def _other_place(said, label, short):
             return False                                  # 그 보기를 말했다(「롯데리아 옆 GS25요」 → 보기 「GS25 역삼점」)
         other = other or bool(ns)
     return other
+
+
+def _cat_pick(said, label, short):
+    """(placebind, 79번) 시민이 종류만 말했고(「병원 정문 앞 버스정류장이요」) 보기 이름도, 보기와 이어지는 이름도 말하지 않았나: Solar가 그 보기를 고르면 받지 않는다."""
+    parts = [gaz.norm(re.sub(r" 쪽$", "", p)) for p in str(label or "").split(" ~ ")]
+    if not any(parts) or any(p and p in gaz.norm(said) for p in parts):
+        return False
+    named = [m for m in short if "key" in m or str(m.get("by", "")).startswith(("#", "≈", "@"))]
+    if any(n and p and (n in p or p in n) for m in named for n in {gaz.norm(x) for x in (m.get("key"), m.get("name")) if x} for p in parts):
+        return False
+    return any("key" not in m and not str(m.get("by", "")).startswith(("#", "≈", "@")) for m in short)
 
 
 def model_read(st, short, known):
@@ -1108,8 +1119,10 @@ def model_read(st, short, known):
         if m.get("fuzzy"):
             read["clues"][-1].update(e=L.WEAK, heard=m.get("said") or str(m.get("by", ""))[1:])
     ch = raw.get("choice") or ""
-    if "choicebind" in L.ON and ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts) and asked.get("id") in NAME_Q and _other_place(turn_["said"], opts[int(ch[1:]) - 1].get("label"), short):
+    if "choicebind" in L.ON and ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts) and asked.get("id") in NAME_Q and _other_place(turn_["said"], opts[int(ch[1:]) - 1].get("label"), short, asked.get("id")):
         ch = ""                                           # (choicebind, 79번) 시민은 보기에 없는 다른 곳의 이름을 댔는데 Solar가 보기 하나를 골랐다: 그 보기는 받지 않는다(동규 시험 통화 11-21: 「강남새로치과의원이 보여요」에 보기 「강남이룸안과의원」을 골라 700m 떨어진 곳 「바로 앞」으로 확정 질문)
+    if "placebind" in L.ON and ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts) and asked.get("id") in NAME_Q and _cat_pick(turn_["said"], opts[int(ch[1:]) - 1].get("label"), short):
+        ch = ""                                           # (placebind) 종류만 말했는데 Solar가 그 종류의 보기 하나를 골랐다(80번 c12: 「병원 정문 앞 버스정류장이요」 → 140m 떨어진 다른 정류장 「세브란스병원앞」 바로 앞). 같은 이름의 후보 단서를 버린 뒤 이 고르기가 드러나 틀린 확정이 났다
     if ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts):
         s = opts[int(ch[1:]) - 1]["set"]
         said_n, named = gaz.norm(turn_["said"]), "choicekeep" in L.ON and bool(short)      # (choicekeep) 시민이 다른 이름을 댔는데(「동부간선진입교 조금 지나서」) Solar가 말하지 않은 보기(「상계교 방금 지남」)를 고르면 그 「지남 · 못 미침」 단서는 넣지 않는다(씨앗 1201 #17, 600m 틀린 확정)

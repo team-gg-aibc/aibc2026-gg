@@ -627,6 +627,8 @@ def bind_choice():
                         ("스벅 보여요", "스타벅스 강남역점"), ("롯데리아 옆 GS25요", "GS25 역삼점"), ("주민센터 앞이에요", "역삼1동주민센터")):
         assert not S._other_place(said, label, sh(said)), (said, label)      # 보기 이름을 말함(줄임말 · 상표 · 지점 포함) · 다른 이름 없음 · 넓은 이름(역)만: Solar의 고르기를 그대로 받는다
     assert S._other_place("올리브영 명동역점이 보여요", "용하다한의원", sh("올리브영 명동역점이 보여요"))      # 80번 c03 5번째 차례(Solar 길): 같은 꼴
+    assert S._other_place("방이역이요", "거여역", sh("방이역이요"), "station") == ("stationbind" in S.L.ON)      # (stationbind) 역 질문에 댄 역 이름은 「다른 곳」(80번 p08). 끄면 역은 넓은 이름이라 보지 않는다
+    assert not S._other_place("방이역이요", "거여역", sh("방이역이요"), "finer")                               # 역 질문이 아니면 켜도 역은 넓은 이름
     print(f"  ✓ Solar가 시민이 말하지 않은 보기를 고름(켬 {on}): {'시민이 댄 곳에 머묾' if on else '그 통화 그대로 700m 떨어진 보기로 확정 질문'} · 보기 이름을 말했거나 다른 이름이 없으면 고르기를 받음")
 
 
@@ -643,7 +645,8 @@ def reread_guards():
         def solar(system, user, schema):           # 이름으로 준 단서를 목록의 id로
             raw = q.pop(0)
             ids = dict((n.strip(), i) for i, n in re.findall(r"^- (m\d+) \| ([^|]+)", user, re.M))
-            return {**{k: v for k, v in raw.items() if k != "by_name"}, "places": [{"id": ids[nm], "rel": rel, "how": how} for nm, rel, how in raw["by_name"]]}
+            ch = next(iter(re.findall(rf"^- (o\d+) \| {re.escape(raw['pick'])}$", user, re.M)), "없음") if raw.get("pick") else raw.get("choice", "없음")      # 보기를 이름으로
+            return {**{k: v for k, v in raw.items() if k not in ("by_name", "pick")}, "choice": ch, "places": [{"id": ids[nm], "rel": rel, "how": how} for nm, rel, how in raw["by_name"]]}
         mode, real, eng = S.MODE, S._solar, os.environ.get("CALL_NO_ENGINE")
         os.environ["CALL_NO_ENGINE"] = "1"
         try:
@@ -684,6 +687,10 @@ def reread_guards():
         assert "위드미" not in vc["chips"] and vc["radius"] > 600, (vc["chips"], vc["radius"])      # 켜면 코드가 넓게 둔 「편의점 바로 옆」 그대로
     else:
         assert "위드미" in vc["chips"] and vc["radius"] < 400, (vc["chips"], vc["radius"])          # 끄면 그 통화 그대로 위드미 쪽으로 끌려감
+    st12, v12 = run([("신촌 세브란스병원 앞인데요, 버스정류장 쪽에 오토바이가 인도에 계속 서 있어요", dict(N, type="other", by_name=[["세브란스병원앞", "근처", "모름"]])),
+                     ("병원 정문 앞 버스정류장이요", dict(N, pick="세브란스병원앞", by_name=[["세브란스병원앞", "근처", "모름"]]))])      # 80번 c12: 종류만 말했는데 Solar가 후보 「세브란스병원앞」(실제 자리에서 140m 떨어진 다른 정류장)을 이름 칸 · 보기 칸 둘 다에
+    labels = [c.get("label") for c in st12["turns"][-1]["model"]["clues"]]
+    assert ("세브란스병원앞" in labels) != ("placebind" in S.L.ON), labels      # 켜면 이름 칸 · 보기 칸 어느 쪽으로도 그 후보가 들어가지 않음(끄면 들어감)
     print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 「출구 쪽」으로 읽은 번 {v18b['radius']}m · 자리만 말한 차례 뒤 일 {kind} · {k10} · 「편의점 바로 앞」 {vc['radius']}m")
 
 
