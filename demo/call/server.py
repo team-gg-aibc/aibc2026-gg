@@ -160,8 +160,8 @@ PARTYES = re.compile(r"^\s*(네|예|응|맞아|맞습|맞긴|그래요|넵)[^?]*
 def _partyes(read, said, R=None):
     """(partyes) 되묻기 답이 「네」로 시작하는 부분 긍정이면 확정으로 받고 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 받았나.
     (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리(15~55m)를 단서로 더해 한 번 더 좁힌다(핀만 옮김)."""
-    if not ({"partyes", "partyes2"} & L.ON) or not PARTYES.search(said or ""):
-        return False
+    if not ({"partyes", "partyes2"} & L.ON) or not PARTYES.search(said or "") or re.search(r"반대|다른 ?(데|곳|자리)|전혀|완전히", said):
+        return False                                      # 「네, 근데 그쪽 말고 반대쪽이에요」는 다른 자리를 말한 것: 전처럼 읽는다
     read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
     if "partyes2" in L.ON:
         read["confirm"] = None
