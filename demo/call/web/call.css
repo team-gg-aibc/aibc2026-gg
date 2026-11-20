@@ -411,6 +411,7 @@ body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }
    자리만 바꾸고 꾸밈은 그대로. 넓은 화면 · 휴대폰 가로(812)는 그대로(11-21) */
 @media (max-width: 600px) {
   body:not(.view-records) #talk { left: 8px; right: 8px; width: auto; bottom: 42%; }
-  body:not(.view-records) #side { left: 8px; right: 8px; width: auto; top: calc(58% + 8px); bottom: 8px; }
+  body:not(.view-records) #side { left: 8px; right: 8px; width: auto; top: calc(58% + 8px); bottom: 8px; overflow-y: auto; }      /* 낮은 칸이라 칸 안에서 내려 읽는다(덩어리 높이는 그대로) */
+  body:not(.view-records) #side .s-ref { flex: none !important; }      /* 내려 읽는 칸에서 참고 자료가 0으로 줄지 않게(원래 규칙이 !important) */
   body:not(.view-records) #ask, body:not(.view-records) #law, body:not(.view-records) #range { display: none; }
 }
