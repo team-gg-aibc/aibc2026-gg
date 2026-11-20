@@ -148,38 +148,50 @@ def field_fixes():
 
 
 def partial_yes_table():
-    """(partyes2) 되묻기 답의 갈림 표를 읽기 함수로 칸마다: 시작(네 · 예 · 맞아요 · 어 네 · 음 네) × 가운데(근데 · 다만 · 그런데 · 아 근데 · 없음) × 어긋남 말 × 끝(긍정 · 자리 말 · 아니에요 · 아니요 · 아닌데요 · 아닌 것 같아요 · 반대쪽).
-    끝이 부정인 칸은 모두 아니요(부분 긍정으로 받지 않음 — 아니라고 한 자리가 확정되는 길이 없다). 그 밖의 칸은 부분 긍정이거나 main 규칙. 스위치를 끄면 칸마다 main 규칙과 같다."""
+    """(partyes2) 이 고침은 부분 긍정을 더하기만 한다: 되묻기 답의 갈림 표(시작 × 가운데 × 어긋남 말 × 끝 + 강조 말 · 「네, 맞아요」 꼴)에서
+    부분 긍정이 아닌 칸은 모두 스위치를 끈 결과(main 규칙)와 같은지 칸마다 견준다. 코드 읽기와 Solar 읽기 길 둘 다. 부정으로 맺는 칸은 부분 긍정이 되지 않는다."""
     import itertools
     os.environ.setdefault("CALL_MODE", "saved"), os.environ.setdefault("CALL_NO_ENGINE", "1")
     sys.path.insert(0, str(HERE))
     import server as S
     ask = {"id": "confirm"}
-    main_rule = lambda t: False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", t) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", t) else None      # noqa: E731  main af6da3c의 규칙 그대로
-    starts, mids, devs = ["네", "예", "맞아요", "어 네", "음 네"], [", 근데 ", ", 다만 ", ", 그런데 ", ", 아 근데 ", " "], ["조금 옆", "뒤", "길 건너", "그쪽", "조금 떨어져"]
-    ends = {"긍정": "{d}이에요", "자리 말": "{d} 편의점 앞이에요", "아니에요": "{d} 아니에요", "아니요": "{d}요. 아니요", "아닌데요": "{d} 아닌데요", "아닌 것 같아요": "{d} 아닌 것 같아요", "반대쪽": "{d} 말고 반대쪽이에요"}
+    starts, mids, devs = ["네", "예", "맞아요", "어 네", "음 네", "네 정말", "네, 완전히"], [", 근데 ", ", 다만 ", ", 그런데 ", ", 아 근데 ", " "], ["조금 옆", "뒤", "길 건너", "그쪽", "조금 떨어져"]
+    ends = {"긍정": "{d}이에요", "자리 말": "{d} 편의점 앞이에요", "강조": "{d}이에요, 완전히 맞아요", "아니에요": "{d} 아니에요", "아니요": "{d}요. 아니요", "아닌데요": "{d} 아닌데요",
+            "아닌 것 같아요": "{d} 아닌 것 같아요", "반대쪽": "{d} 말고 반대쪽이에요"}
+    negend = {"아니에요", "아니요", "아닌데요", "아닌 것 같아요", "반대쪽"}
     cells = [(f"{a}{m}{ends[e].format(d=d)}", e) for a, m, d, e in itertools.product(starts, mids, devs, ends)]
-    cells += [("네, 근데 바로 앞은 아니고 조금 옆이에요", "긍정"), ("예, 근데 길 건너편이에요", "긍정"), ("네, 근데 그쪽 아니에요", "아니에요"), ("예, 근데 거기 뒤 아니에요", "아니에요"), ("네, 맞아요", "긍정"), ("아니요, 거기가 아니에요", "아니요"), ("잘 모르겠어요", "그 밖")]
+    cells += [(t, "따로") for t in ("네, 맞아요", "네", "네, 완전히 맞아요", "네 정말 맞아요", "네, 딱 거기예요", "네, 확실히 거기예요", "네, 전혀 안 움직이고 그 앞에 있어요", "네, 바로 옆이에요",
+                                   "네, 근데 그쪽 아니에요", "예, 근데 거기 뒤 아니에요", "네 맞는데 근데 그쪽 말고 반대쪽이에요", "아니요, 거기가 아니에요", "잘 모르겠어요")]
+    protect = ["네, 근데 바로 앞은 아니고 조금 옆이에요", "예, 근데 길 건너편이에요", "네, 조금 옆이에요"]
+    cells += [(t, "지킬 말") for t in protect]
+
+    def both(said):
+        r_on = S.code_read(said, ask, [], None)
+        had = "partyes2" in S.L.ON
+        S.L.ON.discard("partyes2")
+        try:
+            r_off = S.code_read(said, ask, [], None)
+        finally:
+            S.L.ON.add("partyes2") if had else None
+        return r_on, r_off
     partial = 0
     for said, end in cells:
-        r = S.code_read(said, ask, [], None)
-        if end in ("아니에요", "아니요", "아닌데요", "아닌 것 같아요", "반대쪽"):
-            assert r["confirm"] is False, (said, r["confirm"])               # 아니라고 한 자리: 늘 아니요
-        else:
-            assert r["confirm"] is None and r["matter"].get("side") in ("근처", "건너편") or r["confirm"] == main_rule(said), (said, r["confirm"], r["matter"].get("side"))
-            partial += r["confirm"] is None and "side" in r["matter"]
-    for said in ("네, 근데 바로 앞은 아니고 조금 옆이에요", "예, 근데 길 건너편이에요", "네, 조금 옆이에요"):
-        r = S.code_read(said, ask, [], None)
-        assert r["confirm"] is None and r["matter"].get("side"), (said, r)   # 지키려는 말은 부분 긍정
-    had = "partyes2" in S.L.ON
-    S.L.ON.discard("partyes2")
-    try:
-        for said, _ in cells:                              # 끈 길 = main 규칙
-            r = S.code_read(said, ask, [], None)
-            assert r["confirm"] == main_rule(said) and "side" not in r["matter"], (said, r["confirm"])
-    finally:
-        S.L.ON.add("partyes2") if had else None
-    print(f"  ✓ 되묻기 답 갈림 표 {len(cells)}칸(부분 긍정 {partial}칸): 끝이 부정인 칸은 모두 아니요, 그 밖은 부분 긍정 · main 규칙, 끄면 칸마다 main 규칙과 같음")
+        r_on, r_off = both(said)
+        is_partial = bool(r_on["confirm"] is None and r_on["matter"].get("side") in ("근처", "건너편") and "side" not in r_off["matter"])
+        if not is_partial:
+            assert (r_on["confirm"], r_on["matter"].get("side")) == (r_off["confirm"], r_off["matter"].get("side")), (said, r_on["confirm"], r_off["confirm"])     # 부분 긍정이 아니면 main 그대로
+        assert not (is_partial and end in negend), said                    # 부정으로 맺는 답은 부분 긍정이 아니다
+        assert is_partial or end != "지킬 말", said                        # 지키려는 말은 부분 긍정
+        partial += bool(is_partial)
+        for solar in (True, False, None):                                  # Solar 읽기 길: 부분 긍정이 아니면 Solar가 읽은 그대로, 앞 차례에 부분 긍정이 있으면 늘 그대로
+            for prior in ([], [{"code": {"clues": [{"partyes": True}]}}]):
+                st = {"turns": prior + [{"asked": ask, "said": said, "code": {"clues": []}}]}
+                read = {"confirm": solar, "matter": {}, "clues": []}
+                changed = S._partyes_model(read, st)
+                assert changed == (is_partial and not prior), (said, solar, bool(prior), changed)
+                if not changed:
+                    assert read == {"confirm": solar, "matter": {}, "clues": []}, (said, read)
+    print(f"  ✓ 되묻기 답 갈림 표 {len(cells)}칸(부분 긍정 {partial}칸): 부분 긍정이 아닌 칸은 모두 main 그대로(코드 · Solar 읽기 둘 다), 부정으로 맺는 칸은 부분 긍정이 아님, 두 번째는 늘 그대로")
 
 
 def partial_yes():
@@ -214,7 +226,7 @@ def partial_yes():
         st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
         st, view = say(st, "네, 근데 그쪽 아니에요")
         assert not view["confirmed"], view["question"]
-    print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 확정하지 않음 · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
+    print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 main 그대로(확정 안 됨) · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
 
 
 def free_text():

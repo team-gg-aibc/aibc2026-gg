@@ -160,38 +160,62 @@ PARTYES_NEG = re.compile(r"아니|아닌|아닙|아냐|틀려|틀렸|틀린|잘�
 PARTYES_OFF = re.compile(r"(조금|좀|살짝|약간)\s*(더\s*)?(옆|뒤|떨어|건너|맞은편|안쪽|바깥|쪽)|(근데|그런데|다만|하지만|대신)[^?]*?(옆|뒤|떨어|건너|맞은편|쪽)")      # 되묻은 자리가 조금 어긋났다는 말
 
 
+def _partyes_model(read, st):
+    """(partyes) Solar 읽기 길: 되묻기 답이 이 통화의 첫 부분 긍정일 때만 Solar가 읽은 확인을 바꾼다(코드 읽기의 고리 단서를 가져옴). 그 밖은 Solar가 읽은 그대로 → 바꿨나."""
+    t = st["turns"][-1]
+    if (t.get("asked") or {}).get("id") != "confirm" or _had_partyes(st["turns"][:-1]) or not _partyes(read, t.get("said")):
+        return False
+    read["clues"] += [c for c in (t.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
+    return True
+
+
 def _confirm_main(said):
     """되묻기 답의 main 규칙(부분 긍정을 받지 않을 때): 「아니」 · 「틀려」 · 「다른 데」가 있으면 아니요, 「네」로 시작하면 네."""
     return False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
 
 
-def _partyes(read, said, R=None):
-    """(partyes) 되묻기 답이 「네」로 시작하는 부분 긍정이면 확정으로 받고 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 받았나.
-    (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리를 단서로 더해 한 번 더 좁힌다(핀만 옮김).
-    받는 조건을 좁게(#137 리뷰 2차): 긍정으로 시작 + 「조금 옆 · 근데 … 뒤」 같은 어긋남 말 + 지키려는 「바로 앞은 아니고」를 뺀 나머지에 부정이 하나도 없음.
-    「네, 근데 그쪽 아니에요」처럼 부정으로 맺거나 「옆 아니」처럼 어긋남 말 뒤에 부정이 붙으면 받지 않고 main 규칙으로 간다."""
-    if not ({"partyes", "partyes2"} & L.ON):
-        return False
+def _is_partyes(said):
+    """(partyes) 부분 긍정인가: ① 긍정으로 시작 ② 「조금 옆 · 근데 … 뒤」 같은 어긋남 말 ③ 지키려는 「바로 앞은 아니고」를 뺀 나머지에 PARTYES_NEG 낱말이 없음 — 셋을 다 갖춘 답만 참.
+    PARTYES_NEG는 「받지 않을 조건」으로만 쓴다(강조 말 「완전히 · 전혀」도 들어 있어 넓지만, 걸리면 main 규칙으로 갈 뿐 아니요로 바꾸지 않는다)."""
     said = said or ""
     if not PARTYES_START.match(said):
         return False
     rest = PARTYES_OKNOT.sub(" ", said)
-    if PARTYES_NEG.search(rest):
-        read["confirm"] = False                           # 긍정으로 시작해도 부정 · 다른 자리로 맺음: 아니요(main은 「네 … 말고 반대쪽이에요」를 「아니」가 없어 「네」로 읽었다 — 그것만 main보다 엄격)
-        return True
-    if not PARTYES_OFF.search(rest):
-        return False                                      # 어긋남 말이 없다(「네, 맞아요」 · 「네, 바로 옆이에요」): main 규칙
-    read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
+    return not PARTYES_NEG.search(rest) and bool(PARTYES_OFF.search(rest))
+
+
+def _had_partyes(turns):
+    """이 통화에서 이미 부분 긍정을 받았나(앞 차례의 읽기에 고리 단서가 있나)."""
+    return any(c.get("partyes") for t in turns for c in ((t.get("model") or t.get("code") or {}).get("clues") or []))
+
+
+def _partyes(read, said, R=None):
+    """(partyes · partyes2) 이 PR이 main의 읽기를 바꾸는 단 하나의 길: 부분 긍정(_is_partyes)이면 확인을 바꾸고(partyes2 = 확정하지 않음 + 되묻은 자리 둘레 고리 단서,
+    partyes = 확정) 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 참. 부분 긍정이 아니면 read를 건드리지 않고 거짓(main 규칙이 읽은 그대로)."""
+    if not ({"partyes", "partyes2"} & L.ON) or not _is_partyes(said):
+        return False
+    side_set = "side" not in read["matter"]
+    if side_set:
+        read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
     if "partyes2" in L.ON:
         read["confirm"] = None
         if R is not None:
             near = [float(G.ext[i]) for i in G.near(R["cx"], R["cy"], 40.0) if i < len(G.ext)]
             ring = max([35.0] + near)                     # 되묻은 자리가 넓은 곳(길쭉한 건물 · 부지)이면 「조금 옆」은 그 크기만큼 떨어진 끝일 수 있다(93개 둘레 꼴 74-P10 「자벌레」 120m)
-            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": max(12.0, 0.3 * ring), "ring": ring, "partyes": True, "big": ring > 35.0,
+            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": max(12.0, 0.3 * ring), "ring": ring, "partyes": True, "side_set": side_set,
                                   "label": tab("위치 범위")["단서 · 되묻은 자리 조금 옆"]})
     else:
         read["confirm"] = True
     return True
+
+
+def _partyes_undo(read, said):
+    """(partyes2) 같은 통화의 두 번째 부분 긍정은 받지 않는다: 코드 읽기를 main 규칙이 읽은 그대로로 되돌린다(확정하지 않음 — #137 리뷰 2차)."""
+    ring = [c for c in read["clues"] if c.get("partyes")]
+    read["clues"] = [c for c in read["clues"] if not c.get("partyes")]
+    if any(c.get("side_set") for c in ring):
+        read["matter"].pop("side", None)
+    read["confirm"] = _confirm_main(said)
 
 
 HARD = re.compile(r"멀리 ?보이기만|가운데|모르겠|몰라")      # (hardstop, 71번) 몇 걸음 · 어느 쪽에 답하기 어렵다는 말
@@ -983,10 +1007,7 @@ def model_read(st, short, known):
         read["matter"]["alive"] = raw["alive"] == "살아 있음"
     if raw.get("leash") in ("목줄 있음", "목줄 없음"):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
-    if (turn_.get("asked") or {}).get("id") == "confirm" and _partyes(read, turn_.get("said")):     # (partyes) Solar가 「아니요」로 읽어도 「네」로 시작하는 부분 긍정은 그대로(확정 · 또는 partyes2면 고리 단서)
-        read["clues"] += [c for c in (turn_.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
-        if read["confirm"] is None and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
-            read["confirm"], read["clues"] = _confirm_main(turn_.get("said") or ""), [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차)
+    _partyes_model(read, st)
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}
     return read, "live", sec
@@ -1724,7 +1745,7 @@ def turn(st, ev):
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
             if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
-                read["confirm"], read["clues"] = _confirm_main(bare), [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
+                _partyes_undo(read, bare)     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
                 told = told_of(text, short) or (text.strip()[:41] if (asked or {}).get("id") == "what" else "")
                 if told:
