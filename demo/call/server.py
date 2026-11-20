@@ -83,10 +83,23 @@ def tab(section, head="항목", col=1):
     return {}
 
 
+IGA = re.compile(r"([가-힣])\(이\)가")
+
+
 def fill(s, **kw):
     for k, v in kw.items():
         s = s.replace("{" + k + "}", str(v))
+    if "josa" in L.ON:                                    # (josa · 75번) 「카페(이)가」 → 받침이 없으면 「카페가」, 있으면 「정류장이」: 화면에 괄호째 나가고 소리로는 「카페 이 가」로 읽힌다
+        s = IGA.sub(lambda m: m.group(1) + ("이" if (ord(m.group(1)) - 0xAC00) % 28 else "가"), s)
     return " ".join(s.split())
+
+
+def asked_same(turns, words):
+    """(sameopts · 75번) 「이 질문을 같은 보기로 이미 물었나」를 가리는 함수. 시민이 그 보기를 골랐다면 보기가 달라졌을 것이고, 같은 보기가 또 나왔다는 것은 앞의 답으로 범위가 달라지지 않았다는 뜻이다
+    (「영동1교에서 보면 어느 쪽이세요?」에 「남단 쪽이요」라고 답했는데 같은 질문이 또 나와 시민이 끊음 · 「바로 앞에 뭐가 보이세요? 석촌호수 아뜰리에 같은 거요」가 두 번)."""
+    lab = lambda q: tuple(o.get("label") or words.get(o.get("word"), o.get("word")) for o in q.get("options") or [])      # noqa: E731
+    asked = {(t["asked"]["id"], lab(t["asked"])) for t in turns if t.get("said") and t.get("asked")}
+    return lambda q: (q["id"], lab(q)) in asked
 
 
 def scripts():
@@ -1615,7 +1628,7 @@ def build(st, extra=None):
     line = where_line(parts, done, matter, anc) if parts else None
     blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON or "lamponce2" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
     hard = "hardstop" in L.ON and any(t.get("said") and (t.get("asked") or {}).get("id") in ("dist", "from") and HARD.search(t["said"]) for t in st["turns"])     # (hardstop, 71번)
-    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"])
+    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"], asked_same(st["turns"], tab("이렇게 물어보세요", "낱말")))
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
     log = [a or "" for a in st["asked_log"]]

@@ -847,11 +847,13 @@ def _axis(x, y, w):
     return (math.cos(ang), math.sin(ang)), (mx, my)
 
 
-def _candidates(x, y, w, radius, kinds=None):
-    """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)"""
+def _candidates(x, y, w, radius, kinds=None, skip=()):
+    """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)
+    skip = 이미 내밀었던 자리들((x, y) 소수 첫째 자리)."""
     idx = [i for i in _places_in(x.min() - radius, y.min() - radius, x.max() + radius, y.max() + radius, 6000 if kinds is None else 45000)
            if (kinds is None or G.kind[i] in kinds) and G.kind[i] not in ("동네", "산") and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
            and not G.pk0 <= i < G.rp1     # 공원 안 이름(park_names)은 시민이 말하면 알아듣되 보기로 먼저 내밀지 않는다: 넣어도 지금의 질문 흐름이 그대로(33번 2-5)
+           and not (skip and (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) in skip)
            and not ("selfname" in ON and self_area(i))]     # (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
     if not idx:
         return [], None
@@ -869,6 +871,8 @@ def _candidates(x, y, w, radius, kinds=None):
     for j in np.argsort(-score):
         if mass[j] < (0.03 if radius < 100 else 0.003) or len(picked) >= 6:
             break
+        if "samename" in ON and any(gaz.norm(G.name[idx[j]]) == gaz.norm(G.name[idx[k]]) for k in picked):
+            continue                                      # (samename · 75번) 같은 이름을 보기에 두 번 넣지 않는다(「석촌호수 아뜰리에, 석촌호수 아뜰리에 같은 거요」 — 지명 표에 같은 이름의 점이 둘)
         if all(math.hypot(G.x[idx[j]] - G.x[idx[k]], G.y[idx[j]] - G.y[idx[k]]) >= 1.2 * radius for k in picked):
             picked.append(int(j))
     if not picked:
@@ -892,6 +896,8 @@ STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀�
 FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트 실패 꼴 고침 묶음 가(11-20, 71번): 흔한 말 · 튐 막기 · Solar 「아님」 확인 · 보기 일부 답. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
+ASK_ON = "samename,closestnew,sameopts,josa"      # (75번 후보 2, 기본 끔) 질문 다듬기: samename = 보기에 같은 이름을 두 번 넣지 않음 · closestnew = 「어디가 가장 가까우세요」를 다시 물을 때 앞서 내민 보기는 빼고 새 보기로(셋이 안 되면 묻지 않음) · sameopts = 이 통화에서 같은 보기로 이미 물었던 질문은 다시 고르지 않음(questions의 same, server.asked_same) · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
@@ -946,7 +952,7 @@ def _fresh(asked):
     return not rej or any(a in LOCQ for a in asked[rej[-1] + 1:])
 
 
-def questions(R, clues, matter, asked=()):
+def questions(R, clues, matter, asked=(), same=None):
     """지금 물을 수 있는 질문을 설 순서대로 → [{id, bits, options: [{label | word, set}], …}]. 맨 앞이 화면에 뜬다."""
     conds = []
     if matter.get("type") is None and not matter.get("told"):     # 무슨 일인지 한 번 말했으면 다시 묻지 않는다
@@ -1029,6 +1035,7 @@ def questions(R, clues, matter, asked=()):
         miss.add("closest")                               # (closestcap · 75번) 「어디가 가장 가까우세요?」는 한 통화에 두 번까지: 「다 멀어요」를 듣고도 보기만 바꿔 네댓 번 물었다(올림픽공원 둘레길 · 뚝섬한강공원)
     if zone and "zone" in miss:
         zone = None
+    dup = lambda q: bool(same) and "sameopts" in ON and q["id"] in SAMEQ and same(q)     # noqa: E731  (sameopts · 75번) 이 통화에서 같은 보기로 이미 물었던 질문: 그 답으로 범위가 달라지지 않았다는 뜻이라 사다리의 다음 질문으로 넘어간다
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지
     express = R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
     drive = R["on_road"] and not express and "drive" in ON and any(c.get("drive") for c in clues)     # 큰길을 차로 지나간 통화(33번 5-2)
@@ -1036,7 +1043,7 @@ def questions(R, clues, matter, asked=()):
         lamp = {"id": "lampno", "bits": math.log2(max(1.0, R["r"] / 15.0)), "options": []} if express and G.lamps and R["r"] > 100 else None     # 가로등 기둥 번호: 읽을 수만 있으면 한 번에 기둥 하나로(모를 몫이 커서 점수는 낮게 나온다)
         loc = [_q_between(R, x, y, w, clues), _q_marks(R, x, y, w, "passed", clues), _q_ago(R, clues), lamp, _q_next(R, x, y, w, clues),
                _q_dir(R, x, y, w) if ctx["head"] is None and any(c["t"] in ("past", "before") for c in clues) else None]
-        loc = sorted((q for q in loc if q and _worth(q, R) and q["id"] not in miss), key=lambda q: -(q["bits"] if "score" in OFF else _score(q)))
+        loc = sorted((q for q in loc if q and _worth(q, R) and q["id"] not in miss and not dup(q)), key=lambda q: -(q["bits"] if "score" in OFF else _score(q)))
     if not loc:                                           # 사다리: 넓으면 가까운 역 → 간판 · 건물 이름 → (좁혀지면) 바로 앞의 것 → 둘 중 고르기 → 보이는 것의 종류 → 「바로 앞인지」
         r = R["r"]     # 넓을 때 역 · 간판을 둘 다 모른다고 하면 범위째 확인하기 전에 둘 중 고르기 · 보이는 것을 묻는다(11-15 극한 세트)
         order = ["station", "mark", "either", "seen"] if r > 1500 else ["mark", "station", "either"] if r > 900 else ["mark", "either", "seen"] if r > 250 else ["finer", "either", "seen", "near"]
@@ -1060,7 +1067,7 @@ def questions(R, clues, matter, asked=()):
                 "lampno": lambda: {"id": "lampno", "bits": math.log2(max(1.0, r / 15.0)), "options": []},
                 "addr": lambda: {"id": "addr", "bits": math.log2(max(1.0, r / 15.0)), "options": []}}
         ask = lambda qid: make[qid]() if qid in make else _q_marks(R, x, y, w, qid, clues)   # noqa: E731
-        loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R)), [])
+        loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R) and not dup(q)), [])
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)     # 「아니요」로 되돌아온 뒤에는 다시 센다
     n_loc = sum(1 for a in ids[since + 1:] if a in LOCQ)
     if rejected:                                          # 어느 말이 달랐는지부터 짚는다(한 걸음만 되돌리기)
@@ -1337,7 +1344,9 @@ def _q_closest(R, x, y, w, clues):
     ringed = R.get("ringed") if "rimask" in ON else None
     if sum(1 for c in clues if c["t"] == "closest") >= (2 if "closest2" in ON or ringed else 1):
         return None                                       # (closest2, 기본 끔 · 49번) 좁혀진 범위에서 한 번 더(더 작은 것들로)
-    picked, parts = _candidates(x, y, w, max(60.0, 0.3 * R["r"]) if ringed else max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None)
+    old = ({tuple(c["p"]) for c in clues if "p" in c and (c["t"] == "closest" or (c["t"] == "not" and str(c.get("label", "")).endswith(" 쪽 아님")))}
+           | {tuple(q) for c in clues if c["t"] == "closest" for q in c.get("others", ())}) if "closestnew" in ON else ()      # (closestnew · 75번) 앞서 내밀었던 보기(고른 것 · 「다 멀어요」로 지운 것)는 다시 내밀지 않는다: 같은 넷을 또 물으면 같은 답이 온다. 새 보기가 셋이 안 되면 묻지 않는다
+    picked, parts = _candidates(x, y, w, max(60.0, 0.3 * R["r"]) if ringed else max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None, old)
     keep = []
     for i in picked:
         if all(math.hypot(G.x[i] - G.x[j], G.y[i] - G.y[j]) > 0.5 * R["r"] for j in keep):
@@ -1402,6 +1411,8 @@ def _q_from(R, x, y, w, clues):
     picked = []
     for _, i, d in sorted(cand, reverse=True):
         u = ((G.x[i] - ax) / d, (G.y[i] - ay) / d)
+        if "samename" in ON and any(G.name[i] == G.name[k] for k, _, _ in picked):
+            continue
         if all(u[0] * v[0] + u[1] * v[1] < (0.5 if wide else 0.34) for _, v, _ in picked + [(None, e[1], None) for e in extra]):       # 서로 70도(fromwide 60도) 넘게 다른 쪽
             picked.append((i, u, d))
         if len(picked) + len(extra) >= (4 if wide else 3):
@@ -1728,6 +1739,32 @@ def selftest():
     assert not is_done(Rl) and Rl["r"] > 300 and float(np.percentile(bridge_dist(i_bl, Rl["x"][Rl["cred"]], Rl["y"][Rl["cred"]]), 90)) <= 40, (Rl["r"], Rl["r_cover"])      # 범위 = 고가를 따라 난 띠(가운데 한 점이 아니다)
     assert is_done(infer(short1))                                # 짧은 다리(75m)는 켜도 한 점
     ON.discard("bridgelong")
+    # (ASK_ON · 75번 후보 2, 기본 끔) 질문 다듬기 — 스위치마다 끈 동작 · 켠 동작
+    two = [i for i, nm in enumerate(G.name) if nm == "석촌호수 아뜰리에"]      # 지명 표에 같은 이름의 점이 둘(59m 떨어져 있다)
+    sx, sy, sw = np.array([G.x[i] for i in two]), np.array([G.y[i] for i in two]), np.ones(len(two)) / max(1, len(two))
+    shown = lambda: [G.name[i] for i in _candidates(sx, sy, sw, 35.0, {"문화시설", "시설"})[0]]      # noqa: E731
+    assert not ON & set(ASK_ON.split(",")) and len(two) == 2 and shown().count("석촌호수 아뜰리에") == 2
+    ON.add("samename")
+    assert shown().count("석촌호수 아뜰리에") == 1               # 보기에 같은 이름은 한 번만
+    ON.discard("samename")
+    ring_s = water_ring(resolve(k("석촌호수")))
+    mid_s = [float(ring_s[:, 0].min() + ring_s[:, 0].max()) / 2, float(ring_s[:, 1].min() + ring_s[:, 1].max()) / 2]
+    i_sp = next(i for i, a in enumerate(G.parks) if a["name"] == "송파나루공원")
+    lake_s = [{"t": "cone", "o": mid_s, "v": [-1.0, 0.0], "cos": 0.5, "f": 0.03}, {"t": "at", "k": k("석촌호수"), "how": "가까이"}, {"t": "in", "a": ["park", i_sp]}]      # 「석촌호수 서쪽 산책로예요」 · 「공원 안이에요」
+    Rlk = infer(lake_s)
+    c1 = _q_closest(Rlk, *_sample(Rlk), lake_s)
+    far = lake_s + c1["options"][-1]["set"]["clues"]            # 「다 멀어요」
+    again = lambda: (_q_closest(infer(far), *_sample(infer(far)), far) or {}).get("name")      # noqa: E731
+    assert again() == c1["name"]                              # 끄면 같은 넷을 또 내민다(11-20 현장 서버에서 본 것)
+    ON.add("closestnew")
+    assert again() and not set(again().split(", ")) & set(c1["name"].split(", ")), again()      # 켜면 새 보기로
+    ON.discard("closestnew")
+    stray = {"type": "stray", "animal_matter": True, "alive": True, "leash": False}
+    first = questions(Rlk, lake_s, stray)[0]
+    assert first["id"] == "closest" and questions(Rlk, lake_s, stray, (), lambda q: q["id"] == "closest")[0]["id"] == "closest"      # 끄면 same을 줘도 그대로
+    ON.add("sameopts")
+    assert questions(Rlk, lake_s, stray, (), lambda q: q["id"] == "closest")[0]["id"] != "closest"      # 켜면 같은 보기로 물었던 질문은 건너뛴다
+    ON.discard("sameopts")
     # 스위치마다 하나씩: 넓은 곳에 걸음 안 묻기(bigdist) · 넓은 둘레에서는 둘레 질문 먼저(rimask) · 「가장 가까우세요」 두 번까지(closestcap)
     i_tk = next(i for i, a in enumerate(G.parks) if a["name"] == "뚝섬한강공원")
     pool = [{"t": "in", "a": ["park", i_tk]}, {"t": "at", "k": k("뚝섬수영장"), "how": "바로"}]
