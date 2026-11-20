@@ -14,6 +14,7 @@
   {"t":"toward","k":…} · {"t":"head","v":[ux,uy],"label":…}  가는 방향        {"t":"not","p":…,"r":…}  거기는 아니다
 스스로 시험:  python3 demo/call/locate.py
 """
+import functools
 import math
 import os
 import re
@@ -128,9 +129,20 @@ def bridge_dist(i, x, y):
     return d
 
 
+@functools.lru_cache(maxsize=None)
+def bridge_span(i):
+    """다리 i의 면이 걸친 길이(m, 면을 싸는 상자의 대각선)."""
+    p = np.vstack(G.bridge[i])
+    return float(np.hypot(*(p.max(axis=0) - p.min(axis=0))))
+
+
 def _bridges(r, n=None, ctx=None):
-    """resolve() 결과 가운데 면을 아는 다리의 장소 번호들. 그 통화에 그 다리와 닿는 공원 · 광장 말이 함께 있을 때만(ctx["bp"]) — 다리만 댄 말(「올림픽대교 위예요」)은 전처럼 가운데 점으로 읽는다."""
-    return [i for i in r.get("ids") or () if i in G.bridge] if "bridgeline" in ON and ctx is not None and n in ctx.get("bp", ()) else []
+    """resolve() 결과 가운데 면을 아는 다리의 장소 번호들. 그 통화에 그 다리와 닿는 공원 · 광장 말이 함께 있을 때만(ctx["bp"]) — 다리만 댄 말(「올림픽대교 위예요」)은 전처럼 가운데 점으로 읽는다.
+    (bridgelong · 75번, 기본 끔) 길이가 2 × BIG_M(120m)을 넘는 다리 · 고가는 혼자 나와도 면으로: 가운데 점 둘레 60m는 그 다리의 한 토막일 뿐이라 이름 하나로는 한 점이 서지 않는다(보라매고가는 1.6km — 「보라매고가 바로 앞」을 가운데 점으로 확정해 193m 틀림). 짧은 다리(묵동교 75m)는 전처럼 한 점."""
+    if "bridgeline" not in ON or ctx is None:
+        return []
+    ids = [i for i in r.get("ids") or () if i in G.bridge]
+    return ids if n in ctx.get("bp", ()) else [i for i in ids if "bridgelong" in ON and bridge_span(i) > 2 * BIG_M]
 
 
 _wr = {}
@@ -1709,6 +1721,13 @@ def selftest():
     assert is_done(infer(path[1:])) and not infer(path[1:])["ctx"]["bp"]
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
+    long1, short1 = [{"t": "at", "k": k("보라매고가"), "how": "바로"}], [{"t": "at", "k": k("묵동교"), "how": "바로"}]      # (bridgelong, 기본 끔) 긴 다리 · 고가는 혼자 나와도 면으로
+    assert is_done(infer(long1)) and "bridgelong" not in ON      # 끄면 전처럼 가운데 한 점으로 끝난다(1.6km 고가의 가운데)
+    ON.add("bridgelong")
+    Rl, i_bl = infer(long1), resolve(k("보라매고가"))["ids"][0]
+    assert not is_done(Rl) and Rl["r"] > 300 and float(np.percentile(bridge_dist(i_bl, Rl["x"][Rl["cred"]], Rl["y"][Rl["cred"]]), 90)) <= 40, (Rl["r"], Rl["r_cover"])      # 범위 = 고가를 따라 난 띠(가운데 한 점이 아니다)
+    assert is_done(infer(short1))                                # 짧은 다리(75m)는 켜도 한 점
+    ON.discard("bridgelong")
     # 스위치마다 하나씩: 넓은 곳에 걸음 안 묻기(bigdist) · 넓은 둘레에서는 둘레 질문 먼저(rimask) · 「가장 가까우세요」 두 번까지(closestcap)
     i_tk = next(i for i, a in enumerate(G.parks) if a["name"] == "뚝섬한강공원")
     pool = [{"t": "in", "a": ["park", i_tk]}, {"t": "at", "k": k("뚝섬수영장"), "how": "바로"}]
