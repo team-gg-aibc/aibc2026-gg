@@ -1012,6 +1012,8 @@ def questions(R, clues, matter, asked=(), same=None):
     x, y, w = _sample(R)
     ctx = R["ctx"]
     need_dir = R["on_road"] and ctx["head"] is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    if need_dir and "dirstop" in ON and list(asked).count("dir!") >= 2:
+        need_dir = False                                  # (dirstop · 82번) 좁혀진 뒤의 방향 질문도 다른 위치 질문처럼 두 번 물어 못 얻으면 그만(「방향은 잘 모르겠어요」에 같은 질문을 여덟 번 되풀이하다 끊긴 평가 통화 74-063)
     zone = None                                           # 공원 안 · 바깥: 넘길 곳이 갈리는 경계
     if not R["on_road"] and not any(c["t"] in ("in", "out") for c in clues):
         best = None
