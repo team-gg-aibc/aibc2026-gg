@@ -154,6 +154,24 @@ FILLER = re.compile(r"(?<![가-힣A-Za-z0-9])(음+|어+|으음|그+|저+|그러�
 FIXED_TAIL = re.compile(r"(?:아\s*)?(?:아니다|아니고|아니지|아니라|말고)[\s,.!]*")      # 보기 답 속의 「아 아니다」: 그 뒤의 말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」)
 UNSAID = re.compile(r"^(은|는|이|가|도|요|이요)?아?(아니(?!면)|말고)")      # 이름 바로 뒤의 「아 아니다 · 아니고 · 말고」: 스스로 고친 이름(11-15)
 NEGWORD = re.compile(r"아니|아닌|말고|틀려|틀렸|잘못|없|안 ?보|못 ?봤|다른 ?데|지났")      # (dropcheck, 71번) Solar의 「아님」을 받을 만한 말(「지났」은 「○○은 지났어요」로 그곳을 뺄 때)
+PARTYES = re.compile(r"^\s*(네|예|응|맞아|맞습|맞긴|그래요|넵)[^?]*?(근데|그런데|다만|하지만|대신)[^?]*?(옆|떨어|건너|맞은편|뒤|쪽)")      # (partyes, 73번) 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 그 자리는 맞고 조금 옆이다(「아니요」가 아니다)
+
+
+def _partyes(read, said, R=None):
+    """(partyes) 되묻기 답이 「네」로 시작하는 부분 긍정이면 확정으로 받고 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 받았나.
+    (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리(15~55m)를 단서로 더해 한 번 더 좁힌다(핀만 옮김)."""
+    if not ({"partyes", "partyes2"} & L.ON) or not PARTYES.search(said or ""):
+        return False
+    read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
+    if "partyes2" in L.ON:
+        read["confirm"] = None
+        if R is not None:
+            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": 12.0, "ring": 35.0, "partyes": True, "label": tab("위치 범위").get("단서 · 되묻은 자리 조금 옆", "되묻은 자리 조금 옆")})
+    else:
+        read["confirm"] = True
+    return True
+
+
 HARD = re.compile(r"멀리 ?보이기만|가운데|모르겠|몰라")      # (hardstop, 71번) 몇 걸음 · 어느 쪽에 답하기 어렵다는 말
 NOTSEEN = re.compile(r"안 ?보여|안 ?보이|못 ?봤|못 ?보겠|없어요")      # (seenonce) 둘레에 댈 것이 없다는 답
 RETRACT = re.compile(r"(아까|방금|처음에?|앞에서)\s*(제가\s*)?(말씀드린|말한|말했던|얘기한|한)?\s*(거기|데|곳|자리|거|건|그곳)?\s*(는|은)?\s*(아니|틀렸|잘못)|잘못\s*(말|얘기)했")     # 「아까 거기 아니에요」: 앞 차례에 한 자리 말을 거둔다
@@ -558,6 +576,8 @@ def code_read(said, asked, short, R):
             read["confirm"] = False                       # 그 이름은 확정할 자리에서 멀다: 아님
         elif best is None and re.search(r"아니|틀려|다른 ?데", said):
             read["confirm"] = False                       # 그 사이 · 이름을 못 댐: 예 · 아니요로 다시 묻는다
+    elif q.get("id") == "confirm" and _partyes(read, said, R):
+        pass                                              # (partyes) 「네, 근데 … 조금 옆이에요」
     elif q.get("id") == "confirm":
         read["confirm"] = False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
     elif q.get("id") == "alike" and opts:                # 소리가 같은 이름 가르기: 구 이름으로 고른다(길 이름은 소리가 같아 받아 적은 글로는 못 가른다)
@@ -941,6 +961,8 @@ def model_read(st, short, known):
         read["matter"]["alive"] = raw["alive"] == "살아 있음"
     if raw.get("leash") in ("목줄 있음", "목줄 없음"):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
+    if (turn_.get("asked") or {}).get("id") == "confirm" and _partyes(read, turn_.get("said")):     # (partyes) Solar가 「아니요」로 읽어도 「네」로 시작하는 부분 긍정은 그대로(확정 · 또는 partyes2면 고리 단서)
+        read["clues"] += [c for c in (turn_.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}
     return read, "live", sec
