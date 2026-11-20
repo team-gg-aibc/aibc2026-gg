@@ -59,8 +59,33 @@ def conclusion(st):
     return word if word in ("네", "아니요") and not flow.ASK_WORD.search(ask) else "정보"
 
 
-def accept(new, old, word, texts):
-    """새 답을 써도 되면 None, 아니면 버린 까닭."""
+# ---- 스위치 flow2_plain_guard (11-19, 69번 7절): 줄이다가 맞는 초안을 틀리게 바꾸는 꼴 둘을 막는다 ----
+# dev 기록(c4 11-18)에서 쉬운 말이 ④ 초안의 「통보를 받은 날부터 5일 이내에 … 지급」을 「조례에 정해져 있지 않습니다 … 보통 10일」로,
+# 「1일 주차요금은 28,000원」을 빼고 「계산 결과가 정해져 있지 않습니다」로 바꿨다(animal-S018 · parking-M003, 인용은 맞아 기계 채점은 만점).
+# 버리면 settle이 ④ 초안을 그대로 낸다(지금의 뒷길과 같다). 숫자 대조에서만 「1천500」을 1500으로 읽는다(nums는 그대로 둔다).
+VALUE = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(?:만|천)?\s*(?:원|%|퍼센트|일|시간|개월|년|세|㎡|m²|대|명|배)")
+_KOR = re.compile(r"(\d+)\s*([만천])\s*(\d+)")
+
+
+def _kor(text):
+    """「1천500」 · 「2만5천」 꼴을 한 숫자로(1천500 → 1500). 숫자 대조용."""
+    return _KOR.sub(lambda m: str(int(m.group(1)) * (10000 if m.group(2) == "만" else 1000) + int(m.group(3))), text or "")
+
+
+def guard_check(new, old, texts):
+    """flow2_plain_guard가 켜졌을 때 accept가 더 보는 둘. 써도 되면 None, 아니면 까닭."""
+    if GRAY.search(new) and not GRAY.search(old):
+        return "없던 「정해져 있지 않다」를 붙임"
+    first = re.split(r"(?<=[다요])\.\s", old, maxsplit=1)[0]
+    src, got = nums(_kor(" ".join(texts))), nums(_kor(new))
+    lost = {n for m in VALUE.finditer(_kor(first)) for n in nums(m.group(0), every=False) if n != "1" and n in src} - got
+    if lost:
+        return f"초안 첫 문장의 숫자가 빠짐 {sorted(lost)}"
+    return None
+
+
+def accept(new, old, word, texts, guard=False):
+    """새 답을 써도 되면 None, 아니면 버린 까닭. guard는 스위치 flow2_plain_guard(기본 끔 = 11-18까지와 같은 동작)."""
     if not isinstance(new, str) or not new.strip():
         return "빈 답"
     new = new.strip()
@@ -78,7 +103,7 @@ def accept(new, old, word, texts):
         return "없던 결론 낱말을 붙임"      # ④가 결론을 「정보」로 두었는데 「네, …」로 시작(11-14 dev: 정답 열쇠와 거꾸로인 답 4개가 이 꼴)
     if GRAY.search(old) and not GRAY.search(new):
         return "「정해져 있지 않다」 안내가 빠짐"
-    return None
+    return guard_check(new, old, texts) if guard else None
 
 
 def user(st, word):
@@ -125,7 +150,7 @@ def settle(st, cfg):
         st["calls"].extend(box["calls"])
         if box.get("flow2"):
             flow._f2(st).setdefault("guard", []).extend(box["flow2"]["guard"])
-        rec["drop"], rec["body_says"] = accept(new, old, word, texts), says
+        rec["drop"], rec["body_says"] = accept(new, old, word, texts, guard=cfg["flow2_plain_guard"]), says
     except FutureTimeout:
         rec["drop"], new, says = "늦음", None, None
     except Exception as e:  # noqa: BLE001  이 단계의 오류로 답을 잃지 않는다
@@ -158,6 +183,19 @@ def selftest():
     assert accept("금액은 조례에 정해져 있지 않습니다. 서울시 공고나 120다산콜에서 확인할 수 있습니다.", gray, "정보", []) is None
     assert accept("서울시가 월세를 지원합니다.", gray, "정보", []) == "「정해져 있지 않다」 안내가 빠짐"
     assert nums("1만 5천 원, 10,000원 · 100분의 80") == {"10000", "1", "5000", "5", "100", "80"}
+    # flow2_plain_guard: 끄면 그대로 받고(지금 동작), 켜면 맞는 초안을 망친 두 꼴을 버린다
+    s018_old = "구청장은 통보를 받은 날부터 5일 이내에 동물등록증을 지급합니다. 그래서 보통 10일 안에 받습니다."
+    s018_new = "등록증을 받는 시기는 조례에 정해져 있지 않습니다. 보통 10일 안에 받을 수 있습니다."
+    s018_txt = ["구청장은 통보를 받은 날부터 5일 이내에 소유자에게 동물등록증을 지급하여야 한다."]
+    assert accept(s018_new, s018_old, "정보", s018_txt) is None
+    assert accept(s018_new, s018_old, "정보", s018_txt, guard=True) == "없던 「정해져 있지 않다」를 붙임"
+    m003_old = "이 주차장은 1급지이고 1일 주차요금은 28,000원입니다. 장애인은 100분의 80을 할인받습니다."
+    m003_new = "장애인은 80% 할인됩니다. 실제 요금은 현장에서 확인합니다."
+    assert accept(m003_new, m003_old, "정보", ["1일 주차요금: 28,000"]) is None
+    assert accept(m003_new, m003_old, "정보", ["1일 주차요금: 28,000"], guard=True) == "초안 첫 문장의 숫자가 빠짐 ['28000']"
+    s006_old = "주차전용건축물의 용적률은 1천500퍼센트(1,500%) 이하까지 받을 수 있습니다."
+    assert accept("용적률은 1,500%까지 받을 수 있습니다.", s006_old, "정보", ["용적률은 1천500퍼센트 이하"], guard=True) is None   # 「1천500」 = 1500
+    assert accept("2개월 이상인 개는 등록해야 합니다.", "월령 2개월 이상인 개라면 1대 등록 대상입니다.", "정보", ["월령 2개월 이상"], guard=True) is None
     assert GRAY.search("서울시 동물보호 조례에는 반려견과 식당 출입 여부를 직접 정한 규정이 없습니다.")
     assert GRAY.search("몇 퍼센트 부담하는지는 이 조례에 정해진 값이 없습니다.")
     assert GRAY.search("조례에서 이자율을 몇 %로 정하고 있지는 않습니다.")
