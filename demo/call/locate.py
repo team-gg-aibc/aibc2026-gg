@@ -893,12 +893,13 @@ SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,
 STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀린 글 넷 + 큰 장소의 넓이(11-19 동규, 60번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트 실패 꼴 고침 묶음 가(11-20, 71번): 흔한 말 · 튐 막기 · Solar 「아님」 확인 · 보기 일부 답. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+MATTER_ON = "hurtalive,matterstop"      # 일 질문 되풀이 막기(11-20): 「다쳐서 · 웅크리고 · 떨고」는 살아 있음, 살았나 · 목줄은 두 번 물어 답을 못 읽으면 그만. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
 ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 # sameopts(기본 끔 · 75번): 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same). 영동1교 통화의 같은 「어느 쪽」 질문 되풀이는 없어지지만 가상 600통에서 한 점 421 · 397 · 416 → 414 · 390 · 405, 틀린 확정 0 · 0 · 5 → 0 · 0 · 6이라 켜지 않았다(같은 질문을 다시 물어 같은 답을 한 번 더 세는 것이 지금은 범위를 좁히는 데 쓰이고 있다)
 C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
@@ -958,9 +959,12 @@ def questions(R, clues, matter, asked=(), same=None):
     if matter.get("type") is None and not matter.get("told"):     # 무슨 일인지 한 번 말했으면 다시 묻지 않는다
         conds.append({"id": "what", "bits": None, "options": []})
     elif matter.get("animal_matter"):
-        if matter.get("alive") is None:
+        stuck = lambda q: "matterstop" in ON and sum(1 for a in asked if (a or "").rstrip("!") == q) >= 2      # (matterstop) 일 질문(살았나 · 목줄)은 두 번 물어 답을 못 읽으면 더 묻지 않는다(모름으로 두고 위치로)
+        if matter.get("alive") is None and stuck("alive"):
+            pass
+        elif matter.get("alive") is None:
             conds.append({"id": "alive", "bits": None, "options": [{"word": "살아 있음", "set": {"matter": {"alive": True}}}, {"word": "죽은 것 같음", "set": {"matter": {"alive": False}}}]})
-        elif matter["alive"] and matter.get("leash") is None:
+        elif matter["alive"] and matter.get("leash") is None and not stuck("leash"):
             conds.append({"id": "leash", "bits": None, "options": [{"word": "목줄 있음", "set": {"matter": {"leash": True}}}, {"word": "목줄 없음", "set": {"matter": {"leash": False}}}]})
     if R is None:
         return [{"id": "where", "bits": None, "options": []}] + conds
