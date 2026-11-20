@@ -990,12 +990,19 @@ KICK = re.compile(r"킥보드|개인형 ?이동 ?장치|전동 ?스쿠터")
 DOCK = re.compile(r"(?:대여소|거치대|따릉이 ?자리|공공 ?자전거 ?(?:자리|주차 ?구역))\s*(?:안|사이|자리)?\s*(?:에다가|에다|에)(?!\s*서)")      # 그 구역 「에」 세웠다는 말만. 「대여소 옆 · 앞 길」은 아니다
 
 
+def _other_words(heard):
+    """(KICK_DOCK) 통화 말에 자전거 · 그 밖의 일이 아닌 종류의 낱말(routes.json words)이 있나 — 킥보드가 배경인 통화를 가른다."""
+    return any(w in heard for k, t in TYPES.items() if k not in ("bike", "other") for w in t["words"])
+
+
 def fit_type(kind, things, heard=""):
     """종류 판정(코드 낱말 · Solar)을 시민이 문제 삼은 것들과 맞춰 본다: 그 가운데 하나라도 이 종류가 다루는 것이면 그대로,
     다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로.
-    (KICK_DOCK) 통화 말(heard)에 킥보드가 나오면 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
-    (Solar는 킥보드를 「그 밖의 일」로 읽고, 코드 낱말은 「따릉이 대여소 옆 길」의 「따릉이」로 자전거 일로 읽는다 — 둘 다 자리를 보지 않는다)."""
-    if KICK_DOCK and KICK.search(heard):
+    (KICK_DOCK) 킥보드가 민원의 대상일 때만 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
+    (Solar는 킥보드를 「그 밖의 일」로 읽고, 코드 낱말은 「따릉이 대여소 옆 길」의 「따릉이」로 자전거 일로 읽는다 — 둘 다 자리를 보지 않는다).
+    킥보드가 배경으로만 나온 통화(「킥보드 타고 가다가 고양이가 죽어 있는 걸 봤어요」 · 「킥보드 탄 사람이 담배 피워요」)는 건드리지 않는다:
+    읽은 종류가 자전거 · 그 밖의 일 · 없음이 아니거나, 통화 말에 다른 종류의 낱말(routes.json words)이 있으면 원래대로 맞춘다(PR #132 리뷰 P1)."""
+    if KICK_DOCK and KICK.search(heard) and kind in (None, "other", "bike") and not _other_words(heard):
         return "bike" if DOCK.search(heard) else "other"
     if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
         return kind
