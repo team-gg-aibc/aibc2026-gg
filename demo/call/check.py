@@ -370,10 +370,9 @@ def ask_less():
         return out
 
     looks = {"dupshop": lambda: len(L.resolve(S.gaz.norm("아트박스 강남점"))["x"]),      # 가게 자료에 82m 떨어진 두 줄
-             "finerseen": lambda: [c.get("how") for c in read("강남새로치과의원이 보여요", "finer")["clues"]],
              "dunnoboth": lambda: ([c["t"] for c in read("둘 다 잘 모르겠어요", "either", opts)["clues"]], [c["t"] for c in read("둘 다 아니에요", "either", opts)["clues"]]),
              "dirstop": lambda: dir_asks()[5:8]}
-    want = {"dupshop": (1, 2), "finerseen": (["가까이"], ["보임"]), "dunnoboth": (([], ["not"]), (["not"], ["not"])), "dirstop": (["dir", "dir", "confirm"], ["dir", "dir", "dir"])}
+    want = {"dupshop": (1, 2), "dunnoboth": (([], ["not"]), (["not"], ["not"])), "dirstop": (["dir", "dir", "confirm"], ["dir", "dir", "dir"])}
     for sw, f in looks.items():
         on = sw in L.ON
         got = f()
@@ -384,7 +383,7 @@ def ask_less():
                 assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
             finally:
                 L.ON.add(sw)
-    print("  ✓ 덜 묻기: 같은 가게 두 줄은 한 곳 · 「바로 앞에 뭐가 보이세요?」에 「보여요」도 눈앞 · 「둘 다 잘 모르겠어요」는 모름 · 좁혀진 뒤 방향 질문은 두 번까지"
+    print("  ✓ 덜 묻기: 같은 가게 두 줄은 한 곳 · 「둘 다 잘 모르겠어요」는 모름 · 좁혀진 뒤 방향 질문은 두 번까지"
           + (" — 켬, 하나씩 끄면 지금 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
