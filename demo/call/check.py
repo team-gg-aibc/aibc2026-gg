@@ -24,7 +24,7 @@ EXPECT = {
     "roadkill": {"scope": "out", "to": "서울시설공단", "where": ["강변북로", "구리 방향"], "cite": None, "kind": "length", "r": 100},
     "stray": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안", "사슴우리", "스무 걸음"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
     "vendor": {"scope": "in", "to": "서울숲 관리사무소", "where": ["서울숲 안", "거울연못"], "cite": "서울특별시 도시공원 조례 제22조 제1항", "kind": "radius", "r": 50},      # 자리가 조례 답을 가르는 장면(11-15 동규)
-    "cat_street": {"scope": "in", "to": "송파구청 동물보호", "where": ["롯데월드타워"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},      # 화면 장면 단추의 두 고양이 장면(11-17)
+    "cat_street": {"scope": "in", "to": "송파구청 동물보호", "where": ["잠실역 1번 출구"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},      # 화면 장면 단추의 두 고양이 장면(11-17)
     "cat_park": {"scope": "in", "to": "성동구청 동물보호", "where": ["서울숲 안"], "cite": "서울특별시 동물보호 조례 제10조 제1항", "kind": "radius", "r": 50},
 }
 
@@ -443,7 +443,7 @@ def fix_and_copy(done):
     view = call("/api/view", {"state": done})["view"]
     rows = [x.split(": ", 1)[0] for x in view["summary"]["copy"].split("\n")]
     assert rows[:4] == ["일", "번지수", "찾아가는 말", "민원인이 한 말"] and rows[-2:] == ["민원을 받은 곳", "처음 접수한 담당자"], f"복사 글 차례 {rows}"
-    assert view["summary"]["said"].startswith("롯데월드타워 근처 골목") and "010" not in view["summary"]["copy"], view["summary"]["said"]
+    assert view["summary"]["said"].startswith("롯데월드타워 근처 길가") and "010" not in view["summary"]["copy"], view["summary"]["said"]
     st, fixed = turn(done, fix="carcass")
     assert fixed["read_how"] == "fix" and fixed["matter"]["type"] == "carcass" and fixed["route"]["scope"] == "out" and "청소" in fixed["route"]["hit"]["to"], (fixed["matter"], fixed["route"])
     assert st["lines"] == done["lines"] and st["asked_log"] == done["asked_log"] and fixed["radius"] == view["radius"], "일 고치기가 통화 글 · 질문 기록 · 범위를 바꿈"
