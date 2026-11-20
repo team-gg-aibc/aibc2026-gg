@@ -483,7 +483,7 @@ class Gazetteer:
                 m = re.search(r"(앞|옆|입구|근처|건너편|맞은편|뒤|사거리)$", key)      # 「GS25앞」이라는 정류장보다 「GS25」 + 「앞」으로 읽는다
                 if m and self.brand_like(key[:m.start()]) and len(self.ix[key]) < 3 and t[i:i + ln] == key:
                     key, ln = key[:m.start()], ln - len(m.group())
-                if ("compass" in ON and key[-1] in "동서남북" and re.match(r"(쪽|편|측)", t[i + ln:]) and t[i:i + ln] == key and self._wide(key[:-1])
+                if ("compass" in ON and key[-1] in "동서남북" and re.match(r"(쪽|편|측)", t[i + ln:]) and not (key[-1] == "남" and t[i + ln:i + ln + 1] == "편") and t[i:i + ln] == key and self._wide(key[:-1])
                         and not any(r[0] in ("gu", "dong") for r in self.ix[key])):
                     key, ln = key[:-1], ln - 1            # (compass · 75번) 「석촌호수 남쪽」: 「석촌호수[남]」이라는 정류장 + 「쪽」이 아니라 「석촌호수」 + 「남쪽」으로 읽는다(넓은 곳의 이름일 때만)
                 out.append(self._mention(key, key, False, t[i + ln:i + ln + 14]))

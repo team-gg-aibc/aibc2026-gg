@@ -150,10 +150,17 @@ def clue_of(key, rel, how, label=None):
     return c
 
 
-COMPASS = re.compile(r"^의?(동남|남동|동북|북동|서남|남서|서북|북서|동|서|남|북)(쪽|편|측)")      # (compass · 75번) 이름 바로 뒤의 방위 말: 「석촌호수 서쪽 산책로」 · 「○○공원 북쪽 입구」
+COMPASS = re.compile(r"^의?(?!남편)(동남|남동|동북|북동|서남|남서|서북|북서|동|서|남|북)(쪽|편|측)")      # (compass · 75번) 이름 바로 뒤의 방위 말: 「석촌호수 서쪽 산책로」 · 「○○공원 북쪽 입구」
 EDGE = re.compile(r"^.{0,3}(둘레길|둘레|가장자리|끝쪽|끝이|끝에|끄트머리|외곽|테두리)")      # (edgeband · 75번) 구역의 테두리를 가리키는 말
 CORE = re.compile(r"^.{0,2}(한가운데|한복판|가운데|중앙)")                                       # 구역의 한가운데를 가리키는 말
 TRAIL = re.compile(r"^.{0,3}(산책로|산책길|둘레길|자전거길|자전거도로)")                          # 호수 이름 뒤에 오면 물가 둘레의 길
+NOT_THAT = re.compile(r"^(쯤)?(은|는|이|가|도)?(말고|아니|아닌)")                                  # 바로 뒤에서 부정한 말(「둘레길 말고」 · 「가장자리는 아니에요」 · 「북쪽은 아니고요」)은 그 뜻으로 읽지 않는다
+
+
+def _said(pat, own):
+    """own의 앞머리가 pat에 맞고 바로 뒤에서 부정하지 않았으면 그 맞춤, 아니면 None."""
+    m = pat.match(own)
+    return m if m and not NOT_THAT.match(own[m.end():]) else None
 
 
 def _compass_v(word):
@@ -177,11 +184,11 @@ def edge_clue(m, own):
     """(edgeband · 75번) 「○○ 둘레길 · 가장자리 · 끝 쪽」 → 그 구역의 테두리 띠, 「○○ 한가운데」 → 그 구역의 안쪽 가운데, 「(호수) 산책로 · 둘레길」 → 물가 둘레 40m. 해당 없으면 None."""
     r = L.resolve(m["key"])
     if any(a[0] == "park" for a in r["areas"]):
-        if EDGE.match(own):
+        if _said(EDGE, own):
             return {"t": "rim", "k": m["key"], "w": 25.0, "sure": True, "label": fill(tab("위치 범위")["단서 · 둘레"], 이름=m["name"])}
-        if CORE.match(own):
+        if _said(CORE, own):
             return {"t": "core", "k": m["key"], "sure": True, "label": fill(tab("위치 범위")["단서 · 한가운데"], 이름=m["name"])}
-    elif "lakerim" in L.ON and L.water_ring(r) is not None and (EDGE.match(own) or TRAIL.match(own)):
+    elif "lakerim" in L.ON and L.water_ring(r) is not None and (_said(EDGE, own) or _said(TRAIL, own)):
         return {"t": "at", "k": m["key"], "how": "가까이", "sure": True, "label": m["name"]}
     return None
 
@@ -535,7 +542,7 @@ def code_read(said, asked, short, R):
             continue
         across = False
         own = m.get("own", m["after"])
-        comp = COMPASS.match(own) if "compass" in L.ON and "key" in m else None
+        comp = _said(COMPASS, own) if "compass" in L.ON and "key" in m else None
         if comp:
             own = own[comp.end():]                        # (compass · 75번) 방위 말은 떼고 관계를 읽는다(「서쪽」의 「쪽」을 「○○ 쪽」으로 읽지 않게)
         rel, how, sure = relation(own)      # 관계는 다음 이름이 나오기 전의 말로만(11-16)

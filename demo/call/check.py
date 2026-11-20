@@ -257,7 +257,41 @@ def edge_reads():
     st, view = S.turn({"id": "check-edge2"}, {"line": {"who": "시민", "text": "망원한강공원 자전거길이에요, 양화대교 밑에 고양이가 죽어 있어요"}})
     st, view = S.turn(st, {"line": {"who": "시민", "text": "공원 안이에요"}})
     assert view["done"] and "망원한강공원 안" in view["summary"]["where"] and "양화대교" in view["summary"]["where"], view["summary"]["where"]      # 다리는 강 한복판 한 점이 아니라 공원과 만나는 곳
-    print("  ✓ 둘레 읽기: 길 낱말은 이름이 아님 · 방위 말 · 테두리 띠와 한가운데 · 멀리 보이는 것 · 광장 가장자리는 가운데에 핀 없음 · 공원 + 다리 밑")
+    # 낱말 규칙이 엉뚱한 말에 걸리지 않는다: 「남편」은 방위가 아니고, 바로 뒤에서 부정한 말(둘레길 말고 · 가장자리는 아니에요 · 북쪽은 아니고요)은 그 뜻으로 읽지 않는다
+    plain = lambda said: [(x["t"], x.get("k"), x.get("how")) for x in read(said)]      # noqa: E731
+    for said, want in {"서울숲 남편이랑 걷다가 봤어요": [("at", "서울숲", None)], "올림픽공원 둘레길 말고 안쪽이에요": [("at", "올림픽공원", None)], "숭례문광장 가장자리는 아니에요": [("at", "숭례문광장", None)],
+                       "석촌호수 북쪽은 아니고요": [("at", "석촌호수", "쪽")], "산책로 옆 편의점이에요": [("cat", None, None)], "서울둘레길 안내판 앞이에요": [("at", "서울둘레길", "바로")]}.items():
+        assert plain(said) == want, (said, plain(said))
+    # 스위치 열둘 각각: 다 켜면 참이고, 그 스위치 하나만 끄면 거짓이 되는 장면 하나씩(스위치가 실제로 그 동작을 맡고 있음을 본다)
+    L, G, k = S.L, S.G, S.gaz.norm
+    park = lambda name: ["park", next(i for i, a in enumerate(G.parks) if a["name"] == name)]      # noqa: E731
+    edge = [{"t": "rim", "k": k("숭례문광장"), "w": 25.0}, {"t": "in", "a": park("숭례문광장")}]
+    pool = [{"t": "in", "a": park("뚝섬한강공원")}, {"t": "at", "k": k("뚝섬수영장"), "how": "바로"}]
+    under = [{"t": "in", "a": park("망원한강공원")}, {"t": "at", "k": k("양화대교"), "how": "바로"}]
+    lake, plaza, told = [{"t": "at", "k": k("석촌호수"), "how": "가까이"}], [{"t": "at", "k": k("열린송현 녹지광장")}], {"type": "litter", "told": "쓰레기"}
+    asks = lambda log: [(q["id"], q.get("area")) for q in L.questions(L.infer(lake), lake, told, log)]      # noqa: E731
+    i_self = next(i for i in range(G.shop0) if G.name[i] == "열린송현 녹지광장")
+    probes = {"trailword": lambda: "산책로" not in [x.get("k") for x in read("석촌호수 산책로예요")],
+              "compass": lambda: any(x["t"] == "cone" for x in read("석촌호수 서쪽 산책로예요")),
+              "edgeband": lambda: read("올림픽공원 둘레길이에요")[0]["t"] == "rim",
+              "lakerim": lambda: L.infer(lake).get("ringed") == "석촌호수",
+              "selfname": lambda: i_self not in L._candidates(*L._sample(L.infer(plaza)), 100.0)[0],
+              "bigdist": lambda: L._q_dist(L.infer(pool), pool) is None,
+              "ringdone": lambda: not L.is_done(L.infer(edge)),
+              "rimask": lambda: ("closest", "석촌호수") in asks([]),
+              "rimline": lambda: "rim" in L.describe(L.infer(lake), lake),
+              "closestcap": lambda: "closest" not in [q for q, _ in asks(["mark!", "mark!", "closest", "closest"])],
+              "farsee2": lambda: read("롯데월드타워가 보이긴 해요")[0].get("how") == "쪽",
+              "bridgeline": lambda: L.is_done(L.infer(under))}
+    assert set(probes) == set(L.EDGE_ON.split(",")), set(probes) ^ set(L.EDGE_ON.split(","))
+    for name, probe in probes.items():
+        assert probe(), f"{name}: 켠 채로 기대한 동작이 아님"
+        L.ON.discard(name)
+        try:
+            assert not probe(), f"{name}: 꺼도 결과가 같음(이 장면이 그 스위치를 보지 않는다)"
+        finally:
+            L.ON.add(name)
+    print("  ✓ 둘레 읽기: 길 낱말은 이름이 아님 · 방위 말 · 테두리 띠와 한가운데 · 멀리 보이는 것 · 광장 가장자리는 가운데에 핀 없음 · 공원 + 다리 밑 · 엉뚱한 말에 안 걸림 여섯 · 스위치 열둘 각각 끄면 달라짐")
 
 
 def free_text():
