@@ -212,6 +212,9 @@ def _open(name):
     return gzip.open(str(f) + ".gz", "rt", encoding="utf-8") if not f.exists() else open(f, encoding="utf-8")
 
 
+HOOD_AFTER = re.compile(r"^(이에요|예요|이요|에요|이고|인데|이라|이랑|에서|에있|쪽|근처|일대|부근|주변|인근|방면|방향|쯤|요(?!양|리|가|금|청|즘)|$)")      # (hood, 87번) 동네 말 바로 뒤에 와도 되는 말(공백 · 부호를 지운 글)
+
+
 class Gazetteer:
     def __init__(self):
         rows = [ln.rstrip("\n").split("\t") for ln in _open("places.tsv")]
@@ -367,6 +370,7 @@ class Gazetteer:
             if add:
                 self.ix[k] = [r for r in self.ix.get(k, []) if r[0] != "p"] + add
                 ALIAS_KEYS.add(k)
+                self.hood_keys = getattr(self, "hood_keys", set()) | {k}
         return len(self.HOODS)
 
     def add_bridges(self):
@@ -574,6 +578,8 @@ class Gazetteer:
         return None
 
     def _accept(self, key, refs, after):
+        if key in getattr(self, "hood_keys", ()) and not HOOD_AFTER.match(after):
+            return False                                  # (hood, 87번) 동네 말은 혼자 나왔을 때만: 「CU 신촌피어점」 · 「압구정엮」처럼 더 긴 이름의 일부면 동네로 읽지 않는다(600통 1114 #92)
         if "trailword" in ON and key in TRAIL:
             return False                                  # (trailword · 75번) 「석촌호수 산책로예요」 · 「올림픽공원 둘레길이에요」의 길 낱말은 이름이 아니다
         if self.cross0 < self.cross1 and key in ("교차로", "로터리", "네거리", "오거리"):

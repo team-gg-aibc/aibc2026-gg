@@ -1839,6 +1839,8 @@ def selftest_hood():
         R = infer([{"t": "at", "k": k(word)}])
         assert R and R["r"] > 200, (word, R and R["r"])  # 한 점이 아니라 그 동 일대
         out.append(f"{word} {R['r']:.0f}m")
+    for said, word in (("CU 신촌피어 근처예요", "신촌"), ("압구정엮 근처예요", "압구정"), ("명동스타벅스 앞이에요", "명동")):
+        assert all(m["key"] != k(word) for m in G.mentions(said)), (said, G.mentions(said))      # 더 긴 이름의 일부인 동네 말은 동네로 읽지 않음(600통 1114 #92)
     ms = G.mentions("명동역 6번 출구 바로 앞이에요")
     assert ms and ms[0]["key"] != k("명동"), ms           # 더 좁은 말은 그대로
     assert any(r[0] == "r" for r in G.ix[k("종로")]) and any(r[0] == "r" for r in G.ix[k("을지로")])      # 같은 이름의 길은 덮지 않음
