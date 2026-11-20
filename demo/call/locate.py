@@ -1615,7 +1615,7 @@ def _rim_side(R):
     ox, oy = min(((b[0] + b[2]) / 2, (b[1] + b[3]) / 2) for b in boxes)[:2] if len(boxes) == 1 else min((((b[0] + b[2]) / 2, (b[1] + b[3]) / 2) for b in boxes), key=lambda o: math.hypot(o[0] - R["cx"], o[1] - R["cy"]))
     x, y, w = _sample(R)
     a = np.degrees(np.arctan2(x - ox, y - oy))            # 북 0도, 동 90도
-    for word, mid in (("북쪽", 0), ("동쪽", 90), ("남쪽", 180), ("서쪽", -90)):
+    for word, mid in (("북", 0), ("동", 90), ("남", 180), ("서", -90)):      # 보일 말(「서쪽」)은 문구 파일에서 서버가 붙인다
         if float(w[np.abs((a - mid + 180) % 360 - 180) <= 60].sum()) >= 0.85:
             return word
     return None
@@ -1685,7 +1685,7 @@ def selftest():
     box_mid = [float(ring[:, 0].min() + ring[:, 0].max()) / 2, float(ring[:, 1].min() + ring[:, 1].max()) / 2]
     west = [{"t": "cone", "o": box_mid, "v": [-1.0, 0.0], "cos": 0.5, "f": 0.03}, {"t": "at", "k": k("항동저수지"), "how": "가까이"}]
     Rw = infer(west)
-    assert Rw["cx"] < box_mid[0] - 30 and Rw["ringed"] == "항동저수지" and _rim_side(Rw) == "서쪽" and describe(Rw, west)["rim"]["side"] == "서쪽", (Rw["cx"] - box_mid[0], Rw.get("ringed"))
+    assert Rw["cx"] < box_mid[0] - 30 and Rw["ringed"] == "항동저수지" and _rim_side(Rw) == "서" and describe(Rw, west)["rim"]["side"] == "서", (Rw["cx"] - box_mid[0], Rw.get("ringed"))
     i_pl = next(i for i, a in enumerate(G.parks) if a["name"] == "숭례문광장")
     edge = [{"t": "rim", "k": k("숭례문광장"), "w": 25.0}, {"t": "in", "a": ["park", i_pl]}]
     Re, Rm = infer(edge), infer([{"t": "core", "k": k("숭례문광장")}])
@@ -1702,6 +1702,25 @@ def selftest():
     assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
+    # 스위치마다 하나씩: 넓은 곳에 걸음 안 묻기(bigdist) · 넓은 둘레에서는 둘레 질문 먼저(rimask) · 「가장 가까우세요」 두 번까지(closestcap)
+    i_tk = next(i for i, a in enumerate(G.parks) if a["name"] == "뚝섬한강공원")
+    pool = [{"t": "in", "a": ["park", i_tk]}, {"t": "at", "k": k("뚝섬수영장"), "how": "바로"}]
+    Rq = infer(pool)
+    assert G.ext[resolve(k("뚝섬수영장"))["ids"][0]] > BIG_M and _q_dist(Rq, pool) is None
+    ON.discard("bigdist")
+    assert _q_dist(Rq, pool) is not None                  # 그 스위치가 없으면 수영장 가운데 점에서 걸음을 묻는다
+    ON.add("bigdist")
+    wide = [{"t": "at", "k": k("석촌호수"), "how": "가까이"}]
+    Rk, said = infer(wide), {"type": "litter", "told": "쓰레기"}
+    ask = lambda log: [(q["id"], q.get("area")) for q in questions(Rk, wide, said, log)]      # noqa: E731
+    assert Rk["r_cover"] > 250 and ("closest", "석촌호수") in ask([]), ask([])
+    ON.discard("rimask")
+    assert ("closest", "석촌호수") not in ask([])
+    ON.add("rimask")
+    twice = ["mark!", "mark!", "closest", "closest"]
+    assert "closest" not in [q for q, _ in ask(twice)], ask(twice)
+    ON.discard("closestcap")
+    assert "closest" in [q for q, _ in ask(twice)], ask(twice)      # 그 스위치가 없으면 세 번째도 묻는다
     ON.clear(), ON.update(had)
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 

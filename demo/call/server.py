@@ -178,9 +178,9 @@ def edge_clue(m, own):
     r = L.resolve(m["key"])
     if any(a[0] == "park" for a in r["areas"]):
         if EDGE.match(own):
-            return {"t": "rim", "k": m["key"], "w": 25.0, "sure": True, "label": f"{m['name']} 둘레"}
+            return {"t": "rim", "k": m["key"], "w": 25.0, "sure": True, "label": fill(tab("위치 범위")["단서 · 둘레"], 이름=m["name"])}
         if CORE.match(own):
-            return {"t": "core", "k": m["key"], "sure": True, "label": f"{m['name']} 한가운데"}
+            return {"t": "core", "k": m["key"], "sure": True, "label": fill(tab("위치 범위")["단서 · 한가운데"], 이름=m["name"])}
     elif "lakerim" in L.ON and L.water_ring(r) is not None and (EDGE.match(own) or TRAIL.match(own)):
         return {"t": "at", "k": m["key"], "how": "가까이", "sure": True, "label": m["name"]}
     return None
@@ -494,7 +494,7 @@ def code_read(said, asked, short, R):
                 read["clues"][-1] = edge
             o = _center(m["key"]) if comp else None
             if o:                                         # (compass) 그 장소 가운데에서 본 그 방위 쪽(좌우 60도): 둘레 가운데 그쪽 부분. 그 밖은 0.03으로 낮춘다
-                read["clues"].insert(len(read["clues"]) - 1, {"t": "cone", "o": o, "v": _compass_v(comp.group(1)), "cos": 0.5, "f": 0.03, "sure": True, "label": f"{m['name']} {comp.group(1)}쪽"})      # 이름 단서 앞에 넣는다(아래의 비슷한 이름 · 뚜렷함 표시는 이름 단서의 것)
+                read["clues"].insert(len(read["clues"]) - 1, {"t": "cone", "o": o, "v": _compass_v(comp.group(1)), "cos": 0.5, "f": 0.03, "sure": True, "label": fill(tab("위치 범위")["단서 · 방위"], 이름=m["name"], 쪽=comp.group(1))})      # 이름 단서 앞에 넣는다(아래의 비슷한 이름 · 뚜렷함 표시는 이름 단서의 것)
             mins = re.match(r"^.{0,8}?(\d+|한|일|두|이|세|삼|네|사|오|다섯|십|십오)\s*분", m["after"]) if rel == "past" else None
             if mins:                                      # 「○○ 지나고 2분쯤」 → 속도 × 시간으로 셈한다
                 read["clues"][-1]["min"] = float({"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "십": 10, "십오": 15}.get(mins.group(1)) or mins.group(1))
@@ -873,7 +873,7 @@ def speech_fix(said, read, short, clues):
         lake = next((c for c in reversed(list(clues) + read["clues"]) if c.get("t") == "at" and "k" in c and L.water_ring(L.resolve(c["k"])) is not None), None)
         far = _center(read["over"][0])
         if lake and far:                                  # ○○ 자체는 자리 단서로 쓰지 않는다(물 건너 1km 밖일 수 있다): 「○○ 둘레」로 두면 범위를 ○○ 쪽으로 끌어 건너편과 거꾸로 간다
-            read["clues"] = [c for c in read["clues"] if k0(c) != read["over"][0]] + [{"t": "over", "k": lake["k"], "p": far, "f": 0.05, "sure": True, "label": f"{lake['label']} 건너편에 {G.display(read['over'][0])}"}]
+            read["clues"] = [c for c in read["clues"] if k0(c) != read["over"][0]] + [{"t": "over", "k": lake["k"], "p": far, "f": 0.05, "sure": True, "label": fill(tab("위치 범위")["단서 · 건너편에 보임"], 이름=lake["label"], 표지=G.display(read["over"][0]))}]
             skip.append(read["over"][0])
     if skip:
         read["skip"] = list(dict.fromkeys(skip))
@@ -1409,7 +1409,7 @@ def where_line(p, done, matter=None, anc=None):
             if p.get("gu") and len(G.refs(gaz.norm(anc["name"]))) >= 3:
                 near = f"{p['gu']} {near}"                 # 서울에 같은 이름이 여럿(「BYC」): 긴 길 위에서는 구까지 되말해 다른 지점이면 시민이 잡게 한다(11-14 밤, 4.7km 떨어진 BYC로 확정한 일)
     elif p.get("rim") and "둘레" in W and not (p.get("near") and p.get("near_said") and p["near_m"] <= 60 and p["near"] != p["rim"]["name"]):      # (rimline · 75번) 둘레로 읽은 곳의 한쪽 띠: 「항동저수지 서쪽 둘레」. 시민이 댄 다른 표지가 가까이(60m 안) 있으면 그 표지로 말한다(「올림픽공원 남2문 앞에서 약 40m」가 더 또렷하다)
-        near = fill(W["둘레 쪽"], 표지=p["rim"]["name"], 쪽=p["rim"]["side"]) if p["rim"].get("side") else fill(W["둘레"], 표지=p["rim"]["name"])
+        near = fill(W["둘레 쪽"], 표지=p["rim"]["name"], 쪽=W["쪽 · " + p["rim"]["side"]]) if p["rim"].get("side") else fill(W["둘레"], 표지=p["rim"]["name"])
     elif p.get("near") and (done or p["m"] <= 400):
         near = fill(W["표지 앞"], 표지=p["near"]) if p["near_m"] <= 40 else fill(W["표지 거리"], 표지=p["near"], 거리=p["near_m"])
     lane = [m["lane"]] if done and m.get("lane") else []
