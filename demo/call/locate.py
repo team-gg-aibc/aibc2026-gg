@@ -1587,6 +1587,7 @@ def describe(R, clues):
                 j = int(np.argmin(np.hypot(r["x"] - x, r["y"] - y)))
                 said.append((c.get("label") or G.display(c["k"]), _pos_near(ctx, n, x, y) or (float(r["x"][j]), float(r["y"][j]))))
     best = min(((math.hypot(q[0] - x, q[1] - y), lab) for lab, q in said), default=(1e9, None))
+    p["near_said"] = best[0] <= 150                       # 가까운 표지가 통화에서 나온 이름인가(둘레 되묻기 문구를 고를 때 쓴다)
     if best[0] > 150:
         idx = [i for i in G.near(x, y, 150) if not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R) and not ("selfname" in ON and self_area(int(i)))]
         if idx:
