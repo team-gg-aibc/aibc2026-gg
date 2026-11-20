@@ -56,6 +56,9 @@ NOT_LOST = set("""고속도로 도로 대로 찻길 차길 골목길 뒷길 샛�
 저희아파트 우리아파트 동네공원 근처공원 집앞길 가는길 오는길 지하도 지하차도 고가도로 갓길 인도 차도 보도""".split())      # 장소 꼴이지만 이름이 아닌 말
 
 
+TRAIL = set("산책로 산책길 둘레길 자전거길 자전거도로 오솔길 등산로".split())      # (trailword · 75번) 장소 이름 뒤에 붙는 길 낱말. 지명 표에는 「산책로」라는 공원 하나 · 길 다섯, 「둘레길」이라는 길 둘이 있어 이 말만으로 범위가 서울 여러 곳에 퍼졌다(첫 말에서 13~18km)
+
+
 PLACE_WORDS_COMMON = set("""자리 여기 거기 저기 이쪽 그쪽 저쪽 이곳 그곳 저곳 지금 거리 근처 주변 부근 앞쪽 뒤쪽 옆쪽 가운데 중간 위치 장소 골목 동네 길가 건너편 맞은편 우리 저희
 제가 내가 그냥 진짜 정말 아까 방금 오늘 어제 바로 조금 계속 다시 혹시 아마 그거 이거 저거""".split())      # (commonshop, 71번) 「지금도 그 자리에 있어요」의 「자리에」가 상가정보의 가게 이름으로 읽혀 4.9km 튀던 일
 
@@ -344,6 +347,24 @@ class Gazetteer:
                 n += 1
         return n
 
+    def add_bridges(self):
+        """(bridgeline · 75번) 다리의 면(data/seoul/bridges.json.gz, tools/build_bridges.py)을 지명 표의 다리 줄에 잇는다 → self.bridge = {장소 번호: [면 테두리(x, y m) …]}. 한 번만."""
+        if hasattr(self, "bridge"):
+            return len(self.bridge)
+        self.bridge = {}
+        f = DIR / "bridges.json.gz"
+        if f.exists():
+            at = {}
+            for i in range(self.shop0):
+                if self.kind[i] == "다리":
+                    at.setdefault(self.name[i], []).append(i)
+            for b in json.load(gzip.open(f, "rt", encoding="utf-8"))["bridges"]:
+                x, y = xy(float(b["lon"]), float(b["lat"]))
+                i = min(at.get(b["name"], ()), key=lambda i: abs(self.x[i] - x) + abs(self.y[i] - y), default=None)
+                if i is not None and abs(self.x[i] - x) + abs(self.y[i] - y) < 5:
+                    self.bridge[i] = [_ring(r) for r in b["rings"]]
+        return len(self.bridge)
+
     def prefix_place(self, tok):
         """(prefixname, 71번) 그대로는 없는 다섯 글자 넘는 말이 여러 지명의 앞부분이고(「북촌한옥마을」 → 「북촌한옥마을 돌계단길」 · 「북촌한옥마을입구」), 그 이름들이(가게 포함) 모두 400m 안에 몰려 있으면 그 한가운데에 가까운 지명으로 읽는다.
         흩어져 있으면(「한옥마을」 → 필동 · 은평 · 공덕) 읽지 않는다."""
@@ -462,6 +483,9 @@ class Gazetteer:
                 m = re.search(r"(앞|옆|입구|근처|건너편|맞은편|뒤|사거리)$", key)      # 「GS25앞」이라는 정류장보다 「GS25」 + 「앞」으로 읽는다
                 if m and self.brand_like(key[:m.start()]) and len(self.ix[key]) < 3 and t[i:i + ln] == key:
                     key, ln = key[:m.start()], ln - len(m.group())
+                if ("compass" in ON and key[-1] in "동서남북" and re.match(r"(쪽|편|측)", t[i + ln:]) and t[i:i + ln] == key and self._wide(key[:-1])
+                        and not any(r[0] in ("gu", "dong") for r in self.ix[key])):
+                    key, ln = key[:-1], ln - 1            # (compass · 75번) 「석촌호수 남쪽」: 「석촌호수[남]」이라는 정류장 + 「쪽」이 아니라 「석촌호수」 + 「남쪽」으로 읽는다(넓은 곳의 이름일 때만)
                 out.append(self._mention(key, key, False, t[i + ln:i + ln + 14]))
                 covered.append((i, i + ln))
                 i += ln
@@ -494,6 +518,10 @@ class Gazetteer:
                     break
         return out
 
+    def _wide(self, key):
+        """(compass) 넓은 곳의 이름인가: 공원 · 광장 구역, 공원 안의 호수 · 숲 같은 면, 크기 표에 있는 곳."""
+        return any(r[0] == "park" or (r[0] == "p" and (self.pk0 <= r[1] < self.pk1 or self.ext[r[1]] > 0)) for r in self.ix.get(key, ())[:40])
+
     def near_name(self, tok):
         """서울 전체의 눈에 띄는 이름 가운데 소리가 가장 가까운 것 → (비슷함, 이름)."""
         cands = {}
@@ -524,6 +552,8 @@ class Gazetteer:
         return None
 
     def _accept(self, key, refs, after):
+        if "trailword" in ON and key in TRAIL:
+            return False                                  # (trailword · 75번) 「석촌호수 산책로예요」 · 「올림픽공원 둘레길이에요」의 길 낱말은 이름이 아니다
         if self.cross0 < self.cross1 and key in ("교차로", "로터리", "네거리", "오거리"):
             return False                                  # (CALL_CROSS) 표에 없는 교차로 이름의 꼬리(「○○ 앞 교차로 옆이에요」)를 「교차로」라는 가게 이름으로 읽지 않는다(사거리 · 삼거리는 STOP에 이미 있다)
         if key in STOP or key in CATEGORY or GENERIC.match(key) or key.isdigit():      # 숫자뿐인 이름(「8-15」)은 번호를 읽어 준 말과 헷갈려 받지 않는다

@@ -124,6 +124,8 @@ def relation(after):
         return "out", how, True
     if re.match(r"^.{0,3}(바로)?(앞|옆|입구|정문|후문|밑|아래)", after) or re.match(r"^.{0,10}(그|거기).{0,6}바로(앞|옆)", after):
         return "at", "바로", True                         # 「○○ 있잖아요. 그 ○○ 바로 앞」처럼 한 번 더 받아 말한 것도
+    if "farsee2" in L.ON and re.match(r"^.{0,2}(저?멀리서?)?(보이긴|보이기는|보이기만)|^.{0,2}저?멀리서?(보여|보이|보입)", after):
+        return "at", "쪽", True                           # (farsee2 · 75번) 「○○가 보이긴 해요 · 멀리 보여요」: 눈앞(150m)이 아니라 멀리 보이는 것 — 그 둘레 넓게(450m 안 고르게), 봉우리 없이
     return ("at", "보임", True) if re.match(r"^.{0,4}(보여|보이|보입|간판)", after) else ("at", "근처", False)
 
 
@@ -146,6 +148,42 @@ def clue_of(key, rel, how, label=None):
     if rel in ("past", "before") or how in ("바로", "보임", "가까이", "쪽"):
         c["how"] = how if how in L.DIST or rel == "at" else "모름"
     return c
+
+
+COMPASS = re.compile(r"^의?(동남|남동|동북|북동|서남|남서|서북|북서|동|서|남|북)(쪽|편|측)")      # (compass · 75번) 이름 바로 뒤의 방위 말: 「석촌호수 서쪽 산책로」 · 「○○공원 북쪽 입구」
+EDGE = re.compile(r"^.{0,3}(둘레길|둘레|가장자리|끝쪽|끝이|끝에|끄트머리|외곽|테두리)")      # (edgeband · 75번) 구역의 테두리를 가리키는 말
+CORE = re.compile(r"^.{0,2}(한가운데|한복판|가운데|중앙)")                                       # 구역의 한가운데를 가리키는 말
+TRAIL = re.compile(r"^.{0,3}(산책로|산책길|둘레길|자전거길|자전거도로)")                          # 호수 이름 뒤에 오면 물가 둘레의 길
+
+
+def _compass_v(word):
+    v = np.sum([{"동": (1.0, 0.0), "서": (-1.0, 0.0), "남": (0.0, -1.0), "북": (0.0, 1.0)}[ch] for ch in word], axis=0)
+    return [round(float(a), 3) for a in v / np.hypot(*v)]
+
+
+def _center(key):
+    """(compass) 이름이 가리키는 한 곳의 가운데 [x, y]: 공원 · 광장 구역 하나, 호수 테두리, 한 덩어리로 모인 점들. 여러 곳에 흩어진 이름 · 길 · 구 · 동은 None."""
+    r = L.resolve(key)
+    parks = [a for a in r["areas"] if a[0] == "park"]
+    if len(parks) == 1:
+        x0, y0, x1, y1 = L.area_of(parks[0])["box"]
+        return [round(float(x0 + x1) / 2, 1), round(float(y0 + y1) / 2, 1)]
+    if r["areas"] or r["roads"] or not len(r["x"]) or float(np.ptp(r["x"]) + np.ptp(r["y"])) > 1500:
+        return None
+    return [round(float(r["x"].min() + r["x"].max()) / 2, 1), round(float(r["y"].min() + r["y"].max()) / 2, 1)]
+
+
+def edge_clue(m, own):
+    """(edgeband · 75번) 「○○ 둘레길 · 가장자리 · 끝 쪽」 → 그 구역의 테두리 띠, 「○○ 한가운데」 → 그 구역의 안쪽 가운데, 「(호수) 산책로 · 둘레길」 → 물가 둘레 40m. 해당 없으면 None."""
+    r = L.resolve(m["key"])
+    if any(a[0] == "park" for a in r["areas"]):
+        if EDGE.match(own):
+            return {"t": "rim", "k": m["key"], "w": 25.0, "sure": True, "label": f"{m['name']} 둘레"}
+        if CORE.match(own):
+            return {"t": "core", "k": m["key"], "sure": True, "label": f"{m['name']} 한가운데"}
+    elif "lakerim" in L.ON and L.water_ring(r) is not None and (EDGE.match(own) or TRAIL.match(own)):
+        return {"t": "at", "k": m["key"], "how": "가까이", "sure": True, "label": m["name"]}
+    return None
 
 
 MOVE = (("걷기", re.compile(r"걸어|걷다|걷는|걸으|걷고|산책|도보|조깅")),
@@ -431,15 +469,27 @@ def code_read(said, asked, short, R):
             read.setdefault("drop", []).append(m["key"])   # 「동호대교였나? 아, 아니다」 · 「3번 출구, 아 아니다」 · 「성수대교 아니고」: 스스로 고친 이름은 단서로 쓰지 않는다(한 문장 안에서는 뒷말이 이긴다)
             fixed = bool(UNSAID.match(m["after"]))
             continue
-        rel, how, sure = relation(m.get("own", m["after"]))      # 관계는 다음 이름이 나오기 전의 말로만(11-16)
+        own = m.get("own", m["after"])
+        comp = COMPASS.match(own) if "compass" in L.ON and "key" in m else None
+        if comp:
+            own = own[comp.end():]                        # (compass · 75번) 방위 말은 떼고 관계를 읽는다(「서쪽」의 「쪽」을 「○○ 쪽」으로 읽지 않게)
+        rel, how, sure = relation(own)      # 관계는 다음 이름이 나오기 전의 말로만(11-16)
         if how == "쪽" and "key" in m and (L.resolve(m["key"])["areas"] or not len(L.resolve(m["key"])["x"])):
             how, sure = "근처", False                     # 구역인 이름의 「쪽」은 전처럼(뚜렷하지 않은 「근처」 — Solar가 안 · 밖을 고칠 수 있게). clue_of도 같은 규칙
+        if "farsee2" in L.ON and "key" in m and rel == "at" and how == "보임" and re.search(r"(건너편|맞은편|건너|너머|저쪽|저기|멀리)(에|에서|로|으로|쪽에)?$", gaz.norm(said).split(m["key"])[0]):
+            how = "쪽"                                    # (farsee2) 「호수 건너편에 ○○가 보여요」: ○○는 건너편 멀리 있다(항동저수지 통화: 가까이로 읽어 저수지와 어긋나 범위 18km)
         if (asked or {}).get("id") == "finer" and rel == "at" and how == "근처":
             how = "가까이"                                  # 「바로 앞에 뭐가 보이세요?」에 댄 이름: 눈앞에 보이는 것
         if "across" in L.ON and rel == "at" and how == "가까이" and re.search(r"건너|맞은편", m.get("own", m["after"])[:16]):
             read["matter"]["side"] = "건너편"               # 확정할 때 그 표지 자리에 핀을 찍지 않고, 앞 · 옆 · 건너편을 다시 묻지 않는다
         if "key" in m:
             read["clues"].append(clue_of(m["key"], rel, how, m["name"]))
+            edge = edge_clue(m, own) if "edgeband" in L.ON and rel == "at" else None
+            if edge:
+                read["clues"][-1] = edge
+            o = _center(m["key"]) if comp else None
+            if o:                                         # (compass) 그 장소 가운데에서 본 그 방위 쪽(좌우 78도까지): 둘레 가운데 그쪽 부분
+                read["clues"].insert(len(read["clues"]) - 1, {"t": "cone", "o": o, "v": _compass_v(comp.group(1)), "cos": 0.2, "sure": True, "label": f"{m['name']} {comp.group(1)}쪽"})      # 이름 단서 앞에 넣는다(아래의 비슷한 이름 · 뚜렷함 표시는 이름 단서의 것)
             mins = re.match(r"^.{0,8}?(\d+|한|일|두|이|세|삼|네|사|오|다섯|십|십오)\s*분", m["after"]) if rel == "past" else None
             if mins:                                      # 「○○ 지나고 2분쯤」 → 속도 × 시간으로 셈한다
                 read["clues"][-1]["min"] = float({"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "십": 10, "십오": 15}.get(mins.group(1)) or mins.group(1))
@@ -1490,7 +1540,7 @@ def build(st, extra=None):
     # 「say」의 {위치}는 상담사가 말로 읽는 꼴(괄호 · 가운뎃점 없이)로 넣는다: 화면의 글과 목소리가 같은 글에서 나오게
     question = {"id": pick["id"], "why": why.get(pick["id"], ""), "options": opts, "bits": pick.get("bits"),
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
-                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else pick["id"], pick["id"]), 보기=", ".join(o["label"] for o in opts[:4]), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
+                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else pick["id"], pick["id"]), 보기=", ".join(o["label"] for o in opts[:4]), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
