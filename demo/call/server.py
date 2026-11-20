@@ -990,23 +990,53 @@ KICK = re.compile(r"킥보드|개인형 ?이동 ?장치|전동 ?스쿠터")
 DOCK = re.compile(r"(?:대여소|거치대|따릉이 ?자리|공공 ?자전거 ?(?:자리|주차 ?구역))\s*(?:안|사이|자리)?\s*(?:에다가|에다|에)(?!\s*서)")      # 그 구역 「에」 세웠다는 말만. 「대여소 옆 · 앞 길」은 아니다
 
 
+_AND = r"들?(?:이랑|랑|하고|와|과|이나|나|도)\s+(?:[가-힣]+\s+)?"
+BIKE_WITH = re.compile(r"(?:자전거|따릉이)" + _AND + r"(?:킥보드|개인형|전동 ?스쿠터)|(?:킥보드|이동 ?장치|스쿠터)" + _AND + r"(?:자전거|따릉이)")      # 자전거 · 따릉이와 킥보드를 한데 문제 삼은 말(「자전거랑 킥보드가」 · 「킥보드랑 공유 자전거가」). 「따릉이를 못 빼요」처럼 따로 나온 자전거는 아니다
+KICK_RIDE = re.compile(r"(?:킥보드|이동 ?장치|스쿠터)(?:를|을)?\s*(?:타|탄|탔|몰)")      # 킥보드를 타는 말(「킥보드 타고 가다가」 · 「킥보드 탄 사람」): 그 킥보드는 민원의 배경
+
+
 def _other_words(heard):
     """(KICK_DOCK) 통화 말에 자전거 · 그 밖의 일이 아닌 종류의 낱말(routes.json words)이 있나 — 킥보드가 배경인 통화를 가른다."""
     return any(w in heard for k, t in TYPES.items() if k not in ("bike", "other") for w in t["words"])
 
 
-def fit_type(kind, things, heard=""):
+def kick_of(st):
+    """(KICK_DOCK) 통화 하나를 킥보드 쪽에서 본다 → "dock"(킥보드만 문제 삼았고 대여소 · 거치대 「에」 세움) · "street"(킥보드만, 그 밖의 자리)
+    · "with_bike"(자전거 · 따릉이와 한데 문제 삼음) · None(킥보드 말이 없거나, 타는 말뿐이거나, 다른 일의 배경). 일의 종류 맞추기(fit_type)와 엔진 물음 바꾸기(_run_engine)가 같은 판단을 쓴다.
+    킥보드 · 대여소 · 자전거 말은 통화 전체에서(다른 차례에 나와도), 배경을 가르는 다른 종류의 낱말은 무슨 일인지 말한 차례(첫 말 · 「어떤 일로」의 답)에서만 본다:
+    위치를 말하다 나온 표지(「가로등 옆이에요」 · 「벤치 앞」)로 갈림이 꺼져 통화 가운데 일의 종류가 바뀌지 않게."""
+    if not KICK_DOCK:
+        return None
+    turns = [t for t in st["turns"] if t.get("said")]
+    heard = " ".join(t["said"] for t in turns)
+    if not KICK.search(KICK_RIDE.sub(" ", heard)):
+        return None                                       # 킥보드 말이 없거나 타는 말뿐(「킥보드 타고 가다가 방치된 자전거를 봤어요」): 원래대로
+    if BIKE_WITH.search(heard):
+        return "with_bike"
+    told = " ".join(t["said"] for n, t in enumerate(turns) if n == 0 or (t.get("asked") or {}).get("id") == "what")
+    if _other_words(told):
+        return None
+    return "dock" if DOCK.search(heard) else "street"
+
+
+def fit_type(kind, things, kick=None):
     """종류 판정(코드 낱말 · Solar)을 시민이 문제 삼은 것들과 맞춰 본다: 그 가운데 하나라도 이 종류가 다루는 것이면 그대로,
     다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로.
-    (KICK_DOCK) 킥보드가 민원의 대상일 때만 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
+    (KICK_DOCK, kick = kick_of(st)) 킥보드만 민원의 대상일 때만 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
     (Solar는 킥보드를 「그 밖의 일」로 읽고, 코드 낱말은 「따릉이 대여소 옆 길」의 「따릉이」로 자전거 일로 읽는다 — 둘 다 자리를 보지 않는다).
     킥보드가 배경으로만 나온 통화(「킥보드 타고 가다가 고양이가 죽어 있는 걸 봤어요」 · 「킥보드 탄 사람이 담배 피워요」)는 건드리지 않는다:
-    읽은 종류가 자전거 · 그 밖의 일 · 없음이 아니거나, 통화 말에 다른 종류의 낱말(routes.json words)이 있으면 원래대로 맞춘다(PR #132 리뷰 P1)."""
-    if KICK_DOCK and KICK.search(heard) and kind in (None, "other", "bike") and not _other_words(heard):
-        return "bike" if DOCK.search(heard) else "other"
-    if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
+    원래 맞추기의 결과가 자전거 · 그 밖의 일 · 모름이 아니거나, 무슨 일인지 말한 차례에 다른 종류의 낱말(routes.json words)이 있으면 원래대로 둔다(PR #132 리뷰 P1).
+    자전거 · 따릉이를 킥보드와 함께 문제 삼은 통화(「길가에 자전거랑 킥보드가 몇 달째 세워져 있어요」)는 자전거 일로 읽었으면 그대로 둔다:
+    things_of가 「자전거랑」을 대상으로 잡지 못해 「킥보드가」만 남으면 원래 맞추기도 「그 밖의 일」로 떨어뜨린다(PR #132 리뷰 2차 P1)."""
+    if kick == "with_bike" and kind == "bike":
         return kind
-    return next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
+    if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
+        got = kind
+    else:
+        got = next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
+    if kick in ("dock", "street") and got in (None, "other", "bike"):     # 원래 맞추기가 자전거 · 그 밖의 일 · 모름에 닿았을 때만 자리로 가른다: 위치를 말하다 나온 낱말(「가로등 옆이에요」 → 가로등)도
+        return "bike" if kick == "dock" else "other"                       # 앞서 말한 킥보드와 맞춰 그 밖의 일로 떨어지므로 여기서 대여소 킥보드로 돌아온다. 시민이 문제 삼은 다른 일(「담배를」)은 원래대로
+    return got
 
 
 # ---- 통화 전체에서 단서와 일을 모은다
@@ -1021,7 +1051,7 @@ def _same(a, b):
 def understood(st):
     """차례마다 읽은 것(모델이 읽었으면 그것, 아니면 코드가 읽은 것 · 단추)을 차례대로 모은다 → (단서, 일). 뒤의 말이 앞의 말을 고친다."""
     clues, matter, things = [], {}, []
-    heard = " ".join(t.get("said") or "" for t in st["turns"]) if KICK_DOCK else ""      # (KICK_DOCK) 통화 전체 말: 킥보드와 대여소 말이 다른 차례에 나와도 맞춘다
+    kick = kick_of(st)                                    # (KICK_DOCK) 통화 전체에서 한 번: 킥보드와 대여소 말이 다른 차례에 나와도 맞춘다
     for t in st["turns"]:
         rd = t.get("model") or t.get("code") or {}
         for k in rd.get("drop") or []:
@@ -1031,9 +1061,9 @@ def understood(st):
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다
             things = things_of(t["said"]) or things
-            got["type"] = fit_type(got.get("type"), things, heard)
+            got["type"] = fit_type(got.get("type"), things, kick)
         elif got.get("type"):
-            got["type"] = fit_type(got["type"], things, heard)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
+            got["type"] = fit_type(got["type"], things, kick)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
         matter.update(got)
     fix = st.get("fix")
     if isinstance(fix, str) and fix in TYPES:             # 상담사가 고친 일(57번 6, 11-18)이 읽은 일을 이긴다. 동물의 일은 살았는지도 그 일에 맞춘다
@@ -1124,7 +1154,7 @@ NEAR_AT = re.compile(r" 가까이 길가$")
 KICK_ASK = "\n- 킥보드는 「개인형 이동장치(전동 킥보드)」, 따릉이는 「공공자전거(따릉이)」, 대여소 · 거치대 · 따릉이 자리는 「공공자전거 대여소의 주차구역」이라는 조례의 말로 쓴다."
 # 표지를 넣지 않는 통화: 건물 안(「국민건강증진법」 몫) · 자치구가 정한 금연거리(자치구 조례 몫)는 조례 6종 밖이라 「확인 불가」가 맞는데, 표지를 넣으면
 # 엔진이 그 표지(정류장 · 출구)를 들어 답한다(72번 첫 재기: F1 · G1이 확인 불가 → 제5조 제1항 인용으로 바뀜). 이때는 지금 물음 그대로 보낸다.
-NEAR_SKIP = re.compile(r"건물|화장실|실내|복도|계단|엘리베이터|사무실|(?:가게|식당|상가|매장|카페|술집|노래방|아파트) ?안|구청|구에서 (?:정|지정)|구가 (?:정|지정)")
+NEAR_SKIP = re.compile(r"건물 ?안|화장실|실내|복도|엘리베이터|사무실|(?:가게|식당|상가|매장|카페|술집|노래방|아파트) ?안|금연 ?거리|(?:구청|구)(?:에서|이|가) (?:정|지정)")      # 위치를 말하다 나온 표지(「○○빌딩 건물 앞」 · 「구청 앞 정류장」 · 「출구 계단 옆」)로는 끄지 않게 안 · 금연거리 말만
 
 
 def near_mark(R):
@@ -1142,14 +1172,17 @@ def near_mark(R):
     return f"{name} {word}" if word else name
 
 
-def engine_place(R, route, decided, said=()):
-    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 정해지기(decided) 전에는 None(아직 부르지 않음), 정해지면 가까운 표지를 넣는다.
+def engine_place(R, route, done, ended, said=()):
+    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 좁혀져(done) 확인을 받는 때에만 가까운 표지를 넣는다.
+    좁혀지지 않은 채 끝난 통화(ended: 넓은 범위째 확인 · 자리 미확정으로 넘김)는 표지 없이 지금처럼 보낸다: 넓은 범위의 가운데에서 고른 표지는
+    실제 흡연 장소와 상관없을 수 있다(PR #132 리뷰 2차 P1). 넘김은 좁혀졌어도(「아니요」 뒤 같은 자리로 돌아옴) 시민이 아니라고 한 자리라 넣지 않는다.
+    찾는 중에는 None(아직 부르지 않음: 화면은 지금처럼 「엔진 찾는 중 · 위치를 더 좁히세요」). 확인받은 통화만 기록에 쌓이므로 기록되는 통화는 모두 엔진을 부른다.
     시민 말(said)이 건물 안 · 자치구가 정한 것을 말하면 표지를 넣지 않고 지금처럼 보낸다(NEAR_SKIP)."""
     place = place_phrase(R, route)
     if not (SMOKE_NEAR and route["type"] == "smoking" and not route["class_name"]) or NEAR_SKIP.search(" ".join(said)):
         return place
-    if not decided:
-        return None
+    if ended == "handoff" or not done:
+        return place if ended else None
     mark = near_mark(R)
     return f"{place} {mark} 가까이 길가".replace("의 길가 ", "의 ") if mark else place
 
@@ -1169,31 +1202,31 @@ def chunks():
     return _chunks
 
 
-def _run_engine(key, said, tname, place, job, question=None):
+def _run_engine(key, said, tname, place, job, question=None, kick=False):
     res = {"response": None, "reason": None, "error": None, "evidence": [], "ask": None, "ask_sec": 0, "question": question, "say": None}
     t0 = time.time()
     # 엔진에 보낼 물음에는 화면의 일 이름(「노점 · 적치물」)과 자치구 이름을 넣지 않는다: 일 이름이 섞이면 엔진이 조례에 없는 「적치물」 때문에 물러서고,
     # 자치구 이름이 있으면 엔진이 「조례에 정해져 있지 않다」 꼴 답을 다시 살피는 길(c9-gray)을 닫는다(65번 4절, 11-19). 넘길 곳은 위치 쪽이 정한다.
     where = re.sub(r"^\S+구의 ", "", place)              # place_phrase의 「동작구의 길가」 → 「길가」(공원 · 자동차전용도로 이름은 그대로)
+    mark = NEAR_AT.sub("", where) if NEAR_AT.search(where) else None      # (SMOKE_NEAR) engine_place가 넣은 표지(「○○ 버스 정류장」)
     try:                                                  # ① 물음 간추리기(Solar). 시민이 직접 물었으면 그 물음을 살린다
         user = f"[장소]\n{where}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
         prompt = ASK_Q_PROMPT if question else ASK_PROMPT
-        if NEAR_AT.search(where):                         # (SMOKE_NEAR) 가까운 표지를 물음에 남기게
+        if mark:                                          # (SMOKE_NEAR) 가까운 표지를 물음에 남기게
             prompt += NEAR_ASK + ("" if question else NEAR_ASK_END)
-        kick = KICK_DOCK and KICK.search(" ".join(said)) and DOCK.search(" ".join(said))
         if kick:                                          # (KICK_DOCK) 조례의 말로
             prompt += KICK_ASK
         res["ask"] = _solar(prompt, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
-    res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
-    if KICK_DOCK and KICK.search(" ".join(said)) and DOCK.search(" ".join(said)) and "개인형 이동장치" not in res["ask"]:      # (KICK_DOCK) 간추리기가 조례의 말을 안 썼으면 틀로
-        res["ask"] = (f"{where}의 공공자전거(따릉이) 대여소 주차구역에 개인형 이동장치(전동 킥보드)가 무단으로 세워져 있습니다. " + (question or "누가 맡아 어떻게 처리해야 하나요?"))[:300]
+    T = tab("일의 종류와 갈림")
+    res["ask"] = res["ask"] or fill(T["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
+    if kick and "개인형 이동장치" not in res["ask"]:      # (KICK_DOCK) 간추리기가 조례의 말을 안 썼으면 틀로
+        res["ask"] = fill(T["엔진 물음 틀 · 킥보드 대여소"], 장소=where, 물음=question or T["엔진 물음 끝 · 킥보드 대여소"])[:300]
         res["ask_fixed"] = True
-    mark = NEAR_AT.sub("", where) if NEAR_AT.search(where) else None
     if mark and mark not in res["ask"]:                   # (SMOKE_NEAR) 간추리기가 표지를 뺐으면 틀로: 표지가 없으면 엔진이 「길」만 보고 근거를 못 찾는다
-        res["ask"] = (f"{mark} 가까이 길가에서 담배를 피우는 사람이 있습니다. " + (question or "이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지 알려 주세요."))[:300]
+        res["ask"] = fill(T["엔진 물음 틀 · 길가 흡연"], 표지=mark, 물음=question or T["엔진 물음 끝 · 길가 흡연"])[:300]
         res["ask_fixed"] = True
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
@@ -1236,7 +1269,8 @@ def engine_job(st, route, place, question=None):
         job = jobs[(st["id"], key)] = {"res": None, "ready_at": 0}
     if MODE == "live" and not (key in saved["engine"] and saved_first(st)):      # 장면 재생이면 저장된 엔진 답(아래)
         said = [t["said"] for t in st["turns"] if t.get("said")]
-        threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question), daemon=True).start()
+        kick = route["type"] == "bike" and kick_of(st) == "dock"      # (KICK_DOCK) 대여소 킥보드로 자전거 일이 된 통화만 물음을 조례의 말로(fit_type과 같은 판단). 킥보드가 배경인 흡연 · 다른 일의 물음은 그대로
+        threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question, kick), daemon=True).start()
     else:
         hit = saved["engine"].get(key)
         job.update(res={**hit, "how": "saved"} if hit else {"response": None, "error": "nosaved", "how": MODE, "evidence": [], "sec": 0, "ask": None, "ask_sec": 0},
@@ -1434,7 +1468,7 @@ def build(st, extra=None):
     route = route_of(matter, R) if ready else None
     engine = None
     settled = done or R is not None and (R["on_road"] or R["r"] <= 250 or any(c["t"] in ("in", "out") for c in clues))     # 장소의 종류가 정해진 뒤에 부른다(엔진을 두 번 부르지 않게)
-    place = engine_place(R, route, done or confirmed or handoff, [t["said"] for t in st["turns"] if t.get("said")]) if route else None     # (SMOKE_NEAR) 길가 흡연은 자리가 정해진 뒤에 부른다
+    place = engine_place(R, route, done, "handoff" if handoff else "confirmed" if confirmed else None, [t["said"] for t in st["turns"] if t.get("said")]) if route else None     # (SMOKE_NEAR) 길가 흡연은 좁혀진 뒤(표지 넣음) · 좁혀지지 않은 채 끝난 뒤(표지 없음)에 부른다
     if route and route["ask_engine"] and settled and place and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
         job = engine_job(st, route, place, matter.get("ask"))
         engine = {"status": "ready", **engine_card(job["res"])} if job["res"] is not None and time.time() >= job["ready_at"] else {"status": "running"}
