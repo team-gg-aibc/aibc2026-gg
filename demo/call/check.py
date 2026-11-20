@@ -182,7 +182,9 @@ def partial_yes():
     assert view["question"]["id"] == "confirm", view["question"]
     st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
     st, view = say(st, "네, 근데 바로 앞은 아니고 조금 옆이에요")
-    assert not view["confirmed"] and view["question"]["id"] == "confirm" and "근처" in view["question"]["say"], (view["confirmed"], view["question"])
+    W = {r[0]: r[1] for t in call("/api/text")["text"]["sections"]["위치 범위"]["tables"] for r in t["rows"]}
+    assert not view["confirmed"] and view["question"]["id"] == "confirm" and W["표지 근처"].replace("{표지}", "").strip() in view["question"]["say"], (view["confirmed"], view["question"])
+    assert W["단서 · 되묻은 자리 조금 옆"] in view["chips"], view["chips"]      # 화면 칩의 단서 이름은 문구 파일에서(줄이 없으면 여기서 실패)
     st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
     st, view = say(st, "네, 근데 바로 앞은 아니고 조금 옆이에요")
     assert view["confirmed"], view["question"]

@@ -174,7 +174,7 @@ def _partyes(read, said, R=None):
             near = [float(G.ext[i]) for i in G.near(R["cx"], R["cy"], 40.0) if i < len(G.ext)]
             ring = max([35.0] + near)                     # 되묻은 자리가 넓은 곳(길쭉한 건물 · 부지)이면 「조금 옆」은 그 크기만큼 떨어진 끝일 수 있다(93개 둘레 꼴 74-P10 「자벌레」 120m)
             read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": max(12.0, 0.3 * ring), "ring": ring, "partyes": True, "big": ring > 35.0,
-                                  "label": tab("위치 범위").get("단서 · 되묻은 자리 조금 옆", "되묻은 자리 조금 옆")})
+                                  "label": tab("위치 범위")["단서 · 되묻은 자리 조금 옆"]})
     else:
         read["confirm"] = True
     return True
