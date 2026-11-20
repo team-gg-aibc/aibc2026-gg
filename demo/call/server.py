@@ -43,7 +43,7 @@ MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
 SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
-SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR", "1") != "0"     # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구 · 학교를 엔진 물음에 넣는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
+SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR", "1") != "0"     # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구를 엔진 물음에 넣는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
 KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대여소 · 거치대의 킥보드를 자전거 일(자전거 조례 제12조의2 제7항)로 받는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
@@ -1107,8 +1107,7 @@ SAY_PROMPT = """너는 상담사 화면의 보조 도구다. [답]을 상담사�
 # (SMOKE_NEAR, 72번) 길가 흡연은 금연구역이 「길」이 아니라 장소로 정해진다(금연 조례 제5조 제1항: 제7호 시 관할 버스정류소 · 제9호 지하철역 출입구 10m 안 ·
 # 제3호 교육환경보호구역 등을 시장이 「지정할 수 있다」). 그래서 좁혀진 자리 가까이에 그런 곳이 있으면 엔진 물음의 장소에 넣는다. 좌표에 오차가 있으니
 # 거리는 단정하지 않고 「가까이」로만 쓴다 — 엔진 답이 「지정된 금연구역이라면」처럼 조건을 달게.
-NEAR_KINDS = {"정류장": "버스 정류장", "역 출구": None, "학교": None}       # None이면 이름만(「등촌역 7번 출구」 · 「서울미양초등학교」)
-NEAR_SCHOOL = re.compile(r"(초등|중|고등)학교$|유치원$")                    # 교육환경보호구역은 학교 · 유치원 둘레(어린이집 · 대학은 아니다)
+NEAR_KINDS = {"정류장": "버스 정류장", "역 출구": None}                    # None이면 이름만(「등촌역 7번 출구」). 학교(제3호)는 뺐다: 넣어도 엔진이 제3호를 잇지 못해 학교 사례 맞음 6/7 → 4/7(72번 3절)
 NEAR_M = 50                                                               # 좁혀진 자리(끝내는 기준 반지름 50m)의 가운데에서 이만큼 안
 NEAR_ASK = "\n- [장소]가 「○○ 가까이 길가」 꼴이면 그 표지 이름을 첫 문장의 장소에 그대로 쓴다(거리는 단정하지 않는다)."
 NEAR_ASK_END = " 끝 문장은 「누가 맡아 …」 대신 「이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지」를 묻는다."
@@ -1122,11 +1121,11 @@ NEAR_SKIP = re.compile(r"건물|화장실|실내|복도|계단|엘리베이터|�
 
 
 def near_mark(R):
-    """(SMOKE_NEAR) 좁혀진 자리 가운데에서 NEAR_M 안의 가장 가까운 정류장 · 지하철 출구 · 학교 → 「○○ 버스 정류장」 꼴, 없으면 None."""
+    """(SMOKE_NEAR) 좁혀진 자리 가운데에서 NEAR_M 안의 가장 가까운 정류장 · 지하철 출구 → 「○○ 버스 정류장」 꼴, 없으면 None."""
     best = None
     for i in G.near(R["cx"], R["cy"], NEAR_M):
         k = G.kind[i]
-        if k in NEAR_KINDS and (k != "학교" or NEAR_SCHOOL.search(G.name[i])):
+        if k in NEAR_KINDS:
             d = math.hypot(G.x[i] - R["cx"], G.y[i] - R["cy"])
             if best is None or d < best[0]:
                 best = (d, i)
