@@ -996,7 +996,8 @@ PRIVATE_RACK = re.compile(r"(?:아파트|빌라|학교|회사|건물|상가|주�
 
 _AND = r"들?(?:이랑|랑|하고|와|과|이나|나|도)\s+(?:[가-힣]+\s+)?"
 BIKE_WITH = re.compile(r"(?:자전거|따릉이)" + _AND + r"(?:킥보드|개인형)|(?:킥보드|이동 ?장치)" + _AND + r"(?:자전거|따릉이)")      # 자전거 · 따릉이와 킥보드를 한데 문제 삼은 말(「자전거랑 킥보드가」 · 「킥보드랑 공유 자전거가」). 「따릉이를 못 빼요」처럼 따로 나온 자전거는 아니다
-KICK_RIDE = re.compile(r"(?:킥보드|이동 ?장치)(?:를|을)?\s*(?:타|탄|탔|몰)")      # 킥보드를 타는 말(「킥보드 타고 가다가」 · 「킥보드 탄 사람」): 그 킥보드는 민원의 배경
+KICK_RIDE = re.compile(r"(?:킥보드|이동 ?장치)(?:를|을)?\s*(?:타|탄|탔|몰)")
+BIKE_TARGET = re.compile(r"(?:자전거|따릉이)들?(?:이|가|을|를|도)(?=[\s.,?!]|$)(?!\s*못\s)(?!\s*(?:타|탄|탔|빌려|빌린|반납))")      # 킥보드와 따로 문제 삼은 자전거 · 따릉이(「길에 자전거가 몇 달째 버려져 있어요」). 「따릉이를 못 빼요」(못 쓰게 된 쪽) · 「자전거를 타고」는 대상이 아니다      # 킥보드를 타는 말(「킥보드 타고 가다가」 · 「킥보드 탄 사람」): 그 킥보드는 민원의 배경
 
 
 def _other_words(heard):
@@ -1007,7 +1008,8 @@ def _other_words(heard):
 def kick_of(st):
     """(KICK_DOCK) 통화 하나를 킥보드 쪽에서 본다 → "dock"(킥보드만 문제 삼았고 공공자전거 구역 「에」 세움: 대여소 · 따릉이 자리 · 따릉이 거치대,
     또는 통화에 따릉이 · 공공자전거 · 대여소가 있고 아파트 · 학교 같은 앞말 없는 거치대) · "street"(킥보드만, 그 밖의 자리)
-    · "with_bike"(자전거 · 따릉이와 한데 문제 삼음) · None(킥보드 말이 없거나, 타는 말뿐이거나, 다른 일의 배경). 일의 종류 맞추기(fit_type)와 엔진 물음 바꾸기(_run_engine)가 같은 판단을 쓴다.
+    · "with_bike"(자전거 · 따릉이도 문제 삼음: 「자전거랑 킥보드가」 · 「자전거가 버려져 있어요」 + 어느 차례든 킥보드) · None(킥보드 말이 없거나, 타는 말뿐이거나, 다른 일의 배경).
+    원칙: 킥보드 갈림은 킥보드만이 민원의 대상일 때만 일의 종류를 바꾼다. 다른 대상(자전거 포함)이 있으면 원래 판정을 그대로 둔다. 칸마다의 결과는 check.py switches()의 표. 일의 종류 맞추기(fit_type)와 엔진 물음 바꾸기(_run_engine)가 같은 판단을 쓴다.
     킥보드 · 대여소 · 자전거 말은 통화 전체에서(다른 차례에 나와도), 배경을 가르는 다른 종류의 낱말은 무슨 일인지 말한 차례(첫 말 · 「어떤 일로」의 답)에서만 본다:
     위치를 말하다 나온 표지(「가로등 옆이에요」 · 「벤치 앞」)로 갈림이 꺼져 통화 가운데 일의 종류가 바뀌지 않게."""
     if not KICK_DOCK:
@@ -1016,13 +1018,19 @@ def kick_of(st):
     heard = " ".join(t["said"] for t in turns)
     if not KICK.search(KICK_RIDE.sub(" ", heard)):
         return None                                       # 킥보드 말이 없거나 타는 말뿐(「킥보드 타고 가다가 방치된 자전거를 봤어요」): 원래대로
-    if BIKE_WITH.search(heard):
-        return "with_bike"
+    if BIKE_WITH.search(heard) or BIKE_TARGET.search(heard):
+        return "with_bike"                                # 자전거 · 따릉이도 민원의 대상: 일의 종류는 원래 판정 그대로(PR #132 리뷰 4차 P1, 다른 차례 · 다른 문장의 킥보드도)
     told = " ".join(t["said"] for n, t in enumerate(turns) if n == 0 or (t.get("asked") or {}).get("id") == "what")
     if _other_words(told):
         return None
     public_rack = RACK.search(heard) and re.search(_PUBLIC, heard) and not PRIVATE_RACK.search(heard)     # 「거치대에」만 말해도 통화에 따릉이 · 공공자전거 · 대여소가 있으면(아파트 · 학교 거치대는 아님)
     return "dock" if DOCK.search(heard) or public_rack else "street"      # 앞말 없는 「거치대」만으로는 공공자전거 대여소로 보지 않는다(PR #132 리뷰 3차 P1): 자전거 조례 제12조의2 ⑦은 공공자전거 주차구역의 일
+
+
+def kick_words(st, kind):
+    """(KICK_DOCK) 엔진 물음을 조례의 말(공공자전거 주차구역 · 개인형 이동장치)로 바꿔 쓸 통화인가: 일의 종류가 자전거이고 킥보드만 공공자전거 구역에 세웠다는 통화.
+    킥보드가 배경인 흡연 · 다른 일, 자전거도 문제 삼은 통화, 일반 거치대 · 길의 킥보드는 물음을 그대로 둔다."""
+    return kind == "bike" and kick_of(st) == "dock"
 
 
 def fit_type(kind, things, kick=None):
@@ -1276,7 +1284,7 @@ def engine_job(st, route, place, question=None):
         job = jobs[(st["id"], key)] = {"res": None, "ready_at": 0}
     if MODE == "live" and not (key in saved["engine"] and saved_first(st)):      # 장면 재생이면 저장된 엔진 답(아래)
         said = [t["said"] for t in st["turns"] if t.get("said")]
-        kick = route["type"] == "bike" and kick_of(st) == "dock"      # (KICK_DOCK) 대여소 킥보드로 자전거 일이 된 통화만 물음을 조례의 말로(fit_type과 같은 판단). 킥보드가 배경인 흡연 · 다른 일의 물음은 그대로
+        kick = kick_words(st, route["type"])
         threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question, kick), daemon=True).start()
     else:
         hit = saved["engine"].get(key)
