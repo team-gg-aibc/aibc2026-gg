@@ -43,6 +43,7 @@ MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
 SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
+SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR") == "1"          # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구 · 학교를 엔진 물음에 넣는다(72번, 기본 끔). 끄면 main과 같다
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -1090,6 +1091,43 @@ SAY_PROMPT = """너는 상담사 화면의 보조 도구다. [답]을 상담사�
 - 쉬운 말로, 「~입니다 · ~합니다」로 끝낸다. 두 문장을 넘기지 않고, 모두 합쳐 100자 안팎으로 쓴다.
 - [답]에 있는 사실만 쓴다. 조항 번호와 조례 이름은 말하지 않는다. 숫자(금액 · 기간 · 날수)는 바꾸지 않는다.
 - [시민이 물은 것]이 있으면 그 물음에 먼저 답한다."""
+# (SMOKE_NEAR, 72번) 길가 흡연은 금연구역이 「길」이 아니라 장소로 정해진다(금연 조례 제5조 제1항: 제7호 시 관할 버스정류소 · 제9호 지하철역 출입구 10m 안 ·
+# 제3호 교육환경보호구역 등을 시장이 「지정할 수 있다」). 그래서 좁혀진 자리 가까이에 그런 곳이 있으면 엔진 물음의 장소에 넣는다. 좌표에 오차가 있으니
+# 거리는 단정하지 않고 「가까이」로만 쓴다 — 엔진 답이 「지정된 금연구역이라면」처럼 조건을 달게.
+NEAR_KINDS = {"정류장": "버스 정류장", "역 출구": None, "학교": None}       # None이면 이름만(「등촌역 7번 출구」 · 「서울미양초등학교」)
+NEAR_SCHOOL = re.compile(r"(초등|중|고등)학교$|유치원$")                    # 교육환경보호구역은 학교 · 유치원 둘레(어린이집 · 대학은 아니다)
+NEAR_M = 50                                                               # 좁혀진 자리(끝내는 기준 반지름 50m)의 가운데에서 이만큼 안
+NEAR_ASK = "\n- [장소]가 「○○ 가까이 길가」 꼴이면 그 표지 이름을 첫 문장의 장소에 그대로 쓴다(거리는 단정하지 않는다)."
+NEAR_ASK_END = " 끝 문장은 「누가 맡아 …」 대신 「이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지」를 묻는다."
+NEAR_AT = re.compile(r" 가까이 길가$")
+
+
+def near_mark(R):
+    """(SMOKE_NEAR) 좁혀진 자리 가운데에서 NEAR_M 안의 가장 가까운 정류장 · 지하철 출구 · 학교 → 「○○ 버스 정류장」 꼴, 없으면 None."""
+    best = None
+    for i in G.near(R["cx"], R["cy"], NEAR_M):
+        k = G.kind[i]
+        if k in NEAR_KINDS and (k != "학교" or NEAR_SCHOOL.search(G.name[i])):
+            d = math.hypot(G.x[i] - R["cx"], G.y[i] - R["cy"])
+            if best is None or d < best[0]:
+                best = (d, i)
+    if best is None:
+        return None
+    name, word = G.name[best[1]], NEAR_KINDS[G.kind[best[1]]]
+    return f"{name} {word}" if word else name
+
+
+def engine_place(R, route, decided):
+    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 정해지기(decided) 전에는 None(아직 부르지 않음), 정해지면 가까운 표지를 넣는다."""
+    place = place_phrase(R, route)
+    if not (SMOKE_NEAR and route["type"] == "smoking" and not route["class_name"]):
+        return place
+    if not decided:
+        return None
+    mark = near_mark(R)
+    return f"{place} {mark} 가까이 길가".replace("의 길가 ", "의 ") if mark else place
+
+
 RULE_Q = re.compile(r"[^.?!]*(벌금|과태료|불법|처벌|규정|조례|되나요|되는 ?거|해도 ?(돼|되)|데려가|치우는|치워 ?주|어떻게 ?(돼|되|해)|신고하면)[^.?!]*\?")       # 시민이 규정 · 처리를 묻는 말
 _chunks = None
 
@@ -1113,11 +1151,18 @@ def _run_engine(key, said, tname, place, job, question=None):
     where = re.sub(r"^\S+구의 ", "", place)              # place_phrase의 「동작구의 길가」 → 「길가」(공원 · 자동차전용도로 이름은 그대로)
     try:                                                  # ① 물음 간추리기(Solar). 시민이 직접 물었으면 그 물음을 살린다
         user = f"[장소]\n{where}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
-        res["ask"] = _solar(ASK_Q_PROMPT if question else ASK_PROMPT, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
+        prompt = ASK_Q_PROMPT if question else ASK_PROMPT
+        if NEAR_AT.search(where):                         # (SMOKE_NEAR) 가까운 표지를 물음에 남기게
+            prompt += NEAR_ASK + ("" if question else NEAR_ASK_END)
+        res["ask"] = _solar(prompt, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
     res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
+    mark = NEAR_AT.sub("", where) if NEAR_AT.search(where) else None
+    if mark and mark not in res["ask"]:                   # (SMOKE_NEAR) 간추리기가 표지를 뺐으면 틀로: 표지가 없으면 엔진이 「길」만 보고 근거를 못 찾는다
+        res["ask"] = (f"{mark} 가까이 길가에서 담배를 피우는 사람이 있습니다. " + (question or "이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지 알려 주세요."))[:300]
+        res["ask_fixed"] = True
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
     word = "정보"                                         # 엔진 쉬운 말 단계가 쓴 결론 낱말(네 · 아니요 · 정보). 판단 기록에 없으면 「정보」
@@ -1357,8 +1402,9 @@ def build(st, extra=None):
     route = route_of(matter, R) if ready else None
     engine = None
     settled = done or R is not None and (R["on_road"] or R["r"] <= 250 or any(c["t"] in ("in", "out") for c in clues))     # 장소의 종류가 정해진 뒤에 부른다(엔진을 두 번 부르지 않게)
-    if route and route["ask_engine"] and settled and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
-        job = engine_job(st, route, place_phrase(R, route), matter.get("ask"))
+    place = engine_place(R, route, done or confirmed or handoff) if route else None     # (SMOKE_NEAR) 길가 흡연은 자리가 정해진 뒤에 부른다
+    if route and route["ask_engine"] and settled and place and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
+        job = engine_job(st, route, place, matter.get("ask"))
         engine = {"status": "ready", **engine_card(job["res"])} if job["res"] is not None and time.time() >= job["ready_at"] else {"status": "running"}
     in_scope = bool(route and route["scope"] == "in" and engine and engine.get("citations"))      # 6종 안의 마지막 판정: 표가 후보로 보고, 엔진이 근거 조항을 붙였을 때만
     tname = TYPES[matter["type"]]["name"] if matter.get("type") else None
