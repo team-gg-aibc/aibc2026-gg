@@ -44,6 +44,7 @@ REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 
 SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
 SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR") == "1"          # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구 · 학교를 엔진 물음에 넣는다(72번, 기본 끔). 끄면 main과 같다
+KICK_DOCK = os.environ.get("CALL_KICK_DOCK") == "1"            # 따릉이 대여소 · 거치대의 킥보드를 자전거 일(자전거 조례 제12조의2 제7항)로 받는다(72번, 기본 끔). 끄면 main과 같다
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -982,9 +983,20 @@ def things_of(said):
     return out
 
 
-def fit_type(kind, things):
+# (KICK_DOCK, 72번) 자전거 조례 제12조의2 제7항: 「시장은 공공자전거 주차구역의 질서 유지를 위하여, 민간 공유자전거, 개인형 이동장치 및 일반자전거 등이
+# 해당 구역에 무단으로 주차되지 않도록 필요한 조치를 마련하여야 한다」. 그래서 킥보드는 따릉이 대여소 · 거치대 말과 함께일 때만 자전거 일로 받는다.
+# 길에 그냥 세운 · 버려진 킥보드는 6종이 다루지 않는다(「그 밖의 일」 그대로).
+KICK = re.compile(r"킥보드|개인형 ?이동 ?장치|전동 ?스쿠터")
+DOCK = re.compile(r"(?:대여소|거치대|따릉이 ?자리|공공 ?자전거 ?(?:자리|주차 ?구역))\s*(?:안|사이|자리)?\s*(?:에다가|에다|에)(?!\s*서)")      # 그 구역 「에」 세웠다는 말만. 「대여소 옆 · 앞 길」은 아니다
+
+
+def fit_type(kind, things, heard=""):
     """종류 판정(코드 낱말 · Solar)을 시민이 문제 삼은 것들과 맞춰 본다: 그 가운데 하나라도 이 종류가 다루는 것이면 그대로,
-    다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로."""
+    다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로.
+    (KICK_DOCK) 통화 말(heard)에 킥보드가 나오면 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
+    (Solar는 킥보드를 「그 밖의 일」로 읽고, 코드 낱말은 「따릉이 대여소 옆 길」의 「따릉이」로 자전거 일로 읽는다 — 둘 다 자리를 보지 않는다)."""
+    if KICK_DOCK and KICK.search(heard):
+        return "bike" if DOCK.search(heard) else "other"
     if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
         return kind
     return next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
@@ -1002,6 +1014,7 @@ def _same(a, b):
 def understood(st):
     """차례마다 읽은 것(모델이 읽었으면 그것, 아니면 코드가 읽은 것 · 단추)을 차례대로 모은다 → (단서, 일). 뒤의 말이 앞의 말을 고친다."""
     clues, matter, things = [], {}, []
+    heard = " ".join(t.get("said") or "" for t in st["turns"]) if KICK_DOCK else ""      # (KICK_DOCK) 통화 전체 말: 킥보드와 대여소 말이 다른 차례에 나와도 맞춘다
     for t in st["turns"]:
         rd = t.get("model") or t.get("code") or {}
         for k in rd.get("drop") or []:
@@ -1011,9 +1024,9 @@ def understood(st):
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다
             things = things_of(t["said"]) or things
-            got["type"] = fit_type(got.get("type"), things)
+            got["type"] = fit_type(got.get("type"), things, heard)
         elif got.get("type"):
-            got["type"] = fit_type(got["type"], things)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
+            got["type"] = fit_type(got["type"], things, heard)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
         matter.update(got)
     fix = st.get("fix")
     if isinstance(fix, str) and fix in TYPES:             # 상담사가 고친 일(57번 6, 11-18)이 읽은 일을 이긴다. 동물의 일은 살았는지도 그 일에 맞춘다
