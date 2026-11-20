@@ -573,7 +573,7 @@ def code_read(said, asked, short, R):
         if "farsee2" in L.ON and "key" in m and rel == "at" and how == "보임" and re.search(r"(건너편|맞은편|건너|너머|저쪽|저기|멀리)(에|에서|로|으로|쪽에)?$", gaz.norm(said).split(m["key"])[0]):
             how = "쪽"                                    # (farsee2) 「호수 건너편에 ○○가 보여요」: ○○는 건너편 멀리 있다(항동저수지 통화: 가까이로 읽어 저수지와 어긋나 범위 18km)
             read.setdefault("over", []).append(m["key"])  # 무엇의 건너편인지는 speech_fix가 앞 단서까지 보고 잇는다
-        if (asked or {}).get("id") == "finer" and rel == "at" and how == "근처":
+        if (asked or {}).get("id") == "finer" and rel == "at" and (how == "근처" or (how == "보임" and "finerseen" in L.ON)):     # (finerseen · 82번) 「○○가 보여요」로 답해도 같다
             how = "가까이"                                  # 「바로 앞에 뭐가 보이세요?」에 댄 이름: 눈앞에 보이는 것
         if "across" in L.ON and rel == "at" and how == "가까이" and re.search(r"건너|맞은편", m.get("own", m["after"])[:16]):
             read["matter"]["side"] = "건너편"               # 확정할 때 그 표지 자리에 핀을 찍지 않고, 앞 · 옆 · 건너편을 다시 묻지 않는다

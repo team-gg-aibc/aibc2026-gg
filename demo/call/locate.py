@@ -193,7 +193,23 @@ def resolve(key):
     if any(a[0] == "park" for a in areas):
         keep = [k != "공원" for k in kinds]
         px, py, kinds, ids = ([v for v, m in zip(lst, keep) if m] for lst in (px, py, kinds, ids))
+    if "dupshop" in ON and len(ids) > 1:
+        px, py, kinds, ids = _dupshop(px, py, kinds, ids)
     return {"x": np.asarray(px, float), "y": np.asarray(py, float), "kinds": kinds, "roads": roads, "areas": areas, "ids": ids}
+
+
+def _dupshop(px, py, kinds, ids):
+    """(dupshop · 82번) 가게 자료에 같은 지점 이름 · 같은 종류가 100m 안에 두 줄이면 한 가게로 본다(두 줄의 가운데 한 점).
+    「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21)."""
+    out = []                                              # [x, y, 종류, 번호, 합친 줄 수]
+    for x, y, k, i in zip(px, py, kinds, ids):
+        j = next((o for o in out if i >= G.shop0 and o[3] >= G.shop0 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
+                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if i >= G.shop0 else None
+        if j is None:
+            out.append([x, y, k, i, 1])
+        else:
+            j[0], j[1], j[4] = (j[0] * j[4] + x) / (j[4] + 1), (j[1] * j[4] + y) / (j[4] + 1), j[4] + 1
+    return [o[0] for o in out], [o[1] for o in out], [o[2] for o in out], [o[3] for o in out]
 
 
 def _near_map(px, py, sigma):
@@ -723,6 +739,8 @@ def infer(clues):
     named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof", "rim", "core")]
     heard_only = bool(named) and all(c.get("heard") for c in named)      # 자리 단서가 모두 비슷한 이름으로 이은 것뿐이다(11-15)
     R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
+    if "manyk" in ON:                                     # (manyk · 82번) 범위를 받치는 서로 다른 기준점 수(78번 계측과 같은 셈: 다른 단서와 어긋나 버려진 것 · 「○○ 쪽」 고른 답은 빼고, 같은 자리 이름은 하나로)
+        R["nk"] = len({_anchor_key(c) for n, c in enumerate(clues) if c["t"] in NAMED_T and trust.get(n, 1.0) >= 0.35} - {None})
     if ON & {"ringdone", "rimask", "rimline"}:                       # (75번) 범위를 받치는 단서 가운데 「둘레」로 읽은 곳(호수 테두리 · 구역의 테두리 띠)의 이름. 다른 단서와 어긋나 버려진 것(믿음 0.35 아래)은 뺀다
         ring_k = next((c["k"] for n, c in enumerate(clues) if trust.get(n, 1.0) >= 0.35 and "k" in c and (c["t"] == "rim" or (
             c["t"] == "at" and c.get("how") != "쪽" and not c.get("across") and "lakerim" in ON and water_ring(resolve(c["k"])) is not None))), None)
@@ -797,7 +815,28 @@ def is_done(R):
         return False                                      # (ringdone · 75번) 둘레로 읽은 곳: 범위가 고리 모양으로 남아 그 가운데(핀을 찍을 자리)가 범위 밖이면 넓이가 작아도 끝이 아니다(숭례문광장 가장자리 → 광장 가운데에 핀, 64m 틀린 확정)
     if R is not None and R.get("pk") and R["r_cover"] > 90:
         return False                                      # 호숫가 · 산책길처럼 띠 모양으로 남은 범위는 넓이로는 작아도 길게 퍼져 있다: 덮는 반지름까지 봐야 한다(33번 2-5)
+    if R is not None and "manyk" in ON and not R["on_road"] and R.get("nk", 0) >= MANYK[0] and R["r"] <= MANYK[1]:
+        return True                                       # (manyk · 82번) 서로 다른 기준점 셋 이상이 한곳에서 만나면 반지름이 조금 넓어도(70m) 끝: 측량에서 기준점이 많을수록 겹친 자리를 믿는다(78번: 되묻기 맞는 비율 기준점 3개 이상 91%)
     return R is not None and R["r"] <= (DONE_ROAD_M if R["on_road"] else DONE_M)
+
+
+NAMED_T = ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof", "rim", "core", "cone")
+MANYK = (int(os.environ.get("CALL_MANYK_N", "3")), float(os.environ.get("CALL_MANYK_M", "70")))     # (manyk) 기준점 몇 개 이상 · 반지름 몇 m까지
+
+
+def _anchor_key(c):
+    """(manyk) 같은 기준점인가를 가르는 열쇠(10m 칸). 보기에서 고른 「○○ 쪽」 답 · 「A → B 쪽」은 기준점이 아니라 면이라 뺀다."""
+    lab = str(c.get("label") or "")
+    if (c["t"] == "pt" and c.get("sure") and lab.endswith(" 쪽")) or (" → " in lab and c["t"] in ("cone", "pt")):
+        return None
+    if c["t"] == "pt" and "p" in c:
+        return ("p", round(c["p"][0] / 10), round(c["p"][1] / 10), c.get("ring") is not None)
+    if c["t"] == "at" and "k" in c:
+        r = resolve(c["k"])
+        if 0 < len(r["x"]) <= 3 and not r["roads"] and not r["areas"]:
+            return ("p", round(float(r["x"][0]) / 10), round(float(r["y"][0]) / 10), False)
+        return ("k", c["k"])
+    return None
 
 
 _LAMP_XY = None
