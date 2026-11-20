@@ -394,6 +394,46 @@ def ask_fixes():
     print("  ✓ 질문 다듬기: 조사 「(이)가」" + ("를 받침에 맞춤" if "josa" in S.L.ON else "는 그대로(스위치 꺼짐)") + " · 같은 이름의 보기는 한 번만 말함 · 골라 답한 질문 가리기")
 
 
+def ask_less():
+    """(82번) 덜 묻기 고침(ASKLESS_ON): 켜져 있으면 그 동작을, 꺼져 있으면 지금 동작을 보고, 켜진 것은 하나씩 끄면 달라지는지 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    read = lambda text, qid, opts=(): S.code_read(text, {"id": qid, "options": list(opts)}, S.shortlist(text, None, qid, []), None)     # noqa: E731
+    opts = [{"label": "가 쪽", "set": {"clues": [{"t": "pt", "p": [0, 0], "label": "가 쪽"}]}}, {"label": "나 쪽", "set": {"clues": [{"t": "pt", "p": [9, 9], "label": "나 쪽"}]}},
+            {"label": "둘 다 아님", "set": {"clues": [{"t": "not", "label": "둘 다 아님"}]}}]
+
+    def dir_asks():                                       # 74-063: 자동차전용도로에서 좁혀진 뒤 「방향은 잘 모르겠어요」만 하는 시민
+        st, v = S.turn({"id": "check-dirstop"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
+        out = []
+        for said in ["양재대로 달리다가 봤어요, 갓길이에요 사람들이 담배를 피워요", "번호는 못 봤어요", "잘 못 봤어요", "둔촌동역 근처예요", "잘 못 봤어요", "백제추어탕 옆이에요"] + ["방향은 잘 모르겠어요"] * 3:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": said}})
+            q = v["question"]
+            out.append(q and q["id"])
+            if not q or v["confirmed"]:
+                break
+            st, _ = S.turn(st, {"line": {"who": "상담사", "text": q["say"]}})
+        return out
+
+    looks = {"dupshop": lambda: len(L.resolve(S.gaz.norm("아트박스 강남점"))["x"]),      # 가게 자료에 82m 떨어진 두 줄
+             "dunnoboth": lambda: ([c["t"] for c in read("둘 다 잘 모르겠어요", "either", opts)["clues"]], [c["t"] for c in read("둘 다 아니에요", "either", opts)["clues"]]),
+             "dirstop": lambda: dir_asks()[5:8]}
+    want = {"dupshop": (1, 2), "dunnoboth": (([], ["not"]), (["not"], ["not"])), "dirstop": (["dir", "dir", "confirm"], ["dir", "dir", "dir"])}
+    for sw, f in looks.items():
+        on = sw in L.ON
+        got = f()
+        assert got == want[sw][0 if on else 1], (sw, on, got)
+        if on:                                            # 그 스위치 하나만 끄면 지금 동작으로 돌아가는지
+            L.ON.discard(sw)
+            try:
+                assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
+            finally:
+                L.ON.add(sw)
+    print("  ✓ 덜 묻기: 같은 가게 두 줄은 한 곳 · 「둘 다 잘 모르겠어요」는 모름 · 좁혀진 뒤 방향 질문은 두 번까지"
+          + (" — 켬, 하나씩 끄면 지금 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -781,6 +821,7 @@ def main():
         reread_guards()
         edge_reads()
         ask_fixes()
+        ask_less()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()

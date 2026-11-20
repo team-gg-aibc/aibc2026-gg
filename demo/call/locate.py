@@ -193,7 +193,24 @@ def resolve(key):
     if any(a[0] == "park" for a in areas):
         keep = [k != "공원" for k in kinds]
         px, py, kinds, ids = ([v for v, m in zip(lst, keep) if m] for lst in (px, py, kinds, ids))
+    if "dupshop" in ON and len(ids) > 1:
+        px, py, kinds, ids = _dupshop(px, py, kinds, ids)
     return {"x": np.asarray(px, float), "y": np.asarray(py, float), "kinds": kinds, "roads": roads, "areas": areas, "ids": ids}
+
+
+def _dupshop(px, py, kinds, ids):
+    """(dupshop · 82번) 가게 자료에 같은 지점 이름 · 같은 종류가 100m 안에 두 줄이면 한 가게로 본다(두 줄의 가운데 한 점).
+    「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21)."""
+    out = []                                              # [x, y, 종류, 번호, 합친 줄 수]
+    for x, y, k, i in zip(px, py, kinds, ids):
+        shop = G.shop0 <= i < G.shop1                     # 가게 자료 줄만(공원 안 이름 · 물가 테두리 점은 그 뒤에 붙어 있다)
+        j = next((o for o in out if G.shop0 <= o[3] < G.shop1 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
+                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if shop else None
+        if j is None:
+            out.append([x, y, k, i, 1])
+        else:
+            j[0], j[1], j[4] = (j[0] * j[4] + x) / (j[4] + 1), (j[1] * j[4] + y) / (j[4] + 1), j[4] + 1
+    return [o[0] for o in out], [o[1] for o in out], [o[2] for o in out], [o[3] for o in out]
 
 
 def _near_map(px, py, sigma):
@@ -1038,6 +1055,8 @@ def questions(R, clues, matter, asked=(), same=None):
     x, y, w = _sample(R)
     ctx = R["ctx"]
     need_dir = R["on_road"] and ctx["head"] is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    if need_dir and "dirstop" in ON and list(asked).count("dir!") >= 2:
+        need_dir = False                                  # (dirstop · 82번) 좁혀진 뒤의 방향 질문도 다른 위치 질문처럼 두 번 물어 못 얻으면 그만(「방향은 잘 모르겠어요」에 같은 질문을 여덟 번 되풀이하다 끊긴 평가 통화 74-063)
     zone = None                                           # 공원 안 · 바깥: 넘길 곳이 갈리는 경계
     if not R["on_road"] and not any(c["t"] in ("in", "out") for c in clues):
         best = None
