@@ -83,10 +83,30 @@ def tab(section, head="항목", col=1):
     return {}
 
 
+IGA = re.compile(r"([가-힣])\(이\)가")
+
+
 def fill(s, **kw):
     for k, v in kw.items():
         s = s.replace("{" + k + "}", str(v))
+    if "josa" in L.ON:                                    # (josa · 75번) 「카페(이)가」 → 받침이 없으면 「카페가」, 있으면 「정류장이」: 화면에 괄호째 나가고 소리로는 「카페 이 가」로 읽힌다
+        s = IGA.sub(lambda m: m.group(1) + ("이" if (ord(m.group(1)) - 0xAC00) % 28 else "가"), s)
     return " ".join(s.split())
+
+
+def say_options(opts):
+    """질문 글에 읽어 줄 보기 이름들(앞의 넷). (samename · 75번) 같은 이름은 한 번만 말한다: 지명 표에 같은 이름의 점이 둘이면 「석촌호수 아뜰리에, 석촌호수 아뜰리에 같은 거요」가 됐다.
+    보기 자체에서 하나를 빼지는 않는다 — 빼면 시민이 그 이름을 골랐을 때 다른 한 곳이 범위에서 사라진다(600통에서 올림픽대교 분기점 473m 틀린 확정)."""
+    names = [o["label"] for o in opts[:4]]
+    return list(dict.fromkeys(names)) if "samename" in L.ON else names
+
+
+def asked_same(turns, words):
+    """(sameopts · 75번) 「이 질문을 같은 보기로 이미 물었고 시민이 그 보기 가운데서 골랐나」를 가리는 함수. 고른 답을 받았는데 같은 보기가 또 나왔다는 것은 그 답으로 범위가 달라지지 않았다는 뜻이고, 다시 물어도 같은 답이 온다
+    (「영동1교에서 보면 어느 쪽이세요?」에 「남단 쪽이요」라고 답했는데 같은 질문이 또 나와 시민이 끊음). 「모르겠어요」나 보기 밖의 말로 답한 질문은 여기 넣지 않는다(다른 답을 들은 뒤 다시 물으면 답할 수 있다)."""
+    lab = lambda q: tuple(o.get("label") or words.get(o.get("word"), o.get("word")) for o in q.get("options") or [])      # noqa: E731
+    asked = {(t["asked"]["id"], lab(t["asked"])) for t in turns if t.get("said") and t.get("asked") and (t.get("model") or t.get("code") or {}).get("picked")}
+    return lambda q: (q["id"], lab(q)) in asked
 
 
 def scripts():
@@ -1617,7 +1637,7 @@ def build(st, extra=None):
     line = where_line(parts, done, matter, anc) if parts else None
     blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON or "lamponce2" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
     hard = "hardstop" in L.ON and any(t.get("said") and (t.get("asked") or {}).get("id") in ("dist", "from") and HARD.search(t["said"]) for t in st["turns"])     # (hardstop, 71번)
-    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"])
+    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"], asked_same(st["turns"], tab("이렇게 물어보세요", "낱말")))
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
     log = [a or "" for a in st["asked_log"]]
@@ -1629,7 +1649,7 @@ def build(st, extra=None):
     # 「say」의 {위치}는 상담사가 말로 읽는 꼴(괄호 · 가운뎃점 없이)로 넣는다: 화면의 글과 목소리가 같은 글에서 나오게
     question = {"id": pick["id"], "why": why.get(pick["id"], ""), "options": opts, "bits": pick.get("bits"),
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
-                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else pick["id"], pick["id"]), 보기=", ".join(o["label"] for o in opts[:4]), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
+                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:

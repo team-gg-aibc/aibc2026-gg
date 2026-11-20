@@ -14,6 +14,7 @@
   {"t":"toward","k":…} · {"t":"head","v":[ux,uy],"label":…}  가는 방향        {"t":"not","p":…,"r":…}  거기는 아니다
 스스로 시험:  python3 demo/call/locate.py
 """
+import functools
 import math
 import os
 import re
@@ -128,9 +129,20 @@ def bridge_dist(i, x, y):
     return d
 
 
+@functools.lru_cache(maxsize=None)
+def bridge_span(i):
+    """다리 i의 면이 걸친 길이(m, 면을 싸는 상자의 대각선)."""
+    p = np.vstack(G.bridge[i])
+    return float(np.hypot(*(p.max(axis=0) - p.min(axis=0))))
+
+
 def _bridges(r, n=None, ctx=None):
-    """resolve() 결과 가운데 면을 아는 다리의 장소 번호들. 그 통화에 그 다리와 닿는 공원 · 광장 말이 함께 있을 때만(ctx["bp"]) — 다리만 댄 말(「올림픽대교 위예요」)은 전처럼 가운데 점으로 읽는다."""
-    return [i for i in r.get("ids") or () if i in G.bridge] if "bridgeline" in ON and ctx is not None and n in ctx.get("bp", ()) else []
+    """resolve() 결과 가운데 면을 아는 다리의 장소 번호들. 그 통화에 그 다리와 닿는 공원 · 광장 말이 함께 있을 때만(ctx["bp"]) — 다리만 댄 말(「올림픽대교 위예요」)은 전처럼 가운데 점으로 읽는다.
+    (bridgelong · 75번, 기본 끔) 길이가 2 × BIG_M(120m)을 넘는 다리 · 고가는 혼자 나와도 면으로: 가운데 점 둘레 60m는 그 다리의 한 토막일 뿐이라 이름 하나로는 한 점이 서지 않는다(보라매고가는 1.6km — 「보라매고가 바로 앞」을 가운데 점으로 확정해 193m 틀림). 짧은 다리(묵동교 75m)는 전처럼 한 점."""
+    if "bridgeline" not in ON or ctx is None:
+        return []
+    ids = [i for i in r.get("ids") or () if i in G.bridge]
+    return ids if n in ctx.get("bp", ()) else [i for i in ids if "bridgelong" in ON and bridge_span(i) > 2 * BIG_M]
 
 
 _wr = {}
@@ -337,12 +349,14 @@ def _context(clues):
             pr = [p[0] * head[0] + p[1] * head[1] for p in e]
             pos[n] = e[int(np.argmax(pr))] if clues[n]["t"] in ("past", "toward") else e[int(np.argmin(pr))]
     bp = set()
-    if "bridgeline" in ON:                               # (bridgeline · 75번) 공원 · 광장 말과 함께 나온 다리(그 구역의 상자에서 100m 안): 「망원한강공원 … 양화대교 밑」
+    if "bridgeline" in ON:                               # (bridgeline · 75번) 공원 · 광장 말(그 구역의 상자에서 100m 안)이나 길 이름(그 길이 다리 면에서 60m 안을 지남)과 함께 나온 다리: 「망원한강공원 … 양화대교 밑」 · 「도림천 자전거길 … 도림천고가도로교 밑」
         boxes = [ar["box"] for c in clues if "k" in c and c["t"] in ("at", "rim", "core") for ar in _parks_of(c["k"])] + [area_of(c["a"])["box"] for c in clues if c["t"] == "in" and c["a"][0] == "park"]
-        for n, c in enumerate(clues) if boxes else ():
+        lines = [G.road_xy(i) for c in clues if c["t"] == "at" and "k" in c for i in resolve(c["k"])["roads"]] if "bridgeroad" in ON else []      # 이름이 길이면서 점이기도 한 것(「도림천 자전거길」)까지  (bridgeroad · 75번 후보 2: 길 이름과 함께 나온 다리. 끄면 #138처럼 공원 · 광장 말과 함께일 때만)
+        for n, c in enumerate(clues) if boxes or lines else ():
             if c["t"] == "at" and "k" in c:
                 for i in resolve(c["k"]).get("ids") or ():
-                    if i in G.bridge and any(ring[:, 0].max() > b[0] - 100 and ring[:, 0].min() < b[2] + 100 and ring[:, 1].max() > b[1] - 100 and ring[:, 1].min() < b[3] + 100 for ring in G.bridge[i] for b in boxes):
+                    if i in G.bridge and (any(ring[:, 0].max() > b[0] - 100 and ring[:, 0].min() < b[2] + 100 and ring[:, 1].max() > b[1] - 100 and ring[:, 1].min() < b[3] + 100 for ring in G.bridge[i] for b in boxes)
+                                          or any(float(bridge_dist(i, ln[:, 0], ln[:, 1]).min()) <= 60 for ln in lines)):
                         bp.add(n)
     return {"roads": roads, "rxy": rxy, "pos": pos, "head": head, "ends": ends, "bp": bp}
 
@@ -833,11 +847,13 @@ def _axis(x, y, w):
     return (math.cos(ang), math.sin(ang)), (mx, my)
 
 
-def _candidates(x, y, w, radius, kinds=None):
-    """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)"""
+def _candidates(x, y, w, radius, kinds=None, skip=()):
+    """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)
+    skip = 이미 내밀었던 자리들((x, y) 소수 첫째 자리)."""
     idx = [i for i in _places_in(x.min() - radius, y.min() - radius, x.max() + radius, y.max() + radius, 6000 if kinds is None else 45000)
            if (kinds is None or G.kind[i] in kinds) and G.kind[i] not in ("동네", "산") and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
            and not G.pk0 <= i < G.rp1     # 공원 안 이름(park_names)은 시민이 말하면 알아듣되 보기로 먼저 내밀지 않는다: 넣어도 지금의 질문 흐름이 그대로(33번 2-5)
+           and not (skip and (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) in skip)
            and not ("selfname" in ON and self_area(i))]     # (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
     if not idx:
         return [], None
@@ -879,7 +895,11 @@ FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 MATTER_ON = "hurtalive,matterstop"      # 일 질문 되풀이 막기(11-20): 「다쳐서 · 웅크리고 · 떨고」는 살아 있음, 살았나 · 목줄은 두 번 물어 답을 못 읽으면 그만. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + MATTER_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
+ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
+# sameopts(기본 끔 · 75번): 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same). 영동1교 통화의 같은 「어느 쪽」 질문 되풀이는 없어지지만 가상 600통에서 한 점 421 · 397 · 416 → 414 · 390 · 405, 틀린 확정 0 · 0 · 5 → 0 · 0 · 6이라 켜지 않았다(같은 질문을 다시 물어 같은 답을 한 번 더 세는 것이 지금은 범위를 좁히는 데 쓰이고 있다)
+C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
@@ -933,7 +953,7 @@ def _fresh(asked):
     return not rej or any(a in LOCQ for a in asked[rej[-1] + 1:])
 
 
-def questions(R, clues, matter, asked=()):
+def questions(R, clues, matter, asked=(), same=None):
     """지금 물을 수 있는 질문을 설 순서대로 → [{id, bits, options: [{label | word, set}], …}]. 맨 앞이 화면에 뜬다."""
     conds = []
     if matter.get("type") is None and not matter.get("told"):     # 무슨 일인지 한 번 말했으면 다시 묻지 않는다
@@ -1019,6 +1039,7 @@ def questions(R, clues, matter, asked=()):
         miss.add("closest")                               # (closestcap · 75번) 「어디가 가장 가까우세요?」는 한 통화에 두 번까지: 「다 멀어요」를 듣고도 보기만 바꿔 네댓 번 물었다(올림픽공원 둘레길 · 뚝섬한강공원)
     if zone and "zone" in miss:
         zone = None
+    dup = lambda q: bool(same) and "sameopts" in ON and q["id"] in SAMEQ and same(q)     # noqa: E731  (sameopts · 75번) 이 통화에서 같은 보기로 이미 물었던 질문: 그 답으로 범위가 달라지지 않았다는 뜻이라 사다리의 다음 질문으로 넘어간다
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지
     express = R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
     drive = R["on_road"] and not express and "drive" in ON and any(c.get("drive") for c in clues)     # 큰길을 차로 지나간 통화(33번 5-2)
@@ -1026,7 +1047,7 @@ def questions(R, clues, matter, asked=()):
         lamp = {"id": "lampno", "bits": math.log2(max(1.0, R["r"] / 15.0)), "options": []} if express and G.lamps and R["r"] > 100 else None     # 가로등 기둥 번호: 읽을 수만 있으면 한 번에 기둥 하나로(모를 몫이 커서 점수는 낮게 나온다)
         loc = [_q_between(R, x, y, w, clues), _q_marks(R, x, y, w, "passed", clues), _q_ago(R, clues), lamp, _q_next(R, x, y, w, clues),
                _q_dir(R, x, y, w) if ctx["head"] is None and any(c["t"] in ("past", "before") for c in clues) else None]
-        loc = sorted((q for q in loc if q and _worth(q, R) and q["id"] not in miss), key=lambda q: -(q["bits"] if "score" in OFF else _score(q)))
+        loc = sorted((q for q in loc if q and _worth(q, R) and q["id"] not in miss and not dup(q)), key=lambda q: -(q["bits"] if "score" in OFF else _score(q)))
     if not loc:                                           # 사다리: 넓으면 가까운 역 → 간판 · 건물 이름 → (좁혀지면) 바로 앞의 것 → 둘 중 고르기 → 보이는 것의 종류 → 「바로 앞인지」
         r = R["r"]     # 넓을 때 역 · 간판을 둘 다 모른다고 하면 범위째 확인하기 전에 둘 중 고르기 · 보이는 것을 묻는다(11-15 극한 세트)
         order = ["station", "mark", "either", "seen"] if r > 1500 else ["mark", "station", "either"] if r > 900 else ["mark", "either", "seen"] if r > 250 else ["finer", "either", "seen", "near"]
@@ -1050,7 +1071,7 @@ def questions(R, clues, matter, asked=()):
                 "lampno": lambda: {"id": "lampno", "bits": math.log2(max(1.0, r / 15.0)), "options": []},
                 "addr": lambda: {"id": "addr", "bits": math.log2(max(1.0, r / 15.0)), "options": []}}
         ask = lambda qid: make[qid]() if qid in make else _q_marks(R, x, y, w, qid, clues)   # noqa: E731
-        loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R)), [])
+        loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R) and not dup(q)), [])
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)     # 「아니요」로 되돌아온 뒤에는 다시 센다
     n_loc = sum(1 for a in ids[since + 1:] if a in LOCQ)
     if rejected:                                          # 어느 말이 달랐는지부터 짚는다(한 걸음만 되돌리기)
@@ -1327,7 +1348,9 @@ def _q_closest(R, x, y, w, clues):
     ringed = R.get("ringed") if "rimask" in ON else None
     if sum(1 for c in clues if c["t"] == "closest") >= (2 if "closest2" in ON or ringed else 1):
         return None                                       # (closest2, 기본 끔 · 49번) 좁혀진 범위에서 한 번 더(더 작은 것들로)
-    picked, parts = _candidates(x, y, w, max(60.0, 0.3 * R["r"]) if ringed else max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None)
+    old = ({tuple(c["p"]) for c in clues if "p" in c and (c["t"] == "closest" or (c["t"] == "not" and str(c.get("label", "")).endswith(" 쪽 아님")))}
+           | {tuple(q) for c in clues if c["t"] == "closest" for q in c.get("others", ())}) if "closestnew" in ON else ()      # (closestnew · 75번) 앞서 내밀었던 보기(고른 것 · 「다 멀어요」로 지운 것)는 다시 내밀지 않는다: 같은 넷을 또 물으면 같은 답이 온다. 새 보기가 셋이 안 되면 묻지 않는다
+    picked, parts = _candidates(x, y, w, max(60.0, 0.3 * R["r"]) if ringed else max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None, old)
     keep = []
     for i in picked:
         if all(math.hypot(G.x[i] - G.x[j], G.y[i] - G.y[j]) > 0.5 * R["r"] for j in keep):
@@ -1512,6 +1535,8 @@ def _q_marks(R, x, y, w, qid, clues):
     """가까이 보이는 표지(간판 · 건물 · 시설)를 묻는다. 길 위면 차에서 볼 만한 것을, 이미 좁혀졌으면 더 바짝."""
     radius = 35.0 if qid == "finer" else 600.0 if qid == "station" else 100.0
     used = {tuple(c["p"]) for c in clues if c["t"] in ("pt", "past") and "p" in c and not isinstance(c["p"][0], list)}
+    if "closestnew" in ON:                                # (closestnew · 75번) 「다 멀어요」 · 「둘 다 아니에요」로 지운 곳을 「바로 앞에 뭐가 보이세요? ○○ 같은 거요」로 다시 내밀지 않는다
+        used |= {tuple(c["p"]) for c in clues if c["t"] == "not" and "p" in c and str(c.get("label", "")).endswith(" 쪽 아님")}
     passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]) else set())
     road = gaz.ROADSIDE if _on_express(R) else None          # 자동차전용도로 위: 길에서 보이는 종류만(_road_ok와 같은 규칙)
     picked, parts = _candidates(x, y, w, radius, passed_kinds if qid == "passed" else {"역"} if qid == "station" else road)
@@ -1705,8 +1730,50 @@ def selftest():
     under = [{"t": "in", "a": ["park", i_pk]}, {"t": "at", "k": k("양화대교"), "how": "바로"}]
     Ru, i_br = infer(under), resolve(k("양화대교"))["ids"][0]
     assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
+    path = [{"t": "at", "k": k("도림천 자전거길")}, {"t": "at", "k": k("도림천고가도로교"), "how": "바로"}]      # 길 이름 + 다리 밑: 그 길이 다리 면 아래를 지나는 구간(이 고가는 하천 위로 길게 놓여 한 점이 아니다). 다리 가운데 한 점으로 끝내지 않는다
+    had_br = "bridgeroad" in ON                               # (bridgeroad) 끄면 길 이름과 함께 나온 다리는 전처럼 가운데 한 점
+    ON.discard("bridgeroad")
+    assert not infer(path)["ctx"]["bp"] and is_done(infer(path))
+    ON.add("bridgeroad")
+    Rp2, i_b2 = infer(path), resolve(k("도림천고가도로교"))["ids"][0]
+    assert Rp2["ctx"]["bp"] == {1} and not is_done(Rp2) and float(bridge_dist(i_b2, Rp2["x"][Rp2["cred"]], Rp2["y"][Rp2["cred"]]).max()) <= 80, (Rp2["ctx"]["bp"], Rp2["r"])
+    assert is_done(infer(path[1:])) and not infer(path[1:])["ctx"]["bp"]
+    (ON.add if had_br else ON.discard)("bridgeroad")
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
+    long1, short1 = [{"t": "at", "k": k("보라매고가"), "how": "바로"}], [{"t": "at", "k": k("묵동교"), "how": "바로"}]      # (bridgelong, 기본 끔) 긴 다리 · 고가는 혼자 나와도 면으로
+    assert is_done(infer(long1)) and "bridgelong" not in ON      # 끄면 전처럼 가운데 한 점으로 끝난다(1.6km 고가의 가운데)
+    ON.add("bridgelong")
+    Rl, i_bl = infer(long1), resolve(k("보라매고가"))["ids"][0]
+    assert not is_done(Rl) and Rl["r"] > 300 and float(np.percentile(bridge_dist(i_bl, Rl["x"][Rl["cred"]], Rl["y"][Rl["cred"]]), 90)) <= 40, (Rl["r"], Rl["r_cover"])      # 범위 = 고가를 따라 난 띠(가운데 한 점이 아니다)
+    assert is_done(infer(short1))                                # 짧은 다리(75m)는 켜도 한 점
+    ON.discard("bridgelong")
+    # (ASK_ON · 75번 후보 2, 기본 켬) 질문 다듬기 — 스위치마다 끈 동작 · 켠 동작
+    had_ask = ON & (set(ASK_ON.split(",")) | {"sameopts"})                     # 기본으로 켜져 있든 꺼져 있든: 다 끄고 하나씩 켜 본 뒤 되돌린다
+    ON.difference_update(had_ask)
+    ring_s = water_ring(resolve(k("석촌호수")))
+    mid_s = [float(ring_s[:, 0].min() + ring_s[:, 0].max()) / 2, float(ring_s[:, 1].min() + ring_s[:, 1].max()) / 2]
+    i_sp = next(i for i, a in enumerate(G.parks) if a["name"] == "송파나루공원")
+    lake_s = [{"t": "cone", "o": mid_s, "v": [-1.0, 0.0], "cos": 0.5, "f": 0.03}, {"t": "at", "k": k("석촌호수"), "how": "가까이"}, {"t": "in", "a": ["park", i_sp]}]      # 「석촌호수 서쪽 산책로예요」 · 「공원 안이에요」
+    Rlk = infer(lake_s)
+    c1 = _q_closest(Rlk, *_sample(Rlk), lake_s)
+    far = lake_s + c1["options"][-1]["set"]["clues"]            # 「다 멀어요」
+    again = lambda: (_q_closest(infer(far), *_sample(infer(far)), far) or {}).get("name")      # noqa: E731
+    assert again() == c1["name"]                              # 끄면 같은 넷을 또 내민다(11-20 현장 서버에서 본 것)
+    marks = lambda: {o["label"] for o in (_q_marks(infer(far), *_sample(infer(far)), "mark", far) or {"options": []})["options"]}      # noqa: E731
+    gone = set(c1["name"].split(", "))
+    assert marks() & gone                                     # 끄면 방금 「다 멀어요」라고 한 곳을 보기로 또 내민다
+    ON.add("closestnew")
+    assert again() and not set(again().split(", ")) & gone, again()      # 켜면 새 보기로
+    assert not marks() & gone                                 # 간판 · 바로 앞 질문의 보기에서도 뺀다
+    ON.discard("closestnew")
+    stray = {"type": "stray", "animal_matter": True, "alive": True, "leash": False}
+    first = questions(Rlk, lake_s, stray)[0]
+    assert first["id"] == "closest" and questions(Rlk, lake_s, stray, (), lambda q: q["id"] == "closest")[0]["id"] == "closest"      # 끄면 same을 줘도 그대로
+    ON.add("sameopts")
+    assert questions(Rlk, lake_s, stray, (), lambda q: q["id"] == "closest")[0]["id"] != "closest"      # 켜면 같은 보기로 물었던 질문은 건너뛴다
+    ON.discard("sameopts")
+    ON.update(had_ask)
     # 스위치마다 하나씩: 넓은 곳에 걸음 안 묻기(bigdist) · 넓은 둘레에서는 둘레 질문 먼저(rimask) · 「가장 가까우세요」 두 번까지(closestcap)
     i_tk = next(i for i, a in enumerate(G.parks) if a["name"] == "뚝섬한강공원")
     pool = [{"t": "in", "a": ["park", i_tk]}, {"t": "at", "k": k("뚝섬수영장"), "how": "바로"}]

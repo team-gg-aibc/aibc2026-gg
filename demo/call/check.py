@@ -314,6 +314,38 @@ def edge_reads():
     print("  ✓ 둘레 읽기: 길 낱말은 이름이 아님 · 방위 말 · 테두리 띠와 한가운데 · 멀리 보이는 것 · 광장 가장자리는 가운데에 핀 없음 · 공원 + 다리 밑 · 엉뚱한 말에 안 걸림 여섯 · 스위치 열둘 각각 끄면 달라짐")
 
 
+def ask_fixes():
+    """(75번 후보 2) 질문 다듬기 스위치(ASK_ON) 가운데 서버 쪽 둘: 조사(josa)와 같은 보기로 이미 물었는지 가리기(sameopts). 켜져 있으면 그 동작을, 꺼져 있으면 지금 동작을 본다. 나머지 둘은 locate.py 스스로 시험에 있다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    seen = S.tab("이렇게 물어보세요", "질문")["seen"]
+    got = [S.fill(seen, 종류=w) for w in ("카페", "정류장", "편의점", "학교")]
+    want = ["근처에 카페가 보입니까?", "근처에 정류장이 보입니까?", "근처에 편의점이 보입니까?", "근처에 학교가 보입니까?"]
+    assert (got == want) if "josa" in S.L.ON else all("(이)가" in g for g in got), got
+    if "josa" in S.L.ON:                                  # 그 스위치 하나만 끄면 달라지는지(이 장면이 스위치를 보는지)
+        S.L.ON.discard("josa")
+        try:
+            assert "(이)가" in S.fill(seen, 종류="카페"), "josa: 꺼도 결과가 같음"
+        finally:
+            S.L.ON.add("josa")
+    two = [{"label": "석촌호수 아뜰리에"}, {"label": "석촌호수 아뜰리에"}, {"label": "호수미"}]      # 지명 표에 같은 이름의 점이 둘인 보기
+    assert S.say_options(two) == (["석촌호수 아뜰리에", "호수미"] if "samename" in S.L.ON else ["석촌호수 아뜰리에", "석촌호수 아뜰리에", "호수미"])
+    if "samename" in S.L.ON:
+        S.L.ON.discard("samename")
+        try:
+            assert len(S.say_options(two)) == 3, "samename: 꺼도 결과가 같음"
+        finally:
+            S.L.ON.add("samename")
+    words = S.tab("이렇게 물어보세요", "낱말")
+    asked = {"id": "from", "options": [{"label": "영동1교남단 쪽", "set": {}}, {"label": words["잘 모르겠음"], "set": {}}]}
+    finer = {"id": "finer", "options": [{"label": "가", "set": {}}]}
+    same = S.asked_same([{"said": "영동1교남단 쪽이요", "asked": asked, "code": {"picked": True}}, {"said": "잘 모르겠어요", "asked": finer, "code": {"clues": []}}], words)
+    assert same({"id": "from", "options": [{"label": "영동1교남단 쪽"}, {"word": "잘 모르겠음"}]})      # 보기에서 골라 답한 질문의 같은 보기(낱말 보기는 화면 글로 바꿔 견준다)
+    assert not same({"id": "from", "options": [{"label": "영동1교북단 쪽"}, {"word": "잘 모르겠음"}]}) and not same({"id": "finer", "options": [{"label": "가"}]})      # 보기가 다르거나, 「모르겠어요」로 답했던 질문
+    print("  ✓ 질문 다듬기: 조사 「(이)가」" + ("를 받침에 맞춤" if "josa" in S.L.ON else "는 그대로(스위치 꺼짐)") + " · 같은 이름의 보기는 한 번만 말함 · 골라 답한 질문 가리기")
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -559,6 +591,7 @@ def main():
         records(ends["roadkill"])
         switches()
         edge_reads()
+        ask_fixes()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
