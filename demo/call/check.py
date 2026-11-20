@@ -305,9 +305,10 @@ def ask_fixes():
     assert (got == want) if "josa" in S.L.ON else all("(이)가" in g for g in got), got
     words = S.tab("이렇게 물어보세요", "낱말")
     asked = {"id": "from", "options": [{"label": "영동1교남단 쪽", "set": {}}, {"label": words["잘 모르겠음"], "set": {}}]}
-    same = S.asked_same([{"said": "영동1교남단 쪽이요", "asked": asked}, {"asked": {"id": "finer", "options": [{"label": "가", "set": {}}]}}], words)
-    assert same({"id": "from", "options": [{"label": "영동1교남단 쪽"}, {"word": "잘 모르겠음"}]})      # 같은 보기(낱말 보기는 화면 글로 바꿔 견준다)
-    assert not same({"id": "from", "options": [{"label": "영동1교북단 쪽"}, {"word": "잘 모르겠음"}]}) and not same({"id": "finer", "options": [{"label": "가"}]})      # 보기가 다르거나, 아직 답을 듣지 않은 질문
+    finer = {"id": "finer", "options": [{"label": "가", "set": {}}]}
+    same = S.asked_same([{"said": "영동1교남단 쪽이요", "asked": asked, "code": {"picked": True}}, {"said": "잘 모르겠어요", "asked": finer, "code": {"clues": []}}], words)
+    assert same({"id": "from", "options": [{"label": "영동1교남단 쪽"}, {"word": "잘 모르겠음"}]})      # 보기에서 골라 답한 질문의 같은 보기(낱말 보기는 화면 글로 바꿔 견준다)
+    assert not same({"id": "from", "options": [{"label": "영동1교북단 쪽"}, {"word": "잘 모르겠음"}]}) and not same({"id": "finer", "options": [{"label": "가"}]})      # 보기가 다르거나, 「모르겠어요」로 답했던 질문
     print("  ✓ 질문 다듬기: 조사 「(이)가」" + ("를 받침에 맞춤" if "josa" in S.L.ON else "는 그대로(스위치 꺼짐)") + " · 같은 보기로 이미 물은 질문 가리기")
 
 

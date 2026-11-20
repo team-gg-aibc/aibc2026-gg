@@ -95,10 +95,10 @@ def fill(s, **kw):
 
 
 def asked_same(turns, words):
-    """(sameopts · 75번) 「이 질문을 같은 보기로 이미 물었나」를 가리는 함수. 시민이 그 보기를 골랐다면 보기가 달라졌을 것이고, 같은 보기가 또 나왔다는 것은 앞의 답으로 범위가 달라지지 않았다는 뜻이다
-    (「영동1교에서 보면 어느 쪽이세요?」에 「남단 쪽이요」라고 답했는데 같은 질문이 또 나와 시민이 끊음 · 「바로 앞에 뭐가 보이세요? 석촌호수 아뜰리에 같은 거요」가 두 번)."""
+    """(sameopts · 75번) 「이 질문을 같은 보기로 이미 물었고 시민이 그 보기 가운데서 골랐나」를 가리는 함수. 고른 답을 받았는데 같은 보기가 또 나왔다는 것은 그 답으로 범위가 달라지지 않았다는 뜻이고, 다시 물어도 같은 답이 온다
+    (「영동1교에서 보면 어느 쪽이세요?」에 「남단 쪽이요」라고 답했는데 같은 질문이 또 나와 시민이 끊음). 「모르겠어요」나 보기 밖의 말로 답한 질문은 여기 넣지 않는다(다른 답을 들은 뒤 다시 물으면 답할 수 있다)."""
     lab = lambda q: tuple(o.get("label") or words.get(o.get("word"), o.get("word")) for o in q.get("options") or [])      # noqa: E731
-    asked = {(t["asked"]["id"], lab(t["asked"])) for t in turns if t.get("said") and t.get("asked")}
+    asked = {(t["asked"]["id"], lab(t["asked"])) for t in turns if t.get("said") and t.get("asked") and (t.get("model") or t.get("code") or {}).get("picked")}
     return lambda q: (q["id"], lab(q)) in asked
 
 
