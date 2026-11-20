@@ -98,6 +98,7 @@ HEAD = r"(?<![가-힣])"      # 낱말 머리에서만(「덮개가 · 안개가
 ANIMALS = [("개", HEAD + r"(개(?=[가를는도\s,.?!]|한|인데|인가|인 ?것|예요|이에요|$)|강아지|유기견|멍멍이)"), ("고양이", r"고양이|유기묘|길냥"),
            ("야생동물", HEAD + r"(너구리|고라니|멧돼지|비둘기|까치|족제비|뱀|청설모|새(?=[가를는도들\s,.?!]|한|예요|$))")]     # 한 글자(개 · 새)는 뒤에 토씨 · 띄어쓰기가 올 때만(「개인택시」 · 「새벽」은 아니다)
 ALIVE = (r"죽어|죽은|죽었|사체|안 ?움직|로드킬|치여|치인", r"살아|움직여|움직이고|돌아다니|뛰어|걸어|앉아|서 있|짖")
+HURT = r"다쳐|다친|다쳤|웅크|떨고|떨어요|울고|울어요|숨 ?쉬|절뚝|피 ?흘|낑낑"      # (hurtalive) 다쳤다 · 웅크렸다 · 떤다는 말은 살아 있다는 뜻(「죽어」가 같이 있으면 죽음이 먼저 — ALIVE[0]을 먼저 본다)
 
 
 def relation(after):
@@ -715,7 +716,7 @@ def code_read(said, asked, short, R):
         read["matter"]["animal"] = animal
     if re.search(ALIVE[0], said):
         read["matter"]["alive"] = False
-    elif re.search(ALIVE[1], said) and (animal or q.get("id") == "alive"):
+    elif (re.search(ALIVE[1], said) or ("hurtalive" in L.ON and re.search(HURT, said))) and (animal or q.get("id") == "alive"):
         read["matter"]["alive"] = True
     if ("목줄" in said or "인식표" in said) and "leash" not in read["matter"]:
         read["matter"]["leash"] = not re.search(r"없|안 ?보|안 ?하|안 ?했", said)

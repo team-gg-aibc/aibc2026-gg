@@ -809,9 +809,12 @@ def questions(R, clues, matter, asked=()):
     if matter.get("type") is None and not matter.get("told"):     # 무슨 일인지 한 번 말했으면 다시 묻지 않는다
         conds.append({"id": "what", "bits": None, "options": []})
     elif matter.get("animal_matter"):
-        if matter.get("alive") is None:
+        stuck = lambda q: "matterstop" in ON and sum(1 for a in asked if (a or "").rstrip("!") == q) >= 2      # (matterstop) 일 질문(살았나 · 목줄)은 두 번 물어 답을 못 읽으면 더 묻지 않는다(모름으로 두고 위치로)
+        if matter.get("alive") is None and stuck("alive"):
+            pass
+        elif matter.get("alive") is None:
             conds.append({"id": "alive", "bits": None, "options": [{"word": "살아 있음", "set": {"matter": {"alive": True}}}, {"word": "죽은 것 같음", "set": {"matter": {"alive": False}}}]})
-        elif matter["alive"] and matter.get("leash") is None:
+        elif matter["alive"] and matter.get("leash") is None and not stuck("leash"):
             conds.append({"id": "leash", "bits": None, "options": [{"word": "목줄 있음", "set": {"matter": {"leash": True}}}, {"word": "목줄 없음", "set": {"matter": {"leash": False}}}]})
     if R is None:
         return [{"id": "where", "bits": None, "options": []}] + conds
