@@ -400,3 +400,8 @@ body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }
 /* 상담 기록의 「그때 나눈 대화」: 통화 글 칸과 같은 말풍선(.lines · .ln) 그대로, 길면 칸 안에서 내려 읽기(11-21) */
 #side .talkrec .lines { flex: none; max-height: 320px; padding: 8px 2px 4px; }
 #side .talkrec .n2 { color: var(--sub); font-weight: 500; }
+/* 상담 기록 화면 · 휴대폰 너비: 목록 칸이 고른 기록 카드를 덮지 않게 위(목록) · 아래(고른 기록)로 쌓는다. 자리만 바꾸고 꾸밈은 그대로(11-21) */
+@media (max-width: 760px) {
+  body.view-records #reclist { left: 8px; right: 8px; width: auto; bottom: 58%; }
+  body.view-records #side { left: 8px; right: 8px; width: auto; top: calc(42% + 8px); bottom: 8px; }
+}
