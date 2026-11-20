@@ -24,7 +24,7 @@ import gaz
 
 G = gaz.load()
 STEP, DONE_M, DONE_ROAD_M, MASS = 20, 50, 100, 0.9     # 끝내는 기준: 범위의 반지름 50m. 길 위는 구간 200m(차로 지나며 찾으니 넓게 잡음 — 추측)
-EPS = {"anyof": 0.2, "at": 0.12, "road": 0.04, "pt": 0.05, "in": 0.07, "out": 0.07, "between": 0.07, "past": 0.07, "before": 0.07, "cat": 0.5, "cone": 0.12, "closest": 0.15, "half": 0.1, "rim": 0.1, "core": 0.1}   # 단서 종류마다 「이 말이 틀렸을 몫」(이름은 자료가 낡았을 몫까지)
+EPS = {"anyof": 0.2, "at": 0.12, "road": 0.04, "pt": 0.05, "in": 0.07, "out": 0.07, "between": 0.07, "past": 0.07, "before": 0.07, "cat": 0.5, "cone": 0.12, "closest": 0.15, "half": 0.1, "rim": 0.1, "core": 0.1, "over": 0.12}   # 단서 종류마다 「이 말이 틀렸을 몫」(이름은 자료가 낡았을 몫까지)
 WEAK = 0.3       # 비슷한 이름으로 이은 단서(받아 적기가 틀렸다고 보고 고쳐 이은 것)가 틀렸을 몫. 정확히 맞은 이름(0.12)보다 약하게(11-15)
 AROUND = (450.0, 200.0)     # 「○○ 쪽」(11-16): 그 자리에서 450m 안은 고르게, 그 밖은 폭 200m로 줄어든다(90%가 드는 거리 약 800m). 짐작 — 통화 자료로 맞춘 값이 아니다
 SIG = {"바로": 18.0, "가까이": 40.0, "근처": 100.0, "모름": 100.0, "보임": 150.0, "쪽": AROUND[0]}        # 「바로 앞 · 옆」 · 「근처」를 몇 m 폭(종 모양의 표준편차)으로 볼지. 90%가 드는 반지름은 그 2.1배
@@ -470,6 +470,16 @@ def _like(n, c, keys, x, y, ctx):
         return 1.0 / (1.0 + np.exp(np.clip(-c["side"] * tt / 25.0, -50, 50)))
     if t == "not":
         return np.where(np.hypot(x - c["p"][0], y - c["p"][1]) <= c.get("r", 80), c.get("f", 0.1), 1.0)      # f: 무른 「아니다」(「둘 다 아니에요」는 0.4, 33번 1-4)
+    if t == "over":                                       # (farsee2 · 75번) 「호수 건너편에 ○○가 보여요」: 그 자리에서 ○○ 쪽으로 그은 선(600m까지)이 물 위를 40m 넘게 지나는 곳. 아니면 0.15
+        ring = water_ring(resolve(c["k"]))
+        if ring is None:
+            return None
+        closed, vx, vy = np.vstack((ring, ring[:1])), c["p"][0] - x, c["p"][1] - y
+        dist = np.hypot(vx, vy) + 1e-9
+        steps = np.linspace(0.0, 1.0, 16)[1:]
+        reach = np.minimum(dist, 600.0)
+        wet = sum(in_ring(x + vx / dist * reach * s_, y + vy / dist * reach * s_, closed) for s_ in steps) * reach / len(steps)
+        return np.where(wet >= 40.0, 1.0, c.get("f", 0.15))
     if t in ("rim", "core"):                              # (edgeband · 75번) 「○○ 둘레길 · 가장자리 · 끝 쪽」: 그 구역 테두리 선에서 폭 w의 띠(가운데 한 점이 아니다). 「○○ 한가운데」: 테두리에서 가장 깊은 안쪽(가장 깊은 곳의 절반보다 깊으면 고르게)
         out = np.zeros(len(x))
         for ar in _parks_of(c["k"]):

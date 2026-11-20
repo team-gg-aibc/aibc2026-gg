@@ -479,6 +479,7 @@ def code_read(said, asked, short, R):
             how, sure = "근처", False                     # 구역인 이름의 「쪽」은 전처럼(뚜렷하지 않은 「근처」 — Solar가 안 · 밖을 고칠 수 있게). clue_of도 같은 규칙
         if "farsee2" in L.ON and "key" in m and rel == "at" and how == "보임" and re.search(r"(건너편|맞은편|건너|너머|저쪽|저기|멀리)(에|에서|로|으로|쪽에)?$", gaz.norm(said).split(m["key"])[0]):
             how = "쪽"                                    # (farsee2) 「호수 건너편에 ○○가 보여요」: ○○는 건너편 멀리 있다(항동저수지 통화: 가까이로 읽어 저수지와 어긋나 범위 18km)
+            read.setdefault("over", []).append(m["key"])  # 무엇의 건너편인지는 speech_fix가 앞 단서까지 보고 잇는다
         if (asked or {}).get("id") == "finer" and rel == "at" and how == "근처":
             how = "가까이"                                  # 「바로 앞에 뭐가 보이세요?」에 댄 이름: 눈앞에 보이는 것
         if "across" in L.ON and rel == "at" and how == "가까이" and re.search(r"건너|맞은편", m.get("own", m["after"])[:16]):
@@ -868,6 +869,12 @@ def speech_fix(said, read, short, clues):
             if any(k0(c) == word for c in read["clues"]):
                 read["clues"] = [c for c in read["clues"] if k0(c) != word]
                 skip.append(word)
+    if "farsee2" in on and "lakerim" in on and read.get("over"):      # (75번) 「호수 건너편에 ○○가 보여요」: 호수가 나와 ○○ 사이에 있다 → 그 자리에서 ○○ 쪽으로 그은 선이 물 위를 지나는 곳. 호수를 말한 통화에서만
+        lake = next((c for c in reversed(list(clues) + read["clues"]) if c.get("t") == "at" and "k" in c and L.water_ring(L.resolve(c["k"])) is not None), None)
+        far = _center(read["over"][0])
+        if lake and far:                                  # ○○ 자체는 자리 단서로 쓰지 않는다(물 건너 1km 밖일 수 있다): 「○○ 둘레」로 두면 범위를 ○○ 쪽으로 끌어 건너편과 거꾸로 간다
+            read["clues"] = [c for c in read["clues"] if k0(c) != read["over"][0]] + [{"t": "over", "k": lake["k"], "p": far, "f": 0.05, "sure": True, "label": f"{lake['label']} 건너편에 {G.display(read['over'][0])}"}]
+            skip.append(read["over"][0])
     if skip:
         read["skip"] = list(dict.fromkeys(skip))
     return read

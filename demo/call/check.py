@@ -167,6 +167,8 @@ def edge_reads():
     assert [(x["t"], x.get("k")) for x in read("올림픽공원 둘레길이에요, 입구 반대쪽이요")] == [("rim", "올림픽공원")]
     assert [(x["t"], x.get("k")) for x in read("숭례문광장 한가운데쯤이요")] == [("core", "숭례문광장")]
     assert read("롯데월드타워가 보이긴 해요")[0].get("how") == "쪽" and read("호수 건너편에 잠실역이 보여요")[0].get("how") == "쪽"      # 멀리 보이는 것은 그 둘레 넓게
+    st, view = S.turn({"id": "check-over"}, {"line": {"who": "시민", "text": "항동저수지 산책로인데 호수 건너편에 우신중고등학교가 보여요"}})
+    assert [x["t"] for x in S.understood(st)[0]] == ["at", "over"] and "항동저수지 둘레" in view["summary"]["where"], S.understood(st)[0]      # 건너편에 보이는 것은 자리 단서가 아니라 「그쪽으로 물이 놓인 둘레」
     st, view = S.turn({"id": "check-edge"}, {"line": {"who": "시민", "text": "숭례문광장 가장자리요, 찻길 쪽에 쓰레기가 잔뜩 버려져 있어요"}})
     st, view = S.turn(st, {"line": {"who": "시민", "text": "공원 안이에요"}})
     assert not view["done"] and view["pin"] is None and "숭례문광장 둘레" in view["summary"]["where"], (view["done"], view["summary"]["where"])      # 광장 가장자리: 가운데에 핀을 찍지 않고 둘레로 되묻는다
