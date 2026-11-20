@@ -1,4 +1,4 @@
-<!-- README decision pending 2 (English name): default = "Call Locate", taken from the repository folder name call-locate. Pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph and the "Ordinance engine (scored API)" section. -->
+<!-- README decision pending 2 (English name): default = "Call Locate", taken from the repository folder name call-locate. Pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph and the "Ordinance engine (scored API)" section. The service name is not decided yet either (11-21): when it is, change the h1 in both versions. -->
 <h1 align="center">Call Locate (통화로 위치 좁히기)</h1>
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
@@ -34,6 +34,8 @@
 
 ## Screens
 
+<!-- Images to retake once the demo place is decided: both show the main scene (Sangdo 1-dong, Dongjak-gu). If the demo place changes (decision on the morning of 11-21), retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions. The current images were taken from main 5000e28 on 11-21 in saved-answers mode -->
+
 > [!NOTE]
 > The service and these screenshots are in Korean. The call is a made-up call the team wrote. It is not a real complaint or a real person, the agent's name tag is "상담사 A" (Agent A), and the caller's phone number ("민원인 연락처") is made up with the middle digits hidden. The bottom left of the screen also says "This call and question flow is a made-up flow the team built from public material and the ordinance text. It is not connected to the 120 standard consultation database." The scripted scene was played in "saved answers" mode: the team ran the script once with real calls, saved the Upstage model responses, and replays them for the same words.
 
@@ -63,15 +65,16 @@ So we narrow down the place during the call. Once the place is fixed, the distri
 
 ## Features
 
-- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped. Fixes for real speech are also on by default: "a few minutes' walk", saying where you are now apart from where you saw it, "not X but Y", "across from", "from A toward B", giving only an exit number, naming a brand and its branch separately, giving an address, and more (`SPEECH_ON` in `demo/call/locate.py`). It also handles speech-to-text mistakes: station names split or off by one letter, numbers written out in Korean words, particles after a name, and "no" (아니에요) to the inside-or-outside-the-park question (`STT_ON`).
-- ❓ **Shows only one next question.** It computes which question splits the remaining candidates most evenly. Questions that change the handoff office (is the animal alive, is it inside a park or on the street) come first.
-- 📍 **Reads the place back before fixing it.** When the area is within a 50 m radius (a 200 m stretch on a road), it asks "…is that right?" and drops the pin only after the caller says yes.
+- 🗣️ **Reads location clues from speech.** It finds names in a place list (143,988 OpenStreetMap places and 348,712 small-business records) and uses the words right after a name to tell "right in front of", "near", "past", and "before reaching". A name the caller takes back ("oh, no, wait") is dropped. Fixes for real speech are also on by default: "a few minutes' walk", saying where you are now apart from where you saw it, "not X but Y", "across from", "from A toward B", giving only an exit number, naming a brand and its branch separately, giving an address, and more (`SPEECH_ON` in `demo/call/locate.py`). It also handles speech-to-text mistakes: station names split or off by one letter, numbers written out in Korean words, particles after a name, and "no" (아니에요) to the inside-or-outside-the-park question (`STT_ON`). Fixes for the failures from the 11/19 field test are on by default too: common words such as "spot", "here", and "near" (자리 · 여기 · 근처) are not read as shop names, an area that is already narrow cannot jump several kilometers on one line, and "yes, but not right in front, a bit to the side" is not read as "no" when the screen reads the place back.
+- ❓ **Shows only one next question.** It computes which question splits the remaining candidates most evenly. Questions that change the handoff office (is the animal alive, is it inside a park or on the street) come first, and a case question that has been answered is not asked again later in the call.
+- 📍 **Reads the narrowed place back before fixing it.** When the area is within a 50 m radius (a 200 m stretch on a road), it asks "…is that right?" and drops the pin only after the caller says yes.
 - 🗂️ **Fills the intake card.** It writes a line for finding the spot, the lot number of the nearest building with its distance, map coordinates, and the office in charge. The office line also says whether it was "confirmed in official guidance" or is "not yet confirmed (a guess)". If the agent picks a different case type in "일" (Case), the screen keeps the call text and the area and decides the office and whether the six ordinances apply again.
-- 📜 **Adds the ordinance answer.** If the case falls under the six ordinances, a draft the engine made from the ordinance and the cited articles stay in the same box during the whole call. Clicking an article number shows the article text, effective date, and source link in that box. The screen tells the agent not to read the draft as is but to judge and explain in their own words, and the answer and cited articles can be copied.
-- 🏫 **Knows large places and intersection names.** For schools, stations, large stores and similar places bigger than 60 m, it adds their size to the area instead of treating them as one center point, and it does not drop a pin in their center. It understands 994 names of major intersections in Seoul (such as "강남역사거리").
-- ☎️ **Calls you turn on with a switch (off by default).** `CALL_DIRECT=1` is the direct call for the deployed version: a visitor plays the caller and types, and the next line the screen picked and the ordinance answer appear in the chat as the agent's words (with an access code and usage limits). `CALL_VOICE=1` is a voice call placed and answered from a phone browser; its speech-to-text and reading aloud are not Upstage models, so it is for development experiments and making the demo video only (see "What you should know" 4). Details are in [`demo/call/voice/README.md`](demo/call/voice/README.md) (Korean).
+- 📜 **Adds the ordinance answer.** If the case falls under the six ordinances, a draft the engine made from the ordinance and the cited articles stay in the same box during the whole call. Clicking an article number shows the article text, effective date, and source link in that box. The screen tells the agent not to read the draft as is but to judge and explain in their own words, and the answer and cited articles can be copied. For smoking on the street, smoke-free areas are set as places rather than "the street", so once the place is narrowed, the question to the engine includes the nearest bus stop or subway exit. A kick scooter left at a Ttareungyi (Seoul public bike) station or rack is handled as a bicycle ordinance case.
+- 🏫 **Knows large places and intersection names.** For schools, stations, large stores and similar places bigger than 60 m, it adds their size to the area instead of treating them as one center point, and it does not drop a pin in their center. Places where a person can stand anywhere along the edge, such as a lake, a park trail, or the edge of a plaza, are read as their perimeter, not one center point. It understands 994 names of major intersections in Seoul (such as "강남역사거리").
+- ☎️ **Calls you turn on with a switch (off by default).** `CALL_DIRECT=1` is the direct call: a visitor plays the caller and types, and the next line the screen picked and the ordinance answer appear in the chat as the agent's words (an access code and usage limits can be set). `CALL_VOICE=1` is a voice call placed and answered from a phone browser. Speech-to-text and reading aloud use ElevenLabs and are turned on only on the presentation server (see "What you should know" 4). Details are in [`demo/call/voice/README.md`](demo/call/voice/README.md) (Korean).
 - 🏙️ **Draws map buildings at their real height.** 68,197 Seoul buildings that are taller in reality than in the map tiles are redrawn with heights from Seoul's building data, and the buildings in the script get a roof outline. The heights in Seoul's data are not measured; they are floors × 3.5 m. Add `?heights=off` to the address to turn this off.
-- 🗒️ **Keeps consultation records.** Calls with a confirmed place are saved, and past records nearby (within 400 m) appear on the intake card and the map. The status has five steps: received, handed to the office, in progress, not found on site / call back, and done.
+- 🗒️ **Keeps consultation records.** Calls with a confirmed place are saved, and past records nearby (within 400 m) appear on the intake card and the map. The status has five steps: received, handed to the office, in progress, not found on site / call back, and done. Each record keeps what was said in the call, and "그때 나눈 대화" (the conversation at the time) can be opened on the selected record (it starts folded).
+- 📱 **Works on a phone held upright.** On a narrow screen nothing is hidden: the boxes stack in one column in this order: the chat (with the input box), what to ask now, the ordinance answer, the location area, and the intake card.
 - 🙅 **Says when it does not know.** The engine answers "확인 불가" (cannot confirm) when it finds no basis. The screen writes what is missing as it is, for example "the six Seoul ordinances have no article on handling animal carcasses", "not yet confirmed (a guess)", or "no lot number (inside a park)".
 
 ## How one call goes
@@ -79,15 +82,15 @@ So we narrow down the place during the call. Once the place is fixed, the distri
 Four steps at the top of the screen show where the call is.
 
 1. **Hear the situation.** The caller's words come in one line at a time. In the demo, they come from a script or are typed in.
-2. **Narrow down the place.** For each line, code reads names and relations and shows the area and the next question right away. Then solar-pro4 reads the same line again into fixed fields and corrects it. If the case is one to ask the ordinances about, the screen writes a question for the engine once the case type and place type are known, and gets the ordinance answer.
-3. **Confirm.** When the area is small enough, the screen reads the place back. If the caller says no, it lowers the chance of that spot and keeps narrowing.
+2. **Narrow down the place.** For each line, code reads names and relations and shows the area and the next question right away. Then solar-pro4 reads the same line once more and corrects it into set items (place name, relation, what happened). If the case is one to ask the ordinances about, the screen writes a question for the engine once the case type and place type are known, and gets the ordinance answer.
+3. **Confirm.** When the area is small enough, the screen reads the narrowed place back to the caller. If the caller says no, it lowers the chance of the place it just read back and keeps narrowing.
 4. **Hand off.** From the fixed place it decides the office and the lot number and fills the intake card. A case with a confirmed place is saved to the records, and the agent sets the status to "handed to the office" (the scripted scene shows it as already chosen). When the call ends, "Take next call" and "View records" buttons appear.
 
 The demo does not file or send anything for real. The status changes only inside the screen.
 
 ## Architecture and models
 
-Every model call is a single call that returns fixed fields (JSON), and code decides what happens next. Things that must not be made up, such as place names, article names, source links, and effective dates, come only from tables and the ordinance text.
+Every model call is a single call that returns set items (JSON), and code decides what happens next. Things that must not be made up, such as place names, article names, source links, and effective dates, come only from tables and the ordinance text.
 
 ```mermaid
 flowchart LR
@@ -121,10 +124,10 @@ The table follows the five stages the contest notice asked teams to describe. We
 | Collection | The original text of the six Seoul ordinances is kept as a data file (`engine/data/ordinances.json`), with the source link and effective date for each | None |
 | Document parsing | The tables in the annexes (fee tables and so on) were read with Document Parse and saved. On top of the starter kit's results, we re-read them in a mode that keeps table cells, and code turns each row into "header: value" lines. It is not called per question | Document Parse (`document-parse`) |
 | Search | The 528 ordinance chunks are turned into vectors in advance. The question is turned into a vector to find close chunks, mixed with a keyword score | `solar-embedding-2-passage` (chunks) · `solar-embedding-2-query` (questions) |
-| Answer generation | Break the question into fields, read the full text of the chosen ordinance and write the answer, then rewrite it in plain words | `solar-pro4` |
-| Verification | Judge whether the remaining evidence really covers what the question asks. Three code gates add to this: choosing which ordinance to read, checking that the quoted phrase appears word for word in the article, and checking the output format | `solar-pro4` + code |
+| Answer generation | Pick out the ordinance name, region, and what is asked from the question (no answer yet), read the full text of the chosen ordinance and write the answer, then rewrite it in plain words | `solar-pro4` |
+| Verification | Judge whether the remaining evidence really covers what the question asks. Three code checks add to this: choosing which ordinance to read, checking that the quoted phrase appears word for word in the article, and checking the output format | `solar-pro4` + code |
 | (Demo screen) read again · write the question · shorten for reading aloud | The purple boxes above. Only when the engine answer is longer than two sentences or 160 characters is it shortened to one or two sentences. The short version is dropped if it adds a number or changes the conclusion | `solar-pro4` |
-| (Voice switch `CALL_VOICE`, off by default) speech-to-text · reading aloud | For development experiments and making the demo video only. Not a model the service calls (see "What you should know" 4) | Not an Upstage model |
+| (Presentation server only, voice switch `CALL_VOICE`) speech-to-text · reading aloud | Only turns sound into text and text into sound. Not used for narrowing the place, picking questions, or the ordinance answer. Upstage offers no speech-to-text or speech synthesis model (see "What you should know" 4) | Not an Upstage model: ElevenLabs `scribe_v2_realtime` (speech-to-text) · `eleven_multilingual_v2` (reading aloud) |
 
 <details>
 <summary><b>Stages in more detail (files and functions)</b></summary>
@@ -136,7 +139,7 @@ The table follows the five stages the contest notice asked teams to describe. We
 | Remove fillers | code | Removes fillers such as "um" and "so" | `server.py` `FILLER` |
 | Find names | code + place list | Finds names in the place list, longest first, and also links names that sound alike | `server.py` `shortlist`, `gaz.py` |
 | Read relations | code | Uses the words right after a name to tell the relation, and reads words such as the animal and whether it is alive | `server.py` `code_read` |
-| Read again | solar-pro4, once | Gets the name candidates code found and the options of the last question, and answers only in fixed fields. Names not on the list are dropped. If the format is wrong, only the code reading is used | `server.py` `model_read`, `READ_PROMPT` |
+| Read again | solar-pro4, once | Gets the name candidates code found and the options of the last question, and has it answer only in set items. Names not on the list are dropped. If the format is wrong, only the code reading is used | `server.py` `model_read`, `READ_PROMPT` |
 | Compute area | code | Places candidate points every 20 m where the clues point, and multiplies for each point "how likely the caller would say this if it were here". The area is where 90% of the likelihood sits | `locate.py` `infer` |
 | Pick next question | code | Questions that change the handoff come first, then the one location question that splits the area best. At most 10 location questions | `locate.py` `questions`, `LOCCAP` |
 | Narrow enough · confirm | code | Within a 50 m radius (a 200 m stretch on a road), it reads the place back | `locate.py` `is_done` |
@@ -157,19 +160,31 @@ The table follows the five stages the contest notice asked teams to describe. We
 | Stage | Who | What it does |
 | --- | --- | --- |
 | Search | solar-embedding-2-query, once + code | Picks 20 candidates from the chunks of the six ordinances |
-| Analyze the question | solar-pro4, once | Does not answer. Only breaks the question into fields (subject, what is asked, type, any ordinance named, region) |
+| Analyze the question | solar-pro4, once | Picks out only the subject, what is asked, the type, any ordinance named, and the region. It does not write an answer yet |
 | Choose the ordinance | code | Picks at most two ordinances to read. If the question is about another ordinance, a district, or another city, it ends here with "cannot confirm" |
 | Read the ordinance · write the answer | solar-pro4, once | Reads the full text of the chosen ordinance (annexes included) and returns an answer and evidence (article name + a phrase copied from it) |
-| Phrase gate | code | Keeps a citation only if the copied phrase appears word for word in that article |
+| Phrase check | code | Keeps a citation only if the copied phrase appears word for word in that article |
 | Check against the question | solar-pro4, 0 or 1 time | Judges whether the remaining evidence really covers what the question asks |
-| Plain words · opening word | solar-pro4, once + code | Rewrites the answer in plain words and drops the rewrite if a number or the conclusion changes. Adds "yes" or "no" to the front of answers to yes/no questions |
+| Plain words · opening word | solar-pro4, once + code | Rewrites the answer in plain words and drops the rewrite if a number or the conclusion changes. It also keeps the draft if the rewrite drops a value from a correct draft or adds "it is not set" (정해져 있지 않다) that the draft did not say (the plain-words check). Adds "yes" or "no" to the front of answers to yes/no questions |
 | Output | code | Keeps only articles that are in the index, and code adds the source link and effective date. With no citation left, the answer becomes "cannot confirm" |
 
 </details>
 
+### Servers
+
+All three servers run on AWS. Their code, servers, and addresses are frozen with the 11/22 submission and not changed after it.
+
+| Server | What it does | Sound | Submitted |
+| --- | --- | --- | --- |
+| Scoring API | Answers the contest's scoring questions at `POST /ask`. On during the 11/25 to 11/27 scoring period | None | Yes |
+| Demo | The agent screen judges try themselves. Open from 11/22 to 11/27 | None (text only) | Yes |
+| Presentation | Used only by the team for the live demo during the presentation | Speech-to-text · reading aloud (ElevenLabs) | No |
+
+<!-- Place for the submitted addresses (scoring API · demo): their form is for the PM to decide (11-21). Do not write addresses or IPs until then -->
+
 ### Ordinance engine (scored API)
 
-Send a question to `POST /ask` and it answers in the contest's four-field JSON. This is a real response from the submitted settings (2026-11-18). The answer is in Korean; in English it says: "Yes, parking fees are reduced for people with disabilities. With the disabled vehicle sign attached, a person with a disability on board, and the disability card shown, the fee is 80% off. At subway transfer parking lots, the first 3 hours per day are free and 80% off after that."
+Send a question to `POST /ask` and it answers in the contest's four-field JSON. This is a real response from the version then on the scoring server (2026-11-18). The submitted version only adds the plain-words check to it, so the citations and "cannot confirm" are the same. The answer is in Korean; in English it says: "Yes, parking fees are reduced for people with disabilities. With the disabled vehicle sign attached, a person with a disability on board, and the disability card shown, the fee is 80% off. At subway transfer parking lots, the first 3 hours per day are free and 80% off after that."
 
 ```json
 POST /ask  {"question": "장애인 주차요금 감면되나요?"}
@@ -182,7 +197,7 @@ POST /ask  {"question": "장애인 주차요금 감면되나요?"}
 
 - When it finds no basis, `answer` starts with "확인 불가" (cannot confirm) and `citation` is empty.
 - Each question has a 75-second deadline, and any error still returns HTTP 200 with the four-field JSON.
-- `GET /health` returns the fingerprint of the loaded settings (`settings`). The submitted version is `4fb47ff9df76`.
+- `GET /health` returns the fingerprint of the loaded settings (`settings`). The submitted version is `7327ca7e355b`.
 
 The ordinances are the versions in force on 2026-10-01, as the contest set. Each ordinance has its own effective date, and `effective_date` in the response is the effective date of the cited ordinance.
 
@@ -199,37 +214,38 @@ The ordinances are the versions in force on 2026-10-01, as the contest set. Each
 
 ### Ordinance engine
 
-Scores of the submitted engine on questions never used in development (unseen questions) and on development questions. The weighted score averages the scores by type with the starter kit's example ratio (simple 3, conditional 3, combined 3, trap 2). It is the team's own measurement, not the contest's hidden scoring.
+Scores of the submitted engine on questions never used in development (unseen questions) and on development questions. The answer labels follow the 11/19 scoring notice. The weighted score averages the scores by type with the starter kit's example ratio (simple 3, conditional 3, combined 3, trap 2). It is the team's own measurement, not the contest's hidden scoring.
 
-| | 166 unseen questions, 3 runs | 693 development questions, 3 runs |
+| | 174 unseen questions, 12 runs | 693 development questions, 2 runs |
 | --- | --- | --- |
-| **Weighted score** | **93.0** (91.1 to 94.7) | **95.1** (94.7 to 95.6) |
-| Simple lookup | 97.5 | 95.6 |
-| Conditional | 94.3 | 96.7 |
-| Combining several articles | 92.8 | 91.8 |
-| No basis (trap) | 84.8 (11 questions) | 96.7 (40 questions) |
-| Over-abstaining ("cannot confirm" when an answer exists) | 1.5% | 2.1% |
-| Errors · format errors · answers over 90 s | 0 | 0 |
+| **Weighted score** | **93.1** (90.5 to 95.9) | **95.2** (95.3 · 95.1) |
+| Simple lookup | 95.0 | 94.8 |
+| Conditional | 94.3 | 96.3 |
+| Combining several articles | 91.6 | 92.0 |
+| No basis (trap) | 90.9 (11 questions) | 98.7 |
+| Over-abstaining ("cannot confirm" when an answer exists) | 2.8% | 2.9% |
+| Errors | 0 | 0 |
 
-- Unseen questions: three runs on 2026-11-18 (simple 63, conditional 63, combined 29, trap 11). Development questions: the same version, two runs on 11-15 and one on 11-18. The engine was called directly without the server, four questions at a time.
-- The 2.0-point gap between the two sets all comes from trap questions. Without traps, the average of the other three types is the same (94.8 and 94.7). The unseen set has only 11 trap questions, so one question moves the trap score by 9.1 points.
-- One run of the 166 unseen questions made 704 to 705 Upstage calls (about 4.2 per question, embeddings included). The logged cost (tokens × list price) was $0.37 to $0.40.
+- Unseen questions: measured on 2026-11-20, side by side with other candidate versions at the same time, three runs each on four occasions, 12 runs in all (simple 71, conditional 63, combined 29, trap 11). The scores by type are the average of the 12 runs. Development questions: the record made when the submitted version was built (2026-11-20, two runs, four questions at a time). On the development questions there were also no format errors and no answers over 90 s.
+- The same version scores differently from run to run (90.5 to 95.9 on the unseen questions). Most of the 2.1-point gap between the two sets comes from trap questions. The unseen set has only 11 trap questions, so one question moves the trap score by 9.1 points.
+- Two runs of the 693 development questions made 5,873 Upstage calls (about 4.2 per question, embeddings included). The logged cost (tokens × list price) was $3.06.
 
 <details>
 <summary><b>What we changed from the starter kit (improvement history)</b></summary>
 
-| Cycle | Weighted score on development questions | Over-abstaining | Questions · scoring rule |
+| Version (date measured) | Weighted score on development questions | Over-abstaining | Questions · scoring rule |
 | --- | --- | --- | --- |
-| 0 Start (the starter kit, moved over) | 67.0 | 28.4% | 661 questions, rule before 11-11 |
-| 1 | 76.9 | 18.8% | 661 questions, rule before 11-11 |
-| 3 | 92.5 | 7.2% | 693 questions, current rule |
-| 4 Submitted | 94.8 | 2.0% | 693 questions, current rule |
+| Start, the starter kit moved over (11-07) | 67.0 | 28.4% | 661 questions, rule before 11-11 |
+| 11-10 | 76.9 | 18.8% | 661 questions, rule before 11-11 |
+| 11-13 | 92.5 | 7.2% | 693 questions, 11-11 rule |
+| 11-15, first put on the scoring server | 94.8 | 2.0% | 693 questions, 11-11 rule |
+| 11-20, submitted (the 11-15 version + plain-words check) | 95.2 | 2.9% | 693 questions, labels matched to the 11-19 notice |
 
-The question set and the scoring rule changed in the middle, so cycles 0 and 1 should not be compared directly with cycles 3 and 4. The record for each cycle is in [`docs/engine/releases.md`](docs/engine/releases.md) (Korean).
+The question set and the scoring rule changed in the middle, so the numbers up to 11-10 should not be compared directly with the numbers from 11-13 on. The record for each version is in [`docs/engine/releases.md`](docs/engine/releases.md) (Korean).
 
 | | Start | Submitted |
 | --- | --- | --- |
-| Flow | search → pick evidence · write answer → judge → output | search → analyze the question → choose the ordinance (code) → read the full ordinance and write the answer → phrase gate (code) → check against the question → plain words → output check (code) |
+| Flow | search → pick evidence · write answer → judge → output | search → analyze the question → choose the ordinance (code) → read the full ordinance and write the answer → phrase check (code) → check against the question → plain words (keep the draft if the rewrite spoils a correct one) → output check (code) |
 | What it reads | A few chunks from search | The full text of the chosen ordinance |
 | Annexes | The table text the kit read | Re-read keeping table cells, turned into "header: value" lines |
 | Questions outside the six ordinances | Left to search scores and a model judgment | Code ends them before reading |
@@ -241,18 +257,18 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 ### Narrowing the location
 
-<!-- Numbers to update at the Friday/Saturday number check: the table, the lines below, and "What you should know" 2. Current values: 600 calls measured on 11-19 with the current defaults (six location-reading switches on, PR #123). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
+<!-- The 600-call values in this section were measured on the 11-21 baseline (location code the same as main 5000e28), run r75-c2m (report 78, "바탕" row: 421 · 397 · 416 / 0 · 0 · 5). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
 
-All of these come from simulated calls. In a simulated call, code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. We have not measured with real people speaking yet.
+All of these come from simulated calls. In a simulated call, code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
 
 | What we measured | Result |
 | --- | --- |
 | Calls narrowed to one point | When the caller answers what they see, 421 of 600 calls (70.2%) were narrowed to one point, and 0 calls were fixed at a wrong place. On 11-18, before we found and fixed four causes of wrong fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes |
-| When the caller makes mistakes | With 10% wrong answers and 10% "I don't know": 398 calls (66.3%) and 0 wrong fixes. With 10% wrong answers and a caller who easily says yes to a wrong place: 417 calls (69.5%) and 5 wrong fixes |
+| When the caller makes mistakes | With 10% wrong answers and 10% "I don't know": 397 calls (66.2%) and 0 wrong fixes. With 10% wrong answers and a caller who easily says yes to a wrong place: 416 calls (69.3%) and 5 wrong fixes |
 | How close the lot number is | Median distance from the true location to the nearest lot number: 18 m in alleys and shopping streets, 25 m around station exits, 39 m on main roads. Share more than 100 m away: 48% on motorways, 80% inside parks |
 
-- Measured on 2026-11-19 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 6.5 exchanges on average.
-- The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases.
+- Measured on 2026-11-21 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 6.4 exchanges on average.
+- The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases. The 11-20 fixes (fixes for the field test failures, reading perimeters, and more) also barely changed these 600 calls (398 → 397, 417 → 416); their effect was checked by feeding the words of real calls back in and with a separate set of cases.
 - "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the caller confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
 - Measurements up to 11-18 and how we fixed things are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
 
@@ -317,7 +333,7 @@ curl -s -X POST http://localhost:8000/ask -H 'Content-Type: application/json' -d
 
 | What it checks | Command | Key |
 | --- | --- | --- |
-| Runs the demo server in saved-answers mode and plays the scripted scenes, buttons only, places outside the script, saving a nickname, consultation records, and reference values to the end. Exit code 1 on failure | `OPENBLAS_NUM_THREADS=1 python3 demo/call/check.py` (port 8779, change with `CALL_CHECK_PORT`) | No |
+| Runs the demo server in saved-answers mode and plays the scripted scenes, buttons only, places outside the script, saving a nickname, consultation records (with the conversation at the time), and reference values to the end. Exit code 1 on failure | `OPENBLAS_NUM_THREADS=1 python3 demo/call/check.py` (port 8779, change with `CALL_CHECK_PORT`) | No |
 | Self-test of the location math | `python3 demo/call/locate.py` | No |
 | 30 simulated calls: number of exchanges, error of the fixed point, handoff office (code only, about 30 s) | `OPENBLAS_NUM_THREADS=1 python3 demo/call/tools/sim_calls.py` | No |
 | Server side of the voice call and direct call switches (off by default). Speech-to-text is fake, and outside services are replaced by fake servers on this computer | `OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/check_voice.py`, `OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/check_direct.py` | No |
@@ -336,8 +352,8 @@ curl -s -X POST http://localhost:8000/ask -H 'Content-Type: application/json' -d
 | `CALL_MODE` | Demo: `saved` for saved answers, `code` for code only without a model, anything else for real calls | Real calls |
 | `CALL_PORT` | Demo port | 8772 |
 | `CALL_MODEL` | Model the demo uses to read lines and write the question | solar-pro4 |
-| `CALL_DIRECT` | `1` turns on the direct call (text) for the deployed version | Off |
-| `CALL_VOICE` | `1` turns on the voice call (development experiments and video making only, not a model the service calls) | Off |
+| `CALL_DIRECT` | `1` turns on the direct call (text) | Off |
+| `CALL_VOICE` | `1` turns on the voice call (speech-to-text and reading aloud with ElevenLabs, on only on the presentation server) | Off |
 
 The demo's other environment variables are in [`demo/call/README.md`](demo/call/README.md) (Korean).
 
@@ -347,20 +363,22 @@ The demo's other environment variables are in [`demo/call/README.md`](demo/call/
 
 <!-- README decision pending 4 (standard consultation database sentence): default = the same words as the screen text (the "가상 흐름" row in docs/content/A-05). Change both together -->
 1. **The demo calls are made up.** This call and question flow is a made-up flow the team built from public material and the ordinance text, and it is not connected to the 120 standard consultation database (the bottom left of the screen says the same). The team wrote the call scripts and question wording, and chose the complaint types from Seoul's field complaint handling standard. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
-2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured yet.
-3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 11 were confirmed in official guidance or the ordinance text, and 19 are guesses. The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
-4. **The only models the service calls are Upstage models.** With the default settings, the only outside model API that the engine and the demo server call is Upstage's, and the browser loads only map tiles and the map library from outside. The repository also holds code for a voice call switch (`CALL_VOICE`, off by default). Its speech-to-text and reading aloud (ElevenLabs, Whisper running on this computer, Return Zero) are not Upstage models, so they are for development experiments and making the demo video only, and are not models the service calls. They are not used for deployment or scoring until the contest office answers ([`docs/decisions.md`](docs/decisions.md), 11-19, Korean).
+2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured by distance yet.
+3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 24 were confirmed in official guidance or the ordinance text, and 6 are guesses. The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
+4. **Every model that makes an answer is an Upstage model.** Narrowing the place, picking questions, and the ordinance answer use only Upstage models. Only speech-to-text (sound to text) and reading aloud (text to sound) use another company's models (ElevenLabs: `scribe_v2_realtime` for speech-to-text, `eleven_multilingual_v2` for reading aloud), because Upstage offers no speech-to-text or speech synthesis model. These two run only on the presentation server with the voice switch (`CALL_VOICE`, off by default) turned on. The scoring API server and the demo server work with text only and do not use them ([`docs/decisions.md`](docs/decisions.md), 11-21, Korean). With the default settings, the only outside model API that the engine and the demo server call is Upstage's, and the browser loads only map tiles and the map library from outside. The voice switch code can also choose other speech-to-text options (Whisper running on this computer, Return Zero), but the presentation server uses ElevenLabs.
 
+<!-- README decision pending 5 (name and shape of the "Limitations" section): the presentation uses "next directions" instead of "limitations" (11-20). The README keeps the content under the current name. Once decided, change only this section's title and shape -->
 ## Limitations
 
 - It cannot understand shop or building names that are not in the map data (OpenStreetMap and the small-business data). It also has no motorway signs or exit numbers.
 - The lot number is not the lot number of the spot itself. It is the lot number of the nearest building with a shop, so the distance is always shown with it.
-- Distance ranges such as "right in front" = 18 m and "near" = 100 m, and the rule for when to stop, were not tuned with real calls.
+- The values that read "right in front" as about 18 m and "near" as about 100 m, and the rule for when to move on to confirming, were not tuned with real calls.
 - The first question assumes the caller is at the spot. If someone reports something they saw while passing by from another place, the screen may narrow down the wrong place (only the motorway scene asks separately which bridge the driver passed).
 - Roads, stations, or bridges that share a name are not fixed until another clue tells them apart.
 - The screen assumes it receives text from the call center's speech-to-text tool. It has never been connected to that tool. The demo uses script playback and typed input.
 - It does not actually file or send a case.
-- Engine: on unseen questions, the trap score (questions where "cannot confirm" is correct because there is no basis) is lower than on development questions (84.8 vs 96.7). For cases under the six ordinances, the engine sometimes gives different answers to the same question.
+- Engine: on unseen questions, the trap score (questions where "cannot confirm" is correct because there is no basis) is lower than on development questions (90.9 vs 98.7). For cases under the six ordinances, the engine sometimes gives different answers to the same question.
+- Engine: it is weak on questions about details that an ordinance leaves to someone else, such as the mayor (the delegation case in the 11/19 scoring notice). Candidate versions that fixed this did not pass the criteria set in advance (they had to pass on every set), so they were not put into the submitted version ([`docs/decisions.md`](docs/decisions.md), 11-21, Korean).
 
 Some evidence is still missing. We filed an information disclosure request for the number of call-backs caused by unclear locations and have not received it. A test where real people describe their own location in their own words is prepared but has 0 calls so far (section 7 of the [evidence notes](docs/call-locate/근거.md), Korean).
 
@@ -377,6 +395,8 @@ Some evidence is still missing. We filed an information disclosure request for t
 | Park restrooms (`park_toilets.tsv.gz`) | Seoul Open Data Plaza OA-22586, Seoul public restroom locations. KOGL Type 1 (attribution) |
 | Motorway interchange and tunnel names (`road_nodes.tsv.gz`) · major intersection names (`cross_nodes.tsv.gz`) | National Transport Information Center standard node-link data (2026-11-11) |
 | Sizes of large places (`extents.tsv.gz`) | © OpenStreetMap contributors, ODbL 1.0 (areas from the Seoul extract above) + station exits from the same place list |
+| Bridge areas (`bridges.json.gz`) | © OpenStreetMap contributors, ODbL 1.0 (bridge areas from the Seoul extract above) |
+| Other names of places (`wiki_alias.tsv.gz`, read only by a switch that is off by default) | Korean aliases from Wikidata (CC0) and Korean Wikipedia redirect titles (CC BY-SA 4.0, source ko.wikipedia.org), downloaded 2026-11-20 |
 | A few demo places (`demo/call/data/extra_places.json`) | Added by hand by the team because the map data had no name for them |
 | Saved answers (`demo/call/data/saved.json`) | Upstage model and engine responses saved from running the scripted scenes with real calls |
 | Building heights (`demo/call/web/heights/`) | Seoul Metropolitan Government, "서울시 건물 태양에너지 등급도(2018년)" (Seoul building solar energy grade map, 2018), Seoul Open Data Plaza OA-15944, KOGL Type 1 (attribution). Heights are not measured; they are floors × 3.5 m. Footprints: © OpenStreetMap contributors · OpenFreeMap tiles |
@@ -393,13 +413,14 @@ All of these documents are in Korean.
 | --- | --- |
 | How to run and click through the demo, scene addresses, environment variables | [`demo/call/README.md`](demo/call/README.md) |
 | An introduction to the service and its measurements | [`docs/call-locate/README.md`](docs/call-locate/README.md) |
+| A 30-minute study guide to the whole system | [`docs/공부-자료-1120.md`](docs/공부-자료-1120.md) |
 | Evidence that the problem is real, with sources | [`docs/call-locate/근거.md`](docs/call-locate/근거.md) |
 | The words on the screen and the call scripts (the source of all screen text) | [`docs/content/A-05_통화위치좁히기.md`](docs/content/A-05_통화위치좁히기.md) |
 | How to run the engine, its files, and its logs | [`engine/README.md`](engine/README.md) |
 | The engine's new flow | [`docs/engine/flow2.md`](docs/engine/flow2.md) |
 | The scoring rules we received | [`docs/engine/scoring-rules.md`](docs/engine/scoring-rules.md) |
 | How to measure scores and keep records | [`docs/engine/reproducibility.md`](docs/engine/reproducibility.md) |
-| Engine scores by cycle | [`docs/engine/releases.md`](docs/engine/releases.md) |
+| Engine scores by version | [`docs/engine/releases.md`](docs/engine/releases.md) |
 | Contest judging criteria | [`docs/evaluation.md`](docs/evaluation.md) |
 | What the team decided and why | [`docs/decisions.md`](docs/decisions.md) |
 | How we work | [`AGENTS.md`](AGENTS.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) |
