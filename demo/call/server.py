@@ -1100,6 +1100,9 @@ NEAR_M = 50                                                               # 좁�
 NEAR_ASK = "\n- [장소]가 「○○ 가까이 길가」 꼴이면 그 표지 이름을 첫 문장의 장소에 그대로 쓴다(거리는 단정하지 않는다)."
 NEAR_ASK_END = " 끝 문장은 「누가 맡아 …」 대신 「이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지」를 묻는다."
 NEAR_AT = re.compile(r" 가까이 길가$")
+# 표지를 넣지 않는 통화: 건물 안(「국민건강증진법」 몫) · 자치구가 정한 금연거리(자치구 조례 몫)는 조례 6종 밖이라 「확인 불가」가 맞는데, 표지를 넣으면
+# 엔진이 그 표지(정류장 · 출구)를 들어 답한다(72번 첫 재기: F1 · G1이 확인 불가 → 제5조 제1항 인용으로 바뀜). 이때는 지금 물음 그대로 보낸다.
+NEAR_SKIP = re.compile(r"건물|화장실|실내|복도|계단|엘리베이터|사무실|(?:가게|식당|상가|매장|카페|술집|노래방|아파트) ?안|구청|구에서 (?:정|지정)|구가 (?:정|지정)")
 
 
 def near_mark(R):
@@ -1117,10 +1120,11 @@ def near_mark(R):
     return f"{name} {word}" if word else name
 
 
-def engine_place(R, route, decided):
-    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 정해지기(decided) 전에는 None(아직 부르지 않음), 정해지면 가까운 표지를 넣는다."""
+def engine_place(R, route, decided, said=()):
+    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 정해지기(decided) 전에는 None(아직 부르지 않음), 정해지면 가까운 표지를 넣는다.
+    시민 말(said)이 건물 안 · 자치구가 정한 것을 말하면 표지를 넣지 않고 지금처럼 보낸다(NEAR_SKIP)."""
     place = place_phrase(R, route)
-    if not (SMOKE_NEAR and route["type"] == "smoking" and not route["class_name"]):
+    if not (SMOKE_NEAR and route["type"] == "smoking" and not route["class_name"]) or NEAR_SKIP.search(" ".join(said)):
         return place
     if not decided:
         return None
@@ -1402,7 +1406,7 @@ def build(st, extra=None):
     route = route_of(matter, R) if ready else None
     engine = None
     settled = done or R is not None and (R["on_road"] or R["r"] <= 250 or any(c["t"] in ("in", "out") for c in clues))     # 장소의 종류가 정해진 뒤에 부른다(엔진을 두 번 부르지 않게)
-    place = engine_place(R, route, done or confirmed or handoff) if route else None     # (SMOKE_NEAR) 길가 흡연은 자리가 정해진 뒤에 부른다
+    place = engine_place(R, route, done or confirmed or handoff, [t["said"] for t in st["turns"] if t.get("said")]) if route else None     # (SMOKE_NEAR) 길가 흡연은 자리가 정해진 뒤에 부른다
     if route and route["ask_engine"] and settled and place and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
         job = engine_job(st, route, place, matter.get("ask"))
         engine = {"status": "ready", **engine_card(job["res"])} if job["res"] is not None and time.time() >= job["ready_at"] else {"status": "running"}
