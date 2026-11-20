@@ -402,6 +402,7 @@ body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }
 #side .talkrec .n2 { color: var(--sub); font-weight: 500; }
 /* 상담 기록 화면 · 휴대폰 너비: 목록 칸이 고른 기록 카드를 덮지 않게 위(목록) · 아래(고른 기록)로 쌓는다. 자리만 바꾸고 꾸밈은 그대로(11-21) */
 @media (max-width: 760px) {
-  body.view-records #reclist { left: 8px; right: 8px; width: auto; bottom: 58%; }
+  body.view-records #reclist { left: 8px; right: 8px; width: auto; bottom: 58%; overflow-y: auto; }
+  body.view-records #reclist .recs { flex: none; overflow: visible; }      /* 낮은 칸에서도 기록 줄이 밀려 사라지지 않게 칸 전체를 내려 읽는다 */
   body.view-records #side { left: 8px; right: 8px; width: auto; top: calc(42% + 8px); bottom: 8px; }
 }
