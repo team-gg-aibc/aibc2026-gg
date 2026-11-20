@@ -647,6 +647,8 @@ def code_read(said, asked, short, R):
         pick = 0 if re.search(r"바로|방금|막 ", said) else 3 if re.search(r"5분|오 ?분|다섯", said) else 2 if re.search(r"[23]분|이삼|두세|이 ?분|삼 ?분", said) else 1 if re.search(r"1분|일 ?분|한 ?분", said) else None
     elif q.get("id") == "either" and re.search(r"둘 ?다|아니|모르", said):
         pick = None if "softnot" in L.ON and not re.search(r"둘 ?다|아니", said) else len(opts) - 1      # softnot: 「모르겠어요」는 「둘 다 아님」 단서로 읽지 않는다
+        if pick is not None and "dunnoboth" in L.ON and re.search(r"모르|몰라", said) and not re.search(r"아니", said):
+            pick = None                                   # (dunnoboth · 82번) 「둘 다 잘 모르겠어요」도 모름이다: 「둘 다」에 걸려 「둘 다 아님」으로 읽혀, 없는 단서가 생기고 같은 질문이 곧바로 또 나왔다(평가 통화에서 83번)
     elif q.get("id") == "side":
         pick = 2 if re.search(r"건너|맞은편|반대편", said) else 3 if re.search(r"떨어|조금|좀 |근처", said) else 1 if re.search(r"옆", said) else 0 if re.search(r"앞|정문|입구|^\s*(네|예|응)", said) else None
     elif q.get("id") == "lane":
