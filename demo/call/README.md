@@ -34,6 +34,8 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_REPLAY_SEC` | 저장된 답 방식에서 엔진 답을 보이기 전 기다리는 최대 초 | 2 |
 | `CALL_NO_ENGINE` | 값이 있으면 엔진을 부르지 않는다(가상 통화로 잴 때) | 없음 |
 | `CALL_ON` · `CALL_OFF` | 질문 고르기 · 말 읽기 규칙을 켜고 끈다(견주어 잴 때만). 기본값은 `locate.py`의 `DEFAULT_ON`. 11/18에 실제 말투 고침 묶음(`SPEECH_ON`)을, 11/19에 받아쓰기가 틀린 글 넷과 큰 장소의 넓이(`STT_ON` = `anizone,sttname,sttjosa,numword,bigplace`, 보고 60번)를 더했다. 그 전 값으로 재려면 `CALL_ON=loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone` | 비움 |
+| `CALL_ON`에 `commonshop` · `jumpguard` · `dropcheck` · `optpart` | (71번 · 11/19 현장 테스트 실패 꼴, 묶음 가) `commonshop` = 「자리 · 여기 · 그쪽 · 근처 · 가운데 …」 같은 흔한 말(토씨 붙은 꼴 포함)이 가게로만 있는 이름이면 읽지 않음(「그 자리에 있어요」의 「자리에」 → 4.9km 다른 동으로 확정한 일) · `jumpguard` = 이미 1.5km 안으로 좁혀졌는데 새 말 하나로 범위 가운데가 2km 넘게 옮겨 가면 그 말의 장소는 단서로 받지 않음(「아니 · 말고 · 잘못 · 사실은」으로 고쳐 말하면 받음) · `dropcheck` = Solar 다시 읽기의 「아님」(장소 지우기)은 시민 말에 「아니 · 말고 · 없 · 안 보 · 잘못 · 다른 데」가 있을 때만 받음(「잠실역이요」를 두 번에 한 번 「잠실역 아님」으로 읽어 범위가 사라지고 9km 튀던 일) · `optpart` = 「둘 중 · 어느 쪽」 보기 이름의 일부만 댄 답(「병설유치원이요」)과 목줄 질문의 「안 보여요」를 답으로 읽고, Solar가 비우면 코드가 읽은 목줄 · 생사 답을 씀 | 끔 |
+| `CALL_ON`에 `prefixname` · `hardstop` · `wikialias` · `farsee` | (71번, 기본 끔 · 따로 켜 볼 것) `prefixname` = 지명 표에 그대로 없는 다섯 글자 넘는 말이 400m 안에 몰린 지명들의 앞부분이면 그곳으로(「북촌한옥마을」 → 북촌한옥마을입구) · `hardstop` = 몇 걸음 · 어느 쪽에 「멀리 보이기만 · 가운데 · 모르겠」으로 답한 시민에게 두 질문을 다시 묻지 않음 · `wikialias` = 위키 별칭 사전을 이름 찾기에(「롯데타워」 → 롯데월드타워, 정식 이름과 같은 행을 모두 가리킴) · `farsee` = 이름난 볼거리 · 건물(사전에 오른 곳, 학교 · 공원 빼고)은 「바로 앞」이 아니면 둘레 넓게(`wikialias`와 함께) | 끔 |
 | `CALL_LOCCAP` | 한 통화에 묻는 위치 질문의 상한(11/18에 8 → 10. 앞 값으로 재려면 `8`) | 10 |
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
 | `CALL_CROSS` | 큰길 교차로 이름(`cross_nodes.tsv.gz`, 994개)을 지명 표에 넣는다. `1` 시민이 말하면 알아듣기만(질문 흐름은 그대로) · `2` 보기 · 되말에도 쓴다. `0`이면 넣지 않는다(넣기 전과 견줄 때). 가상 통화의 시민은 `SIM_CROSS=1`일 때만 교차로 이름을 댄다. 보고 60번 | 1(11/19부터) |
@@ -108,6 +110,7 @@ python3 demo/call/tools/sim_calls.py                   # 가상 통화 30통으�
 | `data/seoul/road_nodes.tsv.gz` | 국가교통정보센터 표준노드링크(2026-11-11판) |
 | `data/seoul/cross_nodes.tsv.gz` | 위와 같은 표준노드링크의 일반 도로 교차로 이름(`tools/build_cross.py`). `CALL_CROSS=0`이면 읽지 않는다 |
 | `data/seoul/extents.tsv.gz` | 넓은 장소의 크기(`tools/build_extent.py`): © OpenStreetMap 기여자, ODbL 1.0(위 서울 추출본의 면) + 같은 지명 표의 역 출구. `bigplace`(기본 켬)가 쓴다 |
+| `data/seoul/wiki_alias.tsv.gz` | 서울 장소의 다른 이름 2,358개(1,037곳). 위키데이터(서울 · 좌표가 있는 항목의 한국어 별칭, **CC0**)와 한국어 위키백과 넘겨주기 문서 제목(**CC BY-SA 4.0**, 출처: ko.wikipedia.org), 2026-11-20 받음. 지명 표의 같은 이름 장소(300m 안)에만 이었다(`tools/build_wiki_alias.py`). `CALL_ON`의 `wikialias` · `farsee`만 쓴다(기본 끔) |
 | `data/extra_places.json` | 지도 자료에 이름이 없어 팀이 손으로 더한 시연 장소 |
 | `data/saved.json` | 대본 장면을 실제 호출로 돌려 받아 둔 Solar · 엔진 응답 |
 | `web/heights/index.json` · `cells/*.json` · `hi.geojson` | 서울 전체 건물의 실제 높이와 대본 건물의 지붕 둘레 띠(`web/heights.js`, 주소에 `?heights=off`면 끔). 칸(확대 14 지도 타일, 약 1.9km 네모)마다 파일 하나이고 화면은 보이는 칸만 읽는다(172칸 · 68,197채 · 3.9MB). 지도 타일보다 실제가 높은 건물만 담는다. 높이: 서울특별시 「서울시 건물 태양에너지 등급도(2018년)」, 서울 열린데이터광장 OA-15944, 공공누리 제1유형(출처 표시). 이 자료의 높이는 잰 값이 아니라 층수 × 3.5m다. 바닥 모양: © OpenStreetMap 기여자 · OpenFreeMap(2026-11-15판 타일). 원본 CSV(약 410MB)와 지도 타일(287장, 41MB)은 레포 밖에 두고 `tools/make_heights.py`로 만든다(약 2분) |

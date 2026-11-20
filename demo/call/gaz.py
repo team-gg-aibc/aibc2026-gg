@@ -7,6 +7,7 @@
 - 좌표는 서울 가운데를 원점으로 한 m(동서 x, 남북 y)로 바꿔 쓴다.
 """
 import functools
+import bisect
 import gzip
 import json
 import math
@@ -53,6 +54,18 @@ BLDG_TAIL = re.compile(r"(아파트|빌딩|건물|타워|센터|단지|오피스
 LOST_TAIL = re.compile(r"(대교|역|공원|대로|로|길|터널|지하차도|병원|학교|빌딩|타워|마트|시장|아파트|센터|은행|교회|성당|사거리|삼거리|오거리|나들목|분기점|광장|박물관|구청)$")     # 못 찾았다고 알릴 장소 꼴(한 글자 꼬리 「소 · 청 · 교」는 「주소」 같은 말과 헷갈려 뺀다)
 NOT_LOST = set("""고속도로 도로 대로 찻길 차길 골목길 뒷길 샛길 큰길 산책로 산책길 자전거길 자전거도로 오솔길 교차로 사거리 삼거리 오거리 지하철역 전철역 기차역 버스정류장
 저희아파트 우리아파트 동네공원 근처공원 집앞길 가는길 오는길 지하도 지하차도 고가도로 갓길 인도 차도 보도""".split())      # 장소 꼴이지만 이름이 아닌 말
+
+
+PLACE_WORDS_COMMON = set("""자리 여기 거기 저기 이쪽 그쪽 저쪽 이곳 그곳 저곳 지금 거리 근처 주변 부근 앞쪽 뒤쪽 옆쪽 가운데 중간 위치 장소 골목 동네 길가 건너편 맞은편 우리 저희
+제가 내가 그냥 진짜 정말 아까 방금 오늘 어제 바로 조금 계속 다시 혹시 아마 그거 이거 저거""".split())      # (commonshop, 71번) 「지금도 그 자리에 있어요」의 「자리에」가 상가정보의 가게 이름으로 읽혀 4.9km 튀던 일
+
+
+def _common_word(key):
+    """(commonshop) 흔한 말 그대로이거나 흔한 말 + 토씨 하나(「자리에」 · 「여기서」 · 「거기는」)인가."""
+    if key in PLACE_WORDS_COMMON or key in STOP or key in COMMON:
+        return True
+    m = re.match(r"^(.+?)(에서|에|이|가|은|는|을|를|도|서|로|의|요)$", key)
+    return bool(m) and (m.group(1) in PLACE_WORDS_COMMON or m.group(1) in STOP or m.group(1) in COMMON)
 
 
 def _fill_alias_keys():
@@ -310,6 +323,60 @@ class Gazetteer:
                 continue                      # (CALL_CROSS=1) 교차로 이름은 이름으로만 찾는다
             self.cell.setdefault((cx, cy), []).append(i)
 
+    def add_wiki(self):
+        """(wikialias, 71번) 위키데이터 별칭 + 위키백과 넘겨주기 이름(data/seoul/wiki_alias.tsv.gz)을 이름 색인에 잇는다. 이미 있는 이름은 덮지 않는다(줄 수는 그대로)."""
+        f = DIR / "wiki_alias.tsv.gz"
+        if not f.exists():
+            return 0
+        at, n = {}, 0
+        for i, nm in enumerate(self.name[:self.shop0]):
+            at.setdefault(norm(nm), []).append(i)
+        for line in gzip.open(f, "rt", encoding="utf-8"):
+            a, nm, lo, la = line.rstrip("\n").split("\t")
+            k = norm(a)
+            if len(k) < 3 or k in self.ix:
+                continue
+            x, y = xy(float(lo), float(la))
+            ids = [i for i in at.get(norm(nm), []) if abs(self.x[i] - x) < 2 and abs(self.y[i] - y) < 2]
+            if ids:
+                near = [r for r in self.ix.get(norm(nm), ()) if r[0] == "p" and math.hypot(self.x[r[1]] - x, self.y[r[1]] - y) < 400]
+                self.ix[k] = near or [("p", ids[0])]       # 정식 이름을 댄 것과 같게: 같은 곳의 행을 모두(「인덕대학」 → 인덕대학교의 캠퍼스 넓이 267m 행까지, 600통 #116)
+                n += 1
+        return n
+
+    def prefix_place(self, tok):
+        """(prefixname, 71번) 그대로는 없는 다섯 글자 넘는 말이 여러 지명의 앞부분이고(「북촌한옥마을」 → 「북촌한옥마을 돌계단길」 · 「북촌한옥마을입구」), 그 이름들이(가게 포함) 모두 400m 안에 몰려 있으면 그 한가운데에 가까운 지명으로 읽는다.
+        흩어져 있으면(「한옥마을」 → 필동 · 은평 · 공덕) 읽지 않는다."""
+        if len(tok) < 5:
+            return None
+        if not hasattr(self, "_pre"):
+            self._pre = sorted((norm(n), i) for i, n in enumerate(self.name))
+            self._prek = [k for k, _ in self._pre]
+        a = bisect.bisect_left(self._prek, tok)
+        b = bisect.bisect_left(self._prek, tok + "\uffff")
+        if not 2 <= b - a <= 15:
+            return None
+        ids = [i for _, i in self._pre[a:b]]
+        cx, cy = float(np.mean(self.x[ids])), float(np.mean(self.y[ids]))
+        if max(np.hypot(self.x[ids] - cx, self.y[ids] - cy)) > 400:
+            return None
+        own = [i for i in ids if i < self.shop0 and norm(self.name[i]) in self.ix]
+        return norm(self.name[min(own, key=lambda i: np.hypot(self.x[i] - cx, self.y[i] - cy))]) if own else None
+
+    def far_seen(self):
+        """(farsee, 71번) 멀리서도 보이는 이름난 곳: 위키 별칭 사전에 오른 볼거리 · 건물(학교 빼고). 「롯데타워가 보여요」는 타워 앞이 아니라 그 둘레 넓게다.
+        ponytail: 높이 자료가 없어 「이름난 볼거리 · 건물」로 갈음한다(낮은 이름난 곳도 넓게 읽힘). 높이 자료가 생기면 그것으로"""
+        if not hasattr(self, "_far"):
+            self._far = set()
+            f = DIR / "wiki_alias.tsv.gz"
+            for line in (gzip.open(f, "rt", encoding="utf-8") if f.exists() else ()):
+                a, nm = line.split("\t")[:2]
+                k = norm(nm)
+                ks = {self.kind[i] for t, i in self.ix.get(k, ()) if t == "p" and i < self.shop0}
+                if "학교" not in nm and ks & {"볼거리", "건물"} and "공원" not in ks:      # 공원(「서울숲 근처」)은 구역으로 읽는 길이 따로 있다
+                    self._far |= {k, norm(a)}                 # 별칭으로 댄 것(「롯데타워」)도
+        return self._far
+
     def add_alias(self, name, lon, lat):
         """별명 하나를 지금 떠 있는 지명 표에 더한다(파일에 적는 것은 서버가 한다)."""
         x, y = xy(lon, lat)
@@ -419,6 +486,8 @@ class Gazetteer:
                 if "sttname" in ON and " " in raw and not NEXT_PART.match(raw.split()[-1]) and best[1] and not any(self.ref_kind(r) in ("역", "역 출구") for r in self.ix[best[1]][:40]):
                     best = (0, None)                      # (sttname) 띄어 적은 역 이름을 붙여 본 것은 역으로 이을 때만
                 key = best[1] if best[0] >= need else self.tail_swap(tok)
+                if not key and "prefixname" in ON:
+                    key = self.prefix_place(tok)
                 if key:
                     out.append(self._mention(key, raw, True, norm(text[a:b])[len(tok):] + norm(text[b:b + 14])))
                     used.append((a, b))
@@ -459,6 +528,8 @@ class Gazetteer:
             return False                                  # (CALL_CROSS) 표에 없는 교차로 이름의 꼬리(「○○ 앞 교차로 옆이에요」)를 「교차로」라는 가게 이름으로 읽지 않는다(사거리 · 삼거리는 STOP에 이미 있다)
         if key in STOP or key in CATEGORY or GENERIC.match(key) or key.isdigit():      # 숫자뿐인 이름(「8-15」)은 번호를 읽어 준 말과 헷갈려 받지 않는다
             return False
+        if "commonshop" in ON and self.shop_only(refs) and _common_word(key):
+            return False                                  # (commonshop, 71번) 흔한 말 + 토씨는 가게 이름으로 보지 않는다
         if self.shop_only(refs) and key not in ALIAS_KEYS:            # 상가정보에만 있는 가게 이름은 바로 뒤에 「앞 · 옆 · 간판 · 보여 …」가 올 때만(「갤러리」 · 「가로등」 같은 흔한 낱말)
             return len(key) >= 3 and key not in COMMON and bool((SHOP_AFTER2 if "hasjanha" in ON else SHOP_AFTER).match(after))
         kinds = {self.ref_kind(r) for r in refs[:40]}
