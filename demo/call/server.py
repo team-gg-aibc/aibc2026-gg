@@ -1097,6 +1097,9 @@ def model_read(st, short, known):
         if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search((turn_.get("said") or "") + " " + prev_said)):
             read["drop"].append(m.get("key") or m["name"])
             continue
+        if "placebind" in L.ON and "key" not in m and not str(m.get("by", "")).startswith(("#", "≈", "@")):
+            read["catkeep"] = list(read.get("catkeep") or []) + [m["name"]]
+            continue                                      # (placebind, 79번 · 81번 r01) 종류만 말했는데(「편의점 바로 앞이에요」) Solar가 코드가 넘긴 그 종류 후보 가운데 하나(「위드미」)를 장소로 적었다: 시민이 말하지 않은 이름이라 받지 않는다(넓게 둔 코드 읽기를 쓴다, _merge)
         rel, how = rels.get(pl.get("rel"), "at"), pl.get("how") if pl.get("how") in ("바로", "조금") else "모름"
         if "key" in m:
             read["clues"].append(clue_of(m["key"], rel, "쪽" if pl.get("rel") == "쪽" else "바로" if how == "바로" else "근처" if rel == "at" else how, m["name"]))
@@ -1769,6 +1772,13 @@ def _merge(code, model):
     if "choicekeep" in L.ON:                              # (choicekeep, 기본 끔 · 53번) 「○○ 지나고 1분쯤 됐어요」: 코드는 시민이 말한 정도(1분쯤 · 조금)로 읽어 두는데, Solar가 보기를 고르면 그 보기에 미리 든 「방금 지남」 단서가 다시 들어와 이겼다(47번 pastfix가 실제 호출 길에서 풀리던 일). 같은 표지의 「지났다 · 못 미쳤다」를 코드가 뚜렷이 읽었으면 보기 단서는 버린다
         nl = lambda c: gaz.norm(str(c.get("label") or c.get("k") or "").split(" → ")[0])      # noqa: E731
         model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("past", "before") and nl(c) and any(x.get("t") == c["t"] and nl(x) and (nl(c) in nl(x) or nl(x) in nl(c)) for x in sure))])      # 이름이 겹치는 것도(시민은 「상계교 나가는 길 조금 지나서」라고 했는데 Solar가 다리 「상계교 방금 지남」을 더 넣어 600m 틀린 확정, 씨앗 1201 #17)
+    if model.get("catkeep") is not None:                  # (placebind) Solar가 고른 종류 후보를 버렸으면, 코드가 그 종류 말로 읽은 단서(「편의점 바로 옆」 · 후보가 하나뿐이면 그 한 곳)를 둔다
+        have = {c.get("label") for c in model.get("clues") or []}
+        model = dict(model, clues=list(model.get("clues") or []) + [c for c in code.get("clues") or [] if (c.get("t") == "cat" or c.get("label") in model["catkeep"]) and c.get("label") not in have])
+    if "codekeep" in L.ON:                                # (codekeep, 79번) 코드가 글자 그대로 찾은 이름(비슷한 이름 아님)을 Solar가 「있음 · 근처」에서 「지남 · 못 미침 · 방향」으로 바꿔 읽으면 코드 것을 둔다(80번 c18: 「합정역 7번 출구 나와서 조금 걸어오면 … 마라탕집 앞」 → 출구를 거리 모를 「지남」으로 읽어 40m가 3,140m로)
+        mine = {c["k"]: c for c in code.get("clues") or [] if c.get("t") == "at" and c.get("k") and not c.get("heard")}
+        swap = [c for c in model.get("clues") or [] if c.get("k") in mine and c.get("t") in ("past", "before", "toward")]
+        model = dict(model, clues=[c for c in model.get("clues") or [] if c not in swap] + [mine[c["k"]] for c in swap])
     same = lambda a, b: (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a.get("label") and a.get("label") == b.get("label"))   # noqa: E731
     return dict(model, clues=sure + [c for c in model.get("clues") or [] if not any(same(c, x) for x in sure)])
 
@@ -1828,6 +1838,8 @@ def turn(st, ev):
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
+                if "keeptype" in L.ON and matter.get("type") not in (None, "other") and not ((last.get("code") or {}).get("matter") or {}).get("type") and read["matter"].get("type") not in (None, matter["type"]):
+                    read["matter"].pop("type")            # (keeptype, 79번) 일 낱말이 없는 차례(코드가 이 말에서 일을 못 읽음)에 Solar가 앞서 정한 일을 다른 일로 덮지 않는다(80번 c03 · c10: 자리만 말했는데 적치물 · 소음 → 「그 밖의 일」). 「그 밖의 일」에서 구체적인 일로는 바꾼다
                 if "barename" in L.ON:                    # (barename, 기본 끔 · 53번) 「뚜레쥬르요.」처럼 이름만 답한 말: Solar가 그 이름을 지워도 코드가 읽은 단서를 둔다
                     mine = [c for c in (last.get("code") or {}).get("clues") or [] if c.get("k")]
                     rest = gaz.norm(FILLER.sub(" ", last["said"]))

@@ -630,6 +630,56 @@ def bind_choice():
     print(f"  ✓ Solar가 시민이 말하지 않은 보기를 고름(켬 {on}): {'시민이 댄 곳에 머묾' if on else '그 통화 그대로 700m 떨어진 보기로 확정 질문'} · 보기 이름을 말했거나 다른 이름이 없으면 고르기를 받음")
 
 
+def reread_guards():
+    """(codekeep · keeptype, 79번) Solar 다시 읽기가 코드가 맞게 읽은 것을 덮는 꼴 둘(80번 c18 · c03). Solar 자리에 그 통화의 날 답을 넣어 서버의 turn을 그대로 돈다. 켬 · 끔 어느 쪽이든 그 값대로 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    N = {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "choice": "없음", "confirm": "없음", "outside": False, "said_place": ""}
+
+    def run(turns):
+        q = []
+
+        def solar(system, user, schema):           # 이름으로 준 단서를 목록의 id로
+            raw = q.pop(0)
+            ids = dict((n.strip(), i) for i, n in re.findall(r"^- (m\d+) \| ([^|]+)", user, re.M))
+            return {**{k: v for k, v in raw.items() if k != "by_name"}, "places": [{"id": ids[nm], "rel": rel, "how": how} for nm, rel, how in raw["by_name"]]}
+        mode, real, eng = S.MODE, S._solar, os.environ.get("CALL_NO_ENGINE")
+        os.environ["CALL_NO_ENGINE"] = "1"
+        try:
+            S._solar = solar
+            st, view = S.turn({"id": "check-reread"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+            for said, raw in turns:
+                st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+                q.append(raw)
+                S.MODE = "live"
+                st, view = S.turn(st, {"phase": "model"})
+                S.MODE = mode
+                if view["question"]:
+                    st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        finally:
+            S.MODE, S._solar = mode, real
+            os.environ.pop("CALL_NO_ENGINE") if eng is None else os.environ.update(CALL_NO_ENGINE=eng)
+        return st, view
+    _, v18 = run([("안녕하세요 제가 지금 합정역 7번 출구 나와서 조금 걸어오면 파리바게뜨 있고 그 옆에 마라탕집 앞인데요 거기 트럭이 인도에 반쯤 걸쳐서 계속 서 있어서 사람들이 차도로 걸어 다녀요 위험해요",
+                   dict(N, type="vendor", by_name=[["합정역 7번 출구", "지남", "모름"], ["파리바게뜨", "근처", "바로"]]))])
+    if "codekeep" in S.L.ON:
+        assert v18["radius"] <= 60 and "합정역 7번 출구" in (v18["summary"]["where"] or ""), (v18["radius"], v18["summary"]["where"])      # 코드가 읽은 「출구 있음」을 둔다
+    else:
+        assert v18["radius"] > 1000, v18["radius"]                                           # 끄면 그 통화 그대로: 출구를 거리 모를 「지남」으로 읽어 3km 넘게 넓어짐
+    st, _ = run([("가게에서 물건을 인도에 잔뜩 내놔서 사람이 지나갈 수가 없어요", dict(N, type="vendor", by_name=[])), ("명동이에요", dict(N, by_name=[])),
+                 ("명동역 6번 출구 나와서 밀리오레 앞이요", dict(N, type="other", by_name=[["명동역 6번 출구", "근처", "모름"], ["밀리오레", "근처", "바로"]]))])
+    kind = S.understood(st)[1].get("type")
+    assert kind == ("vendor" if "keeptype" in S.L.ON else "other"), kind                     # 켜면 자리만 말한 차례의 Solar 「그 밖의 일」이 적치물을 덮지 않음
+    _, vc = run([("여기 쓰레기가 너무 많이 버려져 있어요", dict(N, type="litter", by_name=[])), ("강남역 근처요", dict(N, by_name=[["강남역", "근처", "모름"]])),
+                 ("편의점 바로 앞이에요", dict(N, type="litter", by_name=[["위드미", "안", "모름"]]))])      # 81번 r01: 실제 Solar가 세 번 모두 첫 후보 「위드미」를 장소로 적음
+    if "placebind" in S.L.ON:
+        assert "위드미" not in vc["chips"] and vc["radius"] > 600, (vc["chips"], vc["radius"])      # 켜면 코드가 넓게 둔 「편의점 바로 옆」 그대로
+    else:
+        assert "위드미" in vc["chips"] and vc["radius"] < 400, (vc["chips"], vc["radius"])          # 끄면 그 통화 그대로 위드미 쪽으로 끌려감
+    print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 자리만 말한 차례 뒤 일 {kind} · 「편의점 바로 앞」 {vc['radius']}m")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -666,6 +716,7 @@ def main():
         records(ends["roadkill"])
         switches()
         bind_choice()
+        reread_guards()
         edge_reads()
         ask_fixes()
         print("통화로 위치 좁히기 점검 통과")
