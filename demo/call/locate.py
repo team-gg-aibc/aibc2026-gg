@@ -1660,6 +1660,38 @@ def selftest():
     a = anchor(Rg, big)
     assert a["ext"] == ext and a["d"] == 0 and anchor(infer(small), small)["ext"] == 0, a
     ON.add("bigplace") if had else ON.discard("bigplace")
+    # (EDGE_ON · 75번) 둘레에 길이 있는 곳: 호수는 물 안이 낮고, 광장 가장자리는 가운데에 핀을 찍지 않고, 한가운데는 가운데로, 방위 말은 그쪽으로, 「공원 + 다리 밑」은 둘이 만나는 곳
+    had = set(ON)
+    ON.update(EDGE_ON.split(","))
+    G.add_bridges()
+    lake = resolve(k("항동저수지"))
+    ring = water_ring(lake)
+    gx, gy = unpack(box_keys(ring[:, 0].min(), ring[:, 1].min(), ring[:, 0].max(), ring[:, 1].max()))
+    deep = np.where(in_ring(gx, gy, np.vstack((ring, ring[:1]))), ring_dist(gx, gy, ring), -1.0)
+    mid = np.array([gx[deep.argmax()], gy[deep.argmax()]])      # 물 안에서 테두리가 가장 먼 점
+    v = _like(0, {"t": "at", "k": k("항동저수지"), "how": "가까이"}, np.zeros(2), np.array([mid[0], ring[0, 0]]), np.array([mid[1], ring[0, 1]]), _context([]))
+    assert deep.max() > 20 and water_ring(resolve(k("청계천"))) is None and v[0] <= LAKE_IN < 0.9 < v[1], (v, deep.max())      # 물 한가운데 ≤ 0.1, 테두리 위 ≈ 1. 하천은 고리가 아니다
+    box_mid = [float(ring[:, 0].min() + ring[:, 0].max()) / 2, float(ring[:, 1].min() + ring[:, 1].max()) / 2]
+    west = [{"t": "cone", "o": box_mid, "v": [-1.0, 0.0], "cos": 0.5, "f": 0.03}, {"t": "at", "k": k("항동저수지"), "how": "가까이"}]
+    Rw = infer(west)
+    assert Rw["cx"] < box_mid[0] - 30 and Rw["ringed"] == "항동저수지" and _rim_side(Rw) == "서쪽" and describe(Rw, west)["rim"]["side"] == "서쪽", (Rw["cx"] - box_mid[0], Rw.get("ringed"))
+    i_pl = next(i for i, a in enumerate(G.parks) if a["name"] == "숭례문광장")
+    edge = [{"t": "rim", "k": k("숭례문광장"), "w": 25.0}, {"t": "in", "a": ["park", i_pl]}]
+    Re, Rm = infer(edge), infer([{"t": "core", "k": k("숭례문광장")}])
+    assert Re["hole"] and not is_done(Re) and is_done(Rm) and not Rm.get("ringed"), (Re["r"], Re["hole"], Rm["r"])
+    ON.discard("ringdone")
+    assert is_done(Re)                                    # 그 판정이 없으면 고리 가운데(광장 한가운데)에 핀을 찍는다
+    ON.add("ringdone")
+    i_self = next(i for i in range(G.shop0) if G.name[i] == "열린송현 녹지광장")
+    Rp = infer([{"t": "at", "k": k("열린송현 녹지광장")}])
+    assert self_area(i_self) and i_self not in _candidates(*_sample(Rp), 100.0)[0]
+    i_pk = next(i for i, a in enumerate(G.parks) if a["name"] == "망원한강공원")
+    under = [{"t": "in", "a": ["park", i_pk]}, {"t": "at", "k": k("양화대교"), "how": "바로"}]
+    Ru, i_br = infer(under), resolve(k("양화대교"))["ids"][0]
+    assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
+    Rsolo = infer(under[1:])
+    assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
+    ON.clear(), ON.update(had)
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
 

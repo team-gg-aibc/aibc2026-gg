@@ -147,6 +147,35 @@ def field_fixes():
     print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
 
 
+def edge_reads():
+    """(75번) 둘레에 길이 있는 곳의 읽기 스위치(EDGE_ON): 켜져 있으면 그 읽기를, 꺼져 있으면 지금의 읽기(길 낱말이 이름으로 읽힘)를 서버 함수로 바로 본다(모델 · 엔진 호출 없음)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = set(S.L.EDGE_ON.split(",")) <= S.L.ON
+
+    def read(said, asked=None):
+        short = S.shortlist(said, None, (asked or {}).get("id"))
+        return S.code_read(said, asked, short, None)["clues"]
+    c = read("석촌호수 서쪽 산책로예요")
+    names = [x.get("k") for x in c]
+    if not on:
+        assert "산책로" in names, names
+        print("  ✓ 둘레 읽기 스위치 꺼짐: 지금의 읽기 그대로")
+        return
+    assert names == [None, "석촌호수"] and c[0]["t"] == "cone" and c[0]["v"] == [-1.0, 0.0] and c[1]["how"] == "가까이", c      # 길 낱말은 이름이 아니고, 방위 말은 그쪽으로, 호수의 산책로는 물가 둘레
+    assert [(x["t"], x.get("k")) for x in read("올림픽공원 둘레길이에요, 입구 반대쪽이요")] == [("rim", "올림픽공원")]
+    assert [(x["t"], x.get("k")) for x in read("숭례문광장 한가운데쯤이요")] == [("core", "숭례문광장")]
+    assert read("롯데월드타워가 보이긴 해요")[0].get("how") == "쪽" and read("호수 건너편에 잠실역이 보여요")[0].get("how") == "쪽"      # 멀리 보이는 것은 그 둘레 넓게
+    st, view = S.turn({"id": "check-edge"}, {"line": {"who": "시민", "text": "숭례문광장 가장자리요, 찻길 쪽에 쓰레기가 잔뜩 버려져 있어요"}})
+    st, view = S.turn(st, {"line": {"who": "시민", "text": "공원 안이에요"}})
+    assert not view["done"] and view["pin"] is None and "숭례문광장 둘레" in view["summary"]["where"], (view["done"], view["summary"]["where"])      # 광장 가장자리: 가운데에 핀을 찍지 않고 둘레로 되묻는다
+    st, view = S.turn({"id": "check-edge2"}, {"line": {"who": "시민", "text": "망원한강공원 자전거길이에요, 양화대교 밑에 고양이가 죽어 있어요"}})
+    st, view = S.turn(st, {"line": {"who": "시민", "text": "공원 안이에요"}})
+    assert view["done"] and "망원한강공원 안" in view["summary"]["where"] and "양화대교" in view["summary"]["where"], view["summary"]["where"]      # 다리는 강 한복판 한 점이 아니라 공원과 만나는 곳
+    print("  ✓ 둘레 읽기: 길 낱말은 이름이 아님 · 방위 말 · 테두리 띠와 한가운데 · 멀리 보이는 것 · 광장 가장자리는 가운데에 핀 없음 · 공원 + 다리 밑")
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -388,6 +417,7 @@ def main():
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         switches()
+        edge_reads()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
