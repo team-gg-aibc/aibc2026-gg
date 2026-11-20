@@ -171,7 +171,10 @@ def _partyes(read, said, R=None):
     if "partyes2" in L.ON:
         read["confirm"] = None
         if R is not None:
-            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": 12.0, "ring": 35.0, "partyes": True, "label": tab("위치 범위").get("단서 · 되묻은 자리 조금 옆", "되묻은 자리 조금 옆")})
+            near = [float(G.ext[i]) for i in G.near(R["cx"], R["cy"], 40.0) if i < len(G.ext)]
+            ring = max([35.0] + near)                     # 되묻은 자리가 넓은 곳(길쭉한 건물 · 부지)이면 「조금 옆」은 그 크기만큼 떨어진 끝일 수 있다(93개 둘레 꼴 74-P10 「자벌레」 120m)
+            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": max(12.0, 0.3 * ring), "ring": ring, "partyes": True, "big": ring > 35.0,
+                                  "label": tab("위치 범위").get("단서 · 되묻은 자리 조금 옆", "되묻은 자리 조금 옆")})
     else:
         read["confirm"] = True
     return True
@@ -968,7 +971,7 @@ def model_read(st, short, known):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
     if (turn_.get("asked") or {}).get("id") == "confirm" and _partyes(read, turn_.get("said")):     # (partyes) Solar가 「아니요」로 읽어도 「네」로 시작하는 부분 긍정은 그대로(확정 · 또는 partyes2면 고리 단서)
         read["clues"] += [c for c in (turn_.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
-        if read["confirm"] is None and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
+        if read["confirm"] is None and not any(c.get("big") for c in read["clues"] if c.get("partyes")) and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
             read["confirm"], read["clues"] = True, [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째는 확정으로
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}
@@ -1706,7 +1709,7 @@ def turn(st, ev):
             bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
-            if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
+            if any(c.get("partyes") and not c.get("big") for c in read["clues"]) and any(c.get("partyes") for c in clues):
                 read["confirm"], read["clues"] = True, [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 「네, 근데 조금 옆」은 확정으로(같은 되묻기를 되풀이하지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
                 told = told_of(text, short) or (text.strip()[:41] if (asked or {}).get("id") == "what" else "")
