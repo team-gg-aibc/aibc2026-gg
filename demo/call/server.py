@@ -1113,6 +1113,9 @@ NEAR_M = 50                                                               # 좁�
 NEAR_ASK = "\n- [장소]가 「○○ 가까이 길가」 꼴이면 그 표지 이름을 첫 문장의 장소에 그대로 쓴다(거리는 단정하지 않는다)."
 NEAR_ASK_END = " 끝 문장은 「누가 맡아 …」 대신 「이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지」를 묻는다."
 NEAR_AT = re.compile(r" 가까이 길가$")
+# (KICK_DOCK) 대여소 · 거치대의 킥보드 물음은 조례의 말로: 엔진이 「따릉이 자리 · 거치대 사이」와 「킥보드」를 제12조의2 제7항의 「공공자전거 주차구역」 ·
+# 「개인형 이동장치」로 잇지 못해 확인 불가가 났다(72번 5절: 「대여소 · 전동 킥보드」가 든 물음은 3/3, 「따릉이 자리 · 거치대 사이 · 킥보드」만 든 물음은 1/6).
+KICK_ASK = "\n- 킥보드는 「개인형 이동장치(전동 킥보드)」, 따릉이는 「공공자전거(따릉이)」, 대여소 · 거치대 · 따릉이 자리는 「공공자전거 대여소의 주차구역」이라는 조례의 말로 쓴다."
 # 표지를 넣지 않는 통화: 건물 안(「국민건강증진법」 몫) · 자치구가 정한 금연거리(자치구 조례 몫)는 조례 6종 밖이라 「확인 불가」가 맞는데, 표지를 넣으면
 # 엔진이 그 표지(정류장 · 출구)를 들어 답한다(72번 첫 재기: F1 · G1이 확인 불가 → 제5조 제1항 인용으로 바뀜). 이때는 지금 물음 그대로 보낸다.
 NEAR_SKIP = re.compile(r"건물|화장실|실내|복도|계단|엘리베이터|사무실|(?:가게|식당|상가|매장|카페|술집|노래방|아파트) ?안|구청|구에서 (?:정|지정)|구가 (?:정|지정)")
@@ -1171,11 +1174,17 @@ def _run_engine(key, said, tname, place, job, question=None):
         prompt = ASK_Q_PROMPT if question else ASK_PROMPT
         if NEAR_AT.search(where):                         # (SMOKE_NEAR) 가까운 표지를 물음에 남기게
             prompt += NEAR_ASK + ("" if question else NEAR_ASK_END)
+        kick = KICK_DOCK and KICK.search(" ".join(said)) and DOCK.search(" ".join(said))
+        if kick:                                          # (KICK_DOCK) 조례의 말로
+            prompt += KICK_ASK
         res["ask"] = _solar(prompt, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
     res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
+    if KICK_DOCK and KICK.search(" ".join(said)) and DOCK.search(" ".join(said)) and "개인형 이동장치" not in res["ask"]:      # (KICK_DOCK) 간추리기가 조례의 말을 안 썼으면 틀로
+        res["ask"] = (f"{where}의 공공자전거(따릉이) 대여소 주차구역에 개인형 이동장치(전동 킥보드)가 무단으로 세워져 있습니다. " + (question or "누가 맡아 어떻게 처리해야 하나요?"))[:300]
+        res["ask_fixed"] = True
     mark = NEAR_AT.sub("", where) if NEAR_AT.search(where) else None
     if mark and mark not in res["ask"]:                   # (SMOKE_NEAR) 간추리기가 표지를 뺐으면 틀로: 표지가 없으면 엔진이 「길」만 보고 근거를 못 찾는다
         res["ask"] = (f"{mark} 가까이 길가에서 담배를 피우는 사람이 있습니다. " + (question or "이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지 알려 주세요."))[:300]
