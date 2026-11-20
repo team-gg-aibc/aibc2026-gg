@@ -903,6 +903,7 @@ def model_read(st, short, known):
         return None, "failed", round(time.time() - t0, 2)
     sec = round(time.time() - t0, 2)
     usage["read"] += 1
+    prev_said = next((t["said"] for t in reversed(st["turns"][:-1]) if t.get("said")), "")     # (dropcheck) 바로 앞 시민 말(「아니요」 → 「롯데월드요」: 앞서 댄 곳을 빼는 것은 받는다)
     by_id, rels = {m["id"]: m for m in short}, {"있음": "at", "근처": "at", "쪽": "at", "안": "in", "밖": "out", "지남": "past", "못 미침": "before", "방향": "toward"}
     read = {"clues": [], "matter": {}, "confirm": {"예": True, "아니요": False}.get(raw.get("confirm")), "outside": bool(raw.get("outside")), "drop": [],
             "said_place": str(raw.get("said_place") or "")[:40]}
@@ -910,7 +911,7 @@ def model_read(st, short, known):
         m = by_id.get(pl.get("id"))
         if not m:
             continue
-        if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search(turn_.get("said") or "")):
+        if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search((turn_.get("said") or "") + " " + prev_said)):
             read["drop"].append(m.get("key") or m["name"])
             continue
         rel, how = rels.get(pl.get("rel"), "at"), pl.get("how") if pl.get("how") in ("바로", "조금") else "모름"
