@@ -622,9 +622,74 @@ def _places_in(x0, y0, x1, y1, cap_m=6000):
     return out
 
 
+GENERIC_VOCAB = set("""쓰레기통 쓰레기 따릉이 대여소 거치대 입구 출구 출입구 정문 후문 입구광장 잔디밭 잔디광장 잔디 동상 말동상 구름다리 안내소 관리사무소 매표소 경비실 정류장 버스정류장 버스
+앞 옆 뒤 밑 주차장 화장실 공중화장실 놀이터 어린이놀이터 빠지는 나가는 길 진출로 진입로 진출입로 램프 호수 연못 분수 분수대 산책로 벤치 정자 육교 횡단보도 계단
+매점 쉼터 휴게실 휴게소 시장 공원 다리 가로등 보안등 전봇대 신호등 맨홀 화단 운동장 운동기구 음수대 약수터 전망대""".split())     # (genericname · 83번) 민원 말에 시설 · 물건 · 자리 설명으로 나오는 낱말. 「광장」은 뺀다(광장시장). 지명 · 가게 이름에 흔한 「한강 · 하나 · 약국 · 학교」 같은 낱말은 넣지 않는다
+_GEN = {}
+
+
+def generic_key(k):
+    """(genericname · 83번) 이름 열쇠가 흔한 낱말로만 이루어졌나(「쓰레기통」 · 「따릉이대여소」 · 「시장입구」 · 「말동상」 · 「잔디밭」 · 「빠지는길」 · 「버스정류장앞」).
+    지명 자료 · 시연용 표에 그런 이름의 곳이 서울에 한두 곳 있어, 곳 이름 없이 「쓰레기통 옆에 …」라고만 해도 그 한 점으로 확정하러 가던 일(80번 c15 · c24 · c25)."""
+    if not isinstance(k, str) or "|" in k or len(k) < 2:
+        return False
+    if k not in _GEN:
+        ok = [True] + [False] * len(k)
+        for j in range(1, len(k) + 1):
+            ok[j] = any(ok[i] and k[i:j] in GENERIC_VOCAB for i in range(j))
+        _GEN[k] = ok[-1]
+    return _GEN[k]
+
+
+def _generic_drop(clues):
+    """(genericname) 흔한 낱말로만 된 이름의 단서는 혼자서는 자리를 정하지 못한다: 그 단서를 뺀 나머지로 범위를 세워 보고, 그 범위 근처(800m 또는 덮는 반지름의 1.5배)에
+    그 이름의 곳이 있을 때만 남긴다(「서울숲 근처인데요 … 잔디밭에」는 남고, 「공원 잔디밭에서」 · 「쓰레기통 옆에」는 빠진다). 나머지가 없으면 뺀다."""
+    gen = [n for n, c in enumerate(clues) if c["t"] in ("at", "past", "before", "toward") and generic_key(c.get("k"))]
+    if not gen:
+        return clues
+    rest = [c for n, c in enumerate(clues) if n not in gen]
+    R0 = infer(rest) if rest else None
+    keep = set()
+    for n in gen if R0 is not None else ():
+        r = resolve(clues[n]["k"])
+        lim = max(800.0, 1.5 * R0["r_cover"])
+        if len(r["x"]) and float(np.hypot(r["x"] - R0["cx"], r["y"] - R0["cy"]).min()) <= lim:
+            keep.add(n)
+    return [c for n, c in enumerate(clues) if n not in gen or n in keep]
+
+
+SHOP_KINDS = {"가게", "음식점", "카페", "편의점", "마트", "빵집", "약국", "학원", "숙박", "사무실", "건물"}      # (farshop) 지명 자료에 빠졌거나 지점이 다를 수 있는 가게 · 건물 종류
+ANCHOR_KINDS = {"역 출구", "역", "관공서", "학교", "교차로", "다리", "공원", "시장", "경찰", "소방서", "터미널", "볼거리", "문화시설", "동네"}     # (farshop) 서울에 하나뿐이고 지명 자료에 빠질 일이 드문 기준점 종류
+
+
+def _farshop_drop(clues):
+    """(farshop · 83번) 「명동역 6번 출구 나와서 밀리오레 앞이요」: 가게 이름(밀리오레)의 곳이 지명 자료에 둘뿐이고 둘 다 명동역에서 2km 넘게 떨어져 있어(명동 밀리오레가 자료에 없음),
+    폭 18m의 「바로 앞」이 폭 100m의 역 출구보다 확률을 더 끌어 두 밀리오레 사이로 6.9km 범위가 섰다. 측량으로는 두 원이 만나지 않으니 하나가 틀렸다 —
+    기준점 종류(역 출구 · 역 · 관공서 …)의 곳이 있는 단서가 있고, 가게 · 건물 이름 단서의 어느 곳도 그 기준점에서 1.5km 안에 없으면 가게 쪽을 뺀다(자료에 빠진 가게 · 다른 지점일 몫이 크다)."""
+    anchors = [(c, resolve(c["k"])) for c in clues if c["t"] == "at" and isinstance(c.get("k"), str) and "|" not in c["k"]]
+    anchors = [(c, r) for c, r in anchors if 0 < len(r["x"]) <= 3 and set(r["kinds"]) & ANCHOR_KINDS]
+    if not anchors:
+        return clues
+    ax = np.concatenate([r["x"] for _, r in anchors])
+    ay = np.concatenate([r["y"] for _, r in anchors])
+    out = []
+    for c in clues:
+        if c["t"] == "at" and isinstance(c.get("k"), str) and "|" not in c["k"] and all(c is not a for a, _ in anchors):
+            r = resolve(c["k"])
+            if 0 < len(r["x"]) <= 40 and set(r["kinds"]) <= SHOP_KINDS and not r["roads"] and not r["areas"] and \
+                    float(np.hypot(r["x"][:, None] - ax[None, :], r["y"][:, None] - ay[None, :]).min()) > 1500:
+                continue
+        out.append(c)
+    return out
+
+
 def infer(clues):
     """단서들 → 지금의 가능성 분포. 단서가 없거나 가리키는 곳이 없으면 None."""
     clues = [c for c in clues if c.get("t")]
+    if "genericname" in ON:
+        clues = _generic_drop(clues)
+    if "farshop" in ON:
+        clues = _farshop_drop(clues)
     mins = [n for n, c in enumerate(clues) if c["t"] == "past" and c.get("min")]
     if "nogain" in ON and len(mins) > 2:                  # 「○○ 지나고 N분」 대여섯 개는 같은 사람의 같은 어림: 기준 표지가 지금 범위에 가장 가까운 둘만 곱한다(33번 1-3)
         R0 = infer([c for n, c in enumerate(clues) if n not in mins[:-2]])
@@ -1793,6 +1858,31 @@ def selftest():
     assert "closest" not in [q for q, _ in ask(twice)], ask(twice)
     ON.discard("closestcap")
     assert "closest" in [q for q, _ in ask(twice)], ask(twice)      # 그 스위치가 없으면 세 번째도 묻는다
+    had_gn = "genericname" in ON                          # (genericname · 83번) 되짚기: 80번에서 곳 이름 없이 흔한 낱말만 댄 첫마디가 한 곳으로 묶이던 이름들
+    alone = ["쓰레기통", "따릉이대여소", "시장입구", "말동상", "입구광장", "잔디밭", "빠지는길", "버스정류장앞"]
+    ON.discard("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is not None for w in alone)      # 끄면 그 낱말 하나로 서울 어딘가에 범위가 선다
+    ON.add("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is None for w in alone), [w for w in alone if infer([{"t": "at", "k": w, "how": "가까이"}]) is not None]
+    i_sf = next(i for i, a in enumerate(G.parks) if a["name"] == "서울숲")
+    Rg = infer([{"t": "in", "a": ["park", i_sf]}, {"t": "at", "k": "잔디밭", "how": "가까이"}])       # 「서울숲 … 잔디밭」: 그 공원 안이라 남는다(시연 노점 장면)
+    i_fm = resolve("잔디밭")["ids"][0]
+    assert Rg is not None and math.hypot(Rg["cx"] - G.x[i_fm], Rg["cy"] - G.y[i_fm]) < 150, Rg and (Rg["cx"], Rg["cy"])
+    Ry = infer([{"t": "at", "k": "잔디밭", "how": "가까이"}, {"t": "at", "k": gaz.norm("여의도공원")}])     # 「공원 잔디밭 … 여의도공원이요」: 서울숲 가족마당은 빠지고 여의도에 선다(80번 c15 10km)
+    assert Ry is not None and math.hypot(Ry["cx"] - G.x[i_fm], Ry["cy"] - G.y[i_fm]) > 5000
+    assert not generic_key(gaz.norm("광장시장")) and not generic_key(gaz.norm("서울숲")) and not generic_key(gaz.norm("호수약국"))
+    (ON.add if had_gn else ON.discard)("genericname")
+    had_fs = "farshop" in ON                              # (farshop · 83번) 「명동역 6번 출구 나와서 밀리오레 앞」: 자료의 밀리오레 둘은 모두 2km 넘게 떨어져 있다
+    mg = [{"t": "at", "k": gaz.norm("명동역 6번 출구")}, {"t": "at", "k": gaz.norm("밀리오레"), "how": "바로"}]
+    i_mx = resolve(gaz.norm("명동역 6번 출구"))["ids"][0]
+    ON.discard("farshop")
+    Rm0 = infer(mg)
+    assert math.hypot(Rm0["cx"] - G.x[i_mx], Rm0["cy"] - G.y[i_mx]) > 1500 or Rm0["r"] > 1500, (Rm0["r"],)      # 끄면 먼 밀리오레 쪽으로 끌려 넓게 퍼진다
+    ON.add("farshop")
+    Rm1 = infer(mg)
+    assert math.hypot(Rm1["cx"] - G.x[i_mx], Rm1["cy"] - G.y[i_mx]) < 100 and Rm1["r"] < 300, (Rm1["cx"], Rm1["cy"], Rm1["r"])
+    assert infer([mg[1]]) is not None                      # 가게 이름만 댄 말은 그대로 쓴다(어긋날 기준점이 없다)
+    (ON.add if had_fs else ON.discard)("farshop")
     ON.clear(), ON.update(had)
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
