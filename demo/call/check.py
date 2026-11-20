@@ -230,6 +230,53 @@ def partial_yes():
     print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 main 그대로(확정 안 됨) · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
 
 
+def yesno_reads():
+    """(yesno · whichkeep, 81번, 기본 끔) 되묻기 답 읽기와 「어느 말이 달랐을까요?」의 「○○은 맞아요」를 서버 함수로 바로 본다(모델 · 엔진 호출 없음). 스위치를 켠 판 · 끈 판을 같은 함수에서 견준다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    ask = {"id": "confirm"}
+
+    def read(said, sw):
+        had = sw in S.L.ON
+        S.L.ON.add(sw)
+        try:
+            on = S.code_read(said, ask, [], None)["confirm"]
+        finally:
+            S.L.ON.discard(sw) if not had else None
+        S.L.ON.discard(sw)
+        try:
+            off = S.code_read(said, ask, [], None)["confirm"]
+        finally:
+            S.L.ON.add(sw) if had else None
+        return on, off
+    yes = ["네", "네, 맞아요", "네 맞아요", "네 거기 맞아요", "네네 거기요", "맞습니다", "맞아요", "응", "예", "네, 딱 거기예요", "거기요", "네, 바로 옆이에요"]
+    askback = ["네? 뭐라고요?", "네?", "네? 잘 안 들려요", "네네 잠깐만요, 다시 볼게요", "거기 맞는지 잘 모르겠어요"]
+    fix = ["네 맞는데 근데 그쪽 말고 반대쪽이에요", "아 거기서 좀 더 가야 돼요", "그 근처는 맞아요", "네 그런데 거기서 50미터쯤 더 가야 돼요"]
+    same = ["아니요", "아니요, 거기가 아니에요", "아니 그 근처긴 한데요", "잘 모르겠어요", "네, 근데 바로 앞은 아니고 조금 옆이에요", "예, 근데 길 건너편이에요", "네, 근데 그쪽 아니에요"]
+    for said in yes + askback + fix + same:
+        on, off = read(said, "yesno")
+        assert off == S._confirm_main(said) or "partyes2" in S.L.ON and said in same[4:], (said, off)      # 끈 판은 main 규칙 그대로
+        want = True if said in yes else None if said in askback else False if said in fix else off
+        assert on == want, f"되묻기 답 {said!r}: 켬 {on} (기대 {want}) · 끔 {off}"
+    for code, solar, want in ((True, True, True), (True, None, None), (None, True, None), (None, None, None), (True, False, False), (False, True, False), (False, None, False), (None, False, False)):
+        assert S._confirm_pair(code, solar) is want, (code, solar)      # 둘 다 예일 때만 확정, 하나라도 아니요면 아니요
+    opts = [{"label": "강남역", "set": {"drop": ["강남역"]}}, {"label": "강남새로치과의원", "set": {"drop": ["강남새로치과의원"]}}, {"label": "잘 모르겠음", "set": {"clues": []}}]
+    which = {"id": "which", "options": opts}
+    for said, on_drop, off_drop in (("강남새로치과의원은 맞아요", ["강남역"], ["강남새로치과의원"]), ("강남역이 달랐어요", ["강남역"], ["강남역"]),
+                                    ("강남역은 맞고 강남새로치과의원이 아니에요", ["강남새로치과의원"], None)):
+        short = S.shortlist(said, None, "which")
+        had = "whichkeep" in S.L.ON
+        S.L.ON.add("whichkeep")
+        got_on = S.code_read(said, which, short, None).get("drop")
+        S.L.ON.discard("whichkeep")
+        got_off = S.code_read(said, which, short, None).get("drop")
+        S.L.ON.add("whichkeep") if had else None
+        assert got_on == on_drop and got_off == off_drop, (said, got_on, got_off)
+    print(f"  ✓ 되묻기 답 읽기(yesno 켬 · 끔): 진짜 예 {len(yes)}개는 그대로 예 · 되묻는 「네?」 · 확신 없음 {len(askback)}개는 확정 안 함 · 고쳐 말함 {len(fix)}개는 아니요 · 끈 판은 main 그대로 · "
+          "코드와 Solar가 둘 다 예일 때만 확정 · 「○○은 맞아요」는 ○○을 지우지 않음(whichkeep)")
+
+
 def matter_repeat():
     """(hurtalive · matterstop) 같은 일 질문은 세 번 이상 나오지 않는다: 시민이 생사 · 목줄 질문에 답하지 않아도 두 번까지만 묻고 위치로. 「다쳐서 · 웅크리고」는 살아 있음, 「죽어」가 같이 있으면 죽음."""
     say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
@@ -614,6 +661,7 @@ def main():
         field_fixes()
         partial_yes()
         partial_yes_table()
+        yesno_reads()
         matter_repeat()
         alias()
         fix_and_copy(ends["cat_street"])
