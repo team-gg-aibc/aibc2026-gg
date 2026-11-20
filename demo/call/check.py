@@ -229,6 +229,26 @@ def partial_yes():
     print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 main 그대로(확정 안 됨) · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
 
 
+def matter_repeat():
+    """(hurtalive · matterstop) 같은 일 질문은 세 번 이상 나오지 않는다: 시민이 생사 · 목줄 질문에 답하지 않아도 두 번까지만 묻고 위치로. 「다쳐서 · 웅크리고」는 살아 있음, 「죽어」가 같이 있으면 죽음."""
+    say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
+    st, view = say({"id": "check-matter-repeat"}, "상도1동주민센터 바로 앞에 고양이가 있어요")
+    asked = []
+    for _ in range(8):
+        q = view["question"] or {}
+        if not q or q["id"] in ("confirm", "handoff"):
+            break
+        asked.append(q["id"])
+        st, view = turn(st, line={"who": "상담사", "text": q["say"]})
+        st, view = say(st, "네, 맞아요. 지금도 그 자리에 있어요")       # 상도동 대본처럼 일 질문에 답하지 않는 말
+    assert asked and max(asked.count(k) for k in set(asked)) <= 2 and view["question"]["id"] in ("confirm", "handoff"), asked
+    for text, alive in (("집 앞 골목에 고양이가 다쳐서 웅크리고 있어요", True), ("고양이가 다쳐서 죽어 있어요", False), ("강아지가 떨고 있어요", True),
+                        ("고양이가 다친 것 같은데 움직이지 않아요", None), ("강아지가 다쳐서 숨을 안 쉬어요", None), ("고양이가 다쳐서 숨 쉬지 않아요", None), ("다친 고양이가 쓰러져 있어요", None)):
+        _, view = say({"id": "check-hurt-" + text[:6]}, text + ". 상도1동주민센터 바로 앞이에요")
+        assert view["matter"].get("alive") is alive and (view["question"]["id"] == "alive") == (alive is None), (text, view["matter"], view["question"])
+    print(f"  ✓ 일 질문 되풀이 막기: 답하지 않아도 같은 일 질문은 두 번까지({' → '.join(asked)}) · 「다쳐서 웅크리고 · 떨고」는 살아 있음 · 「다쳐서 죽어」는 죽음 · 「다쳤는데 움직이지 않아요 · 숨을 안 쉬어요 · 쓰러져 있어요」는 지금처럼 살았는지 물음")
+
+
 def edge_reads():
     """(75번) 둘레에 길이 있는 곳의 읽기 스위치(EDGE_ON): 켜져 있으면 그 읽기를, 꺼져 있으면 지금의 읽기(길 낱말이 이름으로 읽힘)를 서버 함수로 바로 본다(모델 · 엔진 호출 없음)."""
     os.environ.setdefault("CALL_MODE", "saved")
@@ -533,6 +553,7 @@ def main():
         field_fixes()
         partial_yes()
         partial_yes_table()
+        matter_repeat()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])

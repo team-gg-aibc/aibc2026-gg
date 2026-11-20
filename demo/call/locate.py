@@ -877,8 +877,9 @@ SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,
 STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀린 글 넷 + 큰 장소의 넓이(11-19 동규, 60번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트 실패 꼴 고침 묶음 가(11-20, 71번): 흔한 말 · 튐 막기 · Solar 「아님」 확인 · 보기 일부 답. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+MATTER_ON = "hurtalive,matterstop"      # 일 질문 되풀이 막기(11-20): 「다쳐서 · 웅크리고 · 떨고」는 살아 있음, 살았나 · 목줄은 두 번 물어 답을 못 읽으면 그만. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + MATTER_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
@@ -938,9 +939,12 @@ def questions(R, clues, matter, asked=()):
     if matter.get("type") is None and not matter.get("told"):     # 무슨 일인지 한 번 말했으면 다시 묻지 않는다
         conds.append({"id": "what", "bits": None, "options": []})
     elif matter.get("animal_matter"):
-        if matter.get("alive") is None:
+        stuck = lambda q: "matterstop" in ON and sum(1 for a in asked if (a or "").rstrip("!") == q) >= 2      # (matterstop) 일 질문(살았나 · 목줄)은 두 번 물어 답을 못 읽으면 더 묻지 않는다(모름으로 두고 위치로)
+        if matter.get("alive") is None and stuck("alive"):
+            pass
+        elif matter.get("alive") is None:
             conds.append({"id": "alive", "bits": None, "options": [{"word": "살아 있음", "set": {"matter": {"alive": True}}}, {"word": "죽은 것 같음", "set": {"matter": {"alive": False}}}]})
-        elif matter["alive"] and matter.get("leash") is None:
+        elif matter["alive"] and matter.get("leash") is None and not stuck("leash"):
             conds.append({"id": "leash", "bits": None, "options": [{"word": "목줄 있음", "set": {"matter": {"leash": True}}}, {"word": "목줄 없음", "set": {"matter": {"leash": False}}}]})
     if R is None:
         return [{"id": "where", "bits": None, "options": []}] + conds
