@@ -658,10 +658,17 @@ def generic_key(k):
     return _GEN[k]
 
 
+def demo_key(k):
+    """(genericname · 83번) 이름 열쇠가 시연 장면용 표(extra_places.json)의 장소 · 별명만 가리키나(「큰 연못」 · 「얕은 연못」 · 「보행교」 · 「2번 출입구」 · 「사슴 있는 데」).
+    서울숲 장면을 위해 단 줄이라, 장면 밖 통화(「상도역 2번 출입구 앞」 · 「아파트 단지 얕은 연못」)를 서울숲으로 끌던 일(81번 특례 27줄). 흔한 낱말 이름과 같은 규칙을 탄다."""
+    refs = G.ix.get(k) if isinstance(k, str) else None
+    return bool(refs) and all(r[0] == "p" and G.demo0 <= r[1] < G.demo1 for r in refs)
+
+
 def _generic_drop(clues):
     """(genericname) 흔한 낱말로만 된 이름의 단서는 혼자서는 자리를 정하지 못한다: 그 단서를 뺀 나머지로 범위를 세워 보고, 그 범위 근처(800m 또는 덮는 반지름의 1.5배)에
     그 이름의 곳이 있을 때만 남긴다(「서울숲 근처인데요 … 잔디밭에」는 남고, 「공원 잔디밭에서」 · 「쓰레기통 옆에」는 빠진다). 나머지가 없으면 뺀다."""
-    gen = [n for n, c in enumerate(clues) if c["t"] in ("at", "past", "before", "toward") and generic_key(c.get("k"))]
+    gen = [n for n, c in enumerate(clues) if c["t"] in ("at", "past", "before", "toward") and (generic_key(c.get("k")) or demo_key(c.get("k")))]
     if not gen:
         return clues
     rest = [c for n, c in enumerate(clues) if n not in gen]
@@ -1929,6 +1936,15 @@ def selftest():
     Ry = infer([{"t": "at", "k": "잔디밭", "how": "가까이"}, {"t": "at", "k": gaz.norm("여의도공원")}])     # 「공원 잔디밭 … 여의도공원이요」: 서울숲 가족마당은 빠지고 여의도에 선다(80번 c15 10km)
     assert Ry is not None and math.hypot(Ry["cx"] - G.x[i_fm], Ry["cy"] - G.y[i_fm]) > 5000
     assert not generic_key(gaz.norm("광장시장")) and not generic_key(gaz.norm("서울숲")) and not generic_key(gaz.norm("호수약국"))
+    demo = [gaz.norm(w) for w in ("큰 연못", "얕은 연못", "보행교", "사슴 있는 데", "2번 출입구")]      # 시연 장면용 표의 장소 · 별명: 혼자서는 서지 않고, 서울숲 안이면 남는다
+    assert all(demo_key(w) for w in demo) and not demo_key(gaz.norm("서울숲")) and not demo_key(gaz.norm("상도역"))
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is None for w in demo)
+    Rd = infer([{"t": "in", "a": ["park", i_sf]}, {"t": "at", "k": gaz.norm("큰 연못"), "how": "바로"}])
+    i_lk = resolve(gaz.norm("큰 연못"))["ids"][0]
+    assert Rd is not None and math.hypot(Rd["cx"] - G.x[i_lk], Rd["cy"] - G.y[i_lk]) < 100
+    Rsd = infer([{"t": "at", "k": gaz.norm("상도역")}, {"t": "at", "k": gaz.norm("2번 출입구"), "how": "바로"}])      # 다른 곳 이름과 같이 나온 별명은 서울숲으로 끌지 않는다
+    i_sd = resolve(gaz.norm("상도역"))["ids"][0]
+    assert Rsd is not None and math.hypot(Rsd["cx"] - G.x[i_sd], Rsd["cy"] - G.y[i_sd]) < 600
     (ON.add if had_gn else ON.discard)("genericname")
     had_fs = "farshop" in ON                              # (farshop · 83번) 「명동역 6번 출구 나와서 밀리오레 앞」: 자료의 밀리오레 둘은 모두 2km 넘게 떨어져 있다
     mg = [{"t": "at", "k": gaz.norm("명동역 6번 출구")}, {"t": "at", "k": gaz.norm("밀리오레"), "how": "바로"}]
