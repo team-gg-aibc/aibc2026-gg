@@ -906,6 +906,8 @@ if "bridgeline" in ON:
     G.add_bridges()                                       # (bridgeline · 75번) 다리의 면(data/seoul/bridges.json.gz)
 if "wikialias" in ON:
     G.add_wiki()                                          # (wikialias, 기본 끔 · 71번) 위키 별칭 사전(data/seoul/wiki_alias.tsv.gz)을 이름 색인에
+if "hood" in ON:
+    G.add_hoods()                                         # (hood, 기본 끔 · 87번) 「명동이에요」 · 「신촌이요」: 이름난 동네 말을 그 동 · 구 범위로
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]
 
 
@@ -1651,6 +1653,24 @@ def _rim_side(R):
     return None
 
 
+def selftest_hood():
+    """hood(87번): 「명동이에요」 · 「신촌이요」 같은 첫마디를 동 범위로(한 점 아님), 「명동역 6번 출구」 같은 더 좁은 말 · 「종로」 길은 그대로."""
+    k = gaz.norm
+    if "hood" not in ON:
+        G.add_hoods()                                     # 스스로 시험에서만 켠 판과 같은 색인으로(이 프로세스 안)
+    out = []
+    for word, tail in (("명동", "이에요"), ("신촌", "이요"), ("종로", "요"), ("광화문", "이요"), ("압구정", "이요"), ("동대문", "이요"), ("성수", "요"), ("망원", "이요")):
+        ms = G.mentions(word + tail)
+        assert ms and ms[0]["key"] == k(word), (word, ms)
+        R = infer([{"t": "at", "k": k(word)}])
+        assert R and R["r"] > 200, (word, R and R["r"])  # 한 점이 아니라 그 동 일대
+        out.append(f"{word} {R['r']:.0f}m")
+    ms = G.mentions("명동역 6번 출구 바로 앞이에요")
+    assert ms and ms[0]["key"] != k("명동"), ms           # 더 좁은 말은 그대로
+    assert any(r[0] == "r" for r in G.ix[k("종로")]) and any(r[0] == "r" for r in G.ix[k("을지로")])      # 같은 이름의 길은 덮지 않음
+    print("hood 스스로 시험 통과 (" + " · ".join(out) + f", 「명동역 6번 출구」는 {ms[0]['name']})")
+
+
 def selftest():
     k = gaz.norm
     assert infer([{"t": "at", "k": k("강변북로")}, {"t": "toward", "k": k("성동구")}, {"t": "past", "k": k("서울숲")}]) is not None      # 구 · 공원 이름을 「그쪽 · 지났다」의 기준으로 써도 돈다
@@ -1799,3 +1819,4 @@ def selftest():
 
 if __name__ == "__main__":
     selftest()
+    selftest_hood()
