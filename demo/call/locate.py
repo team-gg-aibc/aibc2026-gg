@@ -337,12 +337,14 @@ def _context(clues):
             pr = [p[0] * head[0] + p[1] * head[1] for p in e]
             pos[n] = e[int(np.argmax(pr))] if clues[n]["t"] in ("past", "toward") else e[int(np.argmin(pr))]
     bp = set()
-    if "bridgeline" in ON:                               # (bridgeline · 75번) 공원 · 광장 말과 함께 나온 다리(그 구역의 상자에서 100m 안): 「망원한강공원 … 양화대교 밑」
+    if "bridgeline" in ON:                               # (bridgeline · 75번) 공원 · 광장 말(그 구역의 상자에서 100m 안)이나 길 이름(그 길이 다리 면에서 60m 안을 지남)과 함께 나온 다리: 「망원한강공원 … 양화대교 밑」 · 「도림천 자전거길 … 도림천고가도로교 밑」
         boxes = [ar["box"] for c in clues if "k" in c and c["t"] in ("at", "rim", "core") for ar in _parks_of(c["k"])] + [area_of(c["a"])["box"] for c in clues if c["t"] == "in" and c["a"][0] == "park"]
-        for n, c in enumerate(clues) if boxes else ():
+        lines = [G.road_xy(i) for c in clues if c["t"] == "at" and "k" in c for i in resolve(c["k"])["roads"]]      # 이름이 길이면서 점이기도 한 것(「도림천 자전거길」)까지
+        for n, c in enumerate(clues) if boxes or lines else ():
             if c["t"] == "at" and "k" in c:
                 for i in resolve(c["k"]).get("ids") or ():
-                    if i in G.bridge and any(ring[:, 0].max() > b[0] - 100 and ring[:, 0].min() < b[2] + 100 and ring[:, 1].max() > b[1] - 100 and ring[:, 1].min() < b[3] + 100 for ring in G.bridge[i] for b in boxes):
+                    if i in G.bridge and (any(ring[:, 0].max() > b[0] - 100 and ring[:, 0].min() < b[2] + 100 and ring[:, 1].max() > b[1] - 100 and ring[:, 1].min() < b[3] + 100 for ring in G.bridge[i] for b in boxes)
+                                          or any(float(bridge_dist(i, ln[:, 0], ln[:, 1]).min()) <= 60 for ln in lines)):
                         bp.add(n)
     return {"roads": roads, "rxy": rxy, "pos": pos, "head": head, "ends": ends, "bp": bp}
 
@@ -1701,6 +1703,10 @@ def selftest():
     under = [{"t": "in", "a": ["park", i_pk]}, {"t": "at", "k": k("양화대교"), "how": "바로"}]
     Ru, i_br = infer(under), resolve(k("양화대교"))["ids"][0]
     assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
+    path = [{"t": "at", "k": k("도림천 자전거길")}, {"t": "at", "k": k("도림천고가도로교"), "how": "바로"}]      # 길 이름 + 다리 밑: 그 길이 다리 면 아래를 지나는 구간(이 고가는 하천 위로 길게 놓여 한 점이 아니다). 다리 가운데 한 점으로 끝내지 않는다
+    Rp2, i_b2 = infer(path), resolve(k("도림천고가도로교"))["ids"][0]
+    assert Rp2["ctx"]["bp"] == {1} and not is_done(Rp2) and float(bridge_dist(i_b2, Rp2["x"][Rp2["cred"]], Rp2["y"][Rp2["cred"]]).max()) <= 80, (Rp2["ctx"]["bp"], Rp2["r"])
+    assert is_done(infer(path[1:])) and not infer(path[1:])["ctx"]["bp"]
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
     # 스위치마다 하나씩: 넓은 곳에 걸음 안 묻기(bigdist) · 넓은 둘레에서는 둘레 질문 먼저(rimask) · 「가장 가까우세요」 두 번까지(closestcap)
