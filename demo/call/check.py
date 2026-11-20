@@ -147,6 +147,25 @@ def field_fixes():
     print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
 
 
+def partial_yes():
+    """(partyes2, 73번) 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니다 — 확정을 한 번 미루고 「○○ 근처」로 다시 되묻고, 두 번째도 그렇게 답하면 확정."""
+    say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
+    st, view = say({"id": "check-partyes"}, "상도1동주민센터 바로 앞에 고양이가 죽어 있어요")
+    for _ in range(4):
+        if view["question"]["id"] == "confirm":
+            break
+        st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+        st, view = say(st, "차로 위예요" if view["question"]["id"] == "lane" else "잘 모르겠어요")
+    assert view["question"]["id"] == "confirm", view["question"]
+    st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+    st, view = say(st, "네, 근데 바로 앞은 아니고 조금 옆이에요")
+    assert not view["confirmed"] and view["question"]["id"] == "confirm" and "근처" in view["question"]["say"], (view["confirmed"], view["question"])
+    st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+    st, view = say(st, "네, 근데 바로 앞은 아니고 조금 옆이에요")
+    assert view["confirmed"], view["question"]
+    print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째에 확정(「아니요」로 읽지 않음)")
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -384,6 +403,7 @@ def main():
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         field_fixes()
+        partial_yes()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
