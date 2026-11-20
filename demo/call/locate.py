@@ -42,6 +42,16 @@ BIG, MUL = 50000, 200000
 SEOUL_M2 = 605e6    # 서울의 넓이(어림). 「틀린 말」의 몫은 서울 어디든 고르게 퍼진다고 본다
 EXPRESSWAYS = ["올림픽대로", "동부간선도로", "동부간선로", "강변북로", "서부간선도로", "서부간선로", "언주로", "북부간선도로", "내부순환로", "국회대로", "양재대로",
                "경부고속도로", "우면산로", "강남순환로"]        # 서울시설공단이 관리하는 자동차전용도로 12개 노선(지도 자료의 이름 꼴 포함). 언주로 · 양재대로는 일부 구간만
+PARTIAL_EXPRESS = {"언주로", "양재대로"}      # (roadcls, 기본 끔 · 86번) 이름째 목록에 들었지만 일부 구간만 자동차전용인 길
+
+
+def _xw(i):
+    """길 i가 자동차전용도로인가(이름 목록). (roadcls, 기본 끔 · 86번) 언주로 · 양재대로는 지도 자료의 길 등급이 trunk · motorway인 구간만:
+    방이역 · 둔촌동역 · 올림픽공원역 앞 양재대로(primary, 일반 구간)의 불법 주차가 자동차전용도로 위로 읽혀 넘길 곳이 경찰 · 번지가 「번지 없음」이 됐다(80번 c09)."""
+    r = G.roads[i]
+    return r["name"] in EXPRESSWAYS and not ("roadcls" in ON and r["name"] in PARTIAL_EXPRESS and r.get("cls") not in ("trunk", "motorway"))
+
+
 DIR_NAMES = {"강변북로": ("구리 방향", "일산 방향"), "올림픽대로": ("하남 방향", "김포공항 방향"), "내부순환로": ("성동 방향", "성산 방향"),
              "동부간선도로": ("의정부 방향", "수서 방향"), "동부간선로": ("의정부 방향", "수서 방향")}      # (동쪽 또는 북쪽으로 가는 방향, 반대 방향)
 CITY_PARKS = ["서울숲", "보라매공원", "월드컵공원", "남산공원", "북서울꿈의숲", "여의도공원", "선유도공원", "서울어린이대공원", "어린이대공원"]   # 시가 직접 관리하는 큰 공원(일부)
@@ -220,7 +230,7 @@ def _lookup(keys, mk, mv):
 
 def _road_sig(sig, kinds, ctx):
     """(roadfloor) 자동차전용도로 이야기 중에 차에서 보이지 않을 이름(가게 · 학원 · 건물)은 폭을 150m 아래로 잡지 않는다(33번 3-2)."""
-    if "roadfloor" in ON and ctx and ctx.get("roads") and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"]) and kinds and not any(k in gaz.ROADSIDE for k in kinds):
+    if "roadfloor" in ON and ctx and ctx.get("roads") and any(_xw(i) for i in ctx["roads"]) and kinds and not any(k in gaz.ROADSIDE for k in kinds):
         return max(sig, 150.0)
     return sig
 
@@ -372,7 +382,7 @@ SPEED = {"자동차전용도로": 1000.0, "길": 500.0}             # 지나고 
 
 def _ahead(c, ctx):
     """「○○ 지나고 N분쯤」 → (가운데 거리 m, 폭 m). 폭은 거리의 절반(적어도 100m)."""
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    express = any(_xw(i) for i in ctx["roads"])
     d = SPEED["자동차전용도로" if express else "길"] * float(c["min"])
     return d, max(100.0, 0.5 * d)
 
@@ -591,7 +601,7 @@ def _nearest_station(key, r, x, y):
 
 def _move(c, ctx):
     """「조금 지나서」의 폭을 고를 움직인 방법: 자동차전용도로 위면 그것(걸어서는 못 간다), 시민이 말했으면 걷기 · 차, 아니면 모름."""
-    if any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"]):
+    if any(_xw(i) for i in ctx["roads"]):
         return "자동차전용도로"
     return c.get("move") if c.get("move") in AFTER else "모름"
 
@@ -812,7 +822,7 @@ def _lamps_within(x, y, rad):
 
 
 def _on_express(R):
-    return R is not None and R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    return R is not None and R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"])
 
 
 def _road_ok(i, R):
@@ -971,7 +981,7 @@ def questions(R, clues, matter, asked=(), same=None):
     confirm = {"id": "confirm", "bits": None, "options": [{"word": "맞음", "set": {"confirm": True}}, {"word": "아님", "set": {"confirm": False}}]}
     x, y, w = _sample(R)
     ctx = R["ctx"]
-    need_dir = R["on_road"] and ctx["head"] is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    need_dir = R["on_road"] and ctx["head"] is None and any(_xw(i) for i in ctx["roads"])
     zone = None                                           # 공원 안 · 바깥: 넘길 곳이 갈리는 경계
     if not R["on_road"] and not any(c["t"] in ("in", "out") for c in clues):
         best = None
@@ -1041,7 +1051,7 @@ def questions(R, clues, matter, asked=(), same=None):
         zone = None
     dup = lambda q: bool(same) and "sameopts" in ON and q["id"] in SAMEQ and same(q)     # noqa: E731  (sameopts · 75번) 이 통화에서 같은 보기로 이미 물었던 질문: 그 답으로 범위가 달라지지 않았다는 뜻이라 사다리의 다음 질문으로 넘어간다
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지
-    express = R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    express = R["on_road"] and any(_xw(i) for i in ctx["roads"])
     drive = R["on_road"] and not express and "drive" in ON and any(c.get("drive") for c in clues)     # 큰길을 차로 지나간 통화(33번 5-2)
     if (express or drive) and not loc:                    # 다리 · 나들목(큰길이면 교차로 · 역 출구 · 정류장 …)으로 가르는 질문
         lamp = {"id": "lampno", "bits": math.log2(max(1.0, R["r"] / 15.0)), "options": []} if express and G.lamps and R["r"] > 100 else None     # 가로등 기둥 번호: 읽을 수만 있으면 한 번에 기둥 하나로(모를 몫이 커서 점수는 낮게 나온다)
@@ -1191,7 +1201,7 @@ def _pin_questions(R, clues, matter):
         dirs = idx[:1] + [i for i in idx[1:] if idx and (G.x[i] - x) * (G.x[idx[0]] - x) + (G.y[i] - y) * (G.y[idx[0]] - y) < 0][:1]     # 서로 반대쪽의 두 곳
         out.append({"id": "went", "bits": None, "options": [{"word": "그 자리에 있음", "set": {"matter": {"went": "그 자리"}}}]
                     + [{"label": f"{G.name[i]} 쪽으로 감", "set": {"matter": {"went": G.name[i]}}} for i in dirs] + [{"word": "못 봄", "set": {"matter": {"went": "모름"}}}]})
-    if R["on_road"] and G.lamps and matter.get("ask_lamp") and matter.get("plate") is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]):
+    if R["on_road"] and G.lamps and matter.get("ask_lamp") and matter.get("plate") is None and any(_xw(i) for i in R["ctx"]["roads"]):
         out.append({"id": "lampno", "bits": None, "options": [{"word": "번호 안 보임", "set": {"matter": {"plate": "없음"}}}]})      # 자동차전용도로: 마지막에 가로등 기둥 번호로 기둥 하나까지
     if kind == "plate" and matter.get("plate") is None:    # 시설물의 일: 기둥 · 시설물의 번호판이 그 시설물을 가리킨다
         out.append({"id": "plate", "bits": None, "options": [{"word": "번호 안 보임", "set": {"matter": {"plate": "없음"}}}]})
@@ -1487,7 +1497,7 @@ def _q_next(R, x, y, w, clues):
     if not best or not 0.15 < best[0] < 0.85:
         return None
     p, nm, pt, ramp = best
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    express = any(_xw(i) for i in R["ctx"]["roads"])
     e = {} if express and not (ramp and "rampsoft" in ON) else {"e": 0.15}     # (rampsoft, 기본 끔 · 49번) 나가는 길을 지났는지는 다리만큼 또렷하지 않다: 틀리게 말할 몫을 큰길과 같게                    # 큰길에서는 지났는지 · 아직인지를 틀리게 말할 몫을 크게(33번 5-2)
     return {"id": "next", "bits": _bits([p, 1 - p]), "name": nm,
             "options": [{"label": f"{nm} 지났음", "set": {"clues": [dict({"t": "past", "p": pt, "flat": True, "label": nm}, **e)]}},
@@ -1498,7 +1508,7 @@ def _q_between(R, x, y, w, clues):
     """길 위: 다리 · 나들목 같은 큰 표지 두 개 사이로 가른다."""
     if any(c["t"] == "between" for c in clues) or R["r"] < 400:
         return None
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    express = any(_xw(i) for i in R["ctx"]["roads"])
     kinds = ("다리", "나들목", "터널") if express else ("다리", "교차로", "역", "역 출구", "정류장", "육교", "터널", "주유소")          # 큰길을 차로 지나간 통화: 교차로 · 역 출구 · 정류장 · 주유소까지(33번 5-2)
     idx = [i for i in _places_in(x.min() - 100, y.min() - 100, x.max() + 100, y.max() + 100, 40000) if G.kind[i] in kinds]
     if len(idx) < 2:
@@ -1537,7 +1547,7 @@ def _q_marks(R, x, y, w, qid, clues):
     used = {tuple(c["p"]) for c in clues if c["t"] in ("pt", "past") and "p" in c and not isinstance(c["p"][0], list)}
     if "closestnew" in ON:                                # (closestnew · 75번) 「다 멀어요」 · 「둘 다 아니에요」로 지운 곳을 「바로 앞에 뭐가 보이세요? ○○ 같은 거요」로 다시 내밀지 않는다
         used |= {tuple(c["p"]) for c in clues if c["t"] == "not" and "p" in c and str(c.get("label", "")).endswith(" 쪽 아님")}
-    passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]) else set())
+    passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(_xw(i) for i in R["ctx"]["roads"]) else set())
     road = gaz.ROADSIDE if _on_express(R) else None          # 자동차전용도로 위: 길에서 보이는 종류만(_road_ok와 같은 규칙)
     picked, parts = _candidates(x, y, w, radius, passed_kinds if qid == "passed" else {"역"} if qid == "station" else road)
     if qid == "passed" and len(picked) < 2:
@@ -1574,11 +1584,11 @@ def place_class(R):
     global _express
     x, y = R["cx"], R["cy"]
     if R["on_road"]:
-        name = next((G.roads[i]["name"] for i in R["ctx"]["roads"] if G.roads[i]["name"] in EXPRESSWAYS), None)
+        name = next((G.roads[i]["name"] for i in R["ctx"]["roads"] if _xw(i)), None)
         if name:
             return "자동차전용도로", name
     if _express is None:
-        _express = [(r["name"], road_keys(i)) for i, r in enumerate(G.roads) if r["name"] in EXPRESSWAYS]
+        _express = [(r["name"], road_keys(i)) for i, r in enumerate(G.roads) if _xw(i)]
     key = int(pack(round(x / STEP), round(y / STEP)))
     for name, ks in _express:
         j = int(np.searchsorted(ks, key))
@@ -1649,6 +1659,34 @@ def _rim_side(R):
         if float(w[np.abs((a - mid + 180) % 360 - 180) <= 60].sum()) >= 0.85:
             return word
     return None
+
+
+def selftest_road():
+    """roadcls(86번): 양재대로 일반 구간 앞 역 출구는 자동차전용도로가 아니고, 진짜 자동차전용도로(강변북로 · 양재대로 trunk 구간)는 그대로."""
+    global _express
+    k = gaz.norm
+    had = set(ON)
+    def cls(clues):
+        global _express
+        _express = None                                   # place_class가 모아 둔 자동차전용도로 칸을 켜고 끔에 맞춰 다시
+        return place_class(infer(clues))[0]
+    out = []
+    for name in ("방이역 1번 출구", "둔촌동역", "올림픽공원역"):
+        c = [{"t": "at", "k": k(name), "how": "바로"}]
+        ON.discard("roadcls")
+        before = cls(c)
+        ON.add("roadcls")
+        after = cls(c)
+        assert before == "자동차전용도로" and after != "자동차전용도로", (name, before, after)
+        out.append(f"{name} {before} → {after}")
+    road = [{"t": "at", "k": k("강변북로")}, {"t": "past", "k": k("성수대교")}, {"t": "before", "k": k("영동대교")}, {"t": "past", "k": k("서울숲 보행다리"), "how": "바로"}]
+    assert cls(road) == "자동차전용도로"                      # 진짜 자동차전용도로(로드킬 장면)는 켜도 그대로
+    j = next(i for i, r in enumerate(G.roads) if r["name"] == "양재대로" and r["cls"] == "trunk")
+    x, y = G.road_xy(j)[len(G.road_xy(j)) // 2]
+    assert cls([{"t": "pt", "p": [float(x), float(y)], "r": 20.0}]) == "자동차전용도로"      # 양재대로의 자동차전용 구간(trunk)은 켜도 그대로
+    ON.clear(), ON.update(had)
+    _express = None
+    print("roadcls 스스로 시험 통과 (" + " · ".join(out) + ", 강변북로 · 양재대로 trunk 구간은 그대로)")
 
 
 def selftest():
@@ -1799,3 +1837,4 @@ def selftest():
 
 if __name__ == "__main__":
     selftest()
+    selftest_road()
