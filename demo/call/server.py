@@ -1034,6 +1034,8 @@ def _solar(system, user, schema):
     return out
 
 
+SEEN_ONLY = re.compile(r"보여|보이|보입|보인")      # (seenwide) 「보인다」는 말
+NEAR_WORD = re.compile(r"앞|옆|바로|붙어|코앞|맞은편|건너")      # (seenwide) 자리를 말하는 말이 함께 있으면 「바로 앞」 보기를 그대로 받는다
 NAME_Q = ("mark", "finer", "mark_again", "closest", "from", "station", "either", "passed", "between")      # (choicebind) 보기가 장소 이름인 질문
 
 
@@ -1126,8 +1128,11 @@ def model_read(st, short, known):
     if ch.startswith("o") and ch[1:].isdigit() and 0 < int(ch[1:]) <= len(opts):
         s = opts[int(ch[1:]) - 1]["set"]
         said_n, named = gaz.norm(turn_["said"]), "choicekeep" in L.ON and bool(short)      # (choicekeep) 시민이 다른 이름을 댔는데(「동부간선진입교 조금 지나서」) Solar가 말하지 않은 보기(「상계교 방금 지남」)를 고르면 그 「지남 · 못 미침」 단서는 넣지 않는다(씨앗 1201 #17, 600m 틀린 확정)
-        read["clues"] += [c for c in s.get("clues", []) if not any(x.get("label") == c.get("label") for x in read["clues"])
-                          and not (named and c.get("t") in ("past", "before") and gaz.norm(str(c.get("label") or "").split(" → ")[0]) not in said_n)]
+        add = [c for c in s.get("clues", []) if not any(x.get("label") == c.get("label") for x in read["clues"])
+               and not (named and c.get("t") in ("past", "before") and gaz.norm(str(c.get("label") or "").split(" → ")[0]) not in said_n)]
+        if "seenwide" in L.ON and asked.get("id") == "finer" and SEEN_ONLY.search(turn_["said"]) and not NEAR_WORD.search(turn_["said"]):
+            add = [dict(c, r=L.SIG["보임"]) if c.get("t") == "pt" and c.get("r", 99.0) <= L.SIG["바로"] else c for c in add]      # (seenwide, 79번 · 80번 c16) 「바로 앞에 뭐가 보이세요?」에 「○○ 보여요」만 답했다: Solar가 고른 보기를 「바로 앞」(18m)이 아니라 코드가 「○○ 보여요」를 읽는 폭(보임)으로 받는다(「서울놀이마당 보여요」 → 「바로 앞, 맞으실까요?」, 실제 119m)
+        read["clues"] += add
         read["matter"].update(s.get("matter") or {})
         read["drop"] += list(s.get("drop") or [])
         if "confirm" in s:
