@@ -135,12 +135,16 @@ def field_fixes():
     assert not far(v2["center"], c0), v2["center"]                                   # 좁혀진 뒤 이름만 댄 먼 곳으로 튀지 않는다
     _, v3 = say(st, "아니요, 잘못 말했어요. 잠실역이에요")
     assert far(v3["center"], c0) and "잠실역" in v3["chips"], (v3["center"], v3["chips"])      # 고쳐 말하면 받는다
+    st, view = say({"id": "check-jump-matter"}, "상도1동주민센터 바로 앞이에요")
+    c1 = view["center"]
+    _, view = say(st, "잠실역 쪽인데 고양이가 죽어 있어요")
+    assert not far(view["center"], c1) and view["matter"].get("type") == "carcass" and view["matter"].get("alive") is False, (view["center"], view["matter"])      # 튐을 막은 말이라도 같은 말의 일 · 생사는 읽는다(#134 리뷰)
     st, view = say({"id": "check-leash"}, "뚝섬역 1번 출구 바로 앞에 개가 돌아다니고 있어요")
     assert view["question"]["id"] == "leash", view["question"]
     st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
     st, view = say(st, "안보여요")
     assert view["matter"].get("leash") is False and view["question"]["id"] != "leash", (view["matter"], view["question"])      # 목줄 질문의 「안보여요」를 답으로(같은 질문을 다시 묻지 않는다)
-    print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐 · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
+    print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
 
 
 def free_text():
