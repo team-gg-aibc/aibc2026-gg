@@ -255,6 +255,31 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
 
 
+def switches():
+    """길가 흡연 · 대여소 킥보드 스위치(72번)의 판단을 서버 함수로 바로 본다(모델 · 엔진 호출 없음). 켬 · 끔 어느 쪽으로 띄워도 그 값대로 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    st = lambda *said: {"turns": [{"said": t, "asked": None if n == 0 else {"id": "where"}} for n, t in enumerate(said)]}      # noqa: E731
+    want = {"따릉이 거치대에 킥보드가 세워져 있어요": "dock", "대여소에 킥보드가 세워져 있어요": "dock", "누가 킥보드를 따릉이 자리에 세워 놓고 갔어요": "dock",
+            "공공자전거 거치대 사이에 킥보드가 끼어 있어요": "dock",
+            "아파트 자전거 거치대에 킥보드가 세워져 있어요": "street", "거치대에 킥보드가 세워져 있어요": "street", "학교 거치대에 킥보드가 꽂혀 있는데 따릉이도 못 세워요": "street",
+            "따릉이 대여소 옆 길에 킥보드가 쓰러져 있어요": "street", "따릉이 대여소에 전동 스쿠터가 세워져 있어요": None,      # 전동 스쿠터는 킥보드로 보지 않는다
+            "길가에 자전거랑 킥보드가 몇 달째 세워져 있어요": "with_bike", "킥보드 타고 가다가 거치대 옆에 방치된 자전거를 봤어요": None}
+    for said, w in want.items():
+        assert S.kick_of(st(said)) == (w if S.KICK_DOCK else None), f"킥보드 판단 {said!r} → {S.kick_of(st(said))} (기대 {w})"
+    assert S.kick_of(st("거치대에 킥보드가 꽂혀 있어요", "따릉이 대여소 앞이에요")) == ("dock" if S.KICK_DOCK else None)      # 대여소 말이 다른 차례에 나와도
+    R, route = {"cx": 653.6, "cy": -7996.1, "r": 30, "on_road": False}, {"type": "smoking", "class": None, "class_name": None}       # 서초구 국립국악원 버스 정류장 앞(72번 A1)
+    base = S.place_phrase(R, route)
+    near = S.engine_place(R, route, True, None, ["버스 정류장 바로 앞에서 담배를 피워요"])
+    assert near != base and "버스 정류장 가까이 길가" in near if S.SMOKE_NEAR else near == base, near
+    assert S.engine_place(R, route, True, None, ["길에서 모닥불 피워요"]) == base                        # 담배 · 흡연 말이 없으면 표지를 넣지 않는다
+    assert S.engine_place(R, route, True, "handoff", ["정류장 옆에서 담배 피워요"]) == base                 # 자리 미확정으로 넘김
+    assert S.engine_place(R, route, False, "confirmed", ["정류장 옆에서 담배 피워요"]) == base              # 좁혀지지 않은 채 범위째 확인
+    assert S.engine_place(R, route, False, None, ["정류장 옆에서 담배 피워요"]) == (None if S.SMOKE_NEAR else base)      # 찾는 중에는 아직 부르지 않음
+    print(f"  ✓ 흡연 표지 · 킥보드 판단(켬: 흡연 {S.SMOKE_NEAR} · 킥보드 {S.KICK_DOCK}): {len(want) + 1}통화 · 장소 다섯 꼴")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -283,6 +308,7 @@ def main():
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
+        switches()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
