@@ -245,6 +245,8 @@ class Gazetteer:
             rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "cross_nodes.tsv.gz", "rt", encoding="utf-8"))]
         self.cross1 = len(rows)
         extra = json.loads((HERE / "data" / "extra_places.json").read_text(encoding="utf-8"))["places"] if (HERE / "data" / "extra_places.json").exists() else []
+        self.demo0 = len(rows)                # (genericname · 83번) 여기부터 시연 장면용 표(extra_places.json)의 줄 — 서울숲 장면을 위해 단 장소 · 별명이라 장면 밖 통화를 그쪽으로 끌지 않게 한다
+        self.demo1 = self.demo0 + len(extra)  # 그 뒤의 상담사 저장 별명(ALIAS_FILE)은 혼자 쓰는 것이 목적이라 넣지 않는다
         if ALIAS_FILE.exists():                       # 상담사가 저장한 별명(사람들이 부르는 이름 → 확인받은 자리). 레포에 올리지 않는 로컬 파일
             extra += [dict(a, kind="별명") for a in json.loads(ALIAS_FILE.read_text(encoding="utf-8"))]
         rows += [[e["name"], e["kind"], str(e["lon"]), str(e["lat"]), "", ""] for e in extra]
