@@ -303,6 +303,12 @@ def ask_fixes():
     got = [S.fill(seen, 종류=w) for w in ("카페", "정류장", "편의점", "학교")]
     want = ["근처에 카페가 보입니까?", "근처에 정류장이 보입니까?", "근처에 편의점이 보입니까?", "근처에 학교가 보입니까?"]
     assert (got == want) if "josa" in S.L.ON else all("(이)가" in g for g in got), got
+    if "josa" in S.L.ON:                                  # 그 스위치 하나만 끄면 달라지는지(이 장면이 스위치를 보는지)
+        S.L.ON.discard("josa")
+        try:
+            assert "(이)가" in S.fill(seen, 종류="카페"), "josa: 꺼도 결과가 같음"
+        finally:
+            S.L.ON.add("josa")
     words = S.tab("이렇게 물어보세요", "낱말")
     asked = {"id": "from", "options": [{"label": "영동1교남단 쪽", "set": {}}, {"label": words["잘 모르겠음"], "set": {}}]}
     finer = {"id": "finer", "options": [{"label": "가", "set": {}}]}
