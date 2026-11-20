@@ -897,7 +897,7 @@ FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
-ASK_ON = "samename,closestnew,sameopts,josa"      # (75번 후보 2, 기본 끔) 질문 다듬기: samename = 보기에 같은 이름을 두 번 넣지 않음 · closestnew = 「어디가 가장 가까우세요」를 다시 물을 때 앞서 내민 보기는 빼고 새 보기로(셋이 안 되면 묻지 않음) · sameopts = 이 통화에서 같은 보기로 이미 물었던 질문은 다시 고르지 않음(questions의 same, server.asked_same) · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
+ASK_ON = "samename,closestnew,sameopts,josa"      # (75번 후보 2, 기본 끔) 질문 다듬기: samename = 보기에 같은 이름을 두 번 넣지 않음 · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · sameopts = 이 통화에서 같은 보기로 이미 물었던 질문은 다시 고르지 않음(questions의 same, server.asked_same) · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
@@ -1533,6 +1533,8 @@ def _q_marks(R, x, y, w, qid, clues):
     """가까이 보이는 표지(간판 · 건물 · 시설)를 묻는다. 길 위면 차에서 볼 만한 것을, 이미 좁혀졌으면 더 바짝."""
     radius = 35.0 if qid == "finer" else 600.0 if qid == "station" else 100.0
     used = {tuple(c["p"]) for c in clues if c["t"] in ("pt", "past") and "p" in c and not isinstance(c["p"][0], list)}
+    if "closestnew" in ON:                                # (closestnew · 75번) 「다 멀어요」 · 「둘 다 아니에요」로 지운 곳을 「바로 앞에 뭐가 보이세요? ○○ 같은 거요」로 다시 내밀지 않는다
+        used |= {tuple(c["p"]) for c in clues if c["t"] == "not" and "p" in c and str(c.get("label", "")).endswith(" 쪽 아님")}
     passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]) else set())
     road = gaz.ROADSIDE if _on_express(R) else None          # 자동차전용도로 위: 길에서 보이는 종류만(_road_ok와 같은 규칙)
     picked, parts = _candidates(x, y, w, radius, passed_kinds if qid == "passed" else {"역"} if qid == "station" else road)
@@ -1756,8 +1758,12 @@ def selftest():
     far = lake_s + c1["options"][-1]["set"]["clues"]            # 「다 멀어요」
     again = lambda: (_q_closest(infer(far), *_sample(infer(far)), far) or {}).get("name")      # noqa: E731
     assert again() == c1["name"]                              # 끄면 같은 넷을 또 내민다(11-20 현장 서버에서 본 것)
+    marks = lambda: {o["label"] for o in (_q_marks(infer(far), *_sample(infer(far)), "mark", far) or {"options": []})["options"]}      # noqa: E731
+    gone = set(c1["name"].split(", "))
+    assert marks() & gone                                     # 끄면 방금 「다 멀어요」라고 한 곳을 보기로 또 내민다
     ON.add("closestnew")
-    assert again() and not set(again().split(", ")) & set(c1["name"].split(", ")), again()      # 켜면 새 보기로
+    assert again() and not set(again().split(", ")) & gone, again()      # 켜면 새 보기로
+    assert not marks() & gone                                 # 간판 · 바로 앞 질문의 보기에서도 뺀다
     ON.discard("closestnew")
     stray = {"type": "stray", "animal_matter": True, "alive": True, "leash": False}
     first = questions(Rlk, lake_s, stray)[0]
