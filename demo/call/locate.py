@@ -1716,6 +1716,41 @@ def _rim_side(R):
     return None
 
 
+STOP_SAID = re.compile(r"정류장|정류소|버스\s*(타는|서는)\s*(곳|데)")
+
+
+def stop_only(c, said):
+    """(stoponly, 기본 끔 · 85번) 「서울시청 바로 앞이에요」: 그 이름이 지명 표에 같은 이름의 버스 정류장 점으로만 있으면,
+    시민이 「정류장」이라고 하지 않았는데 그 점을 「바로 앞」의 좁은 폭으로 읽어 곧바로 39m 되묻기가 나갔다(정류장은 실제 건물에서 수백 m — 서울시청 약 230m · 명동성당 약 190m).
+    ⓐ 「근처」의 넓은 폭으로 읽어 눈앞의 것을 하나 더 받게 하고 ⓑ 이름표 · 되묻기에 「○○ 버스 정류장」으로 정류장임을 밝힌다(시민이 「아니요」라고 할 수 있게).
+    시민이 정류장이라고 말했으면(「○○ 정류장 앞이에요」) 그대로 둔다. 역 출구 · 관공서처럼 정류장이 아닌 점이 하나라도 있으면 그대로."""
+    if c.get("t") != "at" or c.get("how") not in ("바로", "가까이") or not c.get("k") or STOP_SAID.search(said or ""):
+        return c
+    r = resolve(c["k"])
+    if r["roads"] or r["areas"] or not r["kinds"] or any(k != "정류장" for k in r["kinds"]):
+        return c
+    return dict(c, how="근처", label=f"{c.get('label') or G.display(c['k'])} {KIND_WORD['정류장']}", stop_only=True)
+
+
+def selftest_stop():
+    """stoponly(85번): 정류장 점뿐인 이름난 곳은 「바로 앞」 한마디로 확정하지 않고, 정류장이라고 말한 통화 · 정류장이 아닌 곳은 그대로."""
+    k = gaz.norm
+    out = []
+    for name in ("서울시청", "명동성당"):
+        c = {"t": "at", "k": k(name), "how": "바로", "label": name, "sure": True}
+        s = stop_only(c, f"{name} 바로 앞이에요")
+        assert s["how"] == "근처" and s["label"] == f"{name} 버스 정류장" and s["stop_only"], s
+        r0, r1 = infer([c])["r"], infer([s])["r"]
+        assert r0 < 60 < 150 < r1, (name, r0, r1)
+        out.append(f"{name} {r0:.0f}m → {r1:.0f}m")
+    c = {"t": "at", "k": k("서울시청"), "how": "바로", "label": "서울시청"}
+    assert stop_only(c, "서울시청 정류장 앞이에요") is c and stop_only(c, "서울시청 버스 정류장 바로 앞이에요") is c      # 정류장이라고 말했으면 그대로
+    for name in ("잠실역 1번 출구", "상도1동주민센터", "롯데월드타워", "노량진수산시장"):
+        c = {"t": "at", "k": k(name), "how": "바로", "label": name}
+        assert stop_only(c, f"{name} 바로 앞이에요") is c, name      # 역 출구 · 관공서 · 볼거리 · 건물은 그대로(시연 대본 둘)
+    print("stoponly 스스로 시험 통과 (" + " · ".join(out) + ", 정류장이라고 말한 통화 · 역 출구 · 관공서는 그대로)")
+
+
 def selftest():
     k = gaz.norm
     assert infer([{"t": "at", "k": k("강변북로")}, {"t": "toward", "k": k("성동구")}, {"t": "past", "k": k("서울숲")}]) is not None      # 구 · 공원 이름을 「그쪽 · 지났다」의 기준으로 써도 돈다
@@ -1889,3 +1924,4 @@ def selftest():
 
 if __name__ == "__main__":
     selftest()
+    selftest_stop()
