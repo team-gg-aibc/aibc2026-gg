@@ -406,3 +406,16 @@ body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }
   body.view-records #reclist .recs { flex: none; overflow: visible; }      /* 낮은 칸에서도 기록 줄이 밀려 사라지지 않게 칸 전체를 내려 읽는다 */
   body.view-records #side { left: 8px; right: 8px; width: auto; top: calc(42% + 8px); bottom: 8px; }
 }
+/* 통화 화면 · 휴대폰 세로(폭 600px 아래): 컴퓨터용 배치에서는 오른쪽 접수 카드 칸이 대화 칸 · 입력 칸을 덮었다(11-21 현장 시험).
+   이 폭에서는 칸을 하나도 감추지 않고 한 줄로 쌓아 화면 전체를 내려 읽는다: 받아 적기(입력 칸 포함) → 지금 물을 말 → 조례 근거 답(근거 조항 · 인용문 · 원문 열기) → 위치 범위 → 접수 카드.
+   칸 안의 고정 높이 · 잘라 감추기는 좁은 폭에서 글이 길어지면 내용을 감추므로 이 폭에서만 푼다. 자리만 바꾸고 꾸밈은 그대로. 넓은 화면 · 휴대폰 가로(812)는 그대로(11-21, #144 리뷰) */
+@media (max-width: 600px) {
+  html, body { height: auto; overflow: visible; }
+  body:not(.view-records) #map { pointer-events: none; }      /* 칸 뒤에 깔린 지도가 칸 사이 틈에서 손가락 · 휠을 가져가 페이지 대신 지도가 움직이지 않게 */
+  body:not(.view-records) #range .pinbtn { display: none; }      /* 지도가 칸 뒤에 깔려 누를 곳이 없으므로 「지도에서 찍기」만 이 폭에서 뺀다(지도를 누르는 기능은 이것 하나) */
+  body:not(.view-records) #talk, body:not(.view-records) #ask, body:not(.view-records) #law, body:not(.view-records) #range, body:not(.view-records) #side {
+    position: relative; top: auto; right: auto; bottom: auto; left: auto; width: auto; max-width: none; height: auto; margin: 8px; overflow: visible; }
+  body:not(.view-records) #talk { margin-top: 54px; height: 62vh; overflow: hidden; }      /* 첫 화면에 받아 적기 · 입력 칸 · 보내기(대화는 칸 안에서 내려 읽음) */
+  body:not(.view-records) #side .sum, body:not(.view-records) #side .slot, body:not(.view-records) #side .s-to, body:not(.view-records) #side .s-near, body:not(.view-records) #side .s-ref .rbody { height: auto; overflow: visible; }
+  body:not(.view-records) #side .s-ref { flex: none !important; }      /* 원래 규칙이 !important */
+}
