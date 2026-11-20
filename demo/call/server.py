@@ -1247,6 +1247,7 @@ def understood(st):
                 t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"], said_before)
             jumped = bool(t.get("jump"))                  # (jumpguard, 기본 켬 · FIELD_ON · 71번) 이 말의 이름 하나로 범위가 수 km 옮겨 간다: 그 단서만 받지 않는다(같은 말의 일 · 생사 · 목줄은 아래에서 그대로 읽는다)
         for c in ([] if jumped else rd.get("clues") or []):
+            c = L.stop_only(c, t.get("said") or "") if "stoponly" in L.ON else c      # (stoponly, 기본 끔 · 85번) 정류장 점뿐인 이름난 곳의 「바로 앞」은 「근처」로 · 이름표에 「버스 정류장」
             clues = [x for x in clues if not _same(x, c)] + [c]
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다
