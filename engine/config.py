@@ -79,6 +79,7 @@ DEFAULTS = {
     "flow2_check_gray": False,       # flow2만: "c10"이면 두 번째 검사가 c10-gray(규칙 3을 좁힘, 설계 고침 3), True면 ⑥은 판이 고른 프롬프트(7판은 c8)를 먼저 하고, 그것이 거절한 「조례에 정해져 있지 않다 · 조례에 없다」 꼴 답만 c9-gray로 한 번 더 본다(④ topic 조항이 인용에 있을 때, 묻는 그 일을 정한 조항이 있고 값만 조례 밖이면 통과). 코드 판정 둘(flow.code_verdict). False = 7판과 같은 동작
     "flow2_plain": False,            # flow2만: True면 ⑥을 지난 답 글을 짧고 쉬운 말로 한 번 더 쓴다(호출 하나를 ⑥과 나란히, 프롬프트 w1, engine/flow2/plain.py). 인용 · 링크 · 시행일은 그대로, 숫자 · 결론이 바뀌면 원래 답. "two"면 프롬프트 w7(두 문장: 결론 + 조건 · 확인하는 곳, 「네. …」로 끊음, 100자 안쪽). "two_lead"면 w8(w7 + 첫 낱말은 ④ 초안을 따르고 첫 문장은 물음 글자에 그대로 답함, 설계 고침 5). False = 7판과 같은 동작
     # ---- 엔진 안정화 (PM, 11-15 설계 검토 「엔진-안정화-설계.md」) ----
+    "flow2_plain_guard": False,      # flow2만: True면 쉬운 말 단계의 받아들이기 검사(plain.accept)가 둘을 더 본다: ④ 초안에 없던 「정해져 있지 않다」를 붙인 답, ④ 초안 첫 문장의 값 숫자(인용 글에 있는 것)를 뺀 답 → 버리고 ④ 초안을 낸다(11-19 69번 7절, animal-S018 · parking-M003). False = 지금 동작
     "flow2_check_admit": False,      # flow2만: True면 ④ 답 글에 「모른다 · 조례에 없다 · 따로 확인하라」는 말(flow.ADMIT · plain.GRAY)이 없을 때 ⑥ c8을 부르지 않고 통과(c8이 맞는 「아니요」 답을 거절하던 것). False = 7판과 같은 동작
     "flow2_annex_quote": False,      # flow2만: True면 ⑤가 별표 구절을 단위 글자(m² → ㎡)를 맞춰 보고, 안 되면 칸마다 대조한다(flow.annex_quote_in). False = 7판과 같은 동작
     "unknown_guide": False,          # True면 「확인 불가」 답 뒤에 어디에 물으면 되는지 한 줄을 붙인다(contract.GUIDES, 11-11 받은 답: 확인 불가로 시작 + 빈 인용이면 정답). False = 킷 꼴 「확인 불가」 네 글자

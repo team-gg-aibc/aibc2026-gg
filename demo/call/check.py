@@ -147,6 +147,88 @@ def field_fixes():
     print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
 
 
+def partial_yes_table():
+    """(partyes2) 이 고침은 부분 긍정을 더하기만 한다: 되묻기 답의 갈림 표(시작 × 가운데 × 어긋남 말 × 끝 + 강조 말 · 「네, 맞아요」 꼴)에서
+    부분 긍정이 아닌 칸은 모두 스위치를 끈 결과(main 규칙)와 같은지 칸마다 견준다. 코드 읽기와 Solar 읽기 길 둘 다. 부정으로 맺는 칸은 부분 긍정이 되지 않는다."""
+    import itertools
+    os.environ.setdefault("CALL_MODE", "saved"), os.environ.setdefault("CALL_NO_ENGINE", "1")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    ask = {"id": "confirm"}
+    starts, mids, devs = ["네", "예", "맞아요", "어 네", "음 네", "네 정말", "네, 완전히"], [", 근데 ", ", 다만 ", ", 그런데 ", ", 아 근데 ", " "], ["조금 옆", "뒤", "길 건너", "그쪽", "조금 떨어져"]
+    ends = {"긍정": "{d}이에요", "자리 말": "{d} 편의점 앞이에요", "강조": "{d}이에요, 완전히 맞아요", "아니에요": "{d} 아니에요", "아니요": "{d}요. 아니요", "아닌데요": "{d} 아닌데요",
+            "아닌 것 같아요": "{d} 아닌 것 같아요", "반대쪽": "{d} 말고 반대쪽이에요"}
+    negend = {"아니에요", "아니요", "아닌데요", "아닌 것 같아요", "반대쪽"}
+    cells = [(f"{a}{m}{ends[e].format(d=d)}", e) for a, m, d, e in itertools.product(starts, mids, devs, ends)]
+    cells += [(t, "따로") for t in ("네, 맞아요", "네", "네, 완전히 맞아요", "네 정말 맞아요", "네, 딱 거기예요", "네, 확실히 거기예요", "네, 전혀 안 움직이고 그 앞에 있어요", "네, 바로 옆이에요",
+                                   "네, 근데 그쪽 아니에요", "예, 근데 거기 뒤 아니에요", "네 맞는데 근데 그쪽 말고 반대쪽이에요", "아니요, 거기가 아니에요", "잘 모르겠어요")]
+    protect = ["네, 근데 바로 앞은 아니고 조금 옆이에요", "예, 근데 길 건너편이에요", "네, 조금 옆이에요"]
+    cells += [(t, "지킬 말") for t in protect]
+
+    def both(said):
+        r_on = S.code_read(said, ask, [], None)
+        had = "partyes2" in S.L.ON
+        S.L.ON.discard("partyes2")
+        try:
+            r_off = S.code_read(said, ask, [], None)
+        finally:
+            S.L.ON.add("partyes2") if had else None
+        return r_on, r_off
+    partial = 0
+    for said, end in cells:
+        r_on, r_off = both(said)
+        is_partial = bool(r_on["confirm"] is None and r_on["matter"].get("side") in ("근처", "건너편") and "side" not in r_off["matter"])
+        if not is_partial:
+            assert (r_on["confirm"], r_on["matter"].get("side")) == (r_off["confirm"], r_off["matter"].get("side")), (said, r_on["confirm"], r_off["confirm"])     # 부분 긍정이 아니면 main 그대로
+        assert not (is_partial and end in negend), said                    # 부정으로 맺는 답은 부분 긍정이 아니다
+        assert is_partial or end != "지킬 말", said                        # 지키려는 말은 부분 긍정
+        partial += bool(is_partial)
+        for solar in (True, False, None):                                  # Solar 읽기 길: 부분 긍정이 아니면 Solar가 읽은 그대로, 앞 차례에 부분 긍정이 있으면 늘 그대로
+            for prior in ([], [{"code": {"clues": [{"partyes": True}]}}]):
+                st = {"turns": prior + [{"asked": ask, "said": said, "code": {"clues": []}}]}
+                read = {"confirm": solar, "matter": {}, "clues": []}
+                changed = S._partyes_model(read, st)
+                assert changed == (is_partial and not prior), (said, solar, bool(prior), changed)
+                if not changed:
+                    assert read == {"confirm": solar, "matter": {}, "clues": []}, (said, read)
+    print(f"  ✓ 되묻기 답 갈림 표 {len(cells)}칸(부분 긍정 {partial}칸): 부분 긍정이 아닌 칸은 모두 main 그대로(코드 · Solar 읽기 둘 다), 부정으로 맺는 칸은 부분 긍정이 아님, 두 번째는 늘 그대로")
+
+
+def partial_yes():
+    """(partyes2, 73번) 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니다 — 확정을 한 번 미루고 「○○ 근처」로 다시 되묻고, 두 번째도 그렇게 답하면 확정."""
+    say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
+    st, view = say({"id": "check-partyes"}, "상도1동주민센터 바로 앞에 고양이가 죽어 있어요")
+    for _ in range(4):
+        if view["question"]["id"] == "confirm":
+            break
+        st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+        st, view = say(st, "차로 위예요" if view["question"]["id"] == "lane" else "잘 모르겠어요")
+    assert view["question"]["id"] == "confirm", view["question"]
+    st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+    st, view = say(st, "네, 근데 바로 앞은 아니고 조금 옆이에요")
+    W = {r[0]: r[1] for t in call("/api/text")["text"]["sections"]["위치 범위"]["tables"] for r in t["rows"]}
+    assert not view["confirmed"] and view["question"]["id"] == "confirm" and W["표지 근처"].replace("{표지}", "").strip() in view["question"]["say"], (view["confirmed"], view["question"])
+    assert W["단서 · 되묻은 자리 조금 옆"] in view["chips"], view["chips"]      # 화면 칩의 단서 이름은 문구 파일에서(줄이 없으면 여기서 실패)
+    st2, view2 = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+    _, view2 = say(st2, "네, 근데 바로 앞은 아니고 조금 옆이에요")
+    assert not view2["confirmed"], view2["question"]                      # 두 번째 부분 긍정은 확정하지 않는다(main 규칙)
+    _, view3 = say(st2, "네, 맞아요")
+    assert view3["confirmed"], view3["question"]                          # 「○○ 근처」에 「네」면 확정
+    st, view = say({"id": "check-partyes-no"}, "상도1동주민센터 바로 앞에 고양이가 죽어 있어요")
+    for _ in range(4):
+        if view["question"]["id"] == "confirm":
+            break
+        st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+        st, view = say(st, "차로 위예요" if view["question"]["id"] == "lane" else "잘 모르겠어요")
+    for _ in range(3):                                    # 아니라고 맺는 답을 거듭해도 그 자리는 확정되지 않는다
+        if view["question"]["id"] != "confirm":
+            break
+        st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+        st, view = say(st, "네, 근데 그쪽 아니에요")
+        assert not view["confirmed"], view["question"]
+    print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 main 그대로(확정 안 됨) · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
+
+
 def edge_reads():
     """(75번) 둘레에 길이 있는 곳의 읽기 스위치(EDGE_ON): 켜져 있으면 그 읽기를, 꺼져 있으면 지금의 읽기(길 낱말이 이름으로 읽힘)를 서버 함수로 바로 본다(모델 · 엔진 호출 없음)."""
     os.environ.setdefault("CALL_MODE", "saved")
@@ -415,6 +497,8 @@ def main():
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
         field_fixes()
+        partial_yes()
+        partial_yes_table()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])

@@ -1,10 +1,24 @@
 {
- "name": "release-c4",
+ "name": "release-c7",
  "issue": "",
- "cycle": 4,
- "tag": "rc-c4",
+ "cycle": 7,
+ "tag": "rc-c7",
  "note": "릴리스 설정: 채택된 실험을 모두 켠 판. eval/release.py가 쓴다(손으로 고치지 않는다). 채점 서버는 ENGINE_CONFIG=eval/configs/release.json",
  "experiments": [
+  {
+   "issue": "",
+   "name": "plain-guard-1120",
+   "cycle": null,
+   "switches": {
+    "flow": "flow2",
+    "flow2_version": 7,
+    "flow2_hedge_sec": 10,
+    "flow2_plain_guard": true
+   },
+   "from": [
+    "eval/configs/plain-guard-1120.json"
+   ]
+  },
   {
    "issue": "",
    "name": "pm-flow2-v7",
@@ -108,6 +122,7 @@
   "flow2_lead": "comma",
   "flow2_place_scope": true,
   "flow2_plain": "two",
+  "flow2_plain_guard": true,
   "flow2_read_deleg": "topic",
   "flow2_version": 7,
   "group_by_article": true,
