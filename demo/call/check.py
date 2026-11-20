@@ -257,49 +257,53 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
 
 def switches():
     """길가 흡연 · 대여소 킥보드 스위치(72번)의 판단을 서버 함수로 바로 본다(모델 · 엔진 호출 없음). 켬 · 끔 어느 쪽으로 띄워도 그 값대로 본다.
-    킥보드 원칙: 킥보드만이 민원의 대상일 때만 일의 종류를 바꾼다. 다른 대상(자전거 포함)이 있으면 원래 판정(스위치를 끈 결과) 그대로."""
+    킥보드 스위치가 하는 일은 하나: 킥보드가 공공자전거 구역에 세워졌으면 그 밖의 일 · 모름을 자전거 일로 올리고 엔진 물음을 조례의 말로 쓴다. 나머지는 스위치를 끈 결과 그대로."""
     os.environ.setdefault("CALL_MODE", "saved")
     sys.path.insert(0, str(HERE))
     import server as S
     st = lambda *said: {"turns": [{"said": t, "asked": None if n == 0 else {"id": "where"}} for n, t in enumerate(said)]}      # noqa: E731
     single = {"따릉이 거치대에 킥보드가 세워져 있어요": "dock", "대여소에 킥보드가 세워져 있어요": "dock", "누가 킥보드를 따릉이 자리에 세워 놓고 갔어요": "dock",
-            "공공자전거 거치대 사이에 킥보드가 끼어 있어요": "dock", "따릉이 대여소에 전동 킥보드가 세워져 있어서 따릉이를 못 빼요": "dock",      # 못 쓰게 된 따릉이는 대상이 아니다
-            "아파트 자전거 거치대에 킥보드가 세워져 있어요": "street", "거치대에 킥보드가 세워져 있어요": "street", "학교 거치대에 킥보드가 꽂혀 있는데 따릉이도 못 세워요": "street",
-            "따릉이 대여소 옆 길에 킥보드가 쓰러져 있어요": "street", "자전거도로에 킥보드가 쓰러져 있어요": "street", "따릉이 대여소에 전동 스쿠터가 세워져 있어요": None,      # 전동 스쿠터는 킥보드로 보지 않는다
-            "길가에 자전거랑 킥보드가 몇 달째 세워져 있어요": "with_bike", "따릉이가 넘어져 있고 킥보드도 대여소에 세워져 있어요": "with_bike",
-            "킥보드 타고 가다가 거치대 옆에 방치된 자전거를 봤어요": None, "자전거를 타고 가다가 대여소에 킥보드가 세워진 걸 봤어요": "dock"}      # 자전거를 타는 쪽은 대상이 아니다
+              "공공자전거 거치대 사이에 킥보드가 끼어 있어요": "dock", "따릉이 대여소에 전동 킥보드가 세워져 있어서 따릉이를 못 빼요": "dock",
+              "따릉이가 넘어져 있고 킥보드도 대여소에 세워져 있어요": "dock", "자전거를 타고 가다가 대여소에 킥보드가 세워진 걸 봤어요": "dock",
+              "아파트 자전거 거치대에 킥보드가 세워져 있어요": None, "거치대에 킥보드가 세워져 있어요": None, "학교 거치대에 킥보드가 꽂혀 있는데 따릉이도 못 세워요": None,
+              "따릉이 대여소 옆 길에 킥보드가 쓰러져 있어요": None, "자전거도로에 킥보드가 쓰러져 있어요": None, "따릉이 대여소에 전동 스쿠터가 세워져 있어요": None,      # 전동 스쿠터는 킥보드로 보지 않는다
+              "길가에 자전거랑 킥보드가 몇 달째 세워져 있어요": None, "킥보드 타고 가다가 거치대 옆에 방치된 자전거를 봤어요": None,
+              "따릉이 대여소에 킥보드 세운 사람이 담배를 피워요": None}      # 다른 일(흡연)의 배경
     for said, w in single.items():
         assert S.kick_of(st(said)) == (w if S.KICK_DOCK else None), f"킥보드 판단 {said!r} → {S.kick_of(st(said))} (기대 {w})"
     for said in (("거치대에 킥보드가 꽂혀 있어요", "따릉이 대여소 앞이에요"), ):      # 대여소 말이 다른 차례에 나와도
         assert S.kick_of(st(*said)) == ("dock" if S.KICK_DOCK else None)
-    for said in (("길에 자전거가 몇 달째 버려져 있어요", "옆에 킥보드도 하나 쓰러져 있고요"), ("길에 자전거가 몇 달째 버려져 있어요", "킥보드 세워진 데 옆이에요")):      # 리뷰 4차
-        assert S.kick_of(st(*said)) == ("with_bike" if S.KICK_DOCK else None), said
+    for said in (("길에 자전거가 몇 달째 버려져 있어요", "옆에 킥보드도 하나 쓰러져 있고요"), ("길에 자전거가 몇 달째 버려져 있어요", "킥보드 세워진 데 옆이에요"),      # 리뷰 4 · 5차
+                 ("길에 자전거 한 대가 몇 달째 버려져 있어요", "공유 킥보드 세워진 데 옆이에요"), ("자전거는 몇 달째 그대로 있어요", "공유 킥보드 세워진 데 옆이에요"),
+                 ("방치 자전거 신고하려고요", "공유 킥보드 세워진 데 옆이에요")):
+        assert S.kick_of(st(*said)) is None, said                                       # dock이 아니면 스위치는 아무것도 하지 않는다
 
-    # 킥보드 갈림 표: (원래 판정) × (킥보드 말) × (자리) × (자전거도 대상인가). 칸마다 「일의 종류」와 「엔진 물음을 조례의 말로 바꾸나」를 본다.
-    # 원래 판정 = 첫 차례를 읽은 종류(코드 · Solar). 「그대로」 칸은 스위치를 끈 결과와 같아야 한다.
+    # 킥보드 갈림 표: (원래 판정) × (킥보드 말) × (자리) × (자전거를 어떻게 말했나). 칸마다 「일의 종류」와 「엔진 물음을 조례의 말로 바꾸나」를 본다.
+    # 스위치가 하는 일은 하나: 킥보드가 공공자전거 구역에 세워졌으면(dock) 그 밖의 일 · 모름을 자전거 일로 올리고 물음을 바꾼다. 나머지 칸은 모두 스위치를 끈 결과와 같다.
     places = {"공공자전거 구역": "따릉이 대여소에", "일반 거치대": "아파트 자전거 거치대에", "길": "길에"}
+    bikes = {"자전거 말 없음": None, "자전거가": "자전거가 몇 달째 방치돼 있어요", "자전거 한 대가": "자전거 한 대가 몇 달째 방치돼 있어요",
+             "자전거는": "자전거는 몇 달째 그대로 있어요", "조사 없음": "방치 자전거 신고하려고요"}      # 뒤의 셋은 리뷰 5차가 든 말투(「버려져」는 쓰레기 일의 낱말이라 표 밖 위 줄에서 봄)
     cells = 0
     for kind in ("bike", "other", "smoking"):
         for pos in ("없음", "대상", "타는 말", "다른 차례"):
             for pname, at in places.items():
-                for wb in (False, True):
-                    subj = "자전거가 몇 달째 버려져 있어요" if wb else "뭐가 쓰러져 있어요"
+                for bname, bike in bikes.items():
+                    subj = bike or "뭐가 쓰러져 있어요"
                     told = {"없음": f"{at} {subj}", "다른 차례": f"{at} {subj}", "타는 말": f"킥보드 타고 가다 봤는데 {at} {subj}",
-                            "대상": f"{at} " + ("자전거가 몇 달째 버려져 있고 킥보드도 세워져 있어요" if wb else "킥보드가 세워져 있어요")}[pos]
+                            "대상": f"{at} 킥보드가 세워져 있어요" if not bike else f"{bike} {at} 킥보드도 세워져 있어요"}[pos]
                     if kind == "smoking":
                         told = "담배 피우는 사람도 있고 " + told
-                    said = [told] + ([f"{at} 킥보드도 세워져 있어요"] if pos == "다른 차례" else [])
+                    said = [told] + ([f"{at} 공유 킥보드도 세워져 있어요"] if pos == "다른 차례" else [])
                     call_ = {"id": "grid", "turns": [{"said": t, "asked": None if n == 0 else {"id": "where"}, "model": None,
                                                      "code": {"clues": [], "matter": {"type": kind} if n == 0 else {}}} for n, t in enumerate(said)]}
                     got = S.understood(call_)[1].get("type")
                     was, S.KICK_DOCK = S.KICK_DOCK, False
-                    off = S.understood(call_)[1].get("type")       # 원래 판정(스위치 끔)
+                    off = S.understood(call_)[1].get("type")       # 스위치를 끈 결과(main)
                     S.KICK_DOCK = was
-                    only_kick = S.KICK_DOCK and pos in ("대상", "다른 차례") and not wb and kind != "smoking"
-                    want_t = ("bike" if pname == "공공자전거 구역" else "other") if only_kick else off
-                    want_w = only_kick and pname == "공공자전거 구역"
-                    assert got == want_t, f"킥보드 표 칸 (판정 {kind} · 킥보드 {pos} · {pname} · 자전거 대상 {wb}) {said} → {got} (기대 {want_t})"
-                    assert S.kick_words(call_, got) == want_w, f"킥보드 표 칸 엔진 물음 (판정 {kind} · 킥보드 {pos} · {pname} · 자전거 대상 {wb}) → {S.kick_words(call_, got)}"
+                    dock = S.KICK_DOCK and pos in ("대상", "다른 차례") and pname == "공공자전거 구역" and kind != "smoking"
+                    want_t = "bike" if dock and off in (None, "other", "bike") else off
+                    assert got == want_t, f"킥보드 표 칸 (판정 {kind} · 킥보드 {pos} · {pname} · {bname}) {said} → {got} (기대 {want_t})"
+                    assert S.kick_words(call_, got) == dock, f"킥보드 표 칸 엔진 물음 (판정 {kind} · 킥보드 {pos} · {pname} · {bname}) → {S.kick_words(call_, got)}"
                     cells += 1
 
     # 흡연 표지 표: (일의 종류) × (공원 안인가) × (담배 말) × (건물 안 · 금연거리 말) × (통화 상태) × (50m 안 정류장 · 출구). 칸마다 엔진에 보내는 장소를 본다.

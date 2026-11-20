@@ -994,10 +994,7 @@ RACK = re.compile(r"거치대" + _AT)                                           
 PRIVATE_RACK = re.compile(r"(?:아파트|빌라|학교|회사|건물|상가|주택|오피스텔|개인|집)\S*\s*(?:자전거\s*)?거치대")      # 공공자전거가 아닌 거치대
 
 
-_AND = r"들?(?:이랑|랑|하고|와|과|이나|나|도)\s+(?:[가-힣]+\s+)?"
-BIKE_WITH = re.compile(r"(?:자전거|따릉이)" + _AND + r"(?:킥보드|개인형)|(?:킥보드|이동 ?장치)" + _AND + r"(?:자전거|따릉이)")      # 자전거 · 따릉이와 킥보드를 한데 문제 삼은 말(「자전거랑 킥보드가」 · 「킥보드랑 공유 자전거가」). 「따릉이를 못 빼요」처럼 따로 나온 자전거는 아니다
 KICK_RIDE = re.compile(r"(?:킥보드|이동 ?장치)(?:를|을)?\s*(?:타|탄|탔|몰)")
-BIKE_TARGET = re.compile(r"(?:자전거|따릉이)들?(?:이|가|을|를|도)(?=[\s.,?!]|$)(?!\s*못\s)(?!\s*(?:타|탄|탔|빌려|빌린|반납))")      # 킥보드와 따로 문제 삼은 자전거 · 따릉이(「길에 자전거가 몇 달째 버려져 있어요」). 「따릉이를 못 빼요」(못 쓰게 된 쪽) · 「자전거를 타고」는 대상이 아니다      # 킥보드를 타는 말(「킥보드 타고 가다가」 · 「킥보드 탄 사람」): 그 킥보드는 민원의 배경
 
 
 def _other_words(heard):
@@ -1006,51 +1003,40 @@ def _other_words(heard):
 
 
 def kick_of(st):
-    """(KICK_DOCK) 통화 하나를 킥보드 쪽에서 본다 → "dock"(킥보드만 문제 삼았고 공공자전거 구역 「에」 세움: 대여소 · 따릉이 자리 · 따릉이 거치대,
-    또는 통화에 따릉이 · 공공자전거 · 대여소가 있고 아파트 · 학교 같은 앞말 없는 거치대) · "street"(킥보드만, 그 밖의 자리)
-    · "with_bike"(자전거 · 따릉이도 문제 삼음: 「자전거랑 킥보드가」 · 「자전거가 버려져 있어요」 + 어느 차례든 킥보드) · None(킥보드 말이 없거나, 타는 말뿐이거나, 다른 일의 배경).
-    원칙: 킥보드 갈림은 킥보드만이 민원의 대상일 때만 일의 종류를 바꾼다. 다른 대상(자전거 포함)이 있으면 원래 판정을 그대로 둔다. 칸마다의 결과는 check.py switches()의 표. 일의 종류 맞추기(fit_type)와 엔진 물음 바꾸기(_run_engine)가 같은 판단을 쓴다.
-    킥보드 · 대여소 · 자전거 말은 통화 전체에서(다른 차례에 나와도), 배경을 가르는 다른 종류의 낱말은 무슨 일인지 말한 차례(첫 말 · 「어떤 일로」의 답)에서만 본다:
-    위치를 말하다 나온 표지(「가로등 옆이에요」 · 「벤치 앞」)로 갈림이 꺼져 통화 가운데 일의 종류가 바뀌지 않게."""
+    """(KICK_DOCK) 킥보드가 공공자전거 구역에 세워졌다는 통화인가 → "dock", 아니면 None.
+    공공자전거 구역 = 대여소 · 따릉이 자리 · 공공자전거 주차구역 · 따릉이(공공자전거 · 대여소) 거치대 「에」, 또는 통화에 따릉이 · 공공자전거 · 대여소가 있고
+    아파트 · 학교 같은 앞말이 없는 「거치대에」. 킥보드를 타는 말뿐이거나(배경) 무슨 일인지 말한 차례(첫 말 · 「어떤 일로」의 답)에 다른 종류의 낱말이 있으면 None.
+    스위치가 하는 일은 이것 하나다: dock이면 일의 종류를 자전거 일로 올리고(fit_type) 엔진 물음을 조례의 말로 쓴다(kick_words).
+    길 · 일반 거치대의 킥보드나 자전거도 함께 말한 통화를 「그 밖의 일」로 내리는 길은 없다(PR #132 리뷰 5차): dock이 아니면 스위치를 끈 결과와 같다."""
     if not KICK_DOCK:
         return None
     turns = [t for t in st["turns"] if t.get("said")]
     heard = " ".join(t["said"] for t in turns)
     if not KICK.search(KICK_RIDE.sub(" ", heard)):
-        return None                                       # 킥보드 말이 없거나 타는 말뿐(「킥보드 타고 가다가 방치된 자전거를 봤어요」): 원래대로
-    if BIKE_WITH.search(heard) or BIKE_TARGET.search(heard):
-        return "with_bike"                                # 자전거 · 따릉이도 민원의 대상: 일의 종류는 원래 판정 그대로(PR #132 리뷰 4차 P1, 다른 차례 · 다른 문장의 킥보드도)
+        return None                                       # 킥보드 말이 없거나 타는 말뿐(「킥보드 타고 가다가 방치된 자전거를 봤어요」)
     told = " ".join(t["said"] for n, t in enumerate(turns) if n == 0 or (t.get("asked") or {}).get("id") == "what")
     if _other_words(told):
-        return None
+        return None                                       # 다른 일(흡연 · 동물 …)의 배경
     public_rack = RACK.search(heard) and re.search(_PUBLIC, heard) and not PRIVATE_RACK.search(heard)     # 「거치대에」만 말해도 통화에 따릉이 · 공공자전거 · 대여소가 있으면(아파트 · 학교 거치대는 아님)
-    return "dock" if DOCK.search(heard) or public_rack else "street"      # 앞말 없는 「거치대」만으로는 공공자전거 대여소로 보지 않는다(PR #132 리뷰 3차 P1): 자전거 조례 제12조의2 ⑦은 공공자전거 주차구역의 일
+    return "dock" if DOCK.search(heard) or public_rack else None      # 앞말 없는 「거치대」만으로는 공공자전거 대여소로 보지 않는다(리뷰 3차): 자전거 조례 제12조의2 ⑦은 공공자전거 주차구역의 일
 
 
 def kick_words(st, kind):
-    """(KICK_DOCK) 엔진 물음을 조례의 말(공공자전거 주차구역 · 개인형 이동장치)로 바꿔 쓸 통화인가: 일의 종류가 자전거이고 킥보드만 공공자전거 구역에 세웠다는 통화.
-    킥보드가 배경인 흡연 · 다른 일, 자전거도 문제 삼은 통화, 일반 거치대 · 길의 킥보드는 물음을 그대로 둔다."""
+    """(KICK_DOCK) 엔진 물음을 조례의 말(공공자전거 주차구역 · 개인형 이동장치)로 바꿔 쓸 통화인가: 일의 종류가 자전거이고 킥보드가 공공자전거 구역에 세워졌다는 통화.
+    킥보드가 배경인 흡연 · 다른 일, 일반 거치대 · 길의 킥보드는 물음을 그대로 둔다. 대체 물음은 간추린 물음을 뒤에 남겨 자전거 등 다른 내용을 지우지 않는다."""
     return kind == "bike" and kick_of(st) == "dock"
 
 
 def fit_type(kind, things, kick=None):
     """종류 판정(코드 낱말 · Solar)을 시민이 문제 삼은 것들과 맞춰 본다: 그 가운데 하나라도 이 종류가 다루는 것이면 그대로,
     다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로.
-    (KICK_DOCK, kick = kick_of(st)) 킥보드만 민원의 대상일 때만 자리로 가른다: 대여소 · 거치대 「에」 세웠다는 말이 있으면 자전거 일, 없으면 「그 밖의 일」
-    (Solar는 킥보드를 「그 밖의 일」로 읽고, 코드 낱말은 「따릉이 대여소 옆 길」의 「따릉이」로 자전거 일로 읽는다 — 둘 다 자리를 보지 않는다).
-    킥보드가 배경으로만 나온 통화(「킥보드 타고 가다가 고양이가 죽어 있는 걸 봤어요」 · 「킥보드 탄 사람이 담배 피워요」)는 건드리지 않는다:
-    원래 맞추기의 결과가 자전거 · 그 밖의 일 · 모름이 아니거나, 무슨 일인지 말한 차례에 다른 종류의 낱말(routes.json words)이 있으면 원래대로 둔다(PR #132 리뷰 P1).
-    자전거 · 따릉이를 킥보드와 함께 문제 삼은 통화(「길가에 자전거랑 킥보드가 몇 달째 세워져 있어요」)는 자전거 일로 읽었으면 그대로 둔다:
-    things_of가 「자전거랑」을 대상으로 잡지 못해 「킥보드가」만 남으면 원래 맞추기도 「그 밖의 일」로 떨어뜨린다(PR #132 리뷰 2차 P1)."""
-    if kick == "with_bike" and kind == "bike":
-        return kind
+    (KICK_DOCK, kick = kick_of(st)) 킥보드가 공공자전거 구역에 세워졌다는 통화면 「그 밖의 일 · 모름」을 자전거 일(자전거 조례 제12조의2 ⑦)로 올린다.
+    Solar는 대여소의 킥보드를 「그 밖의 일」로 읽는다. 올리기만 하고 내리지는 않는다: 다른 종류로 읽은 통화와 dock이 아닌 통화는 원래 맞추기 그대로."""
     if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
         got = kind
     else:
         got = next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
-    if kick in ("dock", "street") and got in (None, "other", "bike"):     # 원래 맞추기가 자전거 · 그 밖의 일 · 모름에 닿았을 때만 자리로 가른다: 위치를 말하다 나온 낱말(「가로등 옆이에요」 → 가로등)도
-        return "bike" if kick == "dock" else "other"                       # 앞서 말한 킥보드와 맞춰 그 밖의 일로 떨어지므로 여기서 대여소 킥보드로 돌아온다. 시민이 문제 삼은 다른 일(「담배를」)은 원래대로
-    return got
+    return "bike" if kick == "dock" and got in (None, "other") else got
 
 
 # ---- 통화 전체에서 단서와 일을 모은다
@@ -1236,9 +1222,10 @@ def _run_engine(key, said, tname, place, job, question=None, kick=False):
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
     T = tab("일의 종류와 갈림")
+    summed = res["ask"]                                   # 간추리기가 낸 물음(실패면 None)
     res["ask"] = res["ask"] or fill(T["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
     if kick and "개인형 이동장치" not in res["ask"]:      # (KICK_DOCK) 간추리기가 조례의 말을 안 썼으면 틀로
-        res["ask"] = fill(T["엔진 물음 틀 · 킥보드 대여소"], 장소=where, 물음=question or T["엔진 물음 끝 · 킥보드 대여소"])[:300]
+        res["ask"] = fill(T["엔진 물음 틀 · 킥보드 대여소"], 장소=where, 물음=summed or question or T["엔진 물음 끝 · 킥보드 대여소"])[:300]      # 간추린 물음은 뒤에 남긴다(자전거도 함께 말한 통화의 내용을 지우지 않게)
         res["ask_fixed"] = True
     if mark and mark not in res["ask"]:                   # (SMOKE_NEAR) 간추리기가 표지를 뺐으면 틀로: 표지가 없으면 엔진이 「길」만 보고 근거를 못 찾는다
         res["ask"] = fill(T["엔진 물음 틀 · 길가 흡연"], 표지=mark, 물음=question or T["엔진 물음 끝 · 길가 흡연"])[:300]
