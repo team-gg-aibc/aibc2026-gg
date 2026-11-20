@@ -160,8 +160,13 @@ PARTYES = re.compile(r"^\s*(네|예|응|맞아|맞습|맞긴|그래요|넵)[^?]*
 def _partyes(read, said, R=None):
     """(partyes) 되묻기 답이 「네」로 시작하는 부분 긍정이면 확정으로 받고 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 받았나.
     (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리(15~55m)를 단서로 더해 한 번 더 좁힌다(핀만 옮김)."""
-    if not ({"partyes", "partyes2"} & L.ON) or not PARTYES.search(said or "") or re.search(r"반대|다른 ?(데|곳|자리)|전혀|완전히", said):
-        return False                                      # 「네, 근데 그쪽 말고 반대쪽이에요」는 다른 자리를 말한 것: 전처럼 읽는다
+    if not ({"partyes", "partyes2"} & L.ON):
+        return False
+    if re.match(r"^\s*(네|예|응|맞)", said or "") and re.search(r"반대|다른 ?(데|곳|자리)|전혀|완전히", said):
+        read["confirm"] = False                           # 「네 맞는데 근데 그쪽 말고 반대쪽이에요」: 「네」로 시작해도 다른 자리를 말한 것(main은 「아니」가 없어 「네」로 읽었다)
+        return True
+    if not PARTYES.search(said or ""):
+        return False
     read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
     if "partyes2" in L.ON:
         read["confirm"] = None
@@ -963,7 +968,7 @@ def model_read(st, short, known):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
     if (turn_.get("asked") or {}).get("id") == "confirm" and _partyes(read, turn_.get("said")):     # (partyes) Solar가 「아니요」로 읽어도 「네」로 시작하는 부분 긍정은 그대로(확정 · 또는 partyes2면 고리 단서)
         read["clues"] += [c for c in (turn_.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
-        if any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
+        if read["confirm"] is None and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
             read["confirm"], read["clues"] = True, [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째는 확정으로
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}

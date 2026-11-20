@@ -147,6 +147,29 @@ def field_fixes():
     print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
 
 
+def partial_yes_table():
+    """(partyes2) 되묻기 답의 갈림 표를 읽기 함수로 칸마다: 네만 · 네 + 근데 옆 · 네 + 근데 아니 · 아니요 · 그 밖. 스위치를 끄면 main의 규칙(「아니」가 있으면 아니요)과 같다."""
+    os.environ.setdefault("CALL_MODE", "saved"), os.environ.setdefault("CALL_NO_ENGINE", "1")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    ask = {"id": "confirm"}
+    table = [("네, 맞아요", True, None), ("네", True, None), ("네, 근데 바로 앞은 아니고 조금 옆이에요", None, "근처"), ("예, 근데 길 건너편이에요", None, "건너편"),
+             ("네, 근데 거기 아니에요", False, None), ("네 맞는데 근데 그쪽 말고 반대쪽이에요", False, None), ("아니요, 거기가 아니에요", False, None), ("잘 모르겠어요", None, None)]
+    for said, want, side in table:
+        r = S.code_read(said, ask, [], None)
+        assert (r["confirm"], r["matter"].get("side")) == (want, side), (said, r["confirm"], r["matter"].get("side"))
+    had = "partyes2" in S.L.ON
+    S.L.ON.discard("partyes2")
+    try:
+        for said, _, _ in table:                           # 끈 길 = main의 규칙
+            r = S.code_read(said, ask, [], None)
+            old = False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
+            assert r["confirm"] == old and "side" not in r["matter"], (said, r["confirm"], old)
+    finally:
+        S.L.ON.add("partyes2") if had else None
+    print(f"  ✓ 되묻기 답 갈림 표 {len(table)}칸: 네만 · 네+근데 옆(근처 · 건너편) · 네+근데 아니 · 반대쪽 · 아니요 · 그 밖, 끄면 main 규칙과 같음")
+
+
 def partial_yes():
     """(partyes2, 73번) 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니다 — 확정을 한 번 미루고 「○○ 근처」로 다시 되묻고, 두 번째도 그렇게 답하면 확정."""
     say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
@@ -404,6 +427,7 @@ def main():
         free_text()
         field_fixes()
         partial_yes()
+        partial_yes_table()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
