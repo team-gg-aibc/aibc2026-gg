@@ -1401,7 +1401,7 @@ def where_line(p, done, matter=None, anc=None):
             near = fill(W["표지 앞"], 표지=anc["name"])
             if p.get("gu") and len(G.refs(gaz.norm(anc["name"]))) >= 3:
                 near = f"{p['gu']} {near}"                 # 서울에 같은 이름이 여럿(「BYC」): 긴 길 위에서는 구까지 되말해 다른 지점이면 시민이 잡게 한다(11-14 밤, 4.7km 떨어진 BYC로 확정한 일)
-    elif p.get("rim") and "둘레" in W:                       # (rimline · 75번) 둘레로 읽은 곳의 한쪽 띠: 「항동저수지 서쪽 둘레」
+    elif p.get("rim") and "둘레" in W and not (p.get("near") and p["near_m"] <= 60 and p["near"] != p["rim"]["name"]):      # (rimline · 75번) 둘레로 읽은 곳의 한쪽 띠: 「항동저수지 서쪽 둘레」. 시민이 댄 다른 표지가 가까이(60m 안) 있으면 그 표지로 말한다(「올림픽공원 남2문 앞에서 약 40m」가 더 또렷하다)
         near = fill(W["둘레 쪽"], 표지=p["rim"]["name"], 쪽=p["rim"]["side"]) if p["rim"].get("side") else fill(W["둘레"], 표지=p["rim"]["name"])
     elif p.get("near") and (done or p["m"] <= 400):
         near = fill(W["표지 앞"], 표지=p["near"]) if p["near_m"] <= 40 else fill(W["표지 거리"], 표지=p["near"], 거리=p["near_m"])
