@@ -671,13 +671,20 @@ def reread_guards():
                  ("명동역 6번 출구 나와서 밀리오레 앞이요", dict(N, type="other", by_name=[["명동역 6번 출구", "근처", "모름"], ["밀리오레", "근처", "바로"]]))])
     kind = S.understood(st)[1].get("type")
     assert kind == ("vendor" if "keeptype" in S.L.ON else "other"), kind                     # 켜면 자리만 말한 차례의 Solar 「그 밖의 일」이 적치물을 덮지 않음
+    st, _ = run([("강남역 10번 출구요", dict(N, by_name=[["강남역 10번 출구", "근처", "모름"]])), ("길거리에서 스피커로 음악을 엄청 크게 틀어 놔서 시끄러워요", dict(N, type="noise", by_name=[])),
+                 ("네? 스피커는 장소가 아니고요, 강남역 10번 출구 바로 앞이에요", dict(N, type="noise", by_name=[["강남역 10번 출구", "있음", "바로"]]))])      # 80번 c10: Solar는 소음 그대로인데 이 말의 대상(스피커)과 다시 맞추다 「그 밖의 일」
+    k10 = S.understood(st)[1].get("type")
+    assert k10 == ("noise" if "keeptype" in S.L.ON else "other"), k10
+    _, v18b = run([("안녕하세요 제가 지금 합정역 7번 출구 나와서 조금 걸어오면 파리바게뜨 있고 그 옆에 마라탕집 앞인데요 거기 트럭이 인도에 반쯤 걸쳐서 계속 서 있어서 사람들이 차도로 걸어 다녀요 위험해요",
+                    dict(N, type="vendor", by_name=[["합정역 7번 출구", "쪽", "모름"], ["파리바게뜨", "근처", "바로"]]))])      # 같은 통화를 Solar가 「출구 쪽」(둘레 450m)으로 읽은 번
+    assert (v18b["radius"] <= 60) == ("codekeep" in S.L.ON), v18b["radius"]
     _, vc = run([("여기 쓰레기가 너무 많이 버려져 있어요", dict(N, type="litter", by_name=[])), ("강남역 근처요", dict(N, by_name=[["강남역", "근처", "모름"]])),
                  ("편의점 바로 앞이에요", dict(N, type="litter", by_name=[["위드미", "안", "모름"]]))])      # 81번 r01: 실제 Solar가 세 번 모두 첫 후보 「위드미」를 장소로 적음
     if "placebind" in S.L.ON:
         assert "위드미" not in vc["chips"] and vc["radius"] > 600, (vc["chips"], vc["radius"])      # 켜면 코드가 넓게 둔 「편의점 바로 옆」 그대로
     else:
         assert "위드미" in vc["chips"] and vc["radius"] < 400, (vc["chips"], vc["radius"])          # 끄면 그 통화 그대로 위드미 쪽으로 끌려감
-    print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 자리만 말한 차례 뒤 일 {kind} · 「편의점 바로 앞」 {vc['radius']}m")
+    print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 「출구 쪽」으로 읽은 번 {v18b['radius']}m · 자리만 말한 차례 뒤 일 {kind} · {k10} · 「편의점 바로 앞」 {vc['radius']}m")
 
 
 def main():

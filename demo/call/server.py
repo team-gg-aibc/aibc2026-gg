@@ -1777,7 +1777,7 @@ def _merge(code, model):
         model = dict(model, clues=list(model.get("clues") or []) + [c for c in code.get("clues") or [] if (c.get("t") == "cat" or c.get("label") in model["catkeep"]) and c.get("label") not in have])
     if "codekeep" in L.ON:                                # (codekeep, 79번) 코드가 글자 그대로 찾은 이름(비슷한 이름 아님)을 Solar가 「있음 · 근처」에서 「지남 · 못 미침 · 방향」으로 바꿔 읽으면 코드 것을 둔다(80번 c18: 「합정역 7번 출구 나와서 조금 걸어오면 … 마라탕집 앞」 → 출구를 거리 모를 「지남」으로 읽어 40m가 3,140m로)
         mine = {c["k"]: c for c in code.get("clues") or [] if c.get("t") == "at" and c.get("k") and not c.get("heard")}
-        swap = [c for c in model.get("clues") or [] if c.get("k") in mine and c.get("t") in ("past", "before", "toward")]
+        swap = [c for c in model.get("clues") or [] if c.get("k") in mine and (c.get("t") in ("past", "before", "toward") or (c.get("t") == "at" and c.get("how") == "쪽" and mine[c["k"]].get("how") != "쪽"))]      # 시민이 「쪽」이라 하지 않았는데 Solar가 「○○ 쪽」(둘레 450m)으로 넓힌 것도(c18 실제 Solar: 39m → 832m)
         model = dict(model, clues=[c for c in model.get("clues") or [] if c not in swap] + [mine[c["k"]] for c in swap])
     same = lambda a, b: (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a.get("label") and a.get("label") == b.get("label"))   # noqa: E731
     return dict(model, clues=sure + [c for c in model.get("clues") or [] if not any(same(c, x) for x in sure)])
@@ -1838,8 +1838,8 @@ def turn(st, ev):
             extra = {"read_how": how, "read_sec": sec}
             if read:
                 read = last["model"] = _merge(last.get("code") or {}, read)
-                if "keeptype" in L.ON and matter.get("type") not in (None, "other") and not ((last.get("code") or {}).get("matter") or {}).get("type") and read["matter"].get("type") not in (None, matter["type"]):
-                    read["matter"].pop("type")            # (keeptype, 79번) 일 낱말이 없는 차례(코드가 이 말에서 일을 못 읽음)에 Solar가 앞서 정한 일을 다른 일로 덮지 않는다(80번 c03 · c10: 자리만 말했는데 적치물 · 소음 → 「그 밖의 일」). 「그 밖의 일」에서 구체적인 일로는 바꾼다
+                if "keeptype" in L.ON and matter.get("type") not in (None, "other") and not ((last.get("code") or {}).get("matter") or {}).get("type") and read["matter"].get("type") is not None:
+                    read["matter"].pop("type")            # (keeptype, 79번) 일 낱말이 없는 차례(코드가 이 말에서 일을 못 읽음)에는 Solar의 일을 받지 않는다: 앞서 정한 일이 다른 일로 덮이거나, 같은 일이라도 이 말의 대상(「스피커는 장소가 아니고요」)과 다시 맞추다 「그 밖의 일」이 된다(80번 c03 · c10). 「그 밖의 일」에서 구체적인 일로는 바꾼다
                 if "barename" in L.ON:                    # (barename, 기본 끔 · 53번) 「뚜레쥬르요.」처럼 이름만 답한 말: Solar가 그 이름을 지워도 코드가 읽은 단서를 둔다
                     mine = [c for c in (last.get("code") or {}).get("clues") or [] if c.get("k")]
                     rest = gaz.norm(FILLER.sub(" ", last["said"]))
