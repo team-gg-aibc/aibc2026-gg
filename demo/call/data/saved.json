@@ -709,6 +709,73 @@
    "sec": 1.15,
    "said": "네, 맞아요. 거기예요.",
    "asked": "confirm"
+  },
+  "6ea2e7ead59e91ed": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "leash": false,
+     "type": "stray",
+     "animal": "고양이"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.87,
+   "said": "목줄은 없어요. 다친 고양이를 신고하면 누가 데려가나요?",
+   "asked": "leash"
+  },
+  "06ef8787f1b6311e": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "상도1동주민센터",
+      "label": "상도1동주민센터",
+      "how": "바로"
+     }
+    ],
+    "matter": {},
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.24,
+   "said": "상도1동 주민센터 바로 앞이에요.",
+   "asked": "finer"
+  },
+  "85078c1f03e48234": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "went": "그 자리"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.67,
+   "said": "지금도 그 자리에 있어요.",
+   "asked": "went"
+  },
+  "b215775cba0a0162": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.13,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
   }
  },
  "engine": {
@@ -868,6 +935,35 @@
    "say": "다친 고양이를 신고하면 구청장이 구조·보호 조치를 합니다. 실제 구조는 구청장이나 동물보호센터장이 안전한 방법으로 하고, 구조한 동물은 동물보호센터에 보호됩니다. 치료·보호를 위해 민간단체 소속자나 명예동물보호관에게 보호조치를 요청하고 예산 범위에서 경비를 지원할 수도 있습니다.",
    "sec": 6.0,
    "settings": "4fb47ff9df76"
+  },
+  "stray|동작구의 길가|ca273d": {
+   "response": {
+    "answer": "다친 고양이를 신고하면 구청장이 지체 없이 구조하고 보호하도록 필요한 조치를 합니다. 구조된 고양이는 동물보호센터에서 보호하며, 필요하면 민간단체나 명예동물보호관에게 보호조치를 요청하거나 경비를 지원할 수 있습니다.",
+    "citation": [
+     "서울특별시 동물보호 조례 제10조 제1항",
+     "서울특별시 동물보호 조례 제10조 제3항"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171829",
+    "effective_date": "2026-10-01"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제3항",
+     "quote": "구청장 또는 동물보호센터의 장은 제1항에 따라 구조한 동물을 동물보호센터에 보호조치하여야 한다. 다만, 시장 또는 구청장은 동물의 치료와 보호를 위해 영 제6조에 따른 민간단체에 소속된 자 또는 법 제90조에 따른 명예동물보호관에게 보호조치를 하도록 요청할 수 있으며 예산의 범위에서 필요한 경비를 지원할 수 있다."
+    }
+   ],
+   "ask": "길가 집 앞 골목에 다친 고양이가 절뚝거리며 웅크리고 있는데, 다친 고양이를 신고하면 누가 데려가나요?",
+   "ask_sec": 1.5,
+   "question": "다친 고양이를 신고하면 누가 데려가나요?",
+   "say": "다친 고양이를 신고하면 구청장이 지체 없이 구조하고 보호하도록 필요한 조치를 합니다. 구조된 고양이는 동물보호센터에서 보호하며, 필요하면 민간단체나 명예동물보호관에게 보호조치를 요청하거나 경비를 지원할 수 있습니다.",
+   "sec": 5.2,
+   "settings": "7327ca7e355b"
   }
  },
  "made": {
@@ -1105,16 +1201,17 @@
   }
  },
  "made_cat_street": {
-  "at": "2026-11-17T21:27:56+09:00",
+  "at": "2026-11-21T04:04:21+09:00",
   "read_model": "solar-pro4",
-  "engine_settings": "4fb47ff9df76",
+  "engine_settings": "7327ca7e355b",
   "engine_config": "eval/configs/release.json",
   "calls": {
-   "read": 6,
+   "read": 4,
    "ask": 1,
    "engine": 1,
-   "tokens_in": 25996,
-   "tokens_out": 1354
+   "tokens_in": 20519,
+   "tokens_out": 809,
+   "reused": 2
   },
   "steps": {
    "cat_street": [
@@ -1123,7 +1220,7 @@
      "m": null,
      "code_next": "where",
      "next": "where",
-     "code_ms": 3,
+     "code_ms": 70,
      "read": "live",
      "read_sec": 1.83
     },
@@ -1132,36 +1229,36 @@
      "m": 210,
      "code_next": "leash",
      "next": "leash",
-     "code_ms": 17,
+     "code_ms": 577,
      "read": "live",
      "read_sec": 1.93
     },
     {
-     "said": "목줄은 없어요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+     "said": "목줄은 없어요. 다친 고양이를 신고하면 누가 데려가나요?",
      "m": 210,
      "code_next": "finer",
      "next": "finer",
-     "code_ms": 66,
+     "code_ms": 54,
      "read": "live",
-     "read_sec": 1.75
+     "read_sec": 1.87
     },
     {
      "said": "상도1동 주민센터 바로 앞이에요.",
      "m": 40,
      "code_next": "went",
      "next": "went",
-     "code_ms": 272,
+     "code_ms": 10,
      "read": "live",
-     "read_sec": 1.26
+     "read_sec": 1.24
     },
     {
      "said": "지금도 그 자리에 있어요.",
      "m": 40,
      "code_next": "confirm",
      "next": "confirm",
-     "code_ms": 9,
+     "code_ms": 8,
      "read": "live",
-     "read_sec": 2.25
+     "read_sec": 1.67
     },
     {
      "said": "네, 맞아요.",
@@ -1170,7 +1267,7 @@
      "next": null,
      "code_ms": 7,
      "read": "live",
-     "read_sec": 1.93
+     "read_sec": 2.13
     }
    ]
   }
