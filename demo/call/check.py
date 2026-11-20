@@ -279,6 +279,85 @@ def refs(text):      # 참고 자료 칸의 값(web/refs.json)이 원본(조례 
     print(f"  ✓ 참고 자료: 일 {len(d['refs'])}가지 · 값 {n}개가 조례 원문 · 넘길 곳 표와 맞음, 새 문구 {sum(map(len, need.values()))}개가 문구 파일에 있음")
 
 
+def switches():
+    """길가 흡연 · 대여소 킥보드 스위치(72번)의 판단을 서버 함수로 바로 본다(모델 · 엔진 호출 없음). 켬 · 끔 어느 쪽으로 띄워도 그 값대로 본다.
+    킥보드 스위치가 하는 일은 하나: 킥보드가 공공자전거 구역에 세워졌으면 그 밖의 일 · 모름을 자전거 일로 올리고 엔진 물음을 조례의 말로 쓴다. 나머지는 스위치를 끈 결과 그대로."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    st = lambda *said: {"turns": [{"said": t, "asked": None if n == 0 else {"id": "where"}} for n, t in enumerate(said)]}      # noqa: E731
+    single = {"따릉이 거치대에 킥보드가 세워져 있어요": "dock", "대여소에 킥보드가 세워져 있어요": "dock", "누가 킥보드를 따릉이 자리에 세워 놓고 갔어요": "dock",
+              "공공자전거 거치대 사이에 킥보드가 끼어 있어요": "dock", "따릉이 대여소에 전동 킥보드가 세워져 있어서 따릉이를 못 빼요": "dock",
+              "따릉이가 넘어져 있고 킥보드도 대여소에 세워져 있어요": "dock", "자전거를 타고 가다가 대여소에 킥보드가 세워진 걸 봤어요": "dock",
+              "아파트 자전거 거치대에 킥보드가 세워져 있어요": None, "거치대에 킥보드가 세워져 있어요": None, "학교 거치대에 킥보드가 꽂혀 있는데 따릉이도 못 세워요": None,
+              "따릉이 대여소 옆 길에 킥보드가 쓰러져 있어요": None, "자전거도로에 킥보드가 쓰러져 있어요": None, "따릉이 대여소에 전동 스쿠터가 세워져 있어요": None,      # 전동 스쿠터는 킥보드로 보지 않는다
+              "길가에 자전거랑 킥보드가 몇 달째 세워져 있어요": None, "킥보드 타고 가다가 거치대 옆에 방치된 자전거를 봤어요": None,
+              "따릉이 대여소에 킥보드 세운 사람이 담배를 피워요": None}      # 다른 일(흡연)의 배경
+    for said, w in single.items():
+        assert S.kick_of(st(said)) == (w if S.KICK_DOCK else None), f"킥보드 판단 {said!r} → {S.kick_of(st(said))} (기대 {w})"
+    for said in (("거치대에 킥보드가 꽂혀 있어요", "따릉이 대여소 앞이에요"), ):      # 대여소 말이 다른 차례에 나와도
+        assert S.kick_of(st(*said)) == ("dock" if S.KICK_DOCK else None)
+    for said in (("길에 자전거가 몇 달째 버려져 있어요", "옆에 킥보드도 하나 쓰러져 있고요"), ("길에 자전거가 몇 달째 버려져 있어요", "킥보드 세워진 데 옆이에요"),      # 리뷰 4 · 5차
+                 ("길에 자전거 한 대가 몇 달째 버려져 있어요", "공유 킥보드 세워진 데 옆이에요"), ("자전거는 몇 달째 그대로 있어요", "공유 킥보드 세워진 데 옆이에요"),
+                 ("방치 자전거 신고하려고요", "공유 킥보드 세워진 데 옆이에요")):
+        assert S.kick_of(st(*said)) is None, said                                       # dock이 아니면 스위치는 아무것도 하지 않는다
+
+    # 킥보드 갈림 표: (원래 판정) × (킥보드 말) × (자리) × (자전거를 어떻게 말했나). 칸마다 「일의 종류」와 「엔진 물음을 조례의 말로 바꾸나」를 본다.
+    # 스위치가 하는 일은 하나: 킥보드가 공공자전거 구역에 세워졌으면(dock) 그 밖의 일 · 모름을 자전거 일로 올리고 물음을 바꾼다. 나머지 칸은 모두 스위치를 끈 결과와 같다.
+    places = {"공공자전거 구역": "따릉이 대여소에", "일반 거치대": "아파트 자전거 거치대에", "길": "길에"}
+    bikes = {"자전거 말 없음": None, "자전거가": "자전거가 몇 달째 방치돼 있어요", "자전거 한 대가": "자전거 한 대가 몇 달째 방치돼 있어요",
+             "자전거는": "자전거는 몇 달째 그대로 있어요", "조사 없음": "방치 자전거 신고하려고요"}      # 뒤의 셋은 리뷰 5차가 든 말투(「버려져」는 쓰레기 일의 낱말이라 표 밖 위 줄에서 봄)
+    cells = 0
+    for kind in ("bike", "other", "smoking"):
+        for pos in ("없음", "대상", "타는 말", "다른 차례"):
+            for pname, at in places.items():
+                for bname, bike in bikes.items():
+                    subj = bike or "뭐가 쓰러져 있어요"
+                    told = {"없음": f"{at} {subj}", "다른 차례": f"{at} {subj}", "타는 말": f"킥보드 타고 가다 봤는데 {at} {subj}",
+                            "대상": f"{at} 킥보드가 세워져 있어요" if not bike else f"{bike} {at} 킥보드도 세워져 있어요"}[pos]
+                    if kind == "smoking":
+                        told = "담배 피우는 사람도 있고 " + told
+                    said = [told] + ([f"{at} 공유 킥보드도 세워져 있어요"] if pos == "다른 차례" else [])
+                    call_ = {"id": "grid", "turns": [{"said": t, "asked": None if n == 0 else {"id": "where"}, "model": None,
+                                                     "code": {"clues": [], "matter": {"type": kind} if n == 0 else {}}} for n, t in enumerate(said)]}
+                    got = S.understood(call_)[1].get("type")
+                    was, S.KICK_DOCK = S.KICK_DOCK, False
+                    off = S.understood(call_)[1].get("type")       # 스위치를 끈 결과(main)
+                    S.KICK_DOCK = was
+                    dock = S.KICK_DOCK and pos in ("대상", "다른 차례") and pname == "공공자전거 구역" and kind != "smoking"
+                    want_t = "bike" if dock and off in (None, "other", "bike") else off
+                    assert got == want_t, f"킥보드 표 칸 (판정 {kind} · 킥보드 {pos} · {pname} · {bname}) {said} → {got} (기대 {want_t})"
+                    assert S.kick_words(call_, got) == dock, f"킥보드 표 칸 엔진 물음 (판정 {kind} · 킥보드 {pos} · {pname} · {bname}) → {S.kick_words(call_, got)}"
+                    cells += 1
+
+    # 흡연 표지 표: (일의 종류) × (공원 안인가) × (담배 말) × (건물 안 · 금연거리 말) × (통화 상태) × (50m 안 정류장 · 출구). 칸마다 엔진에 보내는 장소를 본다.
+    spots = {"정류장 가까이": {"cx": 653.6, "cy": -7996.1, "r": 30, "on_road": False}, "표지 없음": {"cx": 945.6, "cy": -7696.1, "r": 30, "on_road": False}}      # 서초구(72번 A1 · C1)
+    states = {"찾는 중": (False, None), "좁혀짐(확인 질문)": (True, None), "좁혀짐 · 확인받음": (True, "confirmed"), "넓은 범위째 확인": (False, "confirmed"),
+              "넘김(좁혀졌던 자리를 아니라 함)": (True, "handoff"), "넘김(넓은 범위)": (False, "handoff")}
+    smoke_cells = 0
+    for kind in ("smoking", "other"):
+        for park in (False, True):
+            route = {"type": kind, "class": "공원" if park else None, "class_name": "서울숲" if park else None}
+            for smoke in (True, False):
+                for skip in ("", " 건물 안이에요", " 구청에서 금연거리로 정한 곳이에요"):
+                    said = [("버스 정류장 앞에서 담배를 피워요" if smoke else "버스 정류장 앞에서 불을 피워요") + skip]
+                    for sname, (done, ended) in states.items():
+                        for spot, R in spots.items():
+                            base = S.place_phrase(R, route)
+                            got = S.engine_place(R, route, done, ended, said)
+                            if not (S.SMOKE_NEAR and kind == "smoking" and not park) or not smoke or skip:
+                                want_p = base                                 # 스위치 밖 · 공원 · 담배 말 없음 · 건물 안 · 금연거리: 지금처럼
+                            elif sname == "찾는 중":
+                                want_p = None                                 # 아직 부르지 않음
+                            elif not done or ended == "handoff":
+                                want_p = base                                 # 넓은 범위째 확인 · 넘김: 표지 없이
+                            else:
+                                want_p = base.replace("의 길가", "의 국립국악원 버스 정류장 가까이 길가") if spot == "정류장 가까이" else base
+                            assert got == want_p, f"흡연 표 칸 ({kind} · 공원 {park} · 담배 말 {smoke} · {skip.strip() or '빼는 말 없음'} · {sname} · {spot}) → {got!r} (기대 {want_p!r})"
+                            smoke_cells += 1
+    print(f"  ✓ 흡연 표지 · 킥보드 판단(켬: 흡연 {S.SMOKE_NEAR} · 킥보드 {S.KICK_DOCK}): 킥보드 낱통화 {len(single) + 3} · 킥보드 표 {cells}칸 · 흡연 표 {smoke_cells}칸")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -308,6 +387,7 @@ def main():
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
+        switches()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()
