@@ -241,6 +241,33 @@ def _confirm_main(said):
     return False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
 
 
+YN_ASK = re.compile(r"^\s*(네|예|응|뭐|어|음|에)\s*[?？]|뭐라고|뭐라구|다시\s*(한\s*번|말씀|말해)|잘\s*(못|안)\s*들|못\s*들었|안\s*들려|무슨\s*말")      # (yesno) 되묻는 「네? 뭐라고요?」: 예가 아니라 다시 물어 달라는 말
+YN_FIX = re.compile(r"말고|아니라|반대|건너편|맞은편|더\s*가|좀\s*더|조금\s*더|떨어져|근처(는|긴|이긴|이기는|까지는)|그쪽은|쪽은\s*맞")      # (yesno) 되묻은 자리를 고쳐 말하는 낱말(「그쪽 말고 반대쪽」 · 「거기서 좀 더 가야」 · 「그 근처는 맞아요」)
+YN_UNSURE = re.compile(r"모르겠|글쎄|잠깐|잠시만|다시\s*(볼|봐|확인)|아마")      # (yesno) 확신이 없거나 아직 보는 중
+YN_YES = re.compile(r"^\s*((어|음|아)\s*,?\s*)?(네|예|응|맞|그래|넵|옙|그렇|그럼요)|맞아|맞습|맞네|맞는|^\s*거기(요|예요|에요|입니다|\s*맞)")      # 「거기」 하나만으로는 예가 아니다(「거기서 좀 더 가야 돼요」)
+
+
+def _confirm_yn(said):
+    """(yesno, 81번) 되묻기 답 읽기: 되묻는 「네?」 → 없음(같은 되묻기를 한 번 더), 고쳐 말하는 낱말 · 부정 → 아니요, 확신 없음 → 없음, 그 밖은 긍정 말이 있어야 예."""
+    said = said or ""
+    if YN_ASK.search(said):
+        return None
+    if YN_FIX.search(said) or re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said):
+        return False
+    if YN_UNSURE.search(said):
+        return None
+    return True if YN_YES.search(said) else None
+
+
+def _confirm_read(said):
+    return _confirm_yn(said) if "yesno" in L.ON else _confirm_main(said)
+
+
+def _confirm_pair(code, solar):
+    """(yesno) 되묻기 답에서 코드 읽기와 Solar 읽기를 합친다: 어느 하나라도 아니요면 아니요, 둘 다 예일 때만 예, 그 밖(되묻는 「네?」 · Solar가 「없음」)은 확정하지 않음."""
+    return False if code is False or solar is False else True if code is True and solar is True else None
+
+
 def _is_partyes(said):
     """(partyes) 부분 긍정인가: ① 긍정으로 시작 ② 「조금 옆 · 근데 … 뒤」 같은 어긋남 말 ③ 지키려는 「바로 앞은 아니고」를 뺀 나머지에 PARTYES_NEG 낱말이 없음 — 셋을 다 갖춘 답만 참.
     PARTYES_NEG는 「받지 않을 조건」으로만 쓴다(강조 말 「완전히 · 전혀」도 들어 있어 넓지만, 걸리면 main 규칙으로 갈 뿐 아니요로 바꾸지 않는다)."""
@@ -282,7 +309,7 @@ def _partyes_undo(read, said):
     read["clues"] = [c for c in read["clues"] if not c.get("partyes")]
     if any(c.get("side_set") for c in ring):
         read["matter"].pop("side", None)
-    read["confirm"] = _confirm_main(said)
+    read["confirm"] = _confirm_read(said)
 
 
 HARD = re.compile(r"멀리 ?보이기만|가운데|모르겠|몰라")      # (hardstop, 71번) 몇 걸음 · 어느 쪽에 답하기 어렵다는 말
@@ -709,7 +736,7 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "confirm" and _partyes(read, said, R):
         pass                                              # (partyes) 「네, 근데 … 조금 옆이에요」
     elif q.get("id") == "confirm":
-        read["confirm"] = _confirm_main(said)
+        read["confirm"] = _confirm_read(said)
     elif q.get("id") == "alike" and opts:                # 소리가 같은 이름 가르기: 구 이름으로 고른다(길 이름은 소리가 같아 받아 적은 글로는 못 가른다)
         said_n = gaz.norm(said)
         gus = [[g.strip().removesuffix(" 가까이") for g in o["label"].rpartition("의 ")[0].split("·") if g.strip()] for o in opts]     # 보기의 구 이름(또는 가까운 역 · 표지 이름)
@@ -734,6 +761,10 @@ def code_read(said, asked, short, R):
         longer = [m["key"] for m in short if "key" in m]
         hit = [n for n, o in enumerate(opts) if len(gaz.norm(o["label"])) >= 3 and (lab := gaz.norm(re.sub(r" 쪽$", "", o["label"]))) in said_n
                and not any(lab in k and lab != k for k in longer)]      # 「하월곡분기점」을 말했는데 보기 「하월곡」을 고른 것으로 읽지 않는다(다른 이름의 일부일 뿐)
+        if "whichkeep" in L.ON and q.get("id") == "which" and hit:      # (whichkeep, 81번) 「어느 말이 달랐을까요? A · B」에 「B는 맞아요」: B를 지우지 않는다(B 말고 남은 이름이 하나면 그것이 달랐던 말)
+            ok = [n for n in hit if re.search(re.escape(gaz.norm(opts[n]["label"])) + r"(은|는|이|가|도)?(맞|확실|정확)", said_n)]
+            rest = [n for n, o in enumerate(opts) if n not in ok and (o.get("set") or {}).get("drop")]
+            hit = rest if ok and len(ok) == len(hit) and len(rest) == 1 else [n for n in hit if n not in ok]
         pick = hit[0] if len(hit) == 1 else None
         if pick is None and "optpart" in L.ON and q.get("id") in ("either", "from"):     # (optpart, 71번) 둘 중 · 어느 쪽 보기의 이름 일부만 댄 답(「병설유치원이요」 → 「서울신천초등학교병설유치원 쪽」): 한 보기에만 들면 그것. 현장에서 같은 질문을 다시 했다. 「바로 앞」 보기(finer · mark)는 넣지 않는다(「○○ 근처예요」가 바로 앞 한 점이 되어 600통 틀린 확정 5 → 9)
             toks = {t for _, forms, _, _ in gaz.phrases(said) for t in forms if len(t) >= 3}
@@ -1815,6 +1846,10 @@ def turn(st, ev):
                 _tag_drive(read, last.get("said") or "")
                 if asked.get("id") == "check":
                     read["confirm"] = (last.get("code") or {}).get("confirm")      # 열린 확인은 코드가 거리로 가린 것을 쓴다(Solar의 확인 칸은 「맞습니까」에만)
+                if "yesno" in L.ON and asked.get("id") == "confirm" and not any(c.get("partyes") for c in read["clues"]):
+                    read["confirm"] = _confirm_pair((last.get("code") or {}).get("confirm"), read.get("confirm"))      # (yesno, 81번) 「네? 뭐라고요?」(코드 예 · Solar 없음) · 「그쪽 말고 반대쪽」(Solar 예)이 확정되던 것
+                    if read["confirm"] is None:
+                        st["confirmed"] = False           # 코드 읽기 차례에 넣은 「예」를 거둔다: 같은 되묻기를 한 번 더
                 if asked.get("id") in ("confirm", "check") and read.get("confirm") is not None:
                     st["confirmed"] = read["confirm"]
                     if read["confirm"] is False and R is not None:
