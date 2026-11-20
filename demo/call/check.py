@@ -8,6 +8,7 @@
 """
 import json
 import re
+import shutil
 import os
 import subprocess
 import sys
@@ -380,10 +381,31 @@ def alias():
     print("  ✓ 별명 저장: 저장 뒤 다음 통화에서 그 이름 하나로", view["radius"], "m")
 
 
+OLD_REC = {"id": "check-old", "sample": False, "at": 0, "matter": "쓰레기 무단투기", "go": "옛 기록", "bunji": None, "point": [127.0, 37.55], "range": "반지름 약 30m", "range_m": 30,
+           "scope": "out", "law": None, "cites": [], "scope_why": None, "to": "동작구청 청소 담당 부서", "basis": "확인", "place": "길", "log": [{"status": "filed", "at": 0}]}      # 대화 칸이 생기기 전 꼴의 기록
+BAD = '<img src=x onerror="window.__x=1">\'"&<script>alert(1)</script>'      # 꺾쇠 · 따옴표가 든 글: 저장은 그대로, 화면은 글자로만
+
+
+def talk_render(bad):
+    """화면이 그때 나눈 대화를 글자로만 그리는지: call.js의 esc · bubble · talkHtml을 node로 그대로 돌려, 꺾쇠 · 따옴표가 태그 · 속성이 되지 않는지 본다."""
+    node = shutil.which("node")
+    if not node:
+        print("  - 대화 글자 시험은 node가 없어 건너뜀(저장 쪽 시험은 위에서 함)")
+        return
+    src = (HERE / "web" / "call.js").read_text(encoding="utf-8")
+    pick = lambda pat: re.search(pat, src, re.S).group(0)      # noqa: E731
+    code = "\n".join([pick(r"const esc = [^\n]*\n"), pick(r"function bubble\(.*?\n}\n"), pick(r"function talkHtml\(.*?\n}\n"),
+                      "const K = () => new Proxy({}, { get: (o, k) => String(k) });",
+                      f"process.stdout.write(JSON.stringify(talkHtml([{{ w: '시민', t: {json.dumps(bad)}, v: 'type' }}, {{ w: '상담사', t: 'x', v: 'auto' }}])));"])
+    out = json.loads(subprocess.run([node, "-e", code], capture_output=True, text=True, timeout=30, check=True).stdout)
+    assert "<img" not in out and "<script" not in out and 'onerror="' not in out and "&lt;img" in out and "&lt;script&gt;" in out and out.count('<li class="ln') == 2, out
+
+
 def records(done):
     """상담 기록: 예시 기록은 넘길 곳 · 조례 안팎을 표에서 채워 오고, 위치를 확인받은 통화만 쌓이며, 처리 상태는 정해진 차례로만 바뀐다(되돌리기 없음)."""
     d = call("/api/records")
     nxt, samples = d["next"], [r for r in d["records"] if r["sample"]]
+    assert all(len(r["talk"]) >= 4 and r["talk"][0]["w"] == "상담사" and r["talk"][-1]["w"] == "상담사" and r["to"].split(" · ")[0] in r["talk"][-1]["t"] for r in samples), "예시 기록의 그때 나눈 대화(인사 · 맺음말의 넘길 곳)"
     assert len(samples) >= 10 and all(r["to"] and "{" not in r["to"] and r["scope"] in ("in", "out", "cand") and r["point"] and r["go"] and r["range"] and r["status"] in nxt for r in samples), "예시 기록이 비었거나 표에서 채워지지 않음"
     assert {r["status"] for r in samples} == set(nxt) and all((r["scope"] == "in") == bool(r["law"]) for r in samples), "예시 기록의 상태 · 조례 칸"
     post = lambda body: call("/api/records", body)      # noqa: E731
@@ -398,17 +420,22 @@ def records(done):
     recs = post({"op": "save", "state": done, "status": "filed"})["records"]
     top = recs[0]
     assert top["id"] == done["id"] and not top["sample"] and top["status"] == "filed" and "서울시설공단" in top["to"] and top["go"] and top["point"], f"확인받은 통화가 맨 위에 쌓이지 않음 {top}"
+    assert [(x["w"], x["t"]) for x in top["talk"]] == [("상담사" if x["who"] == "상담사" else "시민", x["text"]) for x in done["lines"]] and top["talk_cut"] == 0, "그때 나눈 대화가 통화의 줄과 다름"
     recs = post({"op": "save", "state": done, "status": "sent"})["records"]
     assert sum(r["id"] == done["id"] for r in recs) == 1 and recs[0]["status"] == "sent" and [x["status"] for x in recs[0]["log"]] == ["filed", "sent"], "같은 통화가 두 건이 되거나 넘김이 안 적힘"
     assert refused({"op": "status", "id": done["id"], "status": "filed"}), "넘긴 기록을 접수됨으로 되돌림"
     for s in ("recall", "doing", "closed"):
         assert post({"op": "status", "id": done["id"], "status": s})["records"][0]["status"] == s, s
     assert all(refused({"op": "status", "id": done["id"], "status": s}) for s in nxt), "끝난 기록의 상태가 바뀜"
+    long = dict(done, id="check-rec-talk", lines=[{"who": "시민", "text": "나" * 500, "via": "type"}] * 60 + [{"who": "시민", "text": BAD, "via": "type"}, {"who": "시민", "text": "가" * 5000, "via": "type"}])
+    t = next(r for r in post({"op": "save", "state": long, "status": "filed"})["records"] if r["id"] == "check-rec-talk")
+    assert t["talk"][-2]["t"] == BAD and len(t["talk"][-1]["t"]) == 500 and len(t["talk"]) <= 80 and sum(len(x["t"]) for x in t["talk"]) <= 20_000 and t["talk_cut"] > 0, (len(t["talk"]), t["talk_cut"])      # 저장은 글 그대로, 한 줄 · 줄 수 · 자 수 상한
+    talk_render(BAD)
     first = next(r for r in samples if r["status"] == "filed")
     assert refused({"op": "status", "id": first["id"], "status": "doing"}), "넘기기 전에 처리 중으로 바뀜"
     recs = post({"op": "reset"})["records"]
     assert all(r["sample"] for r in recs) and next(r for r in recs if r["id"] == first["id"])["status"] == "filed", "처음 상태로 되돌리지 못함"
-    print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로")
+    print(f"  ✓ 상담 기록: 예시 {len(samples)}건(표에서 넘길 곳 채움) · 확인받은 통화만 쌓임 · 상태는 정해진 차례로만 · 처음 상태로 · 그때 나눈 대화(상한 · 글자로만 · 옛 꼴 읽기)")
 
 
 def fix_and_copy(done):
@@ -561,6 +588,7 @@ def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
            "CALL_RECORD_FILE": str(tmp / f"call-check-records-{os.getpid()}.json")}
+    Path(env["CALL_RECORD_FILE"]).write_text(json.dumps({"added": [OLD_REC], "log": {}}, ensure_ascii=False), encoding="utf-8")      # 옛 꼴의 기록 하나를 둔 채로 띄운다
     server = subprocess.Popen([sys.executable, str(HERE / "server.py")], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
         for _ in range(150):
@@ -572,6 +600,7 @@ def main():
                 time.sleep(0.1)
         else:
             raise AssertionError("서버가 15초 안에 뜨지 않음")
+        assert any(r["id"] == "check-old" and "talk" not in r and r["status"] == "filed" for r in call("/api/records")["records"]), "대화 칸이 없는 옛 꼴의 기록을 읽지 못함"      # 다른 점검이 기록을 비우기 전에
         assert text["mode"] == "saved" and set(text["scripts"]) >= set(EXPECT) and text["places"] > 100000 and len(text["seoul"]) > 100
         html = urllib.request.urlopen(BASE + "/", timeout=5).read().decode("utf-8")
         assert 'id="ask"' in html and 'id="law"' in html and "call.js" in html      # 조례 근거 답 칸(말할 것 띠, 11-18 확정)

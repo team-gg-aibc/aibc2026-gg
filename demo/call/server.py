@@ -1959,7 +1959,23 @@ STATUSES = ["filed", "sent", "doing", "recall", "closed"]       # 접수됨 · �
 NEXT = {"filed": ["sent"], "sent": ["doing", "recall", "closed"], "doing": ["recall", "closed"], "recall": ["sent", "doing", "closed"], "closed": []}      # 지금 상태에서 고를 수 있는 것(되돌리기는 없다)
 _PATH = {"filed": ["filed"], "sent": ["filed", "sent"], "doing": ["filed", "sent", "doing"], "recall": ["filed", "sent", "doing", "recall"], "closed": ["filed", "sent", "doing", "closed"]}
 RECORD_FILE = Path(os.environ.get("CALL_RECORD_FILE") or HERE / "data" / "records_local.json")
+TALK_LINES, TALK_CHARS = 80, 20_000      # 기록에 남기는 그때 나눈 대화: 줄 수(통화 상태가 들고 있는 줄 수와 같음) · 모두 합친 자 수. 한 줄은 SAID_MAX(배포 판 2,000자)까지. 소리는 남기지 않는다
 _samples = []
+
+
+def _talk(lines):
+    """통화의 줄 → 기록에 남길 대화 [{w: 상담사|시민, t: 글, v: 넣은 길}]. 줄마다 SAID_MAX자, 끝에서부터 TALK_LINES줄 · TALK_CHARS자까지(넘으면 앞을 버리고 버린 줄 수를 cut에). 글은 데이터로만 두고 화면이 글자로 그린다."""
+    out, total = [], 0
+    for ln in reversed([x for x in lines or [] if isinstance(x, dict)]):
+        t = str(ln.get("text") or "")[:SAID_MAX]
+        if not t.strip():
+            continue
+        if len(out) >= TALK_LINES or total + len(t) > TALK_CHARS:
+            break
+        out.append({"w": "상담사" if ln.get("who") == "상담사" else "시민", "t": t, "v": str(ln.get("via") or "")[:10]})
+        total += len(t)
+    kept = len(out)
+    return out[::-1], max(0, sum(1 for x in lines or [] if isinstance(x, dict) and str(x.get("text") or "").strip()) - kept)
 
 
 def _sample_records():
@@ -1967,7 +1983,9 @@ def _sample_records():
         for r in json.loads((HERE / "data" / "records_sample.json").read_text(encoding="utf-8"))["records"]:
             x, y = gaz.xy(*r["at"])
             rt = route_of({"type": r["type"], "animal": r.get("animal"), "alive": r.get("alive")}, L.infer([{"t": "pt", "p": [float(x), float(y)], "r": 30.0}]))
-            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
+            T = tab("통화 글")      # 예시 대화: 앞뒤의 인사 · 맺음말은 화면과 같은 틀로, 맺음말의 넘길 곳은 표(route_of)에서
+            talk = [{"w": "상담사", "t": T["인사"], "v": "auto"}] + [{"w": w, "t": t, "v": "script"} for w, t in r.get("talk") or []] + [{"w": "상담사", "t": fill(T["맺음말"], **{"넘길 곳": rt["hit"]["to"].replace(" · ", ", ")}), "v": "auto"}]
+            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "talk": talk if r.get("talk") else [], "talk_cut": 0, "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
                              "bunji": bunji_of({"at": r["at"]}, r["range_m"] > BUNJI_FAR, rt["class"]), "point": r["at"], "range": size_text({"kind": r.get("kind", "radius"), "m": r["range_m"]}),
                              "range_m": r["range_m"], "range_kind": r.get("kind", "radius"),
                              "scope": rt["scope"] if rt["scope"] == "out" or rt["law"] else "cand",      # 표가 6종 안으로 보되 조례를 정하지 않은 일(주차 = 통화 때 엔진에 묻는다)은 예시 기록에서 「후보」
@@ -2006,7 +2024,8 @@ def record_of(st, view, old=None):
     return {"id": st["id"], "sample": False, "at": (old or {}).get("at") or int(time.time() * 1000), "matter": s["matter"], "go": s["go"] or s["where"], "bunji": s["bunji"],
             "point": view["pin"]["at"] if view["pin"] else view["center"], "range": s["size"], "range_m": (view["size"] or {}).get("m"), "range_kind": (view["size"] or {}).get("kind"), "scope": view["matter"]["scope"],
             "law": " · ".join(dict.fromkeys(re.sub(r"\s*제\d+조.*$", "", c) for c in cites)) or None, "cites": cites, "scope_why": rt["scope_why"], "to": rt["hit"]["to"], "basis": rt["hit"]["basis"],
-            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}]}
+            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}],
+            **dict(zip(("talk", "talk_cut"), _talk(st["lines"])))}      # 그때 나눈 대화(옛 꼴의 기록에는 이 칸이 없다 — 화면이 「남은 대화 없음」으로 읽는다)
 
 
 def save_record(b):

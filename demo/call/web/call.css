@@ -396,3 +396,7 @@ body:not(.view-records) #ask .q.fs1 { font-size: 17px !important; } body:not(.vi
 body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }      /* fitAsk 마지막: 넘칠 때만 */
 #ask.scroll::after { content: attr(data-more); position: sticky; bottom: -13px; display: block; margin: 0 -15px -13px; padding: 10px 15px 3px; text-align: right; color: var(--accent); font-size: 10.5px; font-weight: 700; background: linear-gradient(transparent, var(--panel) 55%); pointer-events: none; }
 #ask.scroll.end::after { visibility: hidden; }
+
+/* 상담 기록의 「그때 나눈 대화」: 통화 글 칸과 같은 말풍선(.lines · .ln) 그대로, 길면 칸 안에서 내려 읽기(11-21) */
+#side .talkrec .lines { flex: none; max-height: 320px; padding: 8px 2px 4px; }
+#side .talkrec .n2 { color: var(--sub); font-weight: 500; }

@@ -23,7 +23,7 @@ let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
 const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || '', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
              typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'dark' ? 'dark' : 'light',
-             view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '' };      // view: 통화 | 상담 기록(?view=records&rec=R01)
+             view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '', talkOpen: false };      // view: 통화 | 상담 기록(?view=records&rec=R01)
 const tabs = {};
 function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게
   const key = `${section}|${head}|${col}`;
@@ -540,6 +540,18 @@ function renderRecList() {
     + `<div class="row"><span class="exnote">${esc(ui.recErr || B['지도 범례'])}</span><button type="button" class="outline" data-act="rec-reset" title="${esc(B['되돌리기 설명'])}">${esc(B['되돌리기'])}</button></div></footer>`;
   $('reclist').innerHTML = h;
 }
+function talkHtml(talk) {      // 그때 나눈 대화 → 통화 글 칸과 같은 말풍선. 글은 bubble()의 esc()로 글자로만 넣는다(다른 사람이 친 글이 뜨는 자리)
+  return (talk || []).map((l) => bubble({ who: l.w, text: l.t, via: l.v })).join('');
+}
+function talkBox(r) {      // 고른 기록의 「그때 나눈 대화」: 카드 맨 아래라 접수 카드 · 처리 상태를 밀어내지 않는다. 접는 꼴(기본) · 늘 보이는 꼴은 문구 파일 「대화 칸」, 주소 ?talk=open · fold
+  const B = K('상담 기록'), talk = r.talk || [];
+  const head = esc(B['대화 제목']) + (talk.length ? ` <span class="n2">${esc(fill(B['대화 줄 수'], { 줄: talk.length }))}</span>` : '');
+  const body = (talk.length ? `<ol class="lines">${talkHtml(talk)}</ol>` : `<p class="empty">${esc(B['대화 없음'])}</p>`)
+    + (r.talk_cut ? `<p class="exnote">${esc(fill(B['대화 잘림'], { 줄: r.talk_cut }))}</p>` : '') + (r.sample && talk.length ? `<p class="exnote">${esc(B['대화 예시'])}</p>` : '');
+  const how = { open: '펼침', fold: '접음' }[P.get('talk')] || B['대화 칸'];
+  return how === '펼침' ? `<div class="box talkrec"><div class="t">${head}</div>${body}</div>`
+    : `<details class="same talkrec"${ui.talkOpen ? ' open' : ''}><summary>${head}</summary>${body}</details>`;
+}
 function renderRecCard() {
   const B = K('상담 기록'), U = K('접수 카드'), M = K('일의 종류와 갈림'), r = RECS.find((x) => x.id === ui.rec);
   if (!r) { $('side').innerHTML = `<div class="chd"><h2>${esc(B['제목'])}</h2></div><p class="empty">${esc(B['고르기 안내'])}</p>`; return; }
@@ -557,7 +569,7 @@ function renderRecCard() {
   const next = NEXTS[r.status] || [];
   h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend>${radio5('rstatus', r.status, (id) => id === r.status || next.includes(id), (id) => whyOff(id, r.status))}<p class="exnote">${esc(B['상태 안내'])}</p></fieldset>`;
   h += `<div class="box"><div class="t">${esc(B['처리 기록'])}</div><ol class="rlog">${r.log.map((x) => `<li>${stb(x.status)}${x.at ? `<small>${esc(ago({ at: x.at }))}</small>` : ''}</li>`).join('')}</ol></div>`
-    + (ui.recErr ? `<p class="exnote">${esc(ui.recErr)}</p>` : '');
+    + (ui.recErr ? `<p class="exnote">${esc(ui.recErr)}</p>` : '') + talkBox(r);
   $('side').innerHTML = h;
 }
 function renderAll() { renderTop(); renderTalk(); renderAsk(); renderRange(); renderSide(); renderRecList(); renderMap(); }
@@ -764,7 +776,10 @@ document.addEventListener('click', async (ev) => {
   else if (d.act === 'open-rec') { await loadRecords(); openRec(S.id); }      // 방금 통화의 상담 기록
 });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'k-text' && !ev.isComposing) { ev.preventDefault(); document.querySelector('[data-act="send"]').click(); } });
-document.addEventListener('toggle', (ev) => { if (ev.target.classList && ev.target.classList.contains('fate')) ui.fateOpen = ev.target.open; }, true);      // 살았나 표를 펼치거나 접은 것은 카드를 다시 그려도 그대로
+document.addEventListener('toggle', (ev) => {
+  if (ev.target.classList && ev.target.classList.contains('fate')) ui.fateOpen = ev.target.open;
+  if (ev.target.classList && ev.target.classList.contains('talkrec')) { ui.talkOpen = ev.target.open; if (ev.target.open) ev.target.scrollIntoView({ block: 'nearest' }); }      // 대화를 펼치면 카드 아래로 내려 보인다. 다른 기록을 골라도 펼친 채
+}, true);      // 살았나 표를 펼치거나 접은 것은 카드를 다시 그려도 그대로
 document.addEventListener('change', async (ev) => {
   if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); await recPost({ op: 'save', state: S, status: ui.status }); renderTop(); renderSide(); }
   else if (ev.target.name === 'rstatus' && ui.rec) { await recPost({ op: 'status', id: ui.rec, status: ev.target.value }); renderTop(); renderRecList(); renderRecCard(); renderMap(); }
