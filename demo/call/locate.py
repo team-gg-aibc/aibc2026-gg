@@ -622,9 +622,47 @@ def _places_in(x0, y0, x1, y1, cap_m=6000):
     return out
 
 
+GENERIC_VOCAB = set("""쓰레기통 쓰레기 따릉이 대여소 거치대 입구 출구 출입구 정문 후문 입구광장 잔디밭 잔디광장 잔디 동상 말동상 구름다리 안내소 관리사무소 매표소 경비실 정류장 버스정류장 버스
+앞 옆 뒤 밑 주차장 화장실 공중화장실 놀이터 어린이놀이터 빠지는 나가는 길 진출로 진입로 진출입로 램프 호수 연못 분수 분수대 산책로 벤치 정자 육교 횡단보도 계단
+매점 쉼터 휴게실 휴게소 시장 공원 다리 가로등 보안등 전봇대 신호등 맨홀 화단 운동장 운동기구 음수대 약수터 전망대""".split())     # (genericname · 83번) 민원 말에 시설 · 물건 · 자리 설명으로 나오는 낱말. 「광장」은 뺀다(광장시장). 지명 · 가게 이름에 흔한 「한강 · 하나 · 약국 · 학교」 같은 낱말은 넣지 않는다
+_GEN = {}
+
+
+def generic_key(k):
+    """(genericname · 83번) 이름 열쇠가 흔한 낱말로만 이루어졌나(「쓰레기통」 · 「따릉이대여소」 · 「시장입구」 · 「말동상」 · 「잔디밭」 · 「빠지는길」 · 「버스정류장앞」).
+    지명 자료 · 시연용 표에 그런 이름의 곳이 서울에 한두 곳 있어, 곳 이름 없이 「쓰레기통 옆에 …」라고만 해도 그 한 점으로 확정하러 가던 일(80번 c15 · c24 · c25)."""
+    if not isinstance(k, str) or "|" in k or len(k) < 2:
+        return False
+    if k not in _GEN:
+        ok = [True] + [False] * len(k)
+        for j in range(1, len(k) + 1):
+            ok[j] = any(ok[i] and k[i:j] in GENERIC_VOCAB for i in range(j))
+        _GEN[k] = ok[-1]
+    return _GEN[k]
+
+
+def _generic_drop(clues):
+    """(genericname) 흔한 낱말로만 된 이름의 단서는 혼자서는 자리를 정하지 못한다: 그 단서를 뺀 나머지로 범위를 세워 보고, 그 범위 근처(800m 또는 덮는 반지름의 1.5배)에
+    그 이름의 곳이 있을 때만 남긴다(「서울숲 근처인데요 … 잔디밭에」는 남고, 「공원 잔디밭에서」 · 「쓰레기통 옆에」는 빠진다). 나머지가 없으면 뺀다."""
+    gen = [n for n, c in enumerate(clues) if c["t"] in ("at", "past", "before", "toward") and generic_key(c.get("k"))]
+    if not gen:
+        return clues
+    rest = [c for n, c in enumerate(clues) if n not in gen]
+    R0 = infer(rest) if rest else None
+    keep = set()
+    for n in gen if R0 is not None else ():
+        r = resolve(clues[n]["k"])
+        lim = max(800.0, 1.5 * R0["r_cover"])
+        if len(r["x"]) and float(np.hypot(r["x"] - R0["cx"], r["y"] - R0["cy"]).min()) <= lim:
+            keep.add(n)
+    return [c for n, c in enumerate(clues) if n not in gen or n in keep]
+
+
 def infer(clues):
     """단서들 → 지금의 가능성 분포. 단서가 없거나 가리키는 곳이 없으면 None."""
     clues = [c for c in clues if c.get("t")]
+    if "genericname" in ON:
+        clues = _generic_drop(clues)
     mins = [n for n, c in enumerate(clues) if c["t"] == "past" and c.get("min")]
     if "nogain" in ON and len(mins) > 2:                  # 「○○ 지나고 N분」 대여섯 개는 같은 사람의 같은 어림: 기준 표지가 지금 범위에 가장 가까운 둘만 곱한다(33번 1-3)
         R0 = infer([c for n, c in enumerate(clues) if n not in mins[:-2]])
@@ -1793,6 +1831,20 @@ def selftest():
     assert "closest" not in [q for q, _ in ask(twice)], ask(twice)
     ON.discard("closestcap")
     assert "closest" in [q for q, _ in ask(twice)], ask(twice)      # 그 스위치가 없으면 세 번째도 묻는다
+    had_gn = "genericname" in ON                          # (genericname · 83번) 되짚기: 80번에서 곳 이름 없이 흔한 낱말만 댄 첫마디가 한 곳으로 묶이던 이름들
+    alone = ["쓰레기통", "따릉이대여소", "시장입구", "말동상", "입구광장", "잔디밭", "빠지는길", "버스정류장앞"]
+    ON.discard("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is not None for w in alone)      # 끄면 그 낱말 하나로 서울 어딘가에 범위가 선다
+    ON.add("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is None for w in alone), [w for w in alone if infer([{"t": "at", "k": w, "how": "가까이"}]) is not None]
+    i_sf = next(i for i, a in enumerate(G.parks) if a["name"] == "서울숲")
+    Rg = infer([{"t": "in", "a": ["park", i_sf]}, {"t": "at", "k": "잔디밭", "how": "가까이"}])       # 「서울숲 … 잔디밭」: 그 공원 안이라 남는다(시연 노점 장면)
+    i_fm = resolve("잔디밭")["ids"][0]
+    assert Rg is not None and math.hypot(Rg["cx"] - G.x[i_fm], Rg["cy"] - G.y[i_fm]) < 150, Rg and (Rg["cx"], Rg["cy"])
+    Ry = infer([{"t": "at", "k": "잔디밭", "how": "가까이"}, {"t": "at", "k": gaz.norm("여의도공원")}])     # 「공원 잔디밭 … 여의도공원이요」: 서울숲 가족마당은 빠지고 여의도에 선다(80번 c15 10km)
+    assert Ry is not None and math.hypot(Ry["cx"] - G.x[i_fm], Ry["cy"] - G.y[i_fm]) > 5000
+    assert not generic_key(gaz.norm("광장시장")) and not generic_key(gaz.norm("서울숲")) and not generic_key(gaz.norm("호수약국"))
+    (ON.add if had_gn else ON.discard)("genericname")
     ON.clear(), ON.update(had)
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
