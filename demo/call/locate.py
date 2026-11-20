@@ -203,8 +203,9 @@ def _dupshop(px, py, kinds, ids):
     「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21)."""
     out = []                                              # [x, y, 종류, 번호, 합친 줄 수]
     for x, y, k, i in zip(px, py, kinds, ids):
-        j = next((o for o in out if i >= G.shop0 and o[3] >= G.shop0 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
-                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if i >= G.shop0 else None
+        shop = G.shop0 <= i < G.shop1                     # 가게 자료 줄만(공원 안 이름 · 물가 테두리 점은 그 뒤에 붙어 있다)
+        j = next((o for o in out if G.shop0 <= o[3] < G.shop1 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
+                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if shop else None
         if j is None:
             out.append([x, y, k, i, 1])
         else:
