@@ -1113,7 +1113,7 @@ def near_mark(R):
                 best = (d, i)
     if best is None:
         return None
-    name, word = G.name[best[1]], NEAR_KINDS[G.kind[best[1]]]
+    name, word = G.name[best[1]].replace(".", "·"), NEAR_KINDS[G.kind[best[1]]]      # 정류장 이름의 「AT센터.양재꽃시장」 → 「AT센터·양재꽃시장」
     return f"{name} {word}" if word else name
 
 
