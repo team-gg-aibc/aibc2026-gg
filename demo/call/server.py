@@ -154,19 +154,33 @@ FILLER = re.compile(r"(?<![가-힣A-Za-z0-9])(음+|어+|으음|그+|저+|그러�
 FIXED_TAIL = re.compile(r"(?:아\s*)?(?:아니다|아니고|아니지|아니라|말고)[\s,.!]*")      # 보기 답 속의 「아 아니다」: 그 뒤의 말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」)
 UNSAID = re.compile(r"^(은|는|이|가|도|요|이요)?아?(아니(?!면)|말고)")      # 이름 바로 뒤의 「아 아니다 · 아니고 · 말고」: 스스로 고친 이름(11-15)
 NEGWORD = re.compile(r"아니|아닌|말고|틀려|틀렸|잘못|없|안 ?보|못 ?봤|다른 ?데|지났")      # (dropcheck, 71번) Solar의 「아님」을 받을 만한 말(「지났」은 「○○은 지났어요」로 그곳을 뺄 때)
-PARTYES = re.compile(r"^\s*(네|예|응|맞아|맞습|맞긴|그래요|넵)[^?]*?(근데|그런데|다만|하지만|대신)[^?]*?(옆|떨어|건너|맞은편|뒤|쪽)")      # (partyes, 73번) 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 그 자리는 맞고 조금 옆이다(「아니요」가 아니다)
+PARTYES_START = re.compile(r"^\s*((어|음|아)\s*,?\s*)?(네|예|응|맞아요|맞아|맞습니다|맞긴 ?해요)(?![가-힣])")      # (partyes, 73번) 긍정으로 시작
+PARTYES_OKNOT = re.compile(r"(바로\s*|딱\s*)?(앞|거기|그\s*자리|정확히)\s*(은|는|이|가)?\s*(아니고|아니구요|아니라|말고)")     # 지키려는 말: 「바로 앞은 아니고 조금 옆이에요」의 「아니고」는 되묻은 자리를 고쳐 말하는 이음말
+PARTYES_NEG = re.compile(r"아니|아닌|아닙|아냐|틀려|틀렸|틀린|잘못|반대|다른 ?(데|곳|자리|쪽)|전혀|완전히|말고")      # 그 밖의 부정 · 다른 자리: 하나라도 남으면 부분 긍정이 아니다
+PARTYES_OFF = re.compile(r"(조금|좀|살짝|약간)\s*(더\s*)?(옆|뒤|떨어|건너|맞은편|안쪽|바깥|쪽)|(근데|그런데|다만|하지만|대신)[^?]*?(옆|뒤|떨어|건너|맞은편|쪽)")      # 되묻은 자리가 조금 어긋났다는 말
+
+
+def _confirm_main(said):
+    """되묻기 답의 main 규칙(부분 긍정을 받지 않을 때): 「아니」 · 「틀려」 · 「다른 데」가 있으면 아니요, 「네」로 시작하면 네."""
+    return False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
 
 
 def _partyes(read, said, R=None):
     """(partyes) 되묻기 답이 「네」로 시작하는 부분 긍정이면 확정으로 받고 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 받았나.
-    (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리(15~55m)를 단서로 더해 한 번 더 좁힌다(핀만 옮김)."""
+    (partyes2) 확정하지 않고 「아니요」로도 보지 않는다: 되묻은 자리에서 조금 떨어진 고리를 단서로 더해 한 번 더 좁힌다(핀만 옮김).
+    받는 조건을 좁게(#137 리뷰 2차): 긍정으로 시작 + 「조금 옆 · 근데 … 뒤」 같은 어긋남 말 + 지키려는 「바로 앞은 아니고」를 뺀 나머지에 부정이 하나도 없음.
+    「네, 근데 그쪽 아니에요」처럼 부정으로 맺거나 「옆 아니」처럼 어긋남 말 뒤에 부정이 붙으면 받지 않고 main 규칙으로 간다."""
     if not ({"partyes", "partyes2"} & L.ON):
         return False
-    if re.match(r"^\s*(네|예|응|맞)", said or "") and re.search(r"반대|다른 ?(데|곳|자리)|전혀|완전히", said):
-        read["confirm"] = False                           # 「네 맞는데 근데 그쪽 말고 반대쪽이에요」: 「네」로 시작해도 다른 자리를 말한 것(main은 「아니」가 없어 「네」로 읽었다)
-        return True
-    if not PARTYES.search(said or ""):
+    said = said or ""
+    if not PARTYES_START.match(said):
         return False
+    rest = PARTYES_OKNOT.sub(" ", said)
+    if PARTYES_NEG.search(rest):
+        read["confirm"] = False                           # 긍정으로 시작해도 부정 · 다른 자리로 맺음: 아니요(main은 「네 … 말고 반대쪽이에요」를 「아니」가 없어 「네」로 읽었다 — 그것만 main보다 엄격)
+        return True
+    if not PARTYES_OFF.search(rest):
+        return False                                      # 어긋남 말이 없다(「네, 맞아요」 · 「네, 바로 옆이에요」): main 규칙
     read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
     if "partyes2" in L.ON:
         read["confirm"] = None
@@ -587,7 +601,7 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "confirm" and _partyes(read, said, R):
         pass                                              # (partyes) 「네, 근데 … 조금 옆이에요」
     elif q.get("id") == "confirm":
-        read["confirm"] = False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
+        read["confirm"] = _confirm_main(said)
     elif q.get("id") == "alike" and opts:                # 소리가 같은 이름 가르기: 구 이름으로 고른다(길 이름은 소리가 같아 받아 적은 글로는 못 가른다)
         said_n = gaz.norm(said)
         gus = [[g.strip().removesuffix(" 가까이") for g in o["label"].rpartition("의 ")[0].split("·") if g.strip()] for o in opts]     # 보기의 구 이름(또는 가까운 역 · 표지 이름)
@@ -971,8 +985,8 @@ def model_read(st, short, known):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
     if (turn_.get("asked") or {}).get("id") == "confirm" and _partyes(read, turn_.get("said")):     # (partyes) Solar가 「아니요」로 읽어도 「네」로 시작하는 부분 긍정은 그대로(확정 · 또는 partyes2면 고리 단서)
         read["clues"] += [c for c in (turn_.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
-        if read["confirm"] is None and not any(c.get("big") for c in read["clues"] if c.get("partyes")) and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
-            read["confirm"], read["clues"] = True, [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째는 확정으로
+        if read["confirm"] is None and any(c.get("partyes") for t in st["turns"][:-1] for c in ((t.get("model") or t.get("code") or {}).get("clues") or [])):
+            read["confirm"], read["clues"] = _confirm_main(turn_.get("said") or ""), [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차)
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}
     return read, "live", sec
@@ -1709,8 +1723,8 @@ def turn(st, ev):
             bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
-            if any(c.get("partyes") and not c.get("big") for c in read["clues"]) and any(c.get("partyes") for c in clues):
-                read["confirm"], read["clues"] = True, [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 「네, 근데 조금 옆」은 확정으로(같은 되묻기를 되풀이하지 않게)
+            if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
+                read["confirm"], read["clues"] = _confirm_main(bare), [c for c in read["clues"] if not c.get("partyes")]     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
                 told = told_of(text, short) or (text.strip()[:41] if (asked or {}).get("id") == "what" else "")
                 if told:
