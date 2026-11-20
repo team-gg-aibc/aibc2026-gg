@@ -38,6 +38,8 @@ OPENBLAS_NUM_THREADS=1 ENGINE_CONFIG=eval/configs/release.json .venv/bin/python 
 | `CALL_SHOPS` · `CALL_NODES` · `CALL_TOILETS` · `CALL_PARKNAMES` · `CALL_RAMPS` | `0`이면 그 지명 자료를 읽지 않는다(넣기 전과 견줄 때) | 읽음 |
 | `CALL_CROSS` | 큰길 교차로 이름(`cross_nodes.tsv.gz`, 994개)을 지명 표에 넣는다. `1` 시민이 말하면 알아듣기만(질문 흐름은 그대로) · `2` 보기 · 되말에도 쓴다. `0`이면 넣지 않는다(넣기 전과 견줄 때). 가상 통화의 시민은 `SIM_CROSS=1`일 때만 교차로 이름을 댄다. 보고 60번 | 1(11/19부터) |
 | `CALL_BIGM` | `bigplace`(기본 켬)가 이 m보다 큰 장소만 넓은 곳으로 본다(`extents.tsv.gz`). 보고 60번 | 60 |
+| `CALL_SMOKE_NEAR` | 길가 흡연: 자리가 정해진 뒤 엔진을 부르고, 좁혀진 자리 50m 안의 가장 가까운 버스 정류장 · 지하철 출구 · 학교를 엔진 물음에 「○○ 가까이 길가」로 넣는다(금연 조례 제5조 제1항은 금연구역을 장소로 정한다). 건물 안 · 구청이 정한 금연거리를 말한 통화는 넣지 않는다. `0`이면 끈다. 보고 72번 | 켬(11/20부터) |
+| `CALL_KICK_DOCK` | 킥보드가 나온 통화를 자리로 가른다: 따릉이 대여소 · 거치대 「에」 세웠다는 말이면 자전거 일(자전거 조례 제12조의2 제7항)로 받고 엔진 물음을 조례의 말(공공자전거 주차구역 · 개인형 이동장치)로 쓴다. 대여소 옆 길 · 그냥 길의 킥보드는 그 밖의 일. `0`이면 끈다. 보고 72번 | 켬(11/20부터) |
 | `CALL_ALIAS_FILE` | 상담사가 저장한 별명 파일 | `data/aliases_local.json`(git 무시) |
 | `CALL_TRIAL_FILE` | 사람이 해 보는 시험의 기록 파일 | `data/trials_local.jsonl`(git 무시) |
 | `CALL_RECORD_FILE` | 이 화면에서 쌓은 상담 기록 · 바꾼 처리 상태 | `data/records_local.json`(git 무시) |

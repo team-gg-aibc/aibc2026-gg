@@ -43,8 +43,8 @@ MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
 SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
-SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR") == "1"          # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구 · 학교를 엔진 물음에 넣는다(72번, 기본 끔). 끄면 main과 같다
-KICK_DOCK = os.environ.get("CALL_KICK_DOCK") == "1"            # 따릉이 대여소 · 거치대의 킥보드를 자전거 일(자전거 조례 제12조의2 제7항)로 받는다(72번, 기본 끔). 끄면 main과 같다
+SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR", "1") != "0"     # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구 · 학교를 엔진 물음에 넣는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
+KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대여소 · 거치대의 킥보드를 자전거 일(자전거 조례 제12조의2 제7항)로 받는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
