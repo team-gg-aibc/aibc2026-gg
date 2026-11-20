@@ -871,8 +871,6 @@ def _candidates(x, y, w, radius, kinds=None, skip=()):
     for j in np.argsort(-score):
         if mass[j] < (0.03 if radius < 100 else 0.003) or len(picked) >= 6:
             break
-        if "samename" in ON and any(gaz.norm(G.name[idx[j]]) == gaz.norm(G.name[idx[k]]) for k in picked):
-            continue                                      # (samename · 75번) 같은 이름을 보기에 두 번 넣지 않는다(「석촌호수 아뜰리에, 석촌호수 아뜰리에 같은 거요」 — 지명 표에 같은 이름의 점이 둘)
         if all(math.hypot(G.x[idx[j]] - G.x[idx[k]], G.y[idx[j]] - G.y[idx[k]]) >= 1.2 * radius for k in picked):
             picked.append(int(j))
     if not picked:
@@ -897,7 +895,7 @@ FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트
 CONFIRM_ON = "partyes2"      # 되묻기에 「네, 근데 바로 앞은 아니고 조금 옆이에요」: 「아니요」가 아니라 그 자리 조금 옆으로 받기(11-20, 73번 7절). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,rimline,closestcap,farsee2,bridgeline"      # 둘레에 길이 있어 사람이 어디든 설 수 있는 곳(호수 · 공원 둘레길 · 광장 가장자리)의 읽기 고침(11-20, 75번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
-ASK_ON = "samename,closestnew,sameopts,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 보기에 같은 이름을 두 번 넣지 않음 · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · sameopts = 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same) · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
+ASK_ON = "samename,closestnew,sameopts,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · sameopts = 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same) · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + ASK_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
@@ -1411,8 +1409,6 @@ def _q_from(R, x, y, w, clues):
     picked = []
     for _, i, d in sorted(cand, reverse=True):
         u = ((G.x[i] - ax) / d, (G.y[i] - ay) / d)
-        if "samename" in ON and any(G.name[i] == G.name[k] for k, _, _ in picked):
-            continue
         if all(u[0] * v[0] + u[1] * v[1] < (0.5 if wide else 0.34) for _, v, _ in picked + [(None, e[1], None) for e in extra]):       # 서로 70도(fromwide 60도) 넘게 다른 쪽
             picked.append((i, u, d))
         if len(picked) + len(extra) >= (4 if wide else 3):
@@ -1742,15 +1738,8 @@ def selftest():
     assert is_done(infer(short1))                                # 짧은 다리(75m)는 켜도 한 점
     ON.discard("bridgelong")
     # (ASK_ON · 75번 후보 2, 기본 켬) 질문 다듬기 — 스위치마다 끈 동작 · 켠 동작
-    two = [i for i, nm in enumerate(G.name) if nm == "석촌호수 아뜰리에"]      # 지명 표에 같은 이름의 점이 둘(59m 떨어져 있다)
-    sx, sy, sw = np.array([G.x[i] for i in two]), np.array([G.y[i] for i in two]), np.ones(len(two)) / max(1, len(two))
-    shown = lambda: [G.name[i] for i in _candidates(sx, sy, sw, 35.0, {"문화시설", "시설"})[0]]      # noqa: E731
     had_ask = ON & set(ASK_ON.split(","))                     # 기본으로 켜져 있든 꺼져 있든: 다 끄고 하나씩 켜 본 뒤 되돌린다
     ON.difference_update(had_ask)
-    assert len(two) == 2 and shown().count("석촌호수 아뜰리에") == 2
-    ON.add("samename")
-    assert shown().count("석촌호수 아뜰리에") == 1               # 보기에 같은 이름은 한 번만
-    ON.discard("samename")
     ring_s = water_ring(resolve(k("석촌호수")))
     mid_s = [float(ring_s[:, 0].min() + ring_s[:, 0].max()) / 2, float(ring_s[:, 1].min() + ring_s[:, 1].max()) / 2]
     i_sp = next(i for i, a in enumerate(G.parks) if a["name"] == "송파나루공원")
