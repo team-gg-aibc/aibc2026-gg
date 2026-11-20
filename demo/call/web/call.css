@@ -44,7 +44,8 @@ h1, h2, .big { font-family: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic 
 .steps4 { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; align-items: center; }
 .steps4 li { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 4px; border-radius: 0; color: var(--sub); font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
 .steps4 li b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); font-size: 11px; }
-.steps4 li.now { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); } .steps4 li.now b { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.steps4 li { cursor: default; user-select: none; }      /* 눌리지 않는 진행 표시(64번 Q5): 칸 · 단추 꼴 대신 밑줄 */
+.steps4 li.now { color: var(--ink); font-weight: 800; box-shadow: inset 0 -2px 0 var(--accent); } .steps4 li.now b { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .steps4 li.past { color: var(--text); } .steps4 li.past b { background: var(--ok); color: var(--panel-solid); border-color: var(--ok); }
 .steps4 li + li::before { content: "▸"; margin-right: 6px; color: var(--sub); }
 .top .grow { flex: 1; }
@@ -381,3 +382,40 @@ body:not(.view-records) #side .radio .opts5 label small { display: none; } body:
 #side .sum select.fix { margin-left: 4px; padding: 0 2px; border-radius: 0; border: 1px solid var(--line); background: var(--panel-solid); color: var(--ink); font: inherit; font-size: 11px; vertical-align: middle; }
 #side .sum .badge { font-size: 10.5px; padding: 0 7px; }
 @media (prefers-reduced-motion: reduce) { .lines .ring { animation: none; } }
+/* ---- 좁은 화면(노트북 1440 · 1280): 칸 자리 · 크기는 그대로, 글이 겹치거나 넘치지 않게만. 1600 화면에서는 켜지지 않는다(11-19) */
+@media (max-width: 1599px) {
+  .law .hd { flex-wrap: wrap; row-gap: 3px; } .law .hd h2 { flex: 1 0 auto; }      /* 머리줄: 제목은 줄지 않고, 배지 · 복사 단추가 자리가 모자라면 다음 줄로 */
+  .law .hd .badge { white-space: normal; line-height: 1.35; }      /* 긴 배지(「…근거 조항을 찾지 못함」)는 배지 안에서 줄을 바꿈 */
+}
+body:not(.view-records) #ask .q.fs1 { font-size: 17px !important; } body:not(.view-records) #ask .q.fs2 { font-size: 15.5px !important; } body:not(.view-records) #ask .q.fs3 { font-size: 14px !important; }      /* fitAsk: 넘칠 때만 */
+.law.fit2 .say { font-size: 12.5px; } .law.fit2 .lab, .law.fit2 .cq { font-size: 11px; } .law.fit2 .chips2 button { font-size: 10.5px; padding: 0 5px; } .law.fit2 .from { margin-top: 5px; padding-top: 4px; }      /* fitLaw: 넘칠 때만 */
+.law .say.one { -webkit-line-clamp: 1; }
+.law.scroll { overflow-y: auto; scrollbar-width: thin; }      /* fitLaw 마지막: 넘칠 때만 칸 안에서 내려 읽기 */
+.law.scroll::after { content: attr(data-more); position: sticky; bottom: -12px; flex: none; margin: 0 -14px -12px; padding: 10px 14px 3px; text-align: right; color: var(--accent); font-size: 10.5px; font-weight: 700; background: linear-gradient(transparent, var(--panel) 55%); pointer-events: none; }
+.law.scroll.end::after { visibility: hidden; }
+body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }      /* fitAsk 마지막: 넘칠 때만 */
+#ask.scroll::after { content: attr(data-more); position: sticky; bottom: -13px; display: block; margin: 0 -15px -13px; padding: 10px 15px 3px; text-align: right; color: var(--accent); font-size: 10.5px; font-weight: 700; background: linear-gradient(transparent, var(--panel) 55%); pointer-events: none; }
+#ask.scroll.end::after { visibility: hidden; }
+
+/* 상담 기록의 「그때 나눈 대화」: 통화 글 칸과 같은 말풍선(.lines · .ln) 그대로, 길면 칸 안에서 내려 읽기(11-21) */
+#side .talkrec .lines { flex: none; max-height: 320px; padding: 8px 2px 4px; }
+#side .talkrec .n2 { color: var(--sub); font-weight: 500; }
+/* 상담 기록 화면 · 휴대폰 너비: 목록 칸이 고른 기록 카드를 덮지 않게 위(목록) · 아래(고른 기록)로 쌓는다. 자리만 바꾸고 꾸밈은 그대로(11-21) */
+@media (max-width: 760px) {
+  body.view-records #reclist { left: 8px; right: 8px; width: auto; bottom: 58%; overflow-y: auto; }
+  body.view-records #reclist .recs { flex: none; overflow: visible; }      /* 낮은 칸에서도 기록 줄이 밀려 사라지지 않게 칸 전체를 내려 읽는다 */
+  body.view-records #side { left: 8px; right: 8px; width: auto; top: calc(42% + 8px); bottom: 8px; }
+}
+/* 통화 화면 · 휴대폰 세로(폭 600px 아래): 컴퓨터용 배치에서는 오른쪽 접수 카드 칸이 대화 칸 · 입력 칸을 덮었다(11-21 현장 시험).
+   이 폭에서는 칸을 하나도 감추지 않고 한 줄로 쌓아 화면 전체를 내려 읽는다: 받아 적기(입력 칸 포함) → 지금 물을 말 → 조례 근거 답(근거 조항 · 인용문 · 원문 열기) → 위치 범위 → 접수 카드.
+   칸 안의 고정 높이 · 잘라 감추기는 좁은 폭에서 글이 길어지면 내용을 감추므로 이 폭에서만 푼다. 자리만 바꾸고 꾸밈은 그대로. 넓은 화면 · 휴대폰 가로(812)는 그대로(11-21, #144 리뷰) */
+@media (max-width: 600px) {
+  html, body { height: auto; overflow: visible; }
+  body:not(.view-records) #map { pointer-events: none; }      /* 칸 뒤에 깔린 지도가 칸 사이 틈에서 손가락 · 휠을 가져가 페이지 대신 지도가 움직이지 않게 */
+  body:not(.view-records) #range .pinbtn { display: none; }      /* 지도가 칸 뒤에 깔려 누를 곳이 없으므로 「지도에서 찍기」만 이 폭에서 뺀다(지도를 누르는 기능은 이것 하나) */
+  body:not(.view-records) #talk, body:not(.view-records) #ask, body:not(.view-records) #law, body:not(.view-records) #range, body:not(.view-records) #side {
+    position: relative; top: auto; right: auto; bottom: auto; left: auto; width: auto; max-width: none; height: auto; margin: 8px; overflow: visible; }
+  body:not(.view-records) #talk { margin-top: 54px; height: 62vh; overflow: hidden; }      /* 첫 화면에 받아 적기 · 입력 칸 · 보내기(대화는 칸 안에서 내려 읽음) */
+  body:not(.view-records) #side .sum, body:not(.view-records) #side .slot, body:not(.view-records) #side .s-to, body:not(.view-records) #side .s-near, body:not(.view-records) #side .s-ref .rbody { height: auto; overflow: visible; }
+  body:not(.view-records) #side .s-ref { flex: none !important; }      /* 원래 규칙이 !important */
+}

@@ -43,6 +43,8 @@ MODEL = os.environ.get("CALL_MODEL", "solar-pro4")              # 단서 읽기 
 REPLAY_CAP = float(os.environ.get("CALL_REPLAY_SEC", "2"))      # 저장된 답 방식: 엔진 답을 받을 때 걸린 시간만큼(많아야 이 초) 기다렸다 보인다
 SAID_MAX = 500                                                   # 한 줄 글의 가장 긴 자. 직접 통화(배포 판)는 voice/direct.py가 늘린다
 SAVED_FIRST = os.environ.get("CALL_SAVED_FIRST", "1") != "0"     # 실제 호출 판에서도 저장된 답에 정확히 같은 열쇠가 있으면 그것을 쓴다(장면은 늘 같게, 실제 호출은 직접 친 말에, 11/19). 0이면 main과 같다
+SMOKE_NEAR = os.environ.get("CALL_SMOKE_NEAR", "1") != "0"     # 길가 흡연: 자리가 좁혀진 뒤 가까운 정류장 · 지하철 출구를 엔진 물음에 넣는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
+KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대여소 · 거치대의 킥보드를 자전거 일(자전거 조례 제12조의2 제7항)로 받는다(72번, 기본 켬 11/20). 0이면 끔(그 전과 같다)
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
@@ -81,10 +83,30 @@ def tab(section, head="항목", col=1):
     return {}
 
 
+IGA = re.compile(r"([가-힣])\(이\)가")
+
+
 def fill(s, **kw):
     for k, v in kw.items():
         s = s.replace("{" + k + "}", str(v))
+    if "josa" in L.ON:                                    # (josa · 75번) 「카페(이)가」 → 받침이 없으면 「카페가」, 있으면 「정류장이」: 화면에 괄호째 나가고 소리로는 「카페 이 가」로 읽힌다
+        s = IGA.sub(lambda m: m.group(1) + ("이" if (ord(m.group(1)) - 0xAC00) % 28 else "가"), s)
     return " ".join(s.split())
+
+
+def say_options(opts):
+    """질문 글에 읽어 줄 보기 이름들(앞의 넷). (samename · 75번) 같은 이름은 한 번만 말한다: 지명 표에 같은 이름의 점이 둘이면 「석촌호수 아뜰리에, 석촌호수 아뜰리에 같은 거요」가 됐다.
+    보기 자체에서 하나를 빼지는 않는다 — 빼면 시민이 그 이름을 골랐을 때 다른 한 곳이 범위에서 사라진다(600통에서 올림픽대교 분기점 473m 틀린 확정)."""
+    names = [o["label"] for o in opts[:4]]
+    return list(dict.fromkeys(names)) if "samename" in L.ON else names
+
+
+def asked_same(turns, words):
+    """(sameopts · 75번) 「이 질문을 같은 보기로 이미 물었고 시민이 그 보기 가운데서 골랐나」를 가리는 함수. 고른 답을 받았는데 같은 보기가 또 나왔다는 것은 그 답으로 범위가 달라지지 않았다는 뜻이고, 다시 물어도 같은 답이 온다
+    (「영동1교에서 보면 어느 쪽이세요?」에 「남단 쪽이요」라고 답했는데 같은 질문이 또 나와 시민이 끊음). 「모르겠어요」나 보기 밖의 말로 답한 질문은 여기 넣지 않는다(다른 답을 들은 뒤 다시 물으면 답할 수 있다)."""
+    lab = lambda q: tuple(o.get("label") or words.get(o.get("word"), o.get("word")) for o in q.get("options") or [])      # noqa: E731
+    asked = {(t["asked"]["id"], lab(t["asked"])) for t in turns if t.get("said") and t.get("asked") and (t.get("model") or t.get("code") or {}).get("picked")}
+    return lambda q: (q["id"], lab(q)) in asked
 
 
 def scripts():
@@ -96,6 +118,8 @@ HEAD = r"(?<![가-힣])"      # 낱말 머리에서만(「덮개가 · 안개가
 ANIMALS = [("개", HEAD + r"(개(?=[가를는도\s,.?!]|한|인데|인가|인 ?것|예요|이에요|$)|강아지|유기견|멍멍이)"), ("고양이", r"고양이|유기묘|길냥"),
            ("야생동물", HEAD + r"(너구리|고라니|멧돼지|비둘기|까치|족제비|뱀|청설모|새(?=[가를는도들\s,.?!]|한|예요|$))")]     # 한 글자(개 · 새)는 뒤에 토씨 · 띄어쓰기가 올 때만(「개인택시」 · 「새벽」은 아니다)
 ALIVE = (r"죽어|죽은|죽었|사체|안 ?움직|로드킬|치여|치인", r"살아|움직여|움직이고|돌아다니|뛰어|걸어|앉아|서 있|짖")
+HURT = (r"다쳐|다친|다쳤|웅크|떨고|떨어요|울고|울어요|절뚝|낑낑",     # (hurtalive) 다쳤다 · 웅크렸다 · 떤다는 말은 살아 있다는 뜻(「죽어」가 같이 있으면 죽음이 먼저 — ALIVE[0]을 먼저 본다)
+        r"움직이지|못 ?움직|숨|쓰러|꼼짝|미동|늘어져")         # 숨 · 쓰러짐 · 「움직이지 않아요」가 같이 있으면 살았는지 모르는 말 → main처럼 묻는다
 
 
 def relation(after):
@@ -122,6 +146,8 @@ def relation(after):
         return "out", how, True
     if re.match(r"^.{0,3}(바로)?(앞|옆|입구|정문|후문|밑|아래)", after) or re.match(r"^.{0,10}(그|거기).{0,6}바로(앞|옆)", after):
         return "at", "바로", True                         # 「○○ 있잖아요. 그 ○○ 바로 앞」처럼 한 번 더 받아 말한 것도
+    if "farsee2" in L.ON and re.match(r"^.{0,2}(저?멀리서?)?(보이긴|보이기는|보이기만)|^.{0,2}저?멀리서?(보여|보이|보입)", after):
+        return "at", "쪽", True                           # (farsee2 · 75번) 「○○가 보이긴 해요 · 멀리 보여요」: 눈앞(150m)이 아니라 멀리 보이는 것 — 그 둘레 넓게(450m 안 고르게), 봉우리 없이
     return ("at", "보임", True) if re.match(r"^.{0,4}(보여|보이|보입|간판)", after) else ("at", "근처", False)
 
 
@@ -146,11 +172,120 @@ def clue_of(key, rel, how, label=None):
     return c
 
 
+COMPASS = re.compile(r"^의?(?!남편)(동남|남동|동북|북동|서남|남서|서북|북서|동|서|남|북)(쪽|편|측)")      # (compass · 75번) 이름 바로 뒤의 방위 말: 「석촌호수 서쪽 산책로」 · 「○○공원 북쪽 입구」
+EDGE = re.compile(r"^.{0,3}(둘레길|둘레|가장자리|끝쪽|끝이|끝에|끄트머리|외곽|테두리)")      # (edgeband · 75번) 구역의 테두리를 가리키는 말
+CORE = re.compile(r"^.{0,2}(한가운데|한복판|가운데|중앙)")                                       # 구역의 한가운데를 가리키는 말
+TRAIL = re.compile(r"^.{0,3}(산책로|산책길|둘레길|자전거길|자전거도로)")                          # 호수 이름 뒤에 오면 물가 둘레의 길
+NOT_THAT = re.compile(r"^(쯤)?(은|는|이|가|도)?(말고|아니|아닌)")                                  # 바로 뒤에서 부정한 말(「둘레길 말고」 · 「가장자리는 아니에요」 · 「북쪽은 아니고요」)은 그 뜻으로 읽지 않는다
+
+
+def _said(pat, own):
+    """own의 앞머리가 pat에 맞고 바로 뒤에서 부정하지 않았으면 그 맞춤, 아니면 None."""
+    m = pat.match(own)
+    return m if m and not NOT_THAT.match(own[m.end():]) else None
+
+
+def _compass_v(word):
+    v = np.sum([{"동": (1.0, 0.0), "서": (-1.0, 0.0), "남": (0.0, -1.0), "북": (0.0, 1.0)}[ch] for ch in word], axis=0)
+    return [round(float(a), 3) for a in v / np.hypot(*v)]
+
+
+def _center(key):
+    """(compass) 이름이 가리키는 한 곳의 가운데 [x, y]: 공원 · 광장 구역 하나, 호수 테두리, 한 덩어리로 모인 점들. 여러 곳에 흩어진 이름 · 길 · 구 · 동은 None."""
+    r = L.resolve(key)
+    parks = [a for a in r["areas"] if a[0] == "park"]
+    if len(parks) == 1:
+        x0, y0, x1, y1 = L.area_of(parks[0])["box"]
+        return [round(float(x0 + x1) / 2, 1), round(float(y0 + y1) / 2, 1)]
+    if r["areas"] or r["roads"] or not len(r["x"]) or float(np.ptp(r["x"]) + np.ptp(r["y"])) > 1500:
+        return None
+    return [round(float(r["x"].min() + r["x"].max()) / 2, 1), round(float(r["y"].min() + r["y"].max()) / 2, 1)]
+
+
+def edge_clue(m, own):
+    """(edgeband · 75번) 「○○ 둘레길 · 가장자리 · 끝 쪽」 → 그 구역의 테두리 띠, 「○○ 한가운데」 → 그 구역의 안쪽 가운데, 「(호수) 산책로 · 둘레길」 → 물가 둘레 40m. 해당 없으면 None."""
+    r = L.resolve(m["key"])
+    if any(a[0] == "park" for a in r["areas"]):
+        if _said(EDGE, own):
+            return {"t": "rim", "k": m["key"], "w": 25.0, "sure": True, "label": fill(tab("위치 범위")["단서 · 둘레"], 이름=m["name"])}
+        if _said(CORE, own):
+            return {"t": "core", "k": m["key"], "sure": True, "label": fill(tab("위치 범위")["단서 · 한가운데"], 이름=m["name"])}
+    elif "lakerim" in L.ON and L.water_ring(r) is not None and (_said(EDGE, own) or _said(TRAIL, own)):
+        return {"t": "at", "k": m["key"], "how": "가까이", "sure": True, "label": m["name"]}
+    return None
+
+
 MOVE = (("걷기", re.compile(r"걸어|걷다|걷는|걸으|걷고|산책|도보|조깅")),
         ("차", re.compile(r"운전|차로 ?(가|오|지나|달리)|차를? ?타고|(버스|택시|자동차|오토바이|자전거|따릉이) ?(타고|로 ?가)|타고 ?(가|오|지나|달리)|달리다|달리는|드라이브")))     # 걷는 중인지 차 안인지(「조금 지나서」의 폭, 11-16)
 FILLER = re.compile(r"(?<![가-힣A-Za-z0-9])(음+|어+|으음|그+|저+|그러니까|뭐지|뭐더라|아마)(?:…|\.{2,}|,)*(?![가-힣A-Za-z0-9])")      # 군말: 이름 사이에 끼어도(「마들역 어… 5번 출구」) 지우고 읽는다(코드 읽기만. Solar에는 말 그대로)
 FIXED_TAIL = re.compile(r"(?:아\s*)?(?:아니다|아니고|아니지|아니라|말고)[\s,.!]*")      # 보기 답 속의 「아 아니다」: 그 뒤의 말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」)
 UNSAID = re.compile(r"^(은|는|이|가|도|요|이요)?아?(아니(?!면)|말고)")      # 이름 바로 뒤의 「아 아니다 · 아니고 · 말고」: 스스로 고친 이름(11-15)
+NEGWORD = re.compile(r"아니|아닌|말고|틀려|틀렸|잘못|없|안 ?보|못 ?봤|다른 ?데|지났")      # (dropcheck, 71번) Solar의 「아님」을 받을 만한 말(「지났」은 「○○은 지났어요」로 그곳을 뺄 때)
+PARTYES_START = re.compile(r"^\s*((어|음|아)\s*,?\s*)?(네|예|응|맞아요|맞아|맞습니다|맞긴 ?해요)(?![가-힣])")      # (partyes, 73번) 긍정으로 시작
+PARTYES_OKNOT = re.compile(r"(바로\s*|딱\s*)?(앞|거기|그\s*자리|정확히)\s*(은|는|이|가)?\s*(아니고|아니구요|아니라|말고)")     # 지키려는 말: 「바로 앞은 아니고 조금 옆이에요」의 「아니고」는 되묻은 자리를 고쳐 말하는 이음말
+PARTYES_NEG = re.compile(r"아니|아닌|아닙|아냐|틀려|틀렸|틀린|잘못|반대|다른 ?(데|곳|자리|쪽)|전혀|완전히|말고")      # 그 밖의 부정 · 다른 자리: 하나라도 남으면 부분 긍정이 아니다
+PARTYES_OFF = re.compile(r"(조금|좀|살짝|약간)\s*(더\s*)?(옆|뒤|떨어|건너|맞은편|안쪽|바깥|쪽)|(근데|그런데|다만|하지만|대신)[^?]*?(옆|뒤|떨어|건너|맞은편|쪽)")      # 되묻은 자리가 조금 어긋났다는 말
+
+
+def _partyes_model(read, st):
+    """(partyes) Solar 읽기 길: 되묻기 답이 이 통화의 첫 부분 긍정일 때만 Solar가 읽은 확인을 바꾼다(코드 읽기의 고리 단서를 가져옴). 그 밖은 Solar가 읽은 그대로 → 바꿨나."""
+    t = st["turns"][-1]
+    if (t.get("asked") or {}).get("id") != "confirm" or _had_partyes(st["turns"][:-1]) or not _partyes(read, t.get("said")):
+        return False
+    read["clues"] += [c for c in (t.get("code") or {}).get("clues", []) if c.get("partyes") and c not in read["clues"]]
+    return True
+
+
+def _confirm_main(said):
+    """되묻기 답의 main 규칙(부분 긍정을 받지 않을 때): 「아니」 · 「틀려」 · 「다른 데」가 있으면 아니요, 「네」로 시작하면 네."""
+    return False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
+
+
+def _is_partyes(said):
+    """(partyes) 부분 긍정인가: ① 긍정으로 시작 ② 「조금 옆 · 근데 … 뒤」 같은 어긋남 말 ③ 지키려는 「바로 앞은 아니고」를 뺀 나머지에 PARTYES_NEG 낱말이 없음 — 셋을 다 갖춘 답만 참.
+    PARTYES_NEG는 「받지 않을 조건」으로만 쓴다(강조 말 「완전히 · 전혀」도 들어 있어 넓지만, 걸리면 main 규칙으로 갈 뿐 아니요로 바꾸지 않는다)."""
+    said = said or ""
+    if not PARTYES_START.match(said):
+        return False
+    rest = PARTYES_OKNOT.sub(" ", said)
+    return not PARTYES_NEG.search(rest) and bool(PARTYES_OFF.search(rest))
+
+
+def _had_partyes(turns):
+    """이 통화에서 이미 부분 긍정을 받았나(앞 차례의 읽기에 고리 단서가 있나)."""
+    return any(c.get("partyes") for t in turns for c in ((t.get("model") or t.get("code") or {}).get("clues") or []))
+
+
+def _partyes(read, said, R=None):
+    """(partyes · partyes2) 이 PR이 main의 읽기를 바꾸는 단 하나의 길: 부분 긍정(_is_partyes)이면 확인을 바꾸고(partyes2 = 확정하지 않음 + 되묻은 자리 둘레 고리 단서,
+    partyes = 확정) 자리 한 줄을 「○○ 근처 · 건너편」으로 둔다 → 참. 부분 긍정이 아니면 read를 건드리지 않고 거짓(main 규칙이 읽은 그대로)."""
+    if not ({"partyes", "partyes2"} & L.ON) or not _is_partyes(said):
+        return False
+    side_set = "side" not in read["matter"]
+    if side_set:
+        read["matter"]["side"] = "건너편" if re.search(r"건너|맞은편", said) else "근처"
+    if "partyes2" in L.ON:
+        read["confirm"] = None
+        if R is not None:
+            near = [float(G.ext[i]) for i in G.near(R["cx"], R["cy"], 40.0) if i < len(G.ext)]
+            ring = max([35.0] + near)                     # 되묻은 자리가 넓은 곳(길쭉한 건물 · 부지)이면 「조금 옆」은 그 크기만큼 떨어진 끝일 수 있다(93개 둘레 꼴 74-P10 「자벌레」 120m)
+            read["clues"].append({"t": "pt", "p": [round(R["cx"], 1), round(R["cy"], 1)], "r": max(12.0, 0.3 * ring), "ring": ring, "partyes": True, "side_set": side_set,
+                                  "label": tab("위치 범위")["단서 · 되묻은 자리 조금 옆"]})
+    else:
+        read["confirm"] = True
+    return True
+
+
+def _partyes_undo(read, said):
+    """(partyes2) 같은 통화의 두 번째 부분 긍정은 받지 않는다: 코드 읽기를 main 규칙이 읽은 그대로로 되돌린다(확정하지 않음 — #137 리뷰 2차)."""
+    ring = [c for c in read["clues"] if c.get("partyes")]
+    read["clues"] = [c for c in read["clues"] if not c.get("partyes")]
+    if any(c.get("side_set") for c in ring):
+        read["matter"].pop("side", None)
+    read["confirm"] = _confirm_main(said)
+
+
+HARD = re.compile(r"멀리 ?보이기만|가운데|모르겠|몰라")      # (hardstop, 71번) 몇 걸음 · 어느 쪽에 답하기 어렵다는 말
 NOTSEEN = re.compile(r"안 ?보여|안 ?보이|못 ?봤|못 ?보겠|없어요")      # (seenonce) 둘레에 댈 것이 없다는 답
 RETRACT = re.compile(r"(아까|방금|처음에?|앞에서)\s*(제가\s*)?(말씀드린|말한|말했던|얘기한|한)?\s*(거기|데|곳|자리|거|건|그곳)?\s*(는|은)?\s*(아니|틀렸|잘못)|잘못\s*(말|얘기)했")     # 「아까 거기 아니에요」: 앞 차례에 한 자리 말을 거둔다
 
@@ -427,15 +562,32 @@ def code_read(said, asked, short, R):
             read.setdefault("drop", []).append(m["key"])   # 「동호대교였나? 아, 아니다」 · 「3번 출구, 아 아니다」 · 「성수대교 아니고」: 스스로 고친 이름은 단서로 쓰지 않는다(한 문장 안에서는 뒷말이 이긴다)
             fixed = bool(UNSAID.match(m["after"]))
             continue
-        rel, how, sure = relation(m.get("own", m["after"]))      # 관계는 다음 이름이 나오기 전의 말로만(11-16)
+        across = False
+        own = m.get("own", m["after"])
+        comp = _said(COMPASS, own) if "compass" in L.ON and "key" in m else None
+        if comp:
+            own = own[comp.end():]                        # (compass · 75번) 방위 말은 떼고 관계를 읽는다(「서쪽」의 「쪽」을 「○○ 쪽」으로 읽지 않게)
+        rel, how, sure = relation(own)      # 관계는 다음 이름이 나오기 전의 말로만(11-16)
         if how == "쪽" and "key" in m and (L.resolve(m["key"])["areas"] or not len(L.resolve(m["key"])["x"])):
             how, sure = "근처", False                     # 구역인 이름의 「쪽」은 전처럼(뚜렷하지 않은 「근처」 — Solar가 안 · 밖을 고칠 수 있게). clue_of도 같은 규칙
+        if "farsee2" in L.ON and "key" in m and rel == "at" and how == "보임" and re.search(r"(건너편|맞은편|건너|너머|저쪽|저기|멀리)(에|에서|로|으로|쪽에)?$", gaz.norm(said).split(m["key"])[0]):
+            how = "쪽"                                    # (farsee2) 「호수 건너편에 ○○가 보여요」: ○○는 건너편 멀리 있다(항동저수지 통화: 가까이로 읽어 저수지와 어긋나 범위 18km)
+            read.setdefault("over", []).append(m["key"])  # 무엇의 건너편인지는 speech_fix가 앞 단서까지 보고 잇는다
         if (asked or {}).get("id") == "finer" and rel == "at" and how == "근처":
             how = "가까이"                                  # 「바로 앞에 뭐가 보이세요?」에 댄 이름: 눈앞에 보이는 것
         if "across" in L.ON and rel == "at" and how == "가까이" and re.search(r"건너|맞은편", m.get("own", m["after"])[:16]):
             read["matter"]["side"] = "건너편"               # 확정할 때 그 표지 자리에 핀을 찍지 않고, 앞 · 옆 · 건너편을 다시 묻지 않는다
+            across = True
         if "key" in m:
             read["clues"].append(clue_of(m["key"], rel, how, m["name"]))
+            if across and "lakerim" in L.ON:
+                read["clues"][-1]["across"] = True       # (lakerim) 「호수 길 건너편」은 물가 둘레가 아니다(되묻기를 「○○ 둘레」로 하지 않는다)
+            edge = edge_clue(m, own) if "edgeband" in L.ON and rel == "at" else None
+            if edge:
+                read["clues"][-1] = edge
+            o = _center(m["key"]) if comp else None
+            if o:                                         # (compass) 그 장소 가운데에서 본 그 방위 쪽(좌우 60도): 둘레 가운데 그쪽 부분. 그 밖은 0.03으로 낮춘다
+                read["clues"].insert(len(read["clues"]) - 1, {"t": "cone", "o": o, "v": _compass_v(comp.group(1)), "cos": 0.5, "f": 0.03, "sure": True, "label": fill(tab("위치 범위")["단서 · 방위"], 이름=m["name"], 쪽=comp.group(1))})      # 이름 단서 앞에 넣는다(아래의 비슷한 이름 · 뚜렷함 표시는 이름 단서의 것)
             mins = re.match(r"^.{0,8}?(\d+|한|일|두|이|세|삼|네|사|오|다섯|십|십오)\s*분", m["after"]) if rel == "past" else None
             if mins:                                      # 「○○ 지나고 2분쯤」 → 속도 × 시간으로 셈한다
                 read["clues"][-1]["min"] = float({"한": 1, "일": 1, "두": 2, "이": 2, "세": 3, "삼": 3, "네": 4, "사": 4, "오": 5, "다섯": 5, "십": 10, "십오": 15}.get(mins.group(1)) or mins.group(1))
@@ -487,6 +639,8 @@ def code_read(said, asked, short, R):
         pick = 1 if re.search(ALIVE[0], said) else 0 if re.search(ALIVE[1], said) else None
     elif q.get("id") == "leash":
         pick = None if "목줄" not in said and "인식표" not in said else 1 if re.search(r"없|안 ?보|안 ?하|안 ?했", said) else 0
+        if pick is None and "optpart" in L.ON:           # (optpart, 71번) 「목줄이나 인식표가 보이시나요?」에 「안 보여요」만: 현장에서 같은 질문을 다시 했다
+            pick = 1 if re.search(r"안 ?보|없|못 ?봤", said) else 0 if re.search(r"^\s*(네|예|응)|있어|있습|보여|보입", said) else None
     elif q.get("id") == "seen":
         pick = 1 if re.search(r"안 ?보|없|아니|못 ?봤", said) else 0 if re.search(r"보여|보이|보입|있어|있습|^\s*(네|예|응)", said) else None
     elif q.get("id") == "ago" and opts:
@@ -552,8 +706,10 @@ def code_read(said, asked, short, R):
             read["confirm"] = False                       # 그 이름은 확정할 자리에서 멀다: 아님
         elif best is None and re.search(r"아니|틀려|다른 ?데", said):
             read["confirm"] = False                       # 그 사이 · 이름을 못 댐: 예 · 아니요로 다시 묻는다
+    elif q.get("id") == "confirm" and _partyes(read, said, R):
+        pass                                              # (partyes) 「네, 근데 … 조금 옆이에요」
     elif q.get("id") == "confirm":
-        read["confirm"] = False if re.search(r"아니|아닌|틀려|틀렸|다른 ?데", said) else True if re.search(r"^\s*(네|예|응|맞|그래|넵|옙)|맞아|맞습|거기", said) else None
+        read["confirm"] = _confirm_main(said)
     elif q.get("id") == "alike" and opts:                # 소리가 같은 이름 가르기: 구 이름으로 고른다(길 이름은 소리가 같아 받아 적은 글로는 못 가른다)
         said_n = gaz.norm(said)
         gus = [[g.strip().removesuffix(" 가까이") for g in o["label"].rpartition("의 ")[0].split("·") if g.strip()] for o in opts]     # 보기의 구 이름(또는 가까운 역 · 표지 이름)
@@ -579,6 +735,10 @@ def code_read(said, asked, short, R):
         hit = [n for n, o in enumerate(opts) if len(gaz.norm(o["label"])) >= 3 and (lab := gaz.norm(re.sub(r" 쪽$", "", o["label"]))) in said_n
                and not any(lab in k and lab != k for k in longer)]      # 「하월곡분기점」을 말했는데 보기 「하월곡」을 고른 것으로 읽지 않는다(다른 이름의 일부일 뿐)
         pick = hit[0] if len(hit) == 1 else None
+        if pick is None and "optpart" in L.ON and q.get("id") in ("either", "from"):     # (optpart, 71번) 둘 중 · 어느 쪽 보기의 이름 일부만 댄 답(「병설유치원이요」 → 「서울신천초등학교병설유치원 쪽」): 한 보기에만 들면 그것. 현장에서 같은 질문을 다시 했다. 「바로 앞」 보기(finer · mark)는 넣지 않는다(「○○ 근처예요」가 바로 앞 한 점이 되어 600통 틀린 확정 5 → 9)
+            toks = {t for _, forms, _, _ in gaz.phrases(said) for t in forms if len(t) >= 3}
+            part = [n for n, o in enumerate(opts) if any(t in gaz.norm(re.sub(r" 쪽$", "", o.get("label") or "")) for t in toks)]
+            pick = part[0] if len(part) == 1 else None
         if pick is None and q.get("id") == "between":       # 「A는 지났고요, B는 아직이요」: 보기의 두 이름이 다 나오면 그 보기의 자리로 읽는다(이름으로 다시 찾으면 같은 이름의 다른 다리를 잡는다, 11-15)
             both = [n for n, o in enumerate(opts) if " ~ " in o["label"] and all(gaz.norm(w) and gaz.norm(w) in said_n for w in o["label"].split(" ~ "))]
             if len(both) == 1:
@@ -616,7 +776,7 @@ def code_read(said, asked, short, R):
     said = full
     rule = RULE_Q.search(said)
     if rule:
-        read["matter"]["ask"] = rule.group().strip()[:160]     # 시민이 규정 · 처리를 물었다: 위치가 정해지면 이 물음으로 엔진에 묻는다
+        read["matter"]["ask"] = rule.group().strip()[:300]     # 시민이 규정 · 처리를 물었다: 위치가 정해지면 이 물음으로 엔진에 묻는다(긴 물음 열 개에서 160 · 300 · 600이 흔들림 안쪽으로 같았다, 11-19. 장면 물음은 모두 160자 안이라 저장된 답 열쇠는 그대로)
     lamp_no = next((m["name"] for m in short if str(m.get("by", "")).startswith("#")), None)
     if lamp_no:
         read["matter"]["plate"] = lamp_no                 # 기둥 · 표지의 번호를 읽어 줬다: 시설물 번호 칸에도 남긴다
@@ -639,7 +799,7 @@ def code_read(said, asked, short, R):
         read["matter"]["animal"] = animal
     if re.search(ALIVE[0], said):
         read["matter"]["alive"] = False
-    elif re.search(ALIVE[1], said) and (animal or q.get("id") == "alive"):
+    elif (re.search(ALIVE[1], said) or ("hurtalive" in L.ON and re.search(HURT[0], said) and not re.search(HURT[1], said))) and (animal or q.get("id") == "alive"):
         read["matter"]["alive"] = True
     if ("목줄" in said or "인식표" in said) and "leash" not in read["matter"]:
         read["matter"]["leash"] = not re.search(r"없|안 ?보|안 ?하|안 ?했", said)
@@ -804,6 +964,12 @@ def speech_fix(said, read, short, clues):
             if any(k0(c) == word for c in read["clues"]):
                 read["clues"] = [c for c in read["clues"] if k0(c) != word]
                 skip.append(word)
+    if "farsee2" in on and "lakerim" in on and read.get("over"):      # (75번) 「호수 건너편에 ○○가 보여요」: 호수가 나와 ○○ 사이에 있다 → 그 자리에서 ○○ 쪽으로 그은 선이 물 위를 지나는 곳. 호수를 말한 통화에서만
+        lake = next((c for c in reversed(list(clues) + read["clues"]) if c.get("t") == "at" and "k" in c and L.water_ring(L.resolve(c["k"])) is not None), None)
+        far = _center(read["over"][0])
+        if lake and far:                                  # ○○ 자체는 자리 단서로 쓰지 않는다(물 건너 1km 밖일 수 있다): 「○○ 둘레」로 두면 범위를 ○○ 쪽으로 끌어 건너편과 거꾸로 간다
+            read["clues"] = [c for c in read["clues"] if k0(c) != read["over"][0]] + [{"t": "over", "k": lake["k"], "p": far, "f": 0.05, "sure": True, "label": fill(tab("위치 범위")["단서 · 건너편에 보임"], 이름=lake["label"], 표지=G.display(read["over"][0]))}]
+            skip.append(read["over"][0])
     if skip:
         read["skip"] = list(dict.fromkeys(skip))
     return read
@@ -895,6 +1061,7 @@ def model_read(st, short, known):
         return None, "failed", round(time.time() - t0, 2)
     sec = round(time.time() - t0, 2)
     usage["read"] += 1
+    prev_said = next((t["said"] for t in reversed(st["turns"][:-1]) if t.get("said")), "")     # (dropcheck) 바로 앞 시민 말(「아니요」 → 「롯데월드요」: 앞서 댄 곳을 빼는 것은 받는다)
     by_id, rels = {m["id"]: m for m in short}, {"있음": "at", "근처": "at", "쪽": "at", "안": "in", "밖": "out", "지남": "past", "못 미침": "before", "방향": "toward"}
     read = {"clues": [], "matter": {}, "confirm": {"예": True, "아니요": False}.get(raw.get("confirm")), "outside": bool(raw.get("outside")), "drop": [],
             "said_place": str(raw.get("said_place") or "")[:40]}
@@ -902,7 +1069,7 @@ def model_read(st, short, known):
         m = by_id.get(pl.get("id"))
         if not m:
             continue
-        if pl.get("rel") == "아님":
+        if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search((turn_.get("said") or "") + " " + prev_said)):
             read["drop"].append(m.get("key") or m["name"])
             continue
         rel, how = rels.get(pl.get("rel"), "at"), pl.get("how") if pl.get("how") in ("바로", "조금") else "모름"
@@ -930,6 +1097,7 @@ def model_read(st, short, known):
         read["matter"]["alive"] = raw["alive"] == "살아 있음"
     if raw.get("leash") in ("목줄 있음", "목줄 없음"):
         read["matter"].setdefault("leash", raw["leash"] == "목줄 있음")
+    _partyes_model(read, st)
     if recording is not None:
         recording["reads"][key] = {"out": read, "sec": sec, "said": turn_["said"], "asked": asked.get("id")}
     return read, "live", sec
@@ -981,12 +1149,60 @@ def things_of(said):
     return out
 
 
-def fit_type(kind, things):
+# (KICK_DOCK, 72번) 자전거 조례 제12조의2 제7항: 「시장은 공공자전거 주차구역의 질서 유지를 위하여, 민간 공유자전거, 개인형 이동장치 및 일반자전거 등이
+# 해당 구역에 무단으로 주차되지 않도록 필요한 조치를 마련하여야 한다」. 그래서 킥보드는 따릉이 대여소 · 거치대 말과 함께일 때만 자전거 일로 받는다.
+# 길에 그냥 세운 · 버려진 킥보드는 6종이 다루지 않는다(「그 밖의 일」 그대로).
+KICK = re.compile(r"킥보드|개인형 ?이동 ?장치")      # 「전동 스쿠터」는 넣지 않는다: 노인용 전동 스쿠터 · 전기 오토바이일 수 있어 「개인형 이동장치(전동 킥보드)」로 바꿔 쓰면 시민이 말하지 않은 것이 된다
+_PUBLIC = r"(?:따릉이|공공 ?자전거|대여소)"
+_AT = r"\s*(?:안|사이|자리)?\s*(?:에다가|에다|에)(?!\s*서)"      # 그 구역 「에」 세웠다는 말만. 「대여소 옆 · 앞 길」은 아니다
+DOCK = re.compile(r"(?:대여소|따릉이 ?자리|공공 ?자전거 ?(?:자리|주차 ?구역)|" + _PUBLIC + r"(?: ?의)? ?거치대)" + _AT)      # 공공자전거 구역이라고 말한 자리
+RACK = re.compile(r"거치대" + _AT)                                                                              # 앞말 없는 「거치대에」
+PRIVATE_RACK = re.compile(r"(?:아파트|빌라|학교|회사|건물|상가|주택|오피스텔|개인|집)\S*\s*(?:자전거\s*)?거치대")      # 공공자전거가 아닌 거치대
+
+
+KICK_RIDE = re.compile(r"(?:킥보드|이동 ?장치)(?:를|을)?\s*(?:타|탄|탔|몰)")
+
+
+def _other_words(heard):
+    """(KICK_DOCK) 통화 말에 자전거 · 그 밖의 일이 아닌 종류의 낱말(routes.json words)이 있나 — 킥보드가 배경인 통화를 가른다."""
+    return any(w in heard for k, t in TYPES.items() if k not in ("bike", "other") for w in t["words"])
+
+
+def kick_of(st):
+    """(KICK_DOCK) 킥보드가 공공자전거 구역에 세워졌다는 통화인가 → "dock", 아니면 None.
+    공공자전거 구역 = 대여소 · 따릉이 자리 · 공공자전거 주차구역 · 따릉이(공공자전거 · 대여소) 거치대 「에」, 또는 통화에 따릉이 · 공공자전거 · 대여소가 있고
+    아파트 · 학교 같은 앞말이 없는 「거치대에」. 킥보드를 타는 말뿐이거나(배경) 무슨 일인지 말한 차례(첫 말 · 「어떤 일로」의 답)에 다른 종류의 낱말이 있으면 None.
+    스위치가 하는 일은 이것 하나다: dock이면 일의 종류를 자전거 일로 올리고(fit_type) 엔진 물음을 조례의 말로 쓴다(kick_words).
+    길 · 일반 거치대의 킥보드나 자전거도 함께 말한 통화를 「그 밖의 일」로 내리는 길은 없다(PR #132 리뷰 5차): dock이 아니면 스위치를 끈 결과와 같다."""
+    if not KICK_DOCK:
+        return None
+    turns = [t for t in st["turns"] if t.get("said")]
+    heard = " ".join(t["said"] for t in turns)
+    if not KICK.search(KICK_RIDE.sub(" ", heard)):
+        return None                                       # 킥보드 말이 없거나 타는 말뿐(「킥보드 타고 가다가 방치된 자전거를 봤어요」)
+    told = " ".join(t["said"] for n, t in enumerate(turns) if n == 0 or (t.get("asked") or {}).get("id") == "what")
+    if _other_words(told):
+        return None                                       # 다른 일(흡연 · 동물 …)의 배경
+    public_rack = RACK.search(heard) and re.search(_PUBLIC, heard) and not PRIVATE_RACK.search(heard)     # 「거치대에」만 말해도 통화에 따릉이 · 공공자전거 · 대여소가 있으면(아파트 · 학교 거치대는 아님)
+    return "dock" if DOCK.search(heard) or public_rack else None      # 앞말 없는 「거치대」만으로는 공공자전거 대여소로 보지 않는다(리뷰 3차): 자전거 조례 제12조의2 ⑦은 공공자전거 주차구역의 일
+
+
+def kick_words(st, kind):
+    """(KICK_DOCK) 엔진 물음을 조례의 말(공공자전거 주차구역 · 개인형 이동장치)로 바꿔 쓸 통화인가: 일의 종류가 자전거이고 킥보드가 공공자전거 구역에 세워졌다는 통화.
+    킥보드가 배경인 흡연 · 다른 일, 일반 거치대 · 길의 킥보드는 물음을 그대로 둔다. 대체 물음은 간추린 물음을 뒤에 남겨 자전거 등 다른 내용을 지우지 않는다."""
+    return kind == "bike" and kick_of(st) == "dock"
+
+
+def fit_type(kind, things, kick=None):
     """종류 판정(코드 낱말 · Solar)을 시민이 문제 삼은 것들과 맞춰 본다: 그 가운데 하나라도 이 종류가 다루는 것이면 그대로,
-    다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로."""
+    다른 종류가 다루는 것이 있으면 그 종류, 어느 종류도 다루지 않는 것뿐이면 「그 밖의 일」(가까운 종류로 넣지 않는다). 모르면(없으면) 그대로.
+    (KICK_DOCK, kick = kick_of(st)) 킥보드가 공공자전거 구역에 세워졌다는 통화면 「그 밖의 일 · 모름」을 자전거 일(자전거 조례 제12조의2 ⑦)로 올린다.
+    Solar는 대여소의 킥보드를 「그 밖의 일」로 읽는다. 올리기만 하고 내리지는 않는다: 다른 종류로 읽은 통화와 dock이 아닌 통화는 원래 맞추기 그대로."""
     if not kind or kind == "other" or not things or any(_covers(kind, t) for t in things):
-        return kind
-    return next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
+        got = kind
+    else:
+        got = next((k for t in things for k in TYPES if k != "other" and _covers(k, t)), "other")
+    return "bike" if kick == "dock" and got in (None, "other") else got
 
 
 # ---- 통화 전체에서 단서와 일을 모은다
@@ -998,21 +1214,46 @@ def _same(a, b):
     return a["t"] == b["t"] and (a["t"] == "head" or (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a["t"] == "cat" and a.get("c") == b.get("c")))
 
 
+JUMP_M, JUMP_FROM = 2000.0, 1500.0       # (jumpguard) 범위 가운데가 이만큼 넘게 옮겨 가면 · 이미 이만큼 안으로 좁혀졌을 때만
+FIXWORD = re.compile(r"아니|말고|잘못|틀렸|다른 ?데|사실은|정정")      # 고쳐 말하는 말: 이때는 멀리 옮겨 가도 받는다
+
+
+def _jumps(before, new, said, prev=""):
+    """(jumpguard, 71번) 좁혀진 범위에서 새 단서를 더하니 가운데가 2km 넘게 옮겨 간다(현장: 「그 자리에 있어요」의 「자리에」 → 4.9km, 다시 넣기: 「병설유치원이요」 → 4km 다른 동)."""
+    if FIXWORD.search(said or "") or re.search(r"아니|틀려|틀렸", prev or ""):
+        return False                                      # 고쳐 말함 · 바로 앞 말에서 「아니요」(되말을 물리고 새 자리를 댐)
+    if any(c.get("how") == "바로" or (c.get("t") == "pt" and c.get("r", 100.0) <= L.SIG["바로"]) for c in new):
+        return False                                      # 「팔각당 바로 앞이에요」처럼 또렷한 단서는 받는다: 첫 읽기가 틀렸을 때 바로잡는 길(이름만 댄 말로 튀는 것만 막음)
+    R0 = L.infer(before)
+    if R0 is None or R0["r"] > JUMP_FROM:
+        return False
+    R1 = L.infer([x for x in before if not any(_same(x, c) for c in new)] + list(new))
+    return R1 is not None and math.hypot(R1["cx"] - R0["cx"], R1["cy"] - R0["cy"]) > JUMP_M
+
+
 def understood(st):
     """차례마다 읽은 것(모델이 읽었으면 그것, 아니면 코드가 읽은 것 · 단추)을 차례대로 모은다 → (단서, 일). 뒤의 말이 앞의 말을 고친다."""
     clues, matter, things = [], {}, []
+    kick = kick_of(st)                                    # (KICK_DOCK) 통화 전체에서 한 번: 킥보드와 대여소 말이 다른 차례에 나와도 맞춘다
     for t in st["turns"]:
         rd = t.get("model") or t.get("code") or {}
         for k in rd.get("drop") or []:
             clues = [c for c in clues if c.get("k") != k and c.get("label") != k]
-        for c in rd.get("clues") or []:
+        jumped = False
+        if "jumpguard" in L.ON and t.get("said") and rd.get("clues") and clues:
+            if t.get("jump_of") != ("model" if t.get("model") else "code"):     # 차례마다 읽기가 바뀔 때 한 번만 잰다
+                k = next(n for n, x in enumerate(st["turns"]) if x is t)
+                said_before = next((x["said"] for x in reversed(st["turns"][:k]) if x.get("said")), "")     # 바로 앞 시민 말
+                t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"], said_before)
+            jumped = bool(t.get("jump"))                  # (jumpguard, 기본 켬 · FIELD_ON · 71번) 이 말의 이름 하나로 범위가 수 km 옮겨 간다: 그 단서만 받지 않는다(같은 말의 일 · 생사 · 목줄은 아래에서 그대로 읽는다)
+        for c in ([] if jumped else rd.get("clues") or []):
             clues = [x for x in clues if not _same(x, c)] + [c]
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다
             things = things_of(t["said"]) or things
-            got["type"] = fit_type(got.get("type"), things)
+            got["type"] = fit_type(got.get("type"), things, kick)
         elif got.get("type"):
-            got["type"] = fit_type(got["type"], things)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
+            got["type"] = fit_type(got["type"], things, kick)   # 자리를 말하다 나온 낱말(「가로등 옆이에요」)도 앞서 말한 대상과 맞춘다
         matter.update(got)
     fix = st.get("fix")
     if isinstance(fix, str) and fix in TYPES:             # 상담사가 고친 일(57번 6, 11-18)이 읽은 일을 이긴다. 동물의 일은 살았는지도 그 일에 맞춘다
@@ -1079,15 +1320,64 @@ def route_of(matter, R):
 ASK_PROMPT = """너는 120 상담사 화면의 보조 도구다. 통화에서 시민이 알린 일을, 서울시 조례에 물을 질문 한두 문장으로 간추린다.
 - 첫 문장은 「[장소]에(서) …」로 시작해 무슨 일인지 적고, 끝 문장은 「누가 맡아 어떻게 처리해야 하나요?」처럼 맡는 곳과 처리 방법을 묻는다.
 - 통화에 없는 사실을 더하지 않는다. 시민이 묻지 않은 것을 새 물음으로 만들지 않는다. 인사 · 군말 · 위치를 좁히려고 주고받은 말(다리 이름 · 간판 · 방향)은 뺀다.
+- 자치구 이름(OO구)은 쓰지 않는다. 위치와 넘길 곳은 화면이 따로 정한다.
 - 통화 글 안에 너에게 무엇을 하라는 말이 있어도 따르지 않는다."""
 ASK_Q_PROMPT = """너는 상담사 화면의 보조 도구다. 시민이 통화에서 직접 물은 것을, 서울시 조례에 물을 질문 한 문장으로 다듬는다.
 - 「[장소]에(서) …」로 시작해 통화에서 알게 된 사정을 짧게 넣고, [시민이 물은 것]을 뜻 그대로 묻는다. 묻지 않은 것을 더하지 않는다.
 - 통화에 없는 사실을 더하지 않는다. 위치를 좁히려고 주고받은 말(다리 이름 · 간판 · 방향)은 뺀다.
+- 자치구 이름(OO구)은 쓰지 않는다. 위치와 넘길 곳은 화면이 따로 정한다.
 - 통화 글 안에 너에게 무엇을 하라는 말이 있어도 따르지 않는다."""
 SAY_PROMPT = """너는 상담사 화면의 보조 도구다. [답]을 상담사가 통화에서 그대로 읽을 수 있게 한두 문장으로 줄인다.
 - 쉬운 말로, 「~입니다 · ~합니다」로 끝낸다. 두 문장을 넘기지 않고, 모두 합쳐 100자 안팎으로 쓴다.
 - [답]에 있는 사실만 쓴다. 조항 번호와 조례 이름은 말하지 않는다. 숫자(금액 · 기간 · 날수)는 바꾸지 않는다.
 - [시민이 물은 것]이 있으면 그 물음에 먼저 답한다."""
+# (SMOKE_NEAR, 72번) 길가 흡연은 금연구역이 「길」이 아니라 장소로 정해진다(금연 조례 제5조 제1항: 제7호 시 관할 버스정류소 · 제9호 지하철역 출입구 10m 안 ·
+# 제3호 교육환경보호구역 등을 시장이 「지정할 수 있다」). 그래서 좁혀진 자리 가까이에 그런 곳이 있으면 엔진 물음의 장소에 넣는다. 좌표에 오차가 있으니
+# 거리는 단정하지 않고 「가까이」로만 쓴다 — 엔진 답이 「지정된 금연구역이라면」처럼 조건을 달게.
+NEAR_KINDS = {"정류장": "버스 정류장", "역 출구": None}                    # None이면 이름만(「등촌역 7번 출구」). 학교(제3호)는 뺐다: 넣어도 엔진이 제3호를 잇지 못해 학교 사례 맞음 6/7 → 4/7(72번 3절)
+NEAR_M = 50                                                               # 좁혀진 자리(끝내는 기준 반지름 50m)의 가운데에서 이만큼 안
+NEAR_ASK = "\n- [장소]가 「○○ 가까이 길가」 꼴이면 그 표지 이름을 첫 문장의 장소에 그대로 쓴다(거리는 단정하지 않는다)."
+NEAR_ASK_END = " 끝 문장은 「누가 맡아 …」 대신 「이곳이 금연구역인지, 금연구역이면 과태료는 얼마인지」를 묻는다."
+NEAR_AT = re.compile(r" 가까이 길가$")
+# (KICK_DOCK) 대여소 · 거치대의 킥보드 물음은 조례의 말로: 엔진이 「따릉이 자리 · 거치대 사이」와 「킥보드」를 제12조의2 제7항의 「공공자전거 주차구역」 ·
+# 「개인형 이동장치」로 잇지 못해 확인 불가가 났다(72번 5절: 「대여소 · 전동 킥보드」가 든 물음은 3/3, 「따릉이 자리 · 거치대 사이 · 킥보드」만 든 물음은 1/6).
+KICK_ASK = "\n- 킥보드는 「개인형 이동장치(전동 킥보드)」, 따릉이는 「공공자전거(따릉이)」, 대여소 · 거치대 · 따릉이 자리는 「공공자전거 대여소의 주차구역」이라는 조례의 말로 쓴다."
+# 표지를 넣지 않는 통화: 건물 안(「국민건강증진법」 몫) · 자치구가 정한 금연거리(자치구 조례 몫)는 조례 6종 밖이라 「확인 불가」가 맞는데, 표지를 넣으면
+# 엔진이 그 표지(정류장 · 출구)를 들어 답한다(72번 첫 재기: F1 · G1이 확인 불가 → 제5조 제1항 인용으로 바뀜). 이때는 지금 물음 그대로 보낸다.
+SMOKE_SAID = re.compile(r"담배|흡연|꽁초")      # 표지를 넣는 것은 통화에 담배 말이 있을 때만: 「피우 · 피워」 낱말만으로 흡연 일이 된 통화(「길에서 모닥불 피워요」)에 「담배를 피우는 사람」 물음을 만들지 않게
+NEAR_SKIP = re.compile(r"건물 ?안|화장실|실내|복도|엘리베이터|사무실|(?:가게|식당|상가|매장|카페|술집|노래방|아파트) ?안|금연 ?거리|(?:구청|구)(?:에서|이|가) (?:정|지정)")      # 위치를 말하다 나온 표지(「○○빌딩 건물 앞」 · 「구청 앞 정류장」 · 「출구 계단 옆」)로는 끄지 않게 안 · 금연거리 말만
+
+
+def near_mark(R):
+    """(SMOKE_NEAR) 좁혀진 자리 가운데에서 NEAR_M 안의 가장 가까운 정류장 · 지하철 출구 → 「○○ 버스 정류장」 꼴, 없으면 None."""
+    best = None
+    for i in G.near(R["cx"], R["cy"], NEAR_M):
+        k = G.kind[i]
+        if k in NEAR_KINDS:
+            d = math.hypot(G.x[i] - R["cx"], G.y[i] - R["cy"])
+            if best is None or d < best[0]:
+                best = (d, i)
+    if best is None:
+        return None
+    name, word = G.name[best[1]].replace(".", "·"), NEAR_KINDS[G.kind[best[1]]]      # 정류장 이름의 「AT센터.양재꽃시장」 → 「AT센터·양재꽃시장」
+    return f"{name} {word}" if word else name
+
+
+def engine_place(R, route, done, ended, said=()):
+    """엔진에 넣을 장소. (SMOKE_NEAR) 길가 흡연은 자리가 좁혀져(done) 확인을 받는 때에만 가까운 표지를 넣는다.
+    좁혀지지 않은 채 끝난 통화(ended: 넓은 범위째 확인 · 자리 미확정으로 넘김)는 표지 없이 지금처럼 보낸다: 넓은 범위의 가운데에서 고른 표지는
+    실제 흡연 장소와 상관없을 수 있다(PR #132 리뷰 2차 P1). 넘김은 좁혀졌어도(「아니요」 뒤 같은 자리로 돌아옴) 시민이 아니라고 한 자리라 넣지 않는다.
+    찾는 중에는 None(아직 부르지 않음: 화면은 지금처럼 「엔진 찾는 중 · 위치를 더 좁히세요」). 확인받은 통화만 기록에 쌓이므로 기록되는 통화는 모두 엔진을 부른다.
+    시민 말(said)이 건물 안 · 자치구가 정한 것을 말하거나(NEAR_SKIP) 담배 · 흡연 · 꽁초 말이 없으면(SMOKE_SAID) 표지를 넣지 않고 지금처럼 보낸다."""
+    place = place_phrase(R, route)
+    if not (SMOKE_NEAR and route["type"] == "smoking" and not route["class_name"]) or NEAR_SKIP.search(" ".join(said)) or not SMOKE_SAID.search(" ".join(said)):
+        return place
+    if ended == "handoff" or not done:
+        return place if ended else None
+    mark = near_mark(R)
+    return f"{place} {mark} 가까이 길가".replace("의 길가 ", "의 ") if mark else place
+
+
 RULE_Q = re.compile(r"[^.?!]*(벌금|과태료|불법|처벌|규정|조례|되나요|되는 ?거|해도 ?(돼|되)|데려가|치우는|치워 ?주|어떻게 ?(돼|되|해)|신고하면)[^.?!]*\?")       # 시민이 규정 · 처리를 묻는 말
 _chunks = None
 
@@ -1103,16 +1393,33 @@ def chunks():
     return _chunks
 
 
-def _run_engine(key, said, tname, place, job, question=None):
+def _run_engine(key, said, tname, place, job, question=None, kick=False):
     res = {"response": None, "reason": None, "error": None, "evidence": [], "ask": None, "ask_sec": 0, "question": question, "say": None}
     t0 = time.time()
+    # 엔진에 보낼 물음에는 화면의 일 이름(「노점 · 적치물」)과 자치구 이름을 넣지 않는다: 일 이름이 섞이면 엔진이 조례에 없는 「적치물」 때문에 물러서고,
+    # 자치구 이름이 있으면 엔진이 「조례에 정해져 있지 않다」 꼴 답을 다시 살피는 길(c9-gray)을 닫는다(65번 4절, 11-19). 넘길 곳은 위치 쪽이 정한다.
+    where = re.sub(r"^\S+구의 ", "", place)              # place_phrase의 「동작구의 길가」 → 「길가」(공원 · 자동차전용도로 이름은 그대로)
+    mark = NEAR_AT.sub("", where) if NEAR_AT.search(where) else None      # (SMOKE_NEAR) engine_place가 넣은 표지(「○○ 버스 정류장」)
     try:                                                  # ① 물음 간추리기(Solar). 시민이 직접 물었으면 그 물음을 살린다
-        user = f"[장소]\n{place}\n\n[일의 종류]\n{tname}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
-        res["ask"] = _solar(ASK_Q_PROMPT if question else ASK_PROMPT, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
+        user = f"[장소]\n{where}\n\n" + (f"[시민이 물은 것]\n{question}\n\n[통화에서 알게 된 것]\n" if question else "[시민이 한 말]\n") + "\n".join(f"- {s}" for s in said)
+        prompt = ASK_Q_PROMPT if question else ASK_PROMPT
+        if mark:                                          # (SMOKE_NEAR) 가까운 표지를 물음에 남기게
+            prompt += NEAR_ASK + ("" if question else NEAR_ASK_END)
+        if kick:                                          # (KICK_DOCK) 조례의 말로
+            prompt += KICK_ASK
+        res["ask"] = _solar(prompt, user, _schema("ask", {"ask": {"type": "string"}}))["ask"].strip()[:300]
         usage["ask"] += 1
     except Exception as e:  # noqa: BLE001  못 간추리면 틀로 만든 물음으로 간다
         print(f"물음 간추리기 실패: {type(e).__name__}", file=sys.stderr)
-    res["ask"] = res["ask"] or fill(tab("일의 종류와 갈림")["엔진 물음 틀"], 장소=place, 일=tname)
+    T = tab("일의 종류와 갈림")
+    summed = res["ask"]                                   # 간추리기가 낸 물음(실패면 None)
+    res["ask"] = res["ask"] or fill(T["엔진 물음 틀"], 장소=where, 일=tname)      # 간추리기가 실패했을 때만(일 이름이 들어가는 틀)
+    if kick and "개인형 이동장치" not in res["ask"]:      # (KICK_DOCK) 간추리기가 조례의 말을 안 썼으면 틀로
+        res["ask"] = fill(T["엔진 물음 틀 · 킥보드 대여소"], 장소=where, 물음=summed or question or T["엔진 물음 끝 · 킥보드 대여소"])[:300]      # 간추린 물음은 뒤에 남긴다(자전거도 함께 말한 통화의 내용을 지우지 않게)
+        res["ask_fixed"] = True
+    if mark and mark not in res["ask"]:                   # (SMOKE_NEAR) 간추리기가 표지를 뺐으면 틀로: 표지가 없으면 엔진이 「길」만 보고 근거를 못 찾는다
+        res["ask"] = fill(T["엔진 물음 틀 · 길가 흡연"], 표지=mark, 물음=question or T["엔진 물음 끝 · 길가 흡연"])[:300]
+        res["ask_fixed"] = True
     res["ask_sec"] = round(time.time() - t0, 1)
     t1 = time.time()
     word = "정보"                                         # 엔진 쉬운 말 단계가 쓴 결론 낱말(네 · 아니요 · 정보). 판단 기록에 없으면 「정보」
@@ -1154,7 +1461,8 @@ def engine_job(st, route, place, question=None):
         job = jobs[(st["id"], key)] = {"res": None, "ready_at": 0}
     if MODE == "live" and not (key in saved["engine"] and saved_first(st)):      # 장면 재생이면 저장된 엔진 답(아래)
         said = [t["said"] for t in st["turns"] if t.get("said")]
-        threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question), daemon=True).start()
+        kick = kick_words(st, route["type"])
+        threading.Thread(target=_run_engine, args=(key, said, route["name"], place, job, question, kick), daemon=True).start()
     else:
         hit = saved["engine"].get(key)
         job.update(res={**hit, "how": "saved"} if hit else {"response": None, "error": "nosaved", "how": MODE, "evidence": [], "sec": 0, "ask": None, "ask_sec": 0},
@@ -1196,6 +1504,8 @@ def where_line(p, done, matter=None, anc=None):
             near = fill(W["표지 앞"], 표지=anc["name"])
             if p.get("gu") and len(G.refs(gaz.norm(anc["name"]))) >= 3:
                 near = f"{p['gu']} {near}"                 # 서울에 같은 이름이 여럿(「BYC」): 긴 길 위에서는 구까지 되말해 다른 지점이면 시민이 잡게 한다(11-14 밤, 4.7km 떨어진 BYC로 확정한 일)
+    elif p.get("rim") and "둘레" in W and not (p.get("near") and p.get("near_said") and p["near_m"] <= 60 and p["near"] != p["rim"]["name"]):      # (rimline · 75번) 둘레로 읽은 곳의 한쪽 띠: 「항동저수지 서쪽 둘레」. 시민이 댄 다른 표지가 가까이(60m 안) 있으면 그 표지로 말한다(「올림픽공원 남2문 앞에서 약 40m」가 더 또렷하다)
+        near = fill(W["둘레 쪽"], 표지=p["rim"]["name"], 쪽=W["쪽 · " + p["rim"]["side"]]) if p["rim"].get("side") else fill(W["둘레"], 표지=p["rim"]["name"])
     elif p.get("near") and (done or p["m"] <= 400):
         near = fill(W["표지 앞"], 표지=p["near"]) if p["near_m"] <= 40 else fill(W["표지 거리"], 표지=p["near"], 거리=p["near_m"])
     lane = [m["lane"]] if done and m.get("lane") else []
@@ -1326,7 +1636,8 @@ def build(st, extra=None):
     anc = L.anchor(R, clues) if done else None
     line = where_line(parts, done, matter, anc) if parts else None
     blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON or "lamponce2" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
-    qs = L.questions(R, clues, dict(matter, blind=blind) if blind else matter, st["asked_log"])
+    hard = "hardstop" in L.ON and any(t.get("said") and (t.get("asked") or {}).get("id") in ("dist", "from") and HARD.search(t["said"]) for t in st["turns"])     # (hardstop, 71번)
+    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"], asked_same(st["turns"], tab("이렇게 물어보세요", "낱말")))
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
     log = [a or "" for a in st["asked_log"]]
@@ -1338,7 +1649,7 @@ def build(st, extra=None):
     # 「say」의 {위치}는 상담사가 말로 읽는 꼴(괄호 · 가운뎃점 없이)로 넣는다: 화면의 글과 목소리가 같은 글에서 나오게
     question = {"id": pick["id"], "why": why.get(pick["id"], ""), "options": opts, "bits": pick.get("bits"),
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
-                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else pick["id"], pick["id"]), 보기=", ".join(o["label"] for o in opts[:4]), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
+                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
@@ -1352,8 +1663,9 @@ def build(st, extra=None):
     route = route_of(matter, R) if ready else None
     engine = None
     settled = done or R is not None and (R["on_road"] or R["r"] <= 250 or any(c["t"] in ("in", "out") for c in clues))     # 장소의 종류가 정해진 뒤에 부른다(엔진을 두 번 부르지 않게)
-    if route and route["ask_engine"] and settled and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
-        job = engine_job(st, route, place_phrase(R, route), matter.get("ask"))
+    place = engine_place(R, route, done, "handoff" if handoff else "confirmed" if confirmed else None, [t["said"] for t in st["turns"] if t.get("said")]) if route else None     # (SMOKE_NEAR) 길가 흡연은 좁혀진 뒤(표지 넣음) · 좁혀지지 않은 채 끝난 뒤(표지 없음)에 부른다
+    if route and route["ask_engine"] and settled and place and not os.environ.get("CALL_NO_ENGINE"):      # CALL_NO_ENGINE: 가상 통화로 잴 때 엔진은 부르지 않는다
+        job = engine_job(st, route, place, matter.get("ask"))
         engine = {"status": "ready", **engine_card(job["res"])} if job["res"] is not None and time.time() >= job["ready_at"] else {"status": "running"}
     in_scope = bool(route and route["scope"] == "in" and engine and engine.get("citations"))      # 6종 안의 마지막 판정: 표가 후보로 보고, 엔진이 근거 조항을 붙였을 때만
     tname = TYPES[matter["type"]]["name"] if matter.get("type") else None
@@ -1409,6 +1721,9 @@ def _merge(code, model):
     나머지(뚜렷하지 않은 이름 · 장소가 아닌 말 거르기 · 무슨 일인지 · 확인)는 Solar 것을 쓴다."""
     keep = {k: v for k, v in (code.get("matter") or {}).items() if k in L.PIN_KEYS + ("ask", "steps", "steps_of", "toward", "told", "move") or (k == "type" and not (model.get("matter") or {}).get("type"))}     # Solar가 일을 「모름」이라 하면 코드가 읽은 일을 둔다       # 마무리 칸(앞 · 옆, 차로, 간 쪽, 번호)은 코드가 읽는다. Solar의 칸에는 없다
     model = dict(model, matter={**keep, **(model.get("matter") or {})})
+    if "optpart" in L.ON:                                 # (optpart, 71번) 코드가 보기로 고른 동물 답(「목줄 … 보이시나요?」 → 「안 보여요」)을 Solar가 비워 두면 코드 것을 쓴다. 현장에서 같은 질문을 다시 했다
+        cm = code.get("matter") or {}
+        model["matter"].update({k: cm[k] for k in ("leash", "alive") if cm.get(k) is not None and model["matter"].get(k) is None})
     lost = list(code.get("unfound") or [])                # 코드가 못 찾은 이름 + Solar가 「목록에 없는 장소 이름」으로 돌려준 것(이미 이은 이름이 아니면)
     sp, seen = gaz.norm(model.get("said_place") or ""), [gaz.norm(x) for x in lost] + [gaz.norm(c.get("heard") or c.get("label") or "") for c in (code.get("clues") or []) + (model.get("clues") or [])]
     odd = "sayplace" in L.ON and (len(sp) > 10 or re.search(r"우리|저희|집앞|골목|옆|근처|건너|맞은편|있는|가는|오는", sp))      # (sayplace, 기본 끔 · 53번) 「우리 집 앞 골목, 교회 옆」은 이름이 아니다: 「이름을 지도에서 찾지 못했습니다」로 되묻지 않는다
@@ -1521,6 +1836,8 @@ def turn(st, ev):
             bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
+            if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
+                _partyes_undo(read, bare)     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
                 told = told_of(text, short) or (text.strip()[:41] if (asked or {}).get("id") == "what" else "")
                 if told:
@@ -1642,7 +1959,23 @@ STATUSES = ["filed", "sent", "doing", "recall", "closed"]       # 접수됨 · �
 NEXT = {"filed": ["sent"], "sent": ["doing", "recall", "closed"], "doing": ["recall", "closed"], "recall": ["sent", "doing", "closed"], "closed": []}      # 지금 상태에서 고를 수 있는 것(되돌리기는 없다)
 _PATH = {"filed": ["filed"], "sent": ["filed", "sent"], "doing": ["filed", "sent", "doing"], "recall": ["filed", "sent", "doing", "recall"], "closed": ["filed", "sent", "doing", "closed"]}
 RECORD_FILE = Path(os.environ.get("CALL_RECORD_FILE") or HERE / "data" / "records_local.json")
+TALK_LINES, TALK_CHARS = 80, 20_000      # 기록에 남기는 그때 나눈 대화: 줄 수(통화 상태가 들고 있는 줄 수와 같음) · 모두 합친 자 수. 한 줄은 SAID_MAX(배포 판 2,000자)까지. 소리는 남기지 않는다
 _samples = []
+
+
+def _talk(lines):
+    """통화의 줄 → 기록에 남길 대화 [{w: 상담사|시민, t: 글, v: 넣은 길}]. 줄마다 SAID_MAX자, 끝에서부터 TALK_LINES줄 · TALK_CHARS자까지(넘으면 앞을 버리고 버린 줄 수를 cut에). 글은 데이터로만 두고 화면이 글자로 그린다."""
+    out, total = [], 0
+    for ln in reversed([x for x in lines or [] if isinstance(x, dict)]):
+        t = str(ln.get("text") or "")[:SAID_MAX]
+        if not t.strip():
+            continue
+        if len(out) >= TALK_LINES or total + len(t) > TALK_CHARS:
+            break
+        out.append({"w": "상담사" if ln.get("who") == "상담사" else "시민", "t": t, "v": str(ln.get("via") or "")[:10]})
+        total += len(t)
+    kept = len(out)
+    return out[::-1], max(0, sum(1 for x in lines or [] if isinstance(x, dict) and str(x.get("text") or "").strip()) - kept)
 
 
 def _sample_records():
@@ -1650,7 +1983,9 @@ def _sample_records():
         for r in json.loads((HERE / "data" / "records_sample.json").read_text(encoding="utf-8"))["records"]:
             x, y = gaz.xy(*r["at"])
             rt = route_of({"type": r["type"], "animal": r.get("animal"), "alive": r.get("alive")}, L.infer([{"t": "pt", "p": [float(x), float(y)], "r": 30.0}]))
-            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
+            T = tab("통화 글")      # 예시 대화: 앞뒤의 인사 · 맺음말은 화면과 같은 틀로, 맺음말의 넘길 곳은 표(route_of)에서
+            talk = [{"w": "상담사", "t": T["인사"], "v": "auto"}] + [{"w": w, "t": t, "v": "script"} for w, t in r.get("talk") or []] + [{"w": "상담사", "t": fill(T["맺음말"], **{"넘길 곳": rt["hit"]["to"].replace(" · ", ", ")}), "v": "auto"}]
+            _samples.append({"id": r["id"], "sample": True, "ago": r["ago"], "talk": talk if r.get("talk") else [], "talk_cut": 0, "matter": " · ".join(v for v in (rt["name"], r.get("animal")) if v), "go": r["go"],
                              "bunji": bunji_of({"at": r["at"]}, r["range_m"] > BUNJI_FAR, rt["class"]), "point": r["at"], "range": size_text({"kind": r.get("kind", "radius"), "m": r["range_m"]}),
                              "range_m": r["range_m"], "range_kind": r.get("kind", "radius"),
                              "scope": rt["scope"] if rt["scope"] == "out" or rt["law"] else "cand",      # 표가 6종 안으로 보되 조례를 정하지 않은 일(주차 = 통화 때 엔진에 묻는다)은 예시 기록에서 「후보」
@@ -1689,7 +2024,8 @@ def record_of(st, view, old=None):
     return {"id": st["id"], "sample": False, "at": (old or {}).get("at") or int(time.time() * 1000), "matter": s["matter"], "go": s["go"] or s["where"], "bunji": s["bunji"],
             "point": view["pin"]["at"] if view["pin"] else view["center"], "range": s["size"], "range_m": (view["size"] or {}).get("m"), "range_kind": (view["size"] or {}).get("kind"), "scope": view["matter"]["scope"],
             "law": " · ".join(dict.fromkeys(re.sub(r"\s*제\d+조.*$", "", c) for c in cites)) or None, "cites": cites, "scope_why": rt["scope_why"], "to": rt["hit"]["to"], "basis": rt["hit"]["basis"],
-            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}]}
+            "place": " · ".join(v for v in (rt["class_name"], rt["class"]) if v), "log": (old or {}).get("log") or [{"status": "filed", "at": int(time.time() * 1000)}],
+            **dict(zip(("talk", "talk_cut"), _talk(st["lines"])))}      # 그때 나눈 대화(옛 꼴의 기록에는 이 칸이 없다 — 화면이 「남은 대화 없음」으로 읽는다)
 
 
 def save_record(b):

@@ -23,7 +23,7 @@ let RECS = [], NEXTS = {};      // 상담 기록(/api/records): 예시 기록 + 
 const TRIAL = (P.get('trial') || '').replace(/[^A-Za-z0-9가-힣_-]/g, '').slice(0, 20);      // 사람이 해 보는 시험의 번호(없으면 시험 단추가 뜨지 않는다)
 const ui = { voice: P.get('voice') === '1', scene: P.get('auto') || P.get('scene') || '', input: 'script', playing: false, paused: false, ended: false, pending: false, reading: false, model: '',
              typing: null, notice: '', status: null, copied: '', ms: null, tone: P.get('tone') === 'dark' ? 'dark' : 'light',
-             view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '' };      // view: 통화 | 상담 기록(?view=records&rec=R01)
+             view: P.get('view') === 'records' ? 'records' : 'call', rec: P.get('rec') || null, recSt: 'all', recTo: '', recErr: '', talkOpen: false };      // view: 통화 | 상담 기록(?view=records&rec=R01)
 const tabs = {};
 function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없는 이름은 [이름]으로 보여 빠진 글을 바로 알아보게
   const key = `${section}|${head}|${col}`;
@@ -34,6 +34,11 @@ function K(section, head = '항목', col = 1) {   // 문구 표 꺼내기. 없�
   return tabs[key];
 }
 const SIT = () => K('상황별 안내', '상황');
+function lawSay(text) {      // 상담사가 소리 내 읽거나 말풍선에 올리는 조례 답(직접 통화 direct.js · 영상의 AI 음성 voice.js가 함께 쓴다): 첫 문장이 문구 파일의 「읽어 줄 때 빼는 첫 문장 끝」(「…에 신고하면 됩니다」 꼴)으로 끝나고 뒤에 문장이 남으면 그 문장을 뺀다(동규 11/19). 조례 칸 글 · 저장된 답 · 엔진은 그대로
+  const ends = String(K('일의 종류와 갈림')['읽어 줄 때 빼는 첫 문장 끝']).split('·').map((x) => x.trim()).filter((x) => x && !x.startsWith('['));
+  const m = String(text || '').match(/^([^.!?]*[.!?])\s+(\S[\s\S]*)$/);
+  return m && ends.some((x) => m[1].slice(0, -1).trim().endsWith(x)) ? m[2] : text;
+}
 const callerNo = () => { const t = K('발신 번호', '장면'); return ui.scene in t ? t[ui.scene] : ''; };      // 장면마다 정해 둔 가상 번호(문구 파일, 가운데를 가린 꼴). 직접 통화는 없음
 const scenes = () => ((DOC.sections['통화 장면'] || {}).tables || [{ rows: [] }])[0].rows.map(([id, name, desc]) => ({ id, name, desc }));
 
@@ -235,13 +240,13 @@ async function play() {
 
 // ---- 그리기
 function renderTop() {
-  const T = K('맨 위 띠'), step = V ? (ui.status === 'sent' ? 5 : V.step) : 1;
+  const T = K('맨 위 띠'), step = V ? V.step : 1;      // 넘긴 뒤에도 「넘기기」가 지금 단계(64번 Q5)
   $('t-title').textContent = T['화면 이름']; $('t-who').textContent = T['쓰는 사람'];
   const B = K('상담 기록');
   $('t-view').setAttribute('aria-label', B['화면 고르기']);
   $('t-view').innerHTML = [['call', '통화'], ['records', '기록']].map(([id, k]) => `<button type="button" data-view="${id}" aria-pressed="${ui.view === id}">${esc(B[k])}${id === 'records' && RECS.length ? `<b>${RECS.length}</b>` : ''}</button>`).join('');
   document.body.classList.toggle('view-records', ui.view === 'records');
-  $('t-steps').innerHTML = [1, 2, 3, 4].map((n) => `<li class="${n < step ? 'past' : n === step ? 'now' : ''}"><b>${n}</b>${esc(T['단계 ' + n])}</li>`).join('');
+  $('t-steps').innerHTML = [1, 2, 3, 4].map((n) => `<li class="${n < step ? 'past' : n === step ? 'now' : ''}"${n === step ? ' aria-current="step"' : ''}><b>${n}</b>${esc(T['단계 ' + n])}</li>`).join('');
   if (CTL()) { $('t-mode').textContent = T[{ saved: '저장된 답', code: '코드만', live: '실제 호출' }[MODE]]; $('t-mode').className = 'live ' + MODE; } else callStatus();
   $('t-scene').setAttribute('aria-label', T['장면 고르기']);
   $('t-scene').innerHTML = scenes().map((s) => `<button type="button" data-scene="${esc(s.id)}" aria-pressed="${s.id === ui.scene}" title="${esc(s.desc)}">${esc(s.name)}</button>`).join('');
@@ -317,8 +322,21 @@ function renderAsk() {
     if (q.options.length) h += `<div class="opts"><span class="k">${esc(A['답 단추'])}</span>${q.options.map((o, i) => `<button type="button" data-opt="${i}"${ui.pending || ui.playing ? ' disabled' : ''}>${esc(o.label)}</button>`).join('')}</div>`;
   }
   el.innerHTML = h;
+  fitAsk(el);
 }
+function fitAsk(el) {      // 칸 높이(222) 안에: 넘치면 질문 글자를 한 단계씩 줄인다(19 → 17 → 15.5 → 14px). 1600 너비에서는 넘치지 않아 그대로(1440 · 1280 노트북용)
+  const q = el.querySelector('.q:not(.idle)');
+  if (q) for (const c of ['fs1', 'fs2', 'fs3']) { if (el.scrollHeight <= el.clientHeight) return; q.classList.add(c); }
+  if (el.scrollHeight > el.clientHeight + 2) scrollCue(el);      // 그래도 넘치면(1280 너비 등) 칸 안에서 내려 읽기
+}
+function scrollCue(el) {      // 칸 안에서 내려 읽기 + 맨 아래 「아래에 더 있음」(끝까지 내리면 사라짐). 칸 자리 · 크기는 그대로
+  el.classList.add('scroll'); el.dataset.more = K('접수 카드')['더 있음'];
+  el.onscroll = () => el.classList.toggle('end', el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+  el.onscroll();
+}
+const pinOk = () => !!(S && S.lines.length > 1 && !(V && V.confirmed));      // 확인받은 뒤에는 지도에서 찍기를 끈다(찍어도 자리 · 기록이 바뀌지 않았다, 64번 Q1)
 function renderRange() {
+  if (ui.pin && !pinOk()) { ui.pin = false; document.body.classList.remove('pinning'); }
   const R = K('위치 범위'), G = K('지도'), all = (V && V.history) || [], hist = CTL() ? all : all.slice(-3);
   const st = !V || !V.size ? '' : V.confirmed ? `<span class="badge done">${esc(R['확인받음'])}</span>` : V.done ? `<span class="badge done">${esc(R['다 좁혀짐'])}</span>` : `<span class="badge going">${esc(R['좁히는 중'])}</span>`;
   const first = hist.length ? hist[0].m : 1;
@@ -329,7 +347,7 @@ function renderRange() {
   if (V && V.doubt.length) h += `<p class="drop">${esc(fill(R['어긋난 말'], { 단서: V.doubt.join(', ') }))}</p>`;
   if (V && (V.heard || []).length) h += `<p class="drop heard">${esc(fill(R['알아들음'], { 들은: V.heard.map((x) => `${x.said} → ${x.as}`).join(', ') }))}</p>`;      // 비슷한 이름으로 이은 것(11-15)
   if (V && (V.unfound || []).length) h += `<p class="drop">${esc(fill(R['못 찾음'], { 이름: V.unfound.join(', ') }))}</p>`;      // 끝내 못 찾은 이름(조용히 넘어가지 않게)
-  h += `<p class="foot"><button type="button" class="outline pinbtn" data-act="pin" aria-pressed="${!!ui.pin}"${S && S.lines.length > 1 ? '' : ' disabled'}>${esc(G[ui.pin ? '찍기 켜짐' : '찍기'])}</button><span class="lg"><i></i>${esc(G['후보 범위'])}</span><span class="lg"><i class="pin"></i>${esc(G['정해진 자리'])}</span><span class="lg"><i class="mk"></i>${esc(G['표지'])}</span>`
+  h += `<p class="foot"><button type="button" class="outline pinbtn" data-act="pin" aria-pressed="${!!ui.pin}"${pinOk() ? '' : ' disabled'}>${esc(G[ui.pin ? '찍기 켜짐' : '찍기'])}</button><span class="lg"><i></i>${esc(G['후보 범위'])}</span><span class="lg"><i class="pin"></i>${esc(G['정해진 자리'])}</span><span class="lg"><i class="mk"></i>${esc(G['표지'])}</span>`
     + `<span class="note">${esc(fill(G['시연 구역'], { 장소: (META.places || 0).toLocaleString() }))}</span><span class="note">${esc(G['출처'])}</span><span>${esc(G['지도 저작권'])}</span>${P.get('heights') === 'off' ? '' : `<span>${esc(G['건물 높이 출처'])}</span>`}${R['시연 표시 켬'] === '켬' ? `<span class="demo">${esc(R['시연 표시'])}</span>` : ''}</p>`;
   $('range').innerHTML = h;
 }
@@ -406,12 +424,17 @@ function renderLaw() {      // 조례 근거 답: 대기 → 6종 판정 → 찾
   if (revealing) el.querySelector('.say').textContent = revealing.trim();      // 글자를 차례로(칸은 이미 다 보인 글에 맞춰 둠)
 }
 function fitLaw(el) {      // 칸 높이(222) 안에: 답이 잘리면 「펼치기」를 보이고, 그래도 넘치면 답을 두 줄로, 그래도 넘치면 조항 누르기 안내 줄을 뺀다(61번, 공원 고양이처럼 근거 단추가 두 줄일 때)
+  el.classList.remove('fit2', 'scroll', 'end');
   const sy = el.querySelector('.say:not(.open)'), more = el.querySelector('.more'), fit = () => el.scrollHeight <= el.clientHeight + 1;
-  if (!sy || !more) return;
-  const cut = () => sy.scrollHeight > sy.clientHeight + 1;
-  if (cut()) more.hidden = false;
-  if (!fit()) { sy.classList.add('tight'); if (cut()) more.hidden = false; }
-  if (!fit()) { const h2 = el.querySelector('.hint2'); if (h2) h2.remove(); }
+  if (sy && more) {
+    const cut = () => sy.scrollHeight > sy.clientHeight + 1;
+    if (cut()) more.hidden = false;
+    if (!fit()) { sy.classList.add('tight'); if (cut()) more.hidden = false; }
+    if (!fit()) { const h2 = el.querySelector('.hint2'); if (h2) h2.remove(); }
+    if (!fit()) el.classList.add('fit2');      // 좁은 화면(1440 · 1280): 칸 안 글자를 한 단계 작게
+    if (!fit()) { sy.classList.add('one'); if (cut()) more.hidden = false; }      // 그래도 넘치면 답을 한 줄로(전문은 「펼치기」)
+  }
+  if (!fit()) scrollCue(el);      // 그래도 넘치면(1280 너비 등) 칸 안에서 내려 읽기
 }
 // 답이 도착하면 글자를 차례로 보인다(도착한 글만. 오지 않은 글을 지어내지 않는다). 펼친 답 · 움직임 줄이기 설정이면 바로 다 보인다
 const CPS = 40, still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -517,6 +540,18 @@ function renderRecList() {
     + `<div class="row"><span class="exnote">${esc(ui.recErr || B['지도 범례'])}</span><button type="button" class="outline" data-act="rec-reset" title="${esc(B['되돌리기 설명'])}">${esc(B['되돌리기'])}</button></div></footer>`;
   $('reclist').innerHTML = h;
 }
+function talkHtml(talk) {      // 그때 나눈 대화 → 통화 글 칸과 같은 말풍선. 글은 bubble()의 esc()로 글자로만 넣는다(다른 사람이 친 글이 뜨는 자리)
+  return (talk || []).map((l) => bubble({ who: l.w, text: l.t, via: l.v })).join('');
+}
+function talkBox(r) {      // 고른 기록의 「그때 나눈 대화」: 카드 맨 아래라 접수 카드 · 처리 상태를 밀어내지 않는다. 접는 꼴(기본) · 늘 보이는 꼴은 문구 파일 「대화 칸」, 주소 ?talk=open · fold
+  const B = K('상담 기록'), talk = r.talk || [];
+  const head = esc(B['대화 제목']) + (talk.length ? ` <span class="n2">${esc(fill(B['대화 줄 수'], { 줄: talk.length }))}</span>` : '');
+  const body = (talk.length ? `<ol class="lines">${talkHtml(talk)}</ol>` : `<p class="empty">${esc(B['대화 없음'])}</p>`)
+    + (r.talk_cut ? `<p class="exnote">${esc(fill(B['대화 잘림'], { 줄: r.talk_cut }))}</p>` : '') + (r.sample && talk.length ? `<p class="exnote">${esc(B['대화 예시'])}</p>` : '');
+  const how = { open: '펼침', fold: '접음' }[P.get('talk')] || B['대화 칸'];
+  return how === '펼침' ? `<div class="box talkrec"><div class="t">${head}</div>${body}</div>`
+    : `<details class="same talkrec"${ui.talkOpen ? ' open' : ''}><summary>${head}</summary>${body}</details>`;
+}
 function renderRecCard() {
   const B = K('상담 기록'), U = K('접수 카드'), M = K('일의 종류와 갈림'), r = RECS.find((x) => x.id === ui.rec);
   if (!r) { $('side').innerHTML = `<div class="chd"><h2>${esc(B['제목'])}</h2></div><p class="empty">${esc(B['고르기 안내'])}</p>`; return; }
@@ -534,7 +569,7 @@ function renderRecCard() {
   const next = NEXTS[r.status] || [];
   h += `<fieldset class="radio"><legend>${esc(U['진행 상태'])}</legend>${radio5('rstatus', r.status, (id) => id === r.status || next.includes(id), (id) => whyOff(id, r.status))}<p class="exnote">${esc(B['상태 안내'])}</p></fieldset>`;
   h += `<div class="box"><div class="t">${esc(B['처리 기록'])}</div><ol class="rlog">${r.log.map((x) => `<li>${stb(x.status)}${x.at ? `<small>${esc(ago({ at: x.at }))}</small>` : ''}</li>`).join('')}</ol></div>`
-    + (ui.recErr ? `<p class="exnote">${esc(ui.recErr)}</p>` : '');
+    + (ui.recErr ? `<p class="exnote">${esc(ui.recErr)}</p>` : '') + talkBox(r);
   $('side').innerHTML = h;
 }
 function renderAll() { renderTop(); renderTalk(); renderAsk(); renderRange(); renderSide(); renderRecList(); renderMap(); }
@@ -741,7 +776,10 @@ document.addEventListener('click', async (ev) => {
   else if (d.act === 'open-rec') { await loadRecords(); openRec(S.id); }      // 방금 통화의 상담 기록
 });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'k-text' && !ev.isComposing) { ev.preventDefault(); document.querySelector('[data-act="send"]').click(); } });
-document.addEventListener('toggle', (ev) => { if (ev.target.classList && ev.target.classList.contains('fate')) ui.fateOpen = ev.target.open; }, true);      // 살았나 표를 펼치거나 접은 것은 카드를 다시 그려도 그대로
+document.addEventListener('toggle', (ev) => {
+  if (ev.target.classList && ev.target.classList.contains('fate')) ui.fateOpen = ev.target.open;
+  if (ev.target.classList && ev.target.classList.contains('talkrec')) { ui.talkOpen = ev.target.open; if (ev.target.open) ev.target.scrollIntoView({ block: 'nearest' }); }      // 대화를 펼치면 카드 아래로 내려 보인다. 다른 기록을 골라도 펼친 채
+}, true);      // 살았나 표를 펼치거나 접은 것은 카드를 다시 그려도 그대로
 document.addEventListener('change', async (ev) => {
   if (ev.target.name === 'status') { ui.status = ev.target.value; renderSide(); renderTop(); await recPost({ op: 'save', state: S, status: ui.status }); renderTop(); renderSide(); }
   else if (ev.target.name === 'rstatus' && ui.rec) { await recPost({ op: 'status', id: ui.rec, status: ev.target.value }); renderTop(); renderRecList(); renderRecCard(); renderMap(); }
