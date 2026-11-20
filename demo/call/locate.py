@@ -351,7 +351,7 @@ def _context(clues):
     bp = set()
     if "bridgeline" in ON:                               # (bridgeline · 75번) 공원 · 광장 말(그 구역의 상자에서 100m 안)이나 길 이름(그 길이 다리 면에서 60m 안을 지남)과 함께 나온 다리: 「망원한강공원 … 양화대교 밑」 · 「도림천 자전거길 … 도림천고가도로교 밑」
         boxes = [ar["box"] for c in clues if "k" in c and c["t"] in ("at", "rim", "core") for ar in _parks_of(c["k"])] + [area_of(c["a"])["box"] for c in clues if c["t"] == "in" and c["a"][0] == "park"]
-        lines = [G.road_xy(i) for c in clues if c["t"] == "at" and "k" in c for i in resolve(c["k"])["roads"]]      # 이름이 길이면서 점이기도 한 것(「도림천 자전거길」)까지
+        lines = [G.road_xy(i) for c in clues if c["t"] == "at" and "k" in c for i in resolve(c["k"])["roads"]] if "bridgeroad" in ON else []      # 이름이 길이면서 점이기도 한 것(「도림천 자전거길」)까지  (bridgeroad · 75번 후보 2: 길 이름과 함께 나온 다리. 끄면 #138처럼 공원 · 광장 말과 함께일 때만)
         for n, c in enumerate(clues) if boxes or lines else ():
             if c["t"] == "at" and "k" in c:
                 for i in resolve(c["k"]).get("ids") or ():
@@ -897,7 +897,8 @@ EDGE_ON = "trailword,compass,edgeband,lakerim,selfname,bigdist,ringdone,rimask,r
 SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (sameopts) 보기를 내미는 위치 질문. 열린 질문(mark · station)은 답이 달라질 수 있어 뺀다
 ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 # sameopts(기본 끔 · 75번): 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same). 영동1교 통화의 같은 「어느 쪽」 질문 되풀이는 없어지지만 가상 600통에서 한 점 421 · 397 · 416 → 414 · 390 · 405, 틀린 확정 0 · 0 · 5 → 0 · 0 · 6이라 켜지 않았다(같은 질문을 다시 물어 같은 답을 한 번 더 세는 것이 지금은 범위를 좁히는 데 쓰이고 있다)
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + ASK_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
@@ -1726,9 +1727,14 @@ def selftest():
     Ru, i_br = infer(under), resolve(k("양화대교"))["ids"][0]
     assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
     path = [{"t": "at", "k": k("도림천 자전거길")}, {"t": "at", "k": k("도림천고가도로교"), "how": "바로"}]      # 길 이름 + 다리 밑: 그 길이 다리 면 아래를 지나는 구간(이 고가는 하천 위로 길게 놓여 한 점이 아니다). 다리 가운데 한 점으로 끝내지 않는다
+    had_br = "bridgeroad" in ON                               # (bridgeroad) 끄면 길 이름과 함께 나온 다리는 전처럼 가운데 한 점
+    ON.discard("bridgeroad")
+    assert not infer(path)["ctx"]["bp"] and is_done(infer(path))
+    ON.add("bridgeroad")
     Rp2, i_b2 = infer(path), resolve(k("도림천고가도로교"))["ids"][0]
     assert Rp2["ctx"]["bp"] == {1} and not is_done(Rp2) and float(bridge_dist(i_b2, Rp2["x"][Rp2["cred"]], Rp2["y"][Rp2["cred"]]).max()) <= 80, (Rp2["ctx"]["bp"], Rp2["r"])
     assert is_done(infer(path[1:])) and not infer(path[1:])["ctx"]["bp"]
+    (ON.add if had_br else ON.discard)("bridgeroad")
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
     long1, short1 = [{"t": "at", "k": k("보라매고가"), "how": "바로"}], [{"t": "at", "k": k("묵동교"), "how": "바로"}]      # (bridgelong, 기본 끔) 긴 다리 · 고가는 혼자 나와도 면으로
