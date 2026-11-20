@@ -781,6 +781,28 @@ def reread_guards():
     print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 「출구 쪽」으로 읽은 번 {v18b['radius']}m · 자리만 말한 차례 뒤 일 {kind} · {k10} · 「편의점 바로 앞」 {vc['radius']}m")
 
 
+def seen_wide():
+    """(seenwide, 79번 · 80번 c16) 「바로 앞에 뭐가 보이세요?」에 「○○ 보여요」만 답했는데 Solar가 그 보기를 고르면, 켜면 「바로 앞」(18m)이 아니라 「보임」 폭으로 받는다. 「바로 앞이에요」는 켜도 그대로."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    opt = {"label": "송파나루공원 서울놀이마당", "set": {"clues": [{"t": "pt", "p": [0.0, 0.0], "r": S.L.SIG["바로"], "label": "송파나루공원 서울놀이마당"}]}}
+    real, mode = S._solar, S.MODE
+    S._solar = lambda system, user, schema: {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "places": [], "choice": "o1", "confirm": "없음", "outside": False, "said_place": ""}
+    S.MODE = "live"
+    try:
+        r = {}
+        for said in ("서울놀이마당 보여요", "서울놀이마당 바로 앞이에요"):
+            st = {"id": "check-seen", "lines": [{"who": "상담사", "text": "바로 앞에 뭐가 보이세요?"}, {"who": "시민", "text": said}], "turns": [{"said": said, "asked": {"id": "finer", "options": [opt]}}]}
+            read, _, _ = S.model_read(st, [], "없음")
+            r[said] = next(c["r"] for c in read["clues"] if c.get("label") == opt["label"])
+    finally:
+        S._solar, S.MODE = real, mode
+    assert r["서울놀이마당 보여요"] == (S.L.SIG["보임"] if "seenwide" in S.L.ON else S.L.SIG["바로"]), r
+    assert r["서울놀이마당 바로 앞이에요"] == S.L.SIG["바로"], r
+    print(f"  ✓ 「○○ 보여요」만 답한 차례의 Solar 보기 고르기(seenwide {'seenwide' in S.L.ON}): 「보여요」 {r['서울놀이마당 보여요']:.0f}m 폭 · 「바로 앞이에요」 {r['서울놀이마당 바로 앞이에요']:.0f}m 폭")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -819,6 +841,7 @@ def main():
         switches()
         bind_choice()
         reread_guards()
+        seen_wide()
         edge_reads()
         ask_fixes()
         ask_less()
