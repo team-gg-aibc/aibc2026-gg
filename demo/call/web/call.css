@@ -406,3 +406,11 @@ body:not(.view-records) #ask.scroll { overflow-y: auto; scrollbar-width: thin; }
   body.view-records #reclist .recs { flex: none; overflow: visible; }      /* 낮은 칸에서도 기록 줄이 밀려 사라지지 않게 칸 전체를 내려 읽는다 */
   body.view-records #side { left: 8px; right: 8px; width: auto; top: calc(42% + 8px); bottom: 8px; }
 }
+/* 통화 화면 · 휴대폰 세로(폭 600px 아래): 오른쪽 접수 카드 칸이 대화 칸과 입력 칸을 덮던 것 — 대화 칸(입력 칸 포함)을 위, 접수 카드를 아래로 쌓는다.
+   가운데 칸(지금 물을 말 · 조례 근거 답 · 위치 범위)은 이 폭에 놓을 자리가 없어 감춘다. 직접 통화에서는 질문 · 조례 답이 대화 칸에 상담사 말로 함께 오른다.
+   자리만 바꾸고 꾸밈은 그대로. 넓은 화면 · 휴대폰 가로(812)는 그대로(11-21) */
+@media (max-width: 600px) {
+  body:not(.view-records) #talk { left: 8px; right: 8px; width: auto; bottom: 42%; }
+  body:not(.view-records) #side { left: 8px; right: 8px; width: auto; top: calc(58% + 8px); bottom: 8px; }
+  body:not(.view-records) #ask, body:not(.view-records) #law, body:not(.view-records) #range { display: none; }
+}
