@@ -123,6 +123,30 @@ def chips_only(first):
     print("  ✓ 첫 말 뒤로 단추만 눌러 로드킬 장면 끝까지")
 
 
+def field_fixes():
+    """(71번) 기본으로 켠 현장 실패 꼴 고침 가운데 코드로 도는 셋: 흔한 말(commonshop) · 튐 막기(jumpguard) · 목줄 짧은 답(optpart). Solar 「아님」 확인(dropcheck)은 Solar 길에서만 돈다."""
+    far = lambda a, b: ((a[0] - b[0]) * 88200) ** 2 + ((a[1] - b[1]) * 111000) ** 2 > 2000 ** 2      # noqa: E731
+    say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
+    st, view = say({"id": "check-field"}, "상도1동주민센터 바로 앞이에요. 고양이가 다쳐서 웅크리고 있어요")
+    c0 = view["center"]
+    st, view = say(st, "네, 지금도 그 자리에 있어요")
+    assert view["chips"] == ["상도1동주민센터"] and not far(view["center"], c0), (view["chips"], view["center"])      # 「자리에」를 가게 이름으로 읽지 않는다(현장: 4.9km 다른 동으로 확정)
+    _, v2 = say(st, "잠실역이요")
+    assert not far(v2["center"], c0), v2["center"]                                   # 좁혀진 뒤 이름만 댄 먼 곳으로 튀지 않는다
+    _, v3 = say(st, "아니요, 잘못 말했어요. 잠실역이에요")
+    assert far(v3["center"], c0) and "잠실역" in v3["chips"], (v3["center"], v3["chips"])      # 고쳐 말하면 받는다
+    st, view = say({"id": "check-jump-matter"}, "상도1동주민센터 바로 앞이에요")
+    c1 = view["center"]
+    _, view = say(st, "잠실역 쪽인데 고양이가 죽어 있어요")
+    assert not far(view["center"], c1) and view["matter"].get("type") == "carcass" and view["matter"].get("alive") is False, (view["center"], view["matter"])      # 튐을 막은 말이라도 같은 말의 일 · 생사는 읽는다(#134 리뷰)
+    st, view = say({"id": "check-leash"}, "뚝섬역 1번 출구 바로 앞에 개가 돌아다니고 있어요")
+    assert view["question"]["id"] == "leash", view["question"]
+    st, view = turn(st, line={"who": "상담사", "text": view["question"]["say"]})
+    st, view = say(st, "안보여요")
+    assert view["matter"].get("leash") is False and view["question"]["id"] != "leash", (view["matter"], view["question"])      # 목줄 질문의 「안보여요」를 답으로(같은 질문을 다시 묻지 않는다)
+    print("  ✓ 현장 실패 꼴 고침: 「자리에」 안 읽음 · 이름만 댄 먼 곳으로 안 튐(같은 말의 일은 읽음) · 고쳐 말하면 옮김 · 목줄 「안보여요」를 답으로")
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -359,6 +383,7 @@ def main():
         ends = {name: play(name, text["scripts"][name], greeting) for name in EXPECT}
         chips_only("강변북로에 고양이가 차에 치여서 죽어 있어요.")      # 단추만으로 가려면 첫 말에 큰 장소는 있어야 한다
         free_text()
+        field_fixes()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])

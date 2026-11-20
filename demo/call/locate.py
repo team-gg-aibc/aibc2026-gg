@@ -156,6 +156,8 @@ def _sigma(c, kinds):
     if c.get("sig"):
         return float(c["sig"])                            # 단서가 폭을 들고 왔다(열린 확인 2판의 「보이는 둘레」)
     how = c.get("how") or "모름"
+    if how in ("보임", "모름", "근처") and "farsee" in ON and str(c.get("k") or "").split("|")[0] in G.far_seen():
+        return 600.0                                      # (farsee, 기본 끔 · 71번) 「롯데타워가 보여요」 · 「잠실롯데타워요」: 이름난 큰 건물은 멀리서도 보여 그 이름을 댄다(현장 4번 통화의 자리는 타워에서 566m). 「바로 앞」이라고 하면 그대로
     if kinds and all(k == "별명" for k in kinds) and how != "바로":
         return 25.0                                       # 상담사가 확인받은 자리에 붙인 별명: 그 자리 둘레(핀의 오차쯤)
     if how in ("모름", "근처", "가까이") and kinds:
@@ -747,9 +749,12 @@ SPEECH_ON = ("facil,exitfix,walkmin,nowthere,passby,notbut,across,fromto,branch,
              ",addrread,addrline"                         # 주소를 말하면 읽기(묻지는 않는다) + 주소 표에 없는 건물번호를 같은 길의 번호 사이로 어림
              ",fillerlist,finerkeep,choicekeep")          # Solar가 다시 읽을 때 코드 읽기의 규칙 셋이 풀리던 것(실제 호출 길)
 STT_ON = "anizone,sttname,sttjosa,numword,bigplace"      # 받아쓰기가 틀린 글 넷 + 큰 장소의 넓이(11-19 동규, 60번). 끄려면 CALL_ON에 이것을 뺀 목록을 준다
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+FIELD_ON = "commonshop,jumpguard,dropcheck,optpart"     # 11/19 현장 테스트 실패 꼴 고침 묶음 가(11-20, 71번): 흔한 말 · 튐 막기 · Solar 「아님」 확인 · 보기 일부 답. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
+if "wikialias" in ON:
+    G.add_wiki()                                          # (wikialias, 기본 끔 · 71번) 위키 별칭 사전(data/seoul/wiki_alias.tsv.gz)을 이름 색인에
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]
 
 
@@ -874,6 +879,8 @@ def questions(R, clues, matter, asked=()):
     if "seenonce" in ON:                                  # (seenonce, 기본 끔 · 47번 방법 1) 시민 둘레는 통화 내내 같다: 「안 보여요」 · 「번호 못 봤어요」를 한 번 들은 열린 질문은 다시 묻지 않는다
         blind = set(matter.get("blind") or ())
         miss |= ({"mark", "finer", "mark_again"} if blind & {"mark", "finer", "mark_again"} else set()) | (blind & {"lampno"})
+    if "hardstop" in ON and matter.get("hard"):
+        miss |= {"dist", "from"}                          # (hardstop, 기본 끔 · 71번) 「멀리 보이기만 해요」 · 「가운데요」라고 한 시민에게 몇 걸음 · 어느 쪽을 다시 묻지 않는다
     if zone and "zone" in miss:
         zone = None
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지

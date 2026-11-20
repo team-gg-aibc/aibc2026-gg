@@ -153,6 +153,8 @@ MOVE = (("걷기", re.compile(r"걸어|걷다|걷는|걸으|걷고|산책|도보
 FILLER = re.compile(r"(?<![가-힣A-Za-z0-9])(음+|어+|으음|그+|저+|그러니까|뭐지|뭐더라|아마)(?:…|\.{2,}|,)*(?![가-힣A-Za-z0-9])")      # 군말: 이름 사이에 끼어도(「마들역 어… 5번 출구」) 지우고 읽는다(코드 읽기만. Solar에는 말 그대로)
 FIXED_TAIL = re.compile(r"(?:아\s*)?(?:아니다|아니고|아니지|아니라|말고)[\s,.!]*")      # 보기 답 속의 「아 아니다」: 그 뒤의 말로 고른다(「구리 방향이요. 아 아니다, 일산 방향이요」)
 UNSAID = re.compile(r"^(은|는|이|가|도|요|이요)?아?(아니(?!면)|말고)")      # 이름 바로 뒤의 「아 아니다 · 아니고 · 말고」: 스스로 고친 이름(11-15)
+NEGWORD = re.compile(r"아니|아닌|말고|틀려|틀렸|잘못|없|안 ?보|못 ?봤|다른 ?데|지났")      # (dropcheck, 71번) Solar의 「아님」을 받을 만한 말(「지났」은 「○○은 지났어요」로 그곳을 뺄 때)
+HARD = re.compile(r"멀리 ?보이기만|가운데|모르겠|몰라")      # (hardstop, 71번) 몇 걸음 · 어느 쪽에 답하기 어렵다는 말
 NOTSEEN = re.compile(r"안 ?보여|안 ?보이|못 ?봤|못 ?보겠|없어요")      # (seenonce) 둘레에 댈 것이 없다는 답
 RETRACT = re.compile(r"(아까|방금|처음에?|앞에서)\s*(제가\s*)?(말씀드린|말한|말했던|얘기한|한)?\s*(거기|데|곳|자리|거|건|그곳)?\s*(는|은)?\s*(아니|틀렸|잘못)|잘못\s*(말|얘기)했")     # 「아까 거기 아니에요」: 앞 차례에 한 자리 말을 거둔다
 
@@ -489,6 +491,8 @@ def code_read(said, asked, short, R):
         pick = 1 if re.search(ALIVE[0], said) else 0 if re.search(ALIVE[1], said) else None
     elif q.get("id") == "leash":
         pick = None if "목줄" not in said and "인식표" not in said else 1 if re.search(r"없|안 ?보|안 ?하|안 ?했", said) else 0
+        if pick is None and "optpart" in L.ON:           # (optpart, 71번) 「목줄이나 인식표가 보이시나요?」에 「안 보여요」만: 현장에서 같은 질문을 다시 했다
+            pick = 1 if re.search(r"안 ?보|없|못 ?봤", said) else 0 if re.search(r"^\s*(네|예|응)|있어|있습|보여|보입", said) else None
     elif q.get("id") == "seen":
         pick = 1 if re.search(r"안 ?보|없|아니|못 ?봤", said) else 0 if re.search(r"보여|보이|보입|있어|있습|^\s*(네|예|응)", said) else None
     elif q.get("id") == "ago" and opts:
@@ -581,6 +585,10 @@ def code_read(said, asked, short, R):
         hit = [n for n, o in enumerate(opts) if len(gaz.norm(o["label"])) >= 3 and (lab := gaz.norm(re.sub(r" 쪽$", "", o["label"]))) in said_n
                and not any(lab in k and lab != k for k in longer)]      # 「하월곡분기점」을 말했는데 보기 「하월곡」을 고른 것으로 읽지 않는다(다른 이름의 일부일 뿐)
         pick = hit[0] if len(hit) == 1 else None
+        if pick is None and "optpart" in L.ON and q.get("id") in ("either", "from"):     # (optpart, 71번) 둘 중 · 어느 쪽 보기의 이름 일부만 댄 답(「병설유치원이요」 → 「서울신천초등학교병설유치원 쪽」): 한 보기에만 들면 그것. 현장에서 같은 질문을 다시 했다. 「바로 앞」 보기(finer · mark)는 넣지 않는다(「○○ 근처예요」가 바로 앞 한 점이 되어 600통 틀린 확정 5 → 9)
+            toks = {t for _, forms, _, _ in gaz.phrases(said) for t in forms if len(t) >= 3}
+            part = [n for n, o in enumerate(opts) if any(t in gaz.norm(re.sub(r" 쪽$", "", o.get("label") or "")) for t in toks)]
+            pick = part[0] if len(part) == 1 else None
         if pick is None and q.get("id") == "between":       # 「A는 지났고요, B는 아직이요」: 보기의 두 이름이 다 나오면 그 보기의 자리로 읽는다(이름으로 다시 찾으면 같은 이름의 다른 다리를 잡는다, 11-15)
             both = [n for n, o in enumerate(opts) if " ~ " in o["label"] and all(gaz.norm(w) and gaz.norm(w) in said_n for w in o["label"].split(" ~ "))]
             if len(both) == 1:
@@ -897,6 +905,7 @@ def model_read(st, short, known):
         return None, "failed", round(time.time() - t0, 2)
     sec = round(time.time() - t0, 2)
     usage["read"] += 1
+    prev_said = next((t["said"] for t in reversed(st["turns"][:-1]) if t.get("said")), "")     # (dropcheck) 바로 앞 시민 말(「아니요」 → 「롯데월드요」: 앞서 댄 곳을 빼는 것은 받는다)
     by_id, rels = {m["id"]: m for m in short}, {"있음": "at", "근처": "at", "쪽": "at", "안": "in", "밖": "out", "지남": "past", "못 미침": "before", "방향": "toward"}
     read = {"clues": [], "matter": {}, "confirm": {"예": True, "아니요": False}.get(raw.get("confirm")), "outside": bool(raw.get("outside")), "drop": [],
             "said_place": str(raw.get("said_place") or "")[:40]}
@@ -904,7 +913,7 @@ def model_read(st, short, known):
         m = by_id.get(pl.get("id"))
         if not m:
             continue
-        if pl.get("rel") == "아님":
+        if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search((turn_.get("said") or "") + " " + prev_said)):
             read["drop"].append(m.get("key") or m["name"])
             continue
         rel, how = rels.get(pl.get("rel"), "at"), pl.get("how") if pl.get("how") in ("바로", "조금") else "모름"
@@ -1048,6 +1057,23 @@ def _same(a, b):
     return a["t"] == b["t"] and (a["t"] == "head" or (a.get("k") is not None and a.get("k") == b.get("k")) or (a.get("p") is not None and a.get("p") == b.get("p")) or (a["t"] == "cat" and a.get("c") == b.get("c")))
 
 
+JUMP_M, JUMP_FROM = 2000.0, 1500.0       # (jumpguard) 범위 가운데가 이만큼 넘게 옮겨 가면 · 이미 이만큼 안으로 좁혀졌을 때만
+FIXWORD = re.compile(r"아니|말고|잘못|틀렸|다른 ?데|사실은|정정")      # 고쳐 말하는 말: 이때는 멀리 옮겨 가도 받는다
+
+
+def _jumps(before, new, said, prev=""):
+    """(jumpguard, 71번) 좁혀진 범위에서 새 단서를 더하니 가운데가 2km 넘게 옮겨 간다(현장: 「그 자리에 있어요」의 「자리에」 → 4.9km, 다시 넣기: 「병설유치원이요」 → 4km 다른 동)."""
+    if FIXWORD.search(said or "") or re.search(r"아니|틀려|틀렸", prev or ""):
+        return False                                      # 고쳐 말함 · 바로 앞 말에서 「아니요」(되말을 물리고 새 자리를 댐)
+    if any(c.get("how") == "바로" or (c.get("t") == "pt" and c.get("r", 100.0) <= L.SIG["바로"]) for c in new):
+        return False                                      # 「팔각당 바로 앞이에요」처럼 또렷한 단서는 받는다: 첫 읽기가 틀렸을 때 바로잡는 길(이름만 댄 말로 튀는 것만 막음)
+    R0 = L.infer(before)
+    if R0 is None or R0["r"] > JUMP_FROM:
+        return False
+    R1 = L.infer([x for x in before if not any(_same(x, c) for c in new)] + list(new))
+    return R1 is not None and math.hypot(R1["cx"] - R0["cx"], R1["cy"] - R0["cy"]) > JUMP_M
+
+
 def understood(st):
     """차례마다 읽은 것(모델이 읽었으면 그것, 아니면 코드가 읽은 것 · 단추)을 차례대로 모은다 → (단서, 일). 뒤의 말이 앞의 말을 고친다."""
     clues, matter, things = [], {}, []
@@ -1056,7 +1082,14 @@ def understood(st):
         rd = t.get("model") or t.get("code") or {}
         for k in rd.get("drop") or []:
             clues = [c for c in clues if c.get("k") != k and c.get("label") != k]
-        for c in rd.get("clues") or []:
+        jumped = False
+        if "jumpguard" in L.ON and t.get("said") and rd.get("clues") and clues:
+            if t.get("jump_of") != ("model" if t.get("model") else "code"):     # 차례마다 읽기가 바뀔 때 한 번만 잰다
+                k = next(n for n, x in enumerate(st["turns"]) if x is t)
+                said_before = next((x["said"] for x in reversed(st["turns"][:k]) if x.get("said")), "")     # 바로 앞 시민 말
+                t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"], said_before)
+            jumped = bool(t.get("jump"))                  # (jumpguard, 기본 켬 · FIELD_ON · 71번) 이 말의 이름 하나로 범위가 수 km 옮겨 간다: 그 단서만 받지 않는다(같은 말의 일 · 생사 · 목줄은 아래에서 그대로 읽는다)
+        for c in ([] if jumped else rd.get("clues") or []):
             clues = [x for x in clues if not _same(x, c)] + [c]
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다
@@ -1444,7 +1477,8 @@ def build(st, extra=None):
     anc = L.anchor(R, clues) if done else None
     line = where_line(parts, done, matter, anc) if parts else None
     blind = sorted({t["asked"]["id"] for t in st["turns"] if t.get("said") and (t.get("asked") or {}).get("id") in ("mark", "finer", "mark_again", "lampno") and NOTSEEN.search(t["said"])}) if "seenonce" in L.ON or "lamponce2" in L.ON else []     # (seenonce) 「안 보여요」 · 「못 봤어요」라고 답한 열린 질문(47번 방법 1). 「모르겠어요」는 넣지 않는다(다시 물으면 답할 수 있다)
-    qs = L.questions(R, clues, dict(matter, blind=blind) if blind else matter, st["asked_log"])
+    hard = "hardstop" in L.ON and any(t.get("said") and (t.get("asked") or {}).get("id") in ("dist", "from") and HARD.search(t["said"]) for t in st["turns"])     # (hardstop, 71번)
+    qs = L.questions(R, clues, dict(matter, **({"blind": blind} if blind else {}), **({"hard": True} if hard else {})), st["asked_log"])
     last = st["turns"][-1] if st["turns"] and st["turns"][-1].get("said") else {}
     lost = (last.get("model") or last.get("code") or {}).get("unfound") or []
     log = [a or "" for a in st["asked_log"]]
@@ -1528,6 +1562,9 @@ def _merge(code, model):
     나머지(뚜렷하지 않은 이름 · 장소가 아닌 말 거르기 · 무슨 일인지 · 확인)는 Solar 것을 쓴다."""
     keep = {k: v for k, v in (code.get("matter") or {}).items() if k in L.PIN_KEYS + ("ask", "steps", "steps_of", "toward", "told", "move") or (k == "type" and not (model.get("matter") or {}).get("type"))}     # Solar가 일을 「모름」이라 하면 코드가 읽은 일을 둔다       # 마무리 칸(앞 · 옆, 차로, 간 쪽, 번호)은 코드가 읽는다. Solar의 칸에는 없다
     model = dict(model, matter={**keep, **(model.get("matter") or {})})
+    if "optpart" in L.ON:                                 # (optpart, 71번) 코드가 보기로 고른 동물 답(「목줄 … 보이시나요?」 → 「안 보여요」)을 Solar가 비워 두면 코드 것을 쓴다. 현장에서 같은 질문을 다시 했다
+        cm = code.get("matter") or {}
+        model["matter"].update({k: cm[k] for k in ("leash", "alive") if cm.get(k) is not None and model["matter"].get(k) is None})
     lost = list(code.get("unfound") or [])                # 코드가 못 찾은 이름 + Solar가 「목록에 없는 장소 이름」으로 돌려준 것(이미 이은 이름이 아니면)
     sp, seen = gaz.norm(model.get("said_place") or ""), [gaz.norm(x) for x in lost] + [gaz.norm(c.get("heard") or c.get("label") or "") for c in (code.get("clues") or []) + (model.get("clues") or [])]
     odd = "sayplace" in L.ON and (len(sp) > 10 or re.search(r"우리|저희|집앞|골목|옆|근처|건너|맞은편|있는|가는|오는", sp))      # (sayplace, 기본 끔 · 53번) 「우리 집 앞 골목, 교회 옆」은 이름이 아니다: 「이름을 지도에서 찾지 못했습니다」로 되묻지 않는다
