@@ -1288,9 +1288,6 @@ PIN_KEYS = ("side", "lane", "went", "plate", "same")     # 마무리 질문의 �
 KIND_WORD = {"역 출구": "지하철 출구", "정류장": "버스 정류장", "역": "역", "다리": "다리", "나들목": "나들목", "교차로": "교차로"}
 
 
-SAID_NEAR = 50.0     # (saidanchor) 시민이 최근에 댄 이름을 확정 문장의 기준으로 먼저 쓰는 거리(범위 가운데에서)
-
-
 def anchor(R, clues):
     """확정 문장의 기준이 될 「이름 붙은 한 점」: 시민이 말한 표지 가운데 가장 가까운 것(80m 안), 없으면 눈에 띄는 가까운 곳(60m 안).
     → {name, p, d, tight, ext} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다. ext = (bigplace) 그 표지가 넓은 장소면 그 크기(m), 아니면 0 — 넓은 장소의 「바로 앞」은 p가 아니다."""
@@ -1304,10 +1301,10 @@ def anchor(R, clues):
             continue                                      # (twinsanchor, 기본 끔 · 53번) 둘레 300m에 같은 이름이 또 있으면 그 이름으로 되말하지 않는다. twins에서 떼어 냈다: 공원 안에서 확인 문장의 기준 이름이 시민에게 안 보이는 것으로 바뀌어 맞는 자리에 「아니요」를 받았다
         if "p" in c and lab:
             e = _flat(c)                                      # (bigplace) 넓은 장소를 「바로 앞」이라고 한 단서면 그 크기만큼은 「그 장소 앞」으로 친다(「근처」처럼 넓게 말한 단서는 전처럼 그 한 점까지의 거리)
-            said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, _flat(c, SIG["바로"])))
+            said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, _flat(c, SIG["바로"]), bool(c.get("offopt"))))
         elif "k" in c:
             r = resolve(c["k"])
-            many = "saidanchor" in ON and c["t"] == "at" and len(r["x"]) > 40      # (saidanchor) 지점이 많은 상표(CU 3,566곳 · 우리은행 211곳)도 가운데 가까운 지점이면 기준으로(지점 이름까지 되말함)
+            many = "saidanchor" in ON and c.get("offopt") and c["t"] == "at" and len(r["x"]) > 40      # (saidanchor) 보기 밖에서 댄 상표는 지점이 많아도(CU 3,566곳) 가운데 가까운 지점이면 기준으로(지점 이름까지 되말함)
             if (0 < len(r["x"]) <= 40 or many) and not r["areas"] and not _pk(r):
                 j = int(np.argmin(np.hypot(r["x"] - x, r["y"] - y)))
                 q = _pos_near(ctx, n, x, y) or (float(r["x"][j]), float(r["y"][j]))
@@ -1319,10 +1316,8 @@ def anchor(R, clues):
                     lab = full                                 # 같은 상표가 여럿이면 지점 이름까지 되말한다(「BYC 바로 앞」 → 「BYC 천호점 바로 앞」: 4.7km 떨어진 다른 지점으로 확정한 일, 11-14 밤)
                 ext = _exts(r, _sigma(c, r["kinds"])) if c["t"] == "at" else None
                 e = float(ext[j]) if ext is not None else 0
-                said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0))
+                said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0, bool(c.get("offopt"))))
     best = min(said, default=None)
-    if "saidanchor" in ON and any(s[0] <= SAID_NEAR for s in said):
-        best = [s for s in said if s[0] <= SAID_NEAR][-1]      # (saidanchor, 93번) 시민이 가장 최근에 댄 이름(가운데 50m 안)을 기준으로: 보기 밖의 답 「CU랑 신한은행이요」 뒤 「장한평역 바로 앞입니까」가 아니라 「CU 장한평2호점 바로 앞입니까」
     if best and best[0] <= 80:
         return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3], "ext": best[4]}
     idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R) and not ("selfname" in ON and self_area(int(i)))]

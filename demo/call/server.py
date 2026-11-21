@@ -1439,8 +1439,11 @@ def understood(st):
                 said_before = next((x["said"] for x in reversed(st["turns"][:k]) if x.get("said")), "")     # 바로 앞 시민 말
                 t["jump_of"], t["jump"] = ("model" if t.get("model") else "code"), _jumps(clues, rd["clues"], t["said"], said_before)
             jumped = bool(t.get("jump"))                  # (jumpguard, 기본 켬 · FIELD_ON · 71번) 이 말의 이름 하나로 범위가 수 km 옮겨 간다: 그 단서만 받지 않는다(같은 말의 일 · 생사 · 목줄은 아래에서 그대로 읽는다)
+        opts = [gaz.norm(o.get("label") or "") for o in ((t.get("asked") or {}).get("options") or []) if o.get("label")] if "saidanchor" in L.ON and t.get("said") else []
         for c in ([] if jumped else rd.get("clues") or []):
-            c = L.stop_only(c, t.get("said") or "") if "stoponly" in L.ON else c      # (stoponly, 기본 끔 · 85번) 정류장 점뿐인 이름난 곳의 「바로 앞」은 「근처」로 · 이름표에 「버스 정류장」
+            c = L.stop_only(c, t.get("said") or "") if "stoponly" in L.ON else c
+            if opts and c.get("t") == "at" and c.get("k") and not any(n and (n in o or o in n) for o in opts for n in [gaz.norm(c.get("label") or c["k"])]):
+                c = dict(c, offopt=True)                  # (saidanchor, 93번) 내민 보기 밖에서 시민이 댄 이름: 확정 기준으로 먼저 쓴다      # (stoponly, 기본 끔 · 85번) 정류장 점뿐인 이름난 곳의 「바로 앞」은 「근처」로 · 이름표에 「버스 정류장」
             clues = [x for x in clues if not _same(x, c)] + [c]
         got = {k: v for k, v in (rd.get("matter") or {}).items() if v is not None}
         if t.get("said") and (got.get("type") or got.get("told")):     # 일을 말한 차례: 이 말(없으면 앞서 말한)의 대상과 종류를 맞춰 본다. 코드 낱말 · Solar · 다시 읽기가 모두 여기를 지난다

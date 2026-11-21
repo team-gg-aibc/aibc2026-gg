@@ -517,18 +517,25 @@ def again_words():
             st, _ = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
         return out
 
-    new = call()
+    follow = [x for x in S.L.FOLLOW_ON.split(",") if x in S.L.ON]      # (93번) 시민이 한 말을 따라가면 이 통화는 간판 질문을 되풀이하지 않는다: 이 장면은 main 흐름(되풀이)의 말 바꾸기만 본다
+    S.L.ON.difference_update(follow)
+    try:
+        new = call()
+    finally:
+        S.L.ON.update(follow)
     assert new[1][0] == new[2][0] == "mark", new
     if "againwords" in S.L.OFF:
         assert new[2][1] == new[1][1], new
     else:
         assert new[2][1].startswith("네, CU와 신한은행이요.") and new[2][1] != new[1][1] and all(len(x) <= 60 for x in new[2][1].split(". ")), new[2][1]
         S.L.OFF.add("againwords")
+        S.L.ON.difference_update(follow)
         try:
             old = call()
             assert [q for q, _ in old] == [q for q, _ in new] and old[2][1] == old[1][1], old     # 끄면 옛 말 그대로, 질문 종류는 같음
         finally:
             S.L.OFF.discard("againwords")
+            S.L.ON.update(follow)
     print("  ✓ 같은 질문 다른 말: 둘째 간판 질문은 「네, CU와 신한은행이요. …」(질문 종류 · 차례는 그대로)" + (" — 꺼짐(옛 말)" if "againwords" in S.L.OFF else ""))
 
 
@@ -1024,12 +1031,12 @@ def main_blob():
 
 def follow_said():
     """(saidanchor · nhalias, 93번) 시민이 한 말을 따라가기. 동규 장한평역 통화 마지막 단서(main_blob과 같음)로 좁힌 범위의 확정 기준:
-    켜면 시민이 방금 댄 「CU」의 지점(「CU 장한평2호점」), 끄면 76m 떨어진 「장한평역」. 「농협 앞이요」 · 「농협은행 앞이요」는 켜면 NH농협은행 지점으로 읽는다."""
+    켜면 보기 밖에서 댄 「CU」의 가장 가까운 지점(「CU 장한평2호점」, 26m), 끄면 지점이 많은 상표는 기준 후보에서 빠져 다른 곳. 「농협 앞이요」 · 「농협은행 앞이요」는 켜면 NH농협은행 지점으로 읽는다."""
     os.environ.setdefault("CALL_MODE", "saved")
     sys.path.insert(0, str(HERE))
     import server as S
     L = S.L
-    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True, "label": "우리은행"}, {"t": "at", "k": "장한평역", "nearest": True, "label": "장한평역"}, {"t": "at", "k": "cu", "how": "가까이", "label": "C U"}]
+    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True, "label": "우리은행"}, {"t": "at", "k": "장한평역", "nearest": True, "label": "장한평역"}, {"t": "at", "k": "cu", "how": "가까이", "label": "C U", "offopt": True}]      # offopt: 내민 보기 밖에서 댄 이름(server.understood가 붙임)
     R = L.infer(cl)
     anc = (L.anchor(R, cl) or {}).get("name", "")
     if {"saidanchor", "mainblob"} <= L.ON:
