@@ -851,23 +851,6 @@ def seen_wide():
     print(f"  ✓ 「○○ 보여요」만 답한 차례의 Solar 보기 고르기(seenwide {'seenwide' in S.L.ON}): 「보여요」 {r['서울놀이마당 보여요']:.0f}m 폭 · 「바로 앞이에요」 {r['서울놀이마당 바로 앞이에요']:.0f}m 폭")
 
 
-def hangul_options():
-    """(hangulopt, 90번) 롯데월드타워 둘레의 「바로 앞에 뭐가 보이세요?」 보기: 켜면 한글이 한 글자도 없는 이름(「Possibilites」 · 「Light Forest」)을 내밀지 않는다. 끄면 main 그대로(그런 이름이 보기에 든다)."""
-    os.environ.setdefault("CALL_MODE", "saved")
-    sys.path.insert(0, str(HERE))
-    import server as S
-    L = S.L
-    clues = [{"t": "at", "k": S.gaz.norm("롯데월드타워"), "how": "근처", "label": "롯데월드타워"}]
-    R = L.infer(clues)
-    x, y, w = L._sample(R)
-    labels = [o["label"] for o in (L._q_marks(R, x, y, w, "finer", clues) or {"options": []})["options"]]
-    eng = [n for n in labels if not re.search(r"[가-힣]", n)]
-    assert labels and bool(eng) != ("hangulopt" in L.ON), labels      # 켜면 없음, 끄면 있음(이 자리의 지도 자료에 영어 이름이 있다)
-    heard = [m.get("name") for m in S.shortlist("Possibilites 바로 앞이에요", None)]
-    assert "Possibilites" in heard, heard      # 시민이 영어 이름을 말하면 알아듣는 것은 켜도 그대로(보기로 내미는 것만 뺀다)
-    print(f"  ✓ 보기의 영어 이름(hangulopt {'hangulopt' in L.ON}): 롯데월드타워 「바로 앞」 보기 {labels}")
-
-
 def neg_keep():
     """(negkeep, 91번) Solar가 「아님」이라 답했는데 dropcheck가 받지 않은 이름(그 말에 「아니 · 말고 · 없 …」가 없음): 켜면 없던 말로 치고 코드가 읽은 그대로 둔다. 끄면 main 그대로 「있음 · 바로 앞」으로 뒤집혀 들어간다(88번 c14 이태원, 4.5km 튐)."""
     os.environ.setdefault("CALL_MODE", "saved")
@@ -952,7 +935,6 @@ def main():
         bridge_end()
         reread_guards()
         seen_wide()
-        hangul_options()
         edge_reads()
         ask_fixes()
         chain_said()
