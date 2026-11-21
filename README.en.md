@@ -445,7 +445,14 @@ docs/                # Introduction, evidence, screen text, engine docs, decisio
 
 </details>
 
-<!-- README decision pending 1 (license): default = no license section (the repository has no LICENSE file). If one is chosen, add a "## License" section here and keep the "Data sources and terms" table as is -->
+## License
+
+Team GG holds the rights to the code and documents the team wrote in this repository (Copyright © 2026 Team GG. All rights reserved.). The full terms are in [`LICENSE`](LICENSE).
+
+- **No need to ask**: viewing, downloading, and running it for the contest's operation, judging, and reproducibility checks, and reading it and running it on your own device to learn as an individual.
+- **Please ask first**: any other use (redistributing, modifying and using, running it as a service, applying it to your work) needs the team's prior written permission. This applies to commercial and non-commercial use alike, including use by national or local governments and public institutions in their work. Leave a note in [Issues](https://github.com/team-gg-aibc/aibc2026-gg/issues) and we will be glad to talk.
+- **Follows its own terms**: code and data from the starter kit (the team claims no rights to them), the data in the [Data sources and terms](#data-sources-and-terms) table (tables extracted from OpenStreetMap are under ODbL 1.0, so anyone may use them under those terms), and the font and outside libraries.
+
 ## Team
 
 Team GG · 2026 AI Bootcamp Competition, Upstage track "Public law Q&A AI with Upstage AI Studio"
