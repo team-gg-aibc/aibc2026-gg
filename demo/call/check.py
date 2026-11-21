@@ -230,6 +230,53 @@ def partial_yes():
     print("  ✓ 되묻기 부분 긍정: 「네, 근데 … 조금 옆이에요」 → 「○○ 근처」로 다시 되묻고, 두 번째는 main 그대로(확정 안 됨) · 「네, 근데 그쪽 아니에요」는 거듭해도 확정 안 됨")
 
 
+def yesno_reads():
+    """(yesno · whichkeep, 81번, 기본 끔) 되묻기 답 읽기와 「어느 말이 달랐을까요?」의 「○○은 맞아요」를 서버 함수로 바로 본다(모델 · 엔진 호출 없음). 스위치를 켠 판 · 끈 판을 같은 함수에서 견준다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    ask = {"id": "confirm"}
+
+    def read(said, sw):
+        had = sw in S.L.ON
+        S.L.ON.add(sw)
+        try:
+            on = S.code_read(said, ask, [], None)["confirm"]
+        finally:
+            S.L.ON.discard(sw) if not had else None
+        S.L.ON.discard(sw)
+        try:
+            off = S.code_read(said, ask, [], None)["confirm"]
+        finally:
+            S.L.ON.add(sw) if had else None
+        return on, off
+    yes = ["네", "네, 맞아요", "네 맞아요", "네 거기 맞아요", "네네 거기요", "맞습니다", "맞아요", "응", "예", "네, 딱 거기예요", "거기요", "네, 바로 옆이에요"]
+    askback = ["네? 뭐라고요?", "네?", "네? 잘 안 들려요", "네네 잠깐만요, 다시 볼게요", "거기 맞는지 잘 모르겠어요"]
+    fix = ["네 맞는데 근데 그쪽 말고 반대쪽이에요", "아 거기서 좀 더 가야 돼요", "그 근처는 맞아요", "네 그런데 거기서 50미터쯤 더 가야 돼요"]
+    same = ["아니요", "아니요, 거기가 아니에요", "아니 그 근처긴 한데요", "잘 모르겠어요", "네, 근데 바로 앞은 아니고 조금 옆이에요", "예, 근데 길 건너편이에요", "네, 근데 그쪽 아니에요"]
+    for said in yes + askback + fix + same:
+        on, off = read(said, "yesno")
+        assert off == S._confirm_main(said) or "partyes2" in S.L.ON and said in same[4:], (said, off)      # 끈 판은 main 규칙 그대로
+        want = True if said in yes else None if said in askback else False if said in fix else off
+        assert on == want, f"되묻기 답 {said!r}: 켬 {on} (기대 {want}) · 끔 {off}"
+    for code, solar, want in ((True, True, True), (True, None, None), (None, True, None), (None, None, None), (True, False, False), (False, True, False), (False, None, False), (None, False, False)):
+        assert S._confirm_pair(code, solar) is want, (code, solar)      # 둘 다 예일 때만 확정, 하나라도 아니요면 아니요
+    opts = [{"label": "강남역", "set": {"drop": ["강남역"]}}, {"label": "강남새로치과의원", "set": {"drop": ["강남새로치과의원"]}}, {"label": "잘 모르겠음", "set": {"clues": []}}]
+    which = {"id": "which", "options": opts}
+    for said, on_drop, off_drop in (("강남새로치과의원은 맞아요", ["강남역"], ["강남새로치과의원"]), ("강남역이 달랐어요", ["강남역"], ["강남역"]),
+                                    ("강남역은 맞고 강남새로치과의원이 아니에요", ["강남새로치과의원"], None)):
+        short = S.shortlist(said, None, "which")
+        had = "whichkeep" in S.L.ON
+        S.L.ON.add("whichkeep")
+        got_on = S.code_read(said, which, short, None).get("drop")
+        S.L.ON.discard("whichkeep")
+        got_off = S.code_read(said, which, short, None).get("drop")
+        S.L.ON.add("whichkeep") if had else None
+        assert got_on == on_drop and got_off == off_drop, (said, got_on, got_off)
+    print(f"  ✓ 되묻기 답 읽기(yesno 켬 · 끔): 진짜 예 {len(yes)}개는 그대로 예 · 되묻는 「네?」 · 확신 없음 {len(askback)}개는 확정 안 함 · 고쳐 말함 {len(fix)}개는 아니요 · 끈 판은 main 그대로 · "
+          "코드와 Solar가 둘 다 예일 때만 확정 · 「○○은 맞아요」는 ○○을 지우지 않음(whichkeep)")
+
+
 def matter_repeat():
     """(hurtalive · matterstop) 같은 일 질문은 세 번 이상 나오지 않는다: 시민이 생사 · 목줄 질문에 답하지 않아도 두 번까지만 묻고 위치로. 「다쳐서 · 웅크리고」는 살아 있음, 「죽어」가 같이 있으면 죽음."""
     say = lambda st, text: turn(turn(st, line={"who": "시민", "text": text})[0], phase="model")      # noqa: E731
@@ -345,6 +392,46 @@ def ask_fixes():
     assert same({"id": "from", "options": [{"label": "영동1교남단 쪽"}, {"word": "잘 모르겠음"}]})      # 보기에서 골라 답한 질문의 같은 보기(낱말 보기는 화면 글로 바꿔 견준다)
     assert not same({"id": "from", "options": [{"label": "영동1교북단 쪽"}, {"word": "잘 모르겠음"}]}) and not same({"id": "finer", "options": [{"label": "가"}]})      # 보기가 다르거나, 「모르겠어요」로 답했던 질문
     print("  ✓ 질문 다듬기: 조사 「(이)가」" + ("를 받침에 맞춤" if "josa" in S.L.ON else "는 그대로(스위치 꺼짐)") + " · 같은 이름의 보기는 한 번만 말함 · 골라 답한 질문 가리기")
+
+
+def ask_less():
+    """(82번) 덜 묻기 고침(ASKLESS_ON): 켜져 있으면 그 동작을, 꺼져 있으면 지금 동작을 보고, 켜진 것은 하나씩 끄면 달라지는지 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    read = lambda text, qid, opts=(): S.code_read(text, {"id": qid, "options": list(opts)}, S.shortlist(text, None, qid, []), None)     # noqa: E731
+    opts = [{"label": "가 쪽", "set": {"clues": [{"t": "pt", "p": [0, 0], "label": "가 쪽"}]}}, {"label": "나 쪽", "set": {"clues": [{"t": "pt", "p": [9, 9], "label": "나 쪽"}]}},
+            {"label": "둘 다 아님", "set": {"clues": [{"t": "not", "label": "둘 다 아님"}]}}]
+
+    def dir_asks():                                       # 74-063: 자동차전용도로에서 좁혀진 뒤 「방향은 잘 모르겠어요」만 하는 시민
+        st, v = S.turn({"id": "check-dirstop"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
+        out = []
+        for said in ["양재대로 달리다가 봤어요, 갓길이에요 사람들이 담배를 피워요", "번호는 못 봤어요", "잘 못 봤어요", "둔촌동역 근처예요", "잘 못 봤어요", "백제추어탕 옆이에요"] + ["방향은 잘 모르겠어요"] * 3:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": said}})
+            q = v["question"]
+            out.append(q and q["id"])
+            if not q or v["confirmed"]:
+                break
+            st, _ = S.turn(st, {"line": {"who": "상담사", "text": q["say"]}})
+        return out
+
+    looks = {"dupshop": lambda: len(L.resolve(S.gaz.norm("아트박스 강남점"))["x"]),      # 가게 자료에 82m 떨어진 두 줄
+             "dunnoboth": lambda: ([c["t"] for c in read("둘 다 잘 모르겠어요", "either", opts)["clues"]], [c["t"] for c in read("둘 다 아니에요", "either", opts)["clues"]]),
+             "dirstop": lambda: dir_asks()[5:8]}
+    want = {"dupshop": (1, 2), "dunnoboth": (([], ["not"]), (["not"], ["not"])), "dirstop": (["dir", "dir", "confirm"], ["dir", "dir", "dir"])}
+    for sw, f in looks.items():
+        on = sw in L.ON
+        got = f()
+        assert got == want[sw][0 if on else 1], (sw, on, got)
+        if on:                                            # 그 스위치 하나만 끄면 지금 동작으로 돌아가는지
+            L.ON.discard(sw)
+            try:
+                assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
+            finally:
+                L.ON.add(sw)
+    print("  ✓ 덜 묻기: 같은 가게 두 줄은 한 곳 · 「둘 다 잘 모르겠어요」는 모름 · 좁혀진 뒤 방향 질문은 두 번까지"
+          + (" — 켬, 하나씩 끄면 지금 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
 def free_text():
@@ -584,6 +671,138 @@ def switches():
     print(f"  ✓ 흡연 표지 · 킥보드 판단(켬: 흡연 {S.SMOKE_NEAR} · 킥보드 {S.KICK_DOCK}): 킥보드 낱통화 {len(single) + 3} · 킥보드 표 {cells}칸 · 흡연 표 {smoke_cells}칸")
 
 
+def bind_choice():
+    """(choicebind, 79번) 동규 시험 통화(11-21, 강남역): 시민은 보기에 없는 다른 곳의 이름을 댔는데 Solar가 보기 하나를 골랐다.
+    Solar 자리에 그 통화의 날 답(보기 고르기)을 넣어 서버의 turn을 그대로 돈다(모델 · 엔진 호출 없음). 켬 · 끔 어느 쪽으로 띄워도 그 값대로 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = "choicebind" in S.L.ON
+
+    def solar(system, user, schema):          # 그 통화의 Solar: 코드가 찾은 이름은 「근처」, 보기는 강남이룸안과의원(있으면) 아니면 1번 — 시민이 말하지 않은 보기
+        opts = user.split("[상담사가 방금 물은 질문의 보기]")[1].split("[코드가 찾은 이름]")[0]
+        names = user.split("[코드가 찾은 이름]")[1].split("[시민이 방금 한 말]")[0]
+        ids = re.findall(r"^- (m\d+) \|", names, re.M)
+        ch = next(iter(re.findall(r"^- (o\d+) \| 강남이룸안과의원$", opts, re.M) + re.findall(r"^- (o1) \|", opts, re.M)), "없음")
+        return {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "places": [{"id": i, "rel": "근처", "how": "모름"} for i in ids],
+                "choice": ch, "confirm": "없음", "outside": False, "said_place": ""}
+    mode, real, eng = S.MODE, S._solar, os.environ.get("CALL_NO_ENGINE")
+    os.environ["CALL_NO_ENGINE"] = "1"
+    try:
+        S._solar = solar
+        st, view = S.turn({"id": "check-bind"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+        for said in ("여기 쓰래기가 너무 많이 버려져 있어요", "여기... 지금 강남역 주변이요", "아트박스가 보여요", "강남새로치과의원이 보여요"):
+            st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+            S.MODE = "live"
+            st, view = S.turn(st, {"phase": "model"})
+            S.MODE = mode
+            if view["question"]:
+                st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+    finally:
+        S.MODE, S._solar = mode, real
+        os.environ.pop("CALL_NO_ENGINE") if eng is None else os.environ.update(CALL_NO_ENGINE=eng)
+    q, where = view["question"] or {}, view["summary"]["where"] or ""
+    if on:
+        assert q.get("id") != "confirm" and "강남새로치과의원" in where and "강남이룸안과의원" not in where, (q.get("say"), where)      # 시민이 댄 곳(아트박스에서 50m)에 머문다
+    else:
+        assert q.get("id") == "confirm" and "강남이룸안과의원" in q.get("say", ""), (q.get("say"), where)      # 끄면 그 통화 그대로: 700m 떨어진 보기로 확정 질문
+    sh = lambda said: S.shortlist(said, None)      # noqa: E731
+    assert S._other_place("아트박스가 보여요", "비타바른이치과의원", sh("아트박스가 보여요"))
+    assert S._other_place("비틀비틀 보여요", "마스터당구장", sh("비틀비틀 보여요"))      # 평가 묶음 74-P17(Solar 길): 같은 꼴로 2km 떨어진 곳 되묻기
+    for said, label in (("비타바른이치과의원 옆이에요", "비타바른이치과의원"), ("첫 번째 거요", "비타바른이치과의원"), ("강남역 쪽 치과요", "비타바른이치과의원"),
+                        ("아트박스 옆에 비타바른이치과의원이요", "비타바른이치과의원"), ("구리 방향이요", "구리 방향"),
+                        ("스벅 보여요", "스타벅스 강남역점"), ("롯데리아 옆 GS25요", "GS25 역삼점"), ("주민센터 앞이에요", "역삼1동주민센터")):
+        assert not S._other_place(said, label, sh(said)), (said, label)      # 보기 이름을 말함(줄임말 · 상표 · 지점 포함) · 다른 이름 없음 · 넓은 이름(역)만: Solar의 고르기를 그대로 받는다
+    assert S._other_place("올리브영 명동역점이 보여요", "용하다한의원", sh("올리브영 명동역점이 보여요"))      # 80번 c03 5번째 차례(Solar 길): 같은 꼴
+    assert S._other_place("방이역이요", "거여역", sh("방이역이요"), "station") == ("stationbind" in S.L.ON)      # (stationbind) 역 질문에 댄 역 이름은 「다른 곳」(80번 p08). 끄면 역은 넓은 이름이라 보지 않는다
+    assert not S._other_place("방이역이요", "거여역", sh("방이역이요"), "finer")                               # 역 질문이 아니면 켜도 역은 넓은 이름
+    print(f"  ✓ Solar가 시민이 말하지 않은 보기를 고름(켬 {on}): {'시민이 댄 곳에 머묾' if on else '그 통화 그대로 700m 떨어진 보기로 확정 질문'} · 보기 이름을 말했거나 다른 이름이 없으면 고르기를 받음")
+
+
+def reread_guards():
+    """(codekeep · keeptype, 79번) Solar 다시 읽기가 코드가 맞게 읽은 것을 덮는 꼴 둘(80번 c18 · c03). Solar 자리에 그 통화의 날 답을 넣어 서버의 turn을 그대로 돈다. 켬 · 끔 어느 쪽이든 그 값대로 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    N = {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "choice": "없음", "confirm": "없음", "outside": False, "said_place": ""}
+
+    def run(turns):
+        q = []
+
+        def solar(system, user, schema):           # 이름으로 준 단서를 목록의 id로
+            raw = q.pop(0)
+            ids = dict((n.strip(), i) for i, n in re.findall(r"^- (m\d+) \| ([^|]+)", user, re.M))
+            ch = next(iter(re.findall(rf"^- (o\d+) \| {re.escape(raw['pick'])}$", user, re.M)), "없음") if raw.get("pick") else raw.get("choice", "없음")      # 보기를 이름으로
+            return {**{k: v for k, v in raw.items() if k not in ("by_name", "pick")}, "choice": ch, "places": [{"id": ids[nm], "rel": rel, "how": how} for nm, rel, how in raw["by_name"]]}
+        mode, real, eng = S.MODE, S._solar, os.environ.get("CALL_NO_ENGINE")
+        os.environ["CALL_NO_ENGINE"] = "1"
+        try:
+            S._solar = solar
+            st, view = S.turn({"id": "check-reread"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+            for said, raw in turns:
+                st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+                q.append(raw)
+                S.MODE = "live"
+                st, view = S.turn(st, {"phase": "model"})
+                S.MODE = mode
+                if view["question"]:
+                    st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        finally:
+            S.MODE, S._solar = mode, real
+            os.environ.pop("CALL_NO_ENGINE") if eng is None else os.environ.update(CALL_NO_ENGINE=eng)
+        return st, view
+    _, v18 = run([("안녕하세요 제가 지금 합정역 7번 출구 나와서 조금 걸어오면 파리바게뜨 있고 그 옆에 마라탕집 앞인데요 거기 트럭이 인도에 반쯤 걸쳐서 계속 서 있어서 사람들이 차도로 걸어 다녀요 위험해요",
+                   dict(N, type="vendor", by_name=[["합정역 7번 출구", "지남", "모름"], ["파리바게뜨", "근처", "바로"]]))])
+    if "codekeep" in S.L.ON:
+        assert v18["radius"] <= 60 and "합정역 7번 출구" in (v18["summary"]["where"] or ""), (v18["radius"], v18["summary"]["where"])      # 코드가 읽은 「출구 있음」을 둔다
+    else:
+        assert v18["radius"] > 1000, v18["radius"]                                           # 끄면 그 통화 그대로: 출구를 거리 모를 「지남」으로 읽어 3km 넘게 넓어짐
+    st, _ = run([("가게에서 물건을 인도에 잔뜩 내놔서 사람이 지나갈 수가 없어요", dict(N, type="vendor", by_name=[])), ("명동이에요", dict(N, by_name=[])),
+                 ("명동역 6번 출구 나와서 밀리오레 앞이요", dict(N, type="other", by_name=[["명동역 6번 출구", "근처", "모름"], ["밀리오레", "근처", "바로"]]))])
+    kind = S.understood(st)[1].get("type")
+    assert kind == ("vendor" if "keeptype" in S.L.ON else "other"), kind                     # 켜면 자리만 말한 차례의 Solar 「그 밖의 일」이 적치물을 덮지 않음
+    st, _ = run([("강남역 10번 출구요", dict(N, by_name=[["강남역 10번 출구", "근처", "모름"]])), ("길거리에서 스피커로 음악을 엄청 크게 틀어 놔서 시끄러워요", dict(N, type="noise", by_name=[])),
+                 ("네? 스피커는 장소가 아니고요, 강남역 10번 출구 바로 앞이에요", dict(N, type="noise", by_name=[["강남역 10번 출구", "있음", "바로"]]))])      # 80번 c10: Solar는 소음 그대로인데 이 말의 대상(스피커)과 다시 맞추다 「그 밖의 일」
+    k10 = S.understood(st)[1].get("type")
+    assert k10 == ("noise" if "keeptype" in S.L.ON else "other"), k10
+    _, v18b = run([("안녕하세요 제가 지금 합정역 7번 출구 나와서 조금 걸어오면 파리바게뜨 있고 그 옆에 마라탕집 앞인데요 거기 트럭이 인도에 반쯤 걸쳐서 계속 서 있어서 사람들이 차도로 걸어 다녀요 위험해요",
+                    dict(N, type="vendor", by_name=[["합정역 7번 출구", "쪽", "모름"], ["파리바게뜨", "근처", "바로"]]))])      # 같은 통화를 Solar가 「출구 쪽」(둘레 450m)으로 읽은 번
+    assert (v18b["radius"] <= 60) == ("codekeep" in S.L.ON), v18b["radius"]
+    _, vc = run([("여기 쓰레기가 너무 많이 버려져 있어요", dict(N, type="litter", by_name=[])), ("강남역 근처요", dict(N, by_name=[["강남역", "근처", "모름"]])),
+                 ("편의점 바로 앞이에요", dict(N, type="litter", by_name=[["위드미", "안", "모름"]]))])      # 81번 r01: 실제 Solar가 세 번 모두 첫 후보 「위드미」를 장소로 적음
+    if "placebind" in S.L.ON:
+        assert "위드미" not in vc["chips"] and vc["radius"] > 600, (vc["chips"], vc["radius"])      # 켜면 코드가 넓게 둔 「편의점 바로 옆」 그대로
+    else:
+        assert "위드미" in vc["chips"] and vc["radius"] < 400, (vc["chips"], vc["radius"])          # 끄면 그 통화 그대로 위드미 쪽으로 끌려감
+    st12, v12 = run([("신촌 세브란스병원 앞인데요, 버스정류장 쪽에 오토바이가 인도에 계속 서 있어요", dict(N, type="other", by_name=[["세브란스병원앞", "근처", "모름"]])),
+                     ("병원 정문 앞 버스정류장이요", dict(N, pick="세브란스병원앞", by_name=[["세브란스병원앞", "근처", "모름"]]))])      # 80번 c12: 종류만 말했는데 Solar가 후보 「세브란스병원앞」(실제 자리에서 140m 떨어진 다른 정류장)을 이름 칸 · 보기 칸 둘 다에
+    labels = [c.get("label") for c in st12["turns"][-1]["model"]["clues"]]
+    assert ("세브란스병원앞" in labels) != ("placebind" in S.L.ON), labels      # 켜면 이름 칸 · 보기 칸 어느 쪽으로도 그 후보가 들어가지 않음(끄면 들어감)
+    print(f"  ✓ Solar 다시 읽기가 코드 읽기를 덮는 꼴(codekeep {'codekeep' in S.L.ON} · keeptype {'keeptype' in S.L.ON} · placebind {'placebind' in S.L.ON}): 합정역 출구 {v18['radius']}m · 「출구 쪽」으로 읽은 번 {v18b['radius']}m · 자리만 말한 차례 뒤 일 {kind} · {k10} · 「편의점 바로 앞」 {vc['radius']}m")
+
+
+def seen_wide():
+    """(seenwide, 79번 · 80번 c16) 「바로 앞에 뭐가 보이세요?」에 「○○ 보여요」만 답했는데 Solar가 그 보기를 고르면, 켜면 「바로 앞」(18m)이 아니라 「보임」 폭으로 받는다. 「바로 앞이에요」는 켜도 그대로."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    opt = {"label": "송파나루공원 서울놀이마당", "set": {"clues": [{"t": "pt", "p": [0.0, 0.0], "r": S.L.SIG["바로"], "label": "송파나루공원 서울놀이마당"}]}}
+    real, mode = S._solar, S.MODE
+    S._solar = lambda system, user, schema: {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "places": [], "choice": "o1", "confirm": "없음", "outside": False, "said_place": ""}
+    S.MODE = "live"
+    try:
+        r = {}
+        for said in ("서울놀이마당 보여요", "서울놀이마당 바로 앞이에요"):
+            st = {"id": "check-seen", "lines": [{"who": "상담사", "text": "바로 앞에 뭐가 보이세요?"}, {"who": "시민", "text": said}], "turns": [{"said": said, "asked": {"id": "finer", "options": [opt]}}]}
+            read, _, _ = S.model_read(st, [], "없음")
+            r[said] = next(c["r"] for c in read["clues"] if c.get("label") == opt["label"])
+    finally:
+        S._solar, S.MODE = real, mode
+    assert r["서울놀이마당 보여요"] == (S.L.SIG["보임"] if "seenwide" in S.L.ON else S.L.SIG["바로"]), r
+    assert r["서울놀이마당 바로 앞이에요"] == S.L.SIG["바로"], r
+    print(f"  ✓ 「○○ 보여요」만 답한 차례의 Solar 보기 고르기(seenwide {'seenwide' in S.L.ON}): 「보여요」 {r['서울놀이마당 보여요']:.0f}m 폭 · 「바로 앞이에요」 {r['서울놀이마당 바로 앞이에요']:.0f}m 폭")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -614,13 +833,18 @@ def main():
         field_fixes()
         partial_yes()
         partial_yes_table()
+        yesno_reads()
         matter_repeat()
         alias()
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         switches()
+        bind_choice()
+        reread_guards()
+        seen_wide()
         edge_reads()
         ask_fixes()
+        ask_less()
         print("통화로 위치 좁히기 점검 통과")
     finally:
         server.terminate()

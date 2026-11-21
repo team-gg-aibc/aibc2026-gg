@@ -42,6 +42,16 @@ BIG, MUL = 50000, 200000
 SEOUL_M2 = 605e6    # 서울의 넓이(어림). 「틀린 말」의 몫은 서울 어디든 고르게 퍼진다고 본다
 EXPRESSWAYS = ["올림픽대로", "동부간선도로", "동부간선로", "강변북로", "서부간선도로", "서부간선로", "언주로", "북부간선도로", "내부순환로", "국회대로", "양재대로",
                "경부고속도로", "우면산로", "강남순환로"]        # 서울시설공단이 관리하는 자동차전용도로 12개 노선(지도 자료의 이름 꼴 포함). 언주로 · 양재대로는 일부 구간만
+PARTIAL_EXPRESS = {"언주로", "양재대로"}      # (roadcls, 기본 끔 · 86번) 이름째 목록에 들었지만 일부 구간만 자동차전용인 길
+
+
+def _xw(i):
+    """길 i가 자동차전용도로인가(이름 목록). (roadcls, 기본 끔 · 86번) 언주로 · 양재대로는 지도 자료의 길 등급이 trunk · motorway인 구간만:
+    방이역 · 둔촌동역 · 올림픽공원역 앞 양재대로(primary, 일반 구간)의 불법 주차가 자동차전용도로 위로 읽혀 넘길 곳이 경찰 · 번지가 「번지 없음」이 됐다(80번 c09)."""
+    r = G.roads[i]
+    return r["name"] in EXPRESSWAYS and not ("roadcls" in ON and r["name"] in PARTIAL_EXPRESS and r.get("cls") not in ("trunk", "motorway"))
+
+
 DIR_NAMES = {"강변북로": ("구리 방향", "일산 방향"), "올림픽대로": ("하남 방향", "김포공항 방향"), "내부순환로": ("성동 방향", "성산 방향"),
              "동부간선도로": ("의정부 방향", "수서 방향"), "동부간선로": ("의정부 방향", "수서 방향")}      # (동쪽 또는 북쪽으로 가는 방향, 반대 방향)
 CITY_PARKS = ["서울숲", "보라매공원", "월드컵공원", "남산공원", "북서울꿈의숲", "여의도공원", "선유도공원", "서울어린이대공원", "어린이대공원"]   # 시가 직접 관리하는 큰 공원(일부)
@@ -138,7 +148,7 @@ def bridge_span(i):
 
 def _bridges(r, n=None, ctx=None):
     """resolve() 결과 가운데 면을 아는 다리의 장소 번호들. 그 통화에 그 다리와 닿는 공원 · 광장 말이 함께 있을 때만(ctx["bp"]) — 다리만 댄 말(「올림픽대교 위예요」)은 전처럼 가운데 점으로 읽는다.
-    (bridgelong · 75번, 기본 끔) 길이가 2 × BIG_M(120m)을 넘는 다리 · 고가는 혼자 나와도 면으로: 가운데 점 둘레 60m는 그 다리의 한 토막일 뿐이라 이름 하나로는 한 점이 서지 않는다(보라매고가는 1.6km — 「보라매고가 바로 앞」을 가운데 점으로 확정해 193m 틀림). 짧은 다리(묵동교 75m)는 전처럼 한 점."""
+    (bridgelong · 75번, 기본 끔 · BRIDGE_ON) 길이가 2 × BIG_M(120m)을 넘는 다리 · 고가는 혼자 나와도 면으로: 가운데 점 둘레 60m는 그 다리의 한 토막일 뿐이라 이름 하나로는 한 점이 서지 않는다(보라매고가는 1.6km — 「보라매고가 바로 앞」을 가운데 점으로 확정해 193m 틀림). 짧은 다리(묵동교 75m)는 전처럼 한 점."""
     if "bridgeline" not in ON or ctx is None:
         return []
     ids = [i for i in r.get("ids") or () if i in G.bridge]
@@ -193,7 +203,24 @@ def resolve(key):
     if any(a[0] == "park" for a in areas):
         keep = [k != "공원" for k in kinds]
         px, py, kinds, ids = ([v for v, m in zip(lst, keep) if m] for lst in (px, py, kinds, ids))
+    if "dupshop" in ON and len(ids) > 1:
+        px, py, kinds, ids = _dupshop(px, py, kinds, ids)
     return {"x": np.asarray(px, float), "y": np.asarray(py, float), "kinds": kinds, "roads": roads, "areas": areas, "ids": ids}
+
+
+def _dupshop(px, py, kinds, ids):
+    """(dupshop · 82번) 가게 자료에 같은 지점 이름 · 같은 종류가 100m 안에 두 줄이면 한 가게로 본다(두 줄의 가운데 한 점).
+    「아트박스 강남점」이 82m 떨어진 두 줄이라 「아트박스 바로 앞」이 두 덩어리로 갈려 50m 안에 들지 못하고 묻기만 거듭했다(동규 통화 11-21)."""
+    out = []                                              # [x, y, 종류, 번호, 합친 줄 수]
+    for x, y, k, i in zip(px, py, kinds, ids):
+        shop = G.shop0 <= i < G.shop1                     # 가게 자료 줄만(공원 안 이름 · 물가 테두리 점은 그 뒤에 붙어 있다)
+        j = next((o for o in out if G.shop0 <= o[3] < G.shop1 and o[2] == k and gaz.norm(G.name[o[3]]) == gaz.norm(G.name[i])
+                  and math.hypot(o[0] - x, o[1] - y) <= 100), None) if shop else None
+        if j is None:
+            out.append([x, y, k, i, 1])
+        else:
+            j[0], j[1], j[4] = (j[0] * j[4] + x) / (j[4] + 1), (j[1] * j[4] + y) / (j[4] + 1), j[4] + 1
+    return [o[0] for o in out], [o[1] for o in out], [o[2] for o in out], [o[3] for o in out]
 
 
 def _near_map(px, py, sigma):
@@ -220,7 +247,7 @@ def _lookup(keys, mk, mv):
 
 def _road_sig(sig, kinds, ctx):
     """(roadfloor) 자동차전용도로 이야기 중에 차에서 보이지 않을 이름(가게 · 학원 · 건물)은 폭을 150m 아래로 잡지 않는다(33번 3-2)."""
-    if "roadfloor" in ON and ctx and ctx.get("roads") and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"]) and kinds and not any(k in gaz.ROADSIDE for k in kinds):
+    if "roadfloor" in ON and ctx and ctx.get("roads") and any(_xw(i) for i in ctx["roads"]) and kinds and not any(k in gaz.ROADSIDE for k in kinds):
         return max(sig, 150.0)
     return sig
 
@@ -372,7 +399,7 @@ SPEED = {"자동차전용도로": 1000.0, "길": 500.0}             # 지나고 
 
 def _ahead(c, ctx):
     """「○○ 지나고 N분쯤」 → (가운데 거리 m, 폭 m). 폭은 거리의 절반(적어도 100m)."""
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    express = any(_xw(i) for i in ctx["roads"])
     d = SPEED["자동차전용도로" if express else "길"] * float(c["min"])
     return d, max(100.0, 0.5 * d)
 
@@ -591,7 +618,7 @@ def _nearest_station(key, r, x, y):
 
 def _move(c, ctx):
     """「조금 지나서」의 폭을 고를 움직인 방법: 자동차전용도로 위면 그것(걸어서는 못 간다), 시민이 말했으면 걷기 · 차, 아니면 모름."""
-    if any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"]):
+    if any(_xw(i) for i in ctx["roads"]):
         return "자동차전용도로"
     return c.get("move") if c.get("move") in AFTER else "모름"
 
@@ -622,9 +649,81 @@ def _places_in(x0, y0, x1, y1, cap_m=6000):
     return out
 
 
+GENERIC_VOCAB = set("""쓰레기통 쓰레기 따릉이 대여소 거치대 입구 출구 출입구 정문 후문 입구광장 잔디밭 잔디광장 잔디 동상 말동상 구름다리 안내소 관리사무소 매표소 경비실 정류장 버스정류장 버스
+앞 옆 뒤 밑 주차장 화장실 공중화장실 놀이터 어린이놀이터 빠지는 나가는 길 진출로 진입로 진출입로 램프 호수 연못 분수 분수대 산책로 벤치 정자 육교 횡단보도 계단
+매점 쉼터 휴게실 휴게소 시장 공원 다리 가로등 보안등 전봇대 신호등 맨홀 화단 운동장 운동기구 음수대 약수터 전망대""".split())     # (genericname · 83번) 민원 말에 시설 · 물건 · 자리 설명으로 나오는 낱말. 「광장」은 뺀다(광장시장). 지명 · 가게 이름에 흔한 「한강 · 하나 · 약국 · 학교」 같은 낱말은 넣지 않는다
+_GEN = {}
+
+
+def generic_key(k):
+    """(genericname · 83번) 이름 열쇠가 흔한 낱말로만 이루어졌나(「쓰레기통」 · 「따릉이대여소」 · 「시장입구」 · 「말동상」 · 「잔디밭」 · 「빠지는길」 · 「버스정류장앞」).
+    지명 자료 · 시연용 표에 그런 이름의 곳이 서울에 한두 곳 있어, 곳 이름 없이 「쓰레기통 옆에 …」라고만 해도 그 한 점으로 확정하러 가던 일(80번 c15 · c24 · c25)."""
+    if not isinstance(k, str) or "|" in k or len(k) < 2:
+        return False
+    if k not in _GEN:
+        ok = [True] + [False] * len(k)
+        for j in range(1, len(k) + 1):
+            ok[j] = any(ok[i] and k[i:j] in GENERIC_VOCAB for i in range(j))
+        _GEN[k] = ok[-1]
+    return _GEN[k]
+
+
+def demo_key(k):
+    """(genericname · 83번) 이름 열쇠가 시연 장면용 표(extra_places.json)의 장소 · 별명만 가리키나(「큰 연못」 · 「얕은 연못」 · 「보행교」 · 「2번 출입구」 · 「사슴 있는 데」).
+    서울숲 장면을 위해 단 줄이라, 장면 밖 통화(「상도역 2번 출입구 앞」 · 「아파트 단지 얕은 연못」)를 서울숲으로 끌던 일(81번 특례 27줄). 흔한 낱말 이름과 같은 규칙을 탄다."""
+    refs = G.ix.get(k) if isinstance(k, str) else None
+    return bool(refs) and all(r[0] == "p" and G.demo0 <= r[1] < G.demo1 for r in refs)
+
+
+def _generic_drop(clues):
+    """(genericname) 흔한 낱말로만 된 이름의 단서는 혼자서는 자리를 정하지 못한다: 그 단서를 뺀 나머지로 범위를 세워 보고, 그 범위 근처(800m 또는 덮는 반지름의 1.5배)에
+    그 이름의 곳이 있을 때만 남긴다(「서울숲 근처인데요 … 잔디밭에」는 남고, 「공원 잔디밭에서」 · 「쓰레기통 옆에」는 빠진다). 나머지가 없으면 뺀다."""
+    gen = [n for n, c in enumerate(clues) if c["t"] in ("at", "past", "before", "toward") and (generic_key(c.get("k")) or demo_key(c.get("k")))]
+    if not gen:
+        return clues
+    rest = [c for n, c in enumerate(clues) if n not in gen]
+    R0 = infer(rest) if rest else None
+    keep = set()
+    for n in gen if R0 is not None else ():
+        r = resolve(clues[n]["k"])
+        lim = max(800.0, 1.5 * R0["r_cover"])
+        if len(r["x"]) and float(np.hypot(r["x"] - R0["cx"], r["y"] - R0["cy"]).min()) <= lim:
+            keep.add(n)
+    return [c for n, c in enumerate(clues) if n not in gen or n in keep]
+
+
+SHOP_KINDS = {"가게", "음식점", "카페", "편의점", "마트", "빵집", "약국", "학원", "숙박", "사무실", "건물"}      # (farshop) 지명 자료에 빠졌거나 지점이 다를 수 있는 가게 · 건물 종류
+ANCHOR_KINDS = {"역 출구", "역", "관공서", "학교", "교차로", "다리", "공원", "시장", "경찰", "소방서", "터미널", "볼거리", "문화시설", "동네"}     # (farshop) 서울에 하나뿐이고 지명 자료에 빠질 일이 드문 기준점 종류
+
+
+def _farshop_drop(clues):
+    """(farshop · 83번) 「명동역 6번 출구 나와서 밀리오레 앞이요」: 가게 이름(밀리오레)의 곳이 지명 자료에 둘뿐이고 둘 다 명동역에서 2km 넘게 떨어져 있어(명동 밀리오레가 자료에 없음),
+    폭 18m의 「바로 앞」이 폭 100m의 역 출구보다 확률을 더 끌어 두 밀리오레 사이로 6.9km 범위가 섰다. 측량으로는 두 원이 만나지 않으니 하나가 틀렸다 —
+    기준점 종류(역 출구 · 역 · 관공서 …)의 곳이 있는 단서가 있고, 가게 · 건물 이름 단서의 어느 곳도 그 기준점에서 1.5km 안에 없으면 가게 쪽을 뺀다(자료에 빠진 가게 · 다른 지점일 몫이 크다)."""
+    anchors = [(c, resolve(c["k"])) for c in clues if c["t"] == "at" and isinstance(c.get("k"), str) and "|" not in c["k"]]
+    anchors = [(c, r) for c, r in anchors if 0 < len(r["x"]) <= 3 and set(r["kinds"]) & ANCHOR_KINDS]
+    if not anchors:
+        return clues
+    ax = np.concatenate([r["x"] for _, r in anchors])
+    ay = np.concatenate([r["y"] for _, r in anchors])
+    out = []
+    for c in clues:
+        if c["t"] == "at" and isinstance(c.get("k"), str) and "|" not in c["k"] and all(c is not a for a, _ in anchors):
+            r = resolve(c["k"])
+            if 0 < len(r["x"]) <= 40 and set(r["kinds"]) <= SHOP_KINDS and not r["roads"] and not r["areas"] and \
+                    float(np.hypot(r["x"][:, None] - ax[None, :], r["y"][:, None] - ay[None, :]).min()) > 1500:
+                continue
+        out.append(c)
+    return out
+
+
 def infer(clues):
     """단서들 → 지금의 가능성 분포. 단서가 없거나 가리키는 곳이 없으면 None."""
     clues = [c for c in clues if c.get("t")]
+    if "genericname" in ON:
+        clues = _generic_drop(clues)
+    if "farshop" in ON:
+        clues = _farshop_drop(clues)
     mins = [n for n, c in enumerate(clues) if c["t"] == "past" and c.get("min")]
     if "nogain" in ON and len(mins) > 2:                  # 「○○ 지나고 N분」 대여섯 개는 같은 사람의 같은 어림: 기준 표지가 지금 범위에 가장 가까운 둘만 곱한다(33번 1-3)
         R0 = infer([c for n, c in enumerate(clues) if n not in mins[:-2]])
@@ -812,7 +911,7 @@ def _lamps_within(x, y, rad):
 
 
 def _on_express(R):
-    return R is not None and R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    return R is not None and R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"])
 
 
 def _road_ok(i, R):
@@ -899,13 +998,17 @@ SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (same
 ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 # sameopts(기본 끔 · 75번): 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same). 영동1교 통화의 같은 「어느 쪽」 질문 되풀이는 없어지지만 가상 600통에서 한 점 421 · 397 · 416 → 414 · 390 · 405, 틀린 확정 0 · 0 · 5 → 0 · 0 · 6이라 켜지 않았다(같은 질문을 다시 물어 같은 답을 한 번 더 세는 것이 지금은 범위를 좁히는 데 쓰이고 있다)
 C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+FIX_ON = "genericname,yesno,whichkeep,choicebind,placebind,codekeep,keeptype,stationbind,stoponly,roadcls"      # (84번, 기본 켬) 고침 모은 판에서 모든 기준을 넘은 열 — 기준점과 어긋난 가게(farshop, 83번)는 확인용 묶음 93통 테두리 둘에서 틀린 확정 +1로 걸려 끔(11-21 07시). 동네 이름(hood, 87번)은 가게 지점 이름 속 동네 말(「CU 신촌피어점」의 신촌)을 동네로 읽어 600통 #92가 맞는 한 점 → 넘김이 되어 끔. 그 밖에 정류장으로만 있는 기관 이름(stoponly, 85번 좁힌 판) · 양재대로 · 언주로의 일반 구간(roadcls, 86번) 더함. 덜 묻기의 dunnoboth는 옛 잣대 한 점 −9 · −12로 끔. 처음 아홉: 흔한 낱말 이름 · 기준점과 어긋난 가게(83번) · 되묻기 답의 헛 「예」 · 「○○은 맞아요」(81번) · Solar가 말에 없는 이름을 쓰지 않기 다섯(79번). seenwide · 긴 다리 · 덜 묻기는 「정할 것」으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+BRIDGE_ON = "bridgelong"      # (75번 9절 · 10절, 모은 판에서는 기본 끔 — 켜는 판은 donggyu/locate-bridge) 길이 120m를 넘는 다리 · 고가는 이름 하나만 대도(「보라매고가 바로 앞」) 가운데 한 점이 아니라 다리의 면으로. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON      # BRIDGE_ON(긴 다리)은 모은 판에서 끈 채(84번 — 동규 09:30 판정). 켜려면 CALL_ON에 bridgelong을 더한다     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
     G.add_bridges()                                       # (bridgeline · 75번) 다리의 면(data/seoul/bridges.json.gz)
 if "wikialias" in ON:
     G.add_wiki()                                          # (wikialias, 기본 끔 · 71번) 위키 별칭 사전(data/seoul/wiki_alias.tsv.gz)을 이름 색인에
+if "hood" in ON:
+    G.add_hoods()                                         # (hood, 기본 끔 · 87번) 「명동이에요」 · 「신촌이요」: 이름난 동네 말을 그 동 · 구 범위로
 SEEN_KINDS = ["육교", "정류장", "편의점", "주유소", "역 출구", "다리", "터널", "학교", "은행", "약국", "카페", "놀이터", "화장실", "주차장", "교차로", "정자", "운동기구", "음수대", "분수", "전망대"]
 
 
@@ -971,7 +1074,9 @@ def questions(R, clues, matter, asked=(), same=None):
     confirm = {"id": "confirm", "bits": None, "options": [{"word": "맞음", "set": {"confirm": True}}, {"word": "아님", "set": {"confirm": False}}]}
     x, y, w = _sample(R)
     ctx = R["ctx"]
-    need_dir = R["on_road"] and ctx["head"] is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    need_dir = R["on_road"] and ctx["head"] is None and any(_xw(i) for i in ctx["roads"])
+    if need_dir and "dirstop" in ON and list(asked).count("dir!") >= 2:
+        need_dir = False                                  # (dirstop · 82번) 좁혀진 뒤의 방향 질문도 다른 위치 질문처럼 두 번 물어 못 얻으면 그만(「방향은 잘 모르겠어요」에 같은 질문을 여덟 번 되풀이하다 끊긴 평가 통화 74-063)
     zone = None                                           # 공원 안 · 바깥: 넘길 곳이 갈리는 경계
     if not R["on_road"] and not any(c["t"] in ("in", "out") for c in clues):
         best = None
@@ -1041,7 +1146,7 @@ def questions(R, clues, matter, asked=(), same=None):
         zone = None
     dup = lambda q: bool(same) and "sameopts" in ON and q["id"] in SAMEQ and same(q)     # noqa: E731  (sameopts · 75번) 이 통화에서 같은 보기로 이미 물었던 질문: 그 답으로 범위가 달라지지 않았다는 뜻이라 사다리의 다음 질문으로 넘어간다
     loc = [q for q in [_q_alike(R, clues)] if q and "alike" not in miss and ids[-1:] != ["alike"] and ids.count("alike") < 2]      # 소리가 같은 이름이 아직 갈리지 않았으면 그것부터(어느 구인지). 잇달아 묻지 않고 두 번까지
-    express = R["on_road"] and any(G.roads[i]["name"] in EXPRESSWAYS for i in ctx["roads"])
+    express = R["on_road"] and any(_xw(i) for i in ctx["roads"])
     drive = R["on_road"] and not express and "drive" in ON and any(c.get("drive") for c in clues)     # 큰길을 차로 지나간 통화(33번 5-2)
     if (express or drive) and not loc:                    # 다리 · 나들목(큰길이면 교차로 · 역 출구 · 정류장 …)으로 가르는 질문
         lamp = {"id": "lampno", "bits": math.log2(max(1.0, R["r"] / 15.0)), "options": []} if express and G.lamps and R["r"] > 100 else None     # 가로등 기둥 번호: 읽을 수만 있으면 한 번에 기둥 하나로(모를 몫이 커서 점수는 낮게 나온다)
@@ -1191,7 +1296,7 @@ def _pin_questions(R, clues, matter):
         dirs = idx[:1] + [i for i in idx[1:] if idx and (G.x[i] - x) * (G.x[idx[0]] - x) + (G.y[i] - y) * (G.y[idx[0]] - y) < 0][:1]     # 서로 반대쪽의 두 곳
         out.append({"id": "went", "bits": None, "options": [{"word": "그 자리에 있음", "set": {"matter": {"went": "그 자리"}}}]
                     + [{"label": f"{G.name[i]} 쪽으로 감", "set": {"matter": {"went": G.name[i]}}} for i in dirs] + [{"word": "못 봄", "set": {"matter": {"went": "모름"}}}]})
-    if R["on_road"] and G.lamps and matter.get("ask_lamp") and matter.get("plate") is None and any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]):
+    if R["on_road"] and G.lamps and matter.get("ask_lamp") and matter.get("plate") is None and any(_xw(i) for i in R["ctx"]["roads"]):
         out.append({"id": "lampno", "bits": None, "options": [{"word": "번호 안 보임", "set": {"matter": {"plate": "없음"}}}]})      # 자동차전용도로: 마지막에 가로등 기둥 번호로 기둥 하나까지
     if kind == "plate" and matter.get("plate") is None:    # 시설물의 일: 기둥 · 시설물의 번호판이 그 시설물을 가리킨다
         out.append({"id": "plate", "bits": None, "options": [{"word": "번호 안 보임", "set": {"matter": {"plate": "없음"}}}]})
@@ -1487,7 +1592,7 @@ def _q_next(R, x, y, w, clues):
     if not best or not 0.15 < best[0] < 0.85:
         return None
     p, nm, pt, ramp = best
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    express = any(_xw(i) for i in R["ctx"]["roads"])
     e = {} if express and not (ramp and "rampsoft" in ON) else {"e": 0.15}     # (rampsoft, 기본 끔 · 49번) 나가는 길을 지났는지는 다리만큼 또렷하지 않다: 틀리게 말할 몫을 큰길과 같게                    # 큰길에서는 지났는지 · 아직인지를 틀리게 말할 몫을 크게(33번 5-2)
     return {"id": "next", "bits": _bits([p, 1 - p]), "name": nm,
             "options": [{"label": f"{nm} 지났음", "set": {"clues": [dict({"t": "past", "p": pt, "flat": True, "label": nm}, **e)]}},
@@ -1498,7 +1603,7 @@ def _q_between(R, x, y, w, clues):
     """길 위: 다리 · 나들목 같은 큰 표지 두 개 사이로 가른다."""
     if any(c["t"] == "between" for c in clues) or R["r"] < 400:
         return None
-    express = any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"])
+    express = any(_xw(i) for i in R["ctx"]["roads"])
     kinds = ("다리", "나들목", "터널") if express else ("다리", "교차로", "역", "역 출구", "정류장", "육교", "터널", "주유소")          # 큰길을 차로 지나간 통화: 교차로 · 역 출구 · 정류장 · 주유소까지(33번 5-2)
     idx = [i for i in _places_in(x.min() - 100, y.min() - 100, x.max() + 100, y.max() + 100, 40000) if G.kind[i] in kinds]
     if len(idx) < 2:
@@ -1537,7 +1642,7 @@ def _q_marks(R, x, y, w, qid, clues):
     used = {tuple(c["p"]) for c in clues if c["t"] in ("pt", "past") and "p" in c and not isinstance(c["p"][0], list)}
     if "closestnew" in ON:                                # (closestnew · 75번) 「다 멀어요」 · 「둘 다 아니에요」로 지운 곳을 「바로 앞에 뭐가 보이세요? ○○ 같은 거요」로 다시 내밀지 않는다
         used |= {tuple(c["p"]) for c in clues if c["t"] == "not" and "p" in c and str(c.get("label", "")).endswith(" 쪽 아님")}
-    passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(G.roads[i]["name"] in EXPRESSWAYS for i in R["ctx"]["roads"]) else set())
+    passed_kinds = gaz.ROADSIDE | ({"정류장", "역 출구"} if "drive" in ON and R["on_road"] and not any(_xw(i) for i in R["ctx"]["roads"]) else set())
     road = gaz.ROADSIDE if _on_express(R) else None          # 자동차전용도로 위: 길에서 보이는 종류만(_road_ok와 같은 규칙)
     picked, parts = _candidates(x, y, w, radius, passed_kinds if qid == "passed" else {"역"} if qid == "station" else road)
     if qid == "passed" and len(picked) < 2:
@@ -1574,11 +1679,11 @@ def place_class(R):
     global _express
     x, y = R["cx"], R["cy"]
     if R["on_road"]:
-        name = next((G.roads[i]["name"] for i in R["ctx"]["roads"] if G.roads[i]["name"] in EXPRESSWAYS), None)
+        name = next((G.roads[i]["name"] for i in R["ctx"]["roads"] if _xw(i)), None)
         if name:
             return "자동차전용도로", name
     if _express is None:
-        _express = [(r["name"], road_keys(i)) for i, r in enumerate(G.roads) if r["name"] in EXPRESSWAYS]
+        _express = [(r["name"], road_keys(i)) for i, r in enumerate(G.roads) if _xw(i)]
     key = int(pack(round(x / STEP), round(y / STEP)))
     for name, ks in _express:
         j = int(np.searchsorted(ks, key))
@@ -1649,6 +1754,95 @@ def _rim_side(R):
         if float(w[np.abs((a - mid + 180) % 360 - 180) <= 60].sum()) >= 0.85:
             return word
     return None
+
+
+STOP_SAID = re.compile(r"정류장|정류소|버스\s*(타는|서는)\s*(곳|데)")
+STOP_INST = re.compile(r"(시청|구청|군청|도청|청사|병원|의료원|대학교|대학|시립대|성당|교회|사찰|세무서|경찰서|소방서|우체국|법원|검찰청|도서관|박물관|미술관|기념관|문화회관|구민회관|대사관)$")      # 정류장이 이름을 빌린 건물 · 기관(끝말)
+STOP_NOT = re.compile(r"아파트|빌라|오피스텔|맨션|타운|사거리|삼거리|오거리|입구|앞$|역$|출구|정류장|[.·,(]")      # 정류장 이름으로만 쓰이는 꼴(「래미안아파트파이낸셜뉴스」 · 「○○병원앞」)
+
+
+def stop_only(c, said):
+    """(stoponly, 기본 끔 · 85번) 「서울시청 바로 앞이에요」: 그 이름이 지명 표에 같은 이름의 버스 정류장 점으로만 있으면,
+    시민이 「정류장」이라고 하지 않았는데 그 점을 「바로 앞」의 좁은 폭으로 읽어 곧바로 39m 되묻기가 나갔다(정류장은 실제 건물에서 수백 m — 서울시청 약 230m · 명동성당 약 190m).
+    ⓐ 「근처」의 넓은 폭으로 읽어 눈앞의 것을 하나 더 받게 하고 ⓑ 이름표 · 되묻기에 「○○ 버스 정류장」으로 정류장임을 밝힌다(시민이 「아니요」라고 할 수 있게).
+    시민이 정류장이라고 말했으면(「○○ 정류장 앞이에요」) 그대로 둔다. 역 출구 · 관공서처럼 정류장이 아닌 점이 하나라도 있으면 그대로.
+    건물 · 기관을 가리키는 이름(STOP_INST 끝말, 지명 표 4,881개 가운데 113개)에만 건다: 정류장 이름 자체(「래미안아파트파이낸셜뉴스」)는 그 정류장 자리에서 댄 말이다."""
+    if c.get("t") != "at" or c.get("how") not in ("바로", "가까이") or not c.get("k") or STOP_SAID.search(said or ""):
+        return c
+    r = resolve(c["k"])
+    if r["roads"] or r["areas"] or not r["kinds"] or any(k != "정류장" for k in r["kinds"]):
+        return c
+    nm = G.name[r["ids"][0]].replace(" ", "")
+    if not STOP_INST.search(nm) or STOP_NOT.search(nm):
+        return c                                          # 건물 · 기관 이름(끝말이 시청 · 병원 · 대학교 · 성당 …)만. 「래미안아파트파이낸셜뉴스」처럼 정류장 이름으로만 쓰이는 이름은 그 자리로(가상 600통 1118 #36, 11-21)
+    return dict(c, how="근처", label=f"{c.get('label') or G.display(c['k'])} {KIND_WORD['정류장']}", stop_only=True)
+
+
+def selftest_stop():
+    """stoponly(85번): 정류장 점뿐인 이름난 곳은 「바로 앞」 한마디로 확정하지 않고, 정류장이라고 말한 통화 · 정류장이 아닌 곳은 그대로."""
+    k = gaz.norm
+    out = []
+    for name in ("서울시청", "명동성당"):
+        c = {"t": "at", "k": k(name), "how": "바로", "label": name, "sure": True}
+        s = stop_only(c, f"{name} 바로 앞이에요")
+        assert s["how"] == "근처" and s["label"] == f"{name} 버스 정류장" and s["stop_only"], s
+        r0, r1 = infer([c])["r"], infer([s])["r"]
+        assert r0 < 60 < 150 < r1, (name, r0, r1)
+        out.append(f"{name} {r0:.0f}m → {r1:.0f}m")
+    c = {"t": "at", "k": k("서울시청"), "how": "바로", "label": "서울시청"}
+    assert stop_only(c, "서울시청 정류장 앞이에요") is c and stop_only(c, "서울시청 버스 정류장 바로 앞이에요") is c      # 정류장이라고 말했으면 그대로
+    c = {"t": "at", "k": k("래미안아파트파이낸셜뉴스"), "how": "바로", "label": "래미안아파트파이낸셜뉴스"}
+    assert stop_only(c, "래미안아파트파이낸셜뉴스 바로 앞이에요") is c      # 정류장 이름으로만 쓰이는 이름은 그 자리로(가상 600통 1118 #36)
+    for name in ("잠실역 1번 출구", "상도1동주민센터", "롯데월드타워", "노량진수산시장"):
+        c = {"t": "at", "k": k(name), "how": "바로", "label": name}
+        assert stop_only(c, f"{name} 바로 앞이에요") is c, name      # 역 출구 · 관공서 · 볼거리 · 건물은 그대로(시연 대본 둘)
+    print("stoponly 스스로 시험 통과 (" + " · ".join(out) + ", 정류장이라고 말한 통화 · 정류장 이름 · 역 출구 · 관공서는 그대로)")
+
+
+def selftest_road():
+    """roadcls(86번): 양재대로 일반 구간 앞 역 출구는 자동차전용도로가 아니고, 진짜 자동차전용도로(강변북로 · 양재대로 trunk 구간)는 그대로."""
+    global _express
+    k = gaz.norm
+    had = set(ON)
+    def cls(clues):
+        global _express
+        _express = None                                   # place_class가 모아 둔 자동차전용도로 칸을 켜고 끔에 맞춰 다시
+        return place_class(infer(clues))[0]
+    out = []
+    for name in ("방이역 1번 출구", "둔촌동역", "올림픽공원역"):
+        c = [{"t": "at", "k": k(name), "how": "바로"}]
+        ON.discard("roadcls")
+        before = cls(c)
+        ON.add("roadcls")
+        after = cls(c)
+        assert before == "자동차전용도로" and after != "자동차전용도로", (name, before, after)
+        out.append(f"{name} {before} → {after}")
+    road = [{"t": "at", "k": k("강변북로")}, {"t": "past", "k": k("성수대교")}, {"t": "before", "k": k("영동대교")}, {"t": "past", "k": k("서울숲 보행다리"), "how": "바로"}]
+    assert cls(road) == "자동차전용도로"                      # 진짜 자동차전용도로(로드킬 장면)는 켜도 그대로
+    j = next(i for i, r in enumerate(G.roads) if r["name"] == "양재대로" and r["cls"] == "trunk")
+    x, y = G.road_xy(j)[len(G.road_xy(j)) // 2]
+    assert cls([{"t": "pt", "p": [float(x), float(y)], "r": 20.0}]) == "자동차전용도로"      # 양재대로의 자동차전용 구간(trunk)은 켜도 그대로
+    ON.clear(), ON.update(had)
+    _express = None
+    print("roadcls 스스로 시험 통과 (" + " · ".join(out) + ", 강변북로 · 양재대로 trunk 구간은 그대로)")
+
+
+def selftest_hood():
+    """hood(87번): 「명동이에요」 · 「신촌이요」 같은 첫마디를 동 범위로(한 점 아님), 「명동역 6번 출구」 같은 더 좁은 말 · 「종로」 길은 그대로."""
+    k = gaz.norm
+    if "hood" not in ON:
+        G.add_hoods()                                     # 스스로 시험에서만 켠 판과 같은 색인으로(이 프로세스 안)
+    out = []
+    for word, tail in (("명동", "이에요"), ("신촌", "이요"), ("종로", "요"), ("광화문", "이요"), ("압구정", "이요"), ("동대문", "이요"), ("성수", "요"), ("망원", "이요")):
+        ms = G.mentions(word + tail)
+        assert ms and ms[0]["key"] == k(word), (word, ms)
+        R = infer([{"t": "at", "k": k(word)}])
+        assert R and R["r"] > 200, (word, R and R["r"])  # 한 점이 아니라 그 동 일대
+        out.append(f"{word} {R['r']:.0f}m")
+    ms = G.mentions("명동역 6번 출구 바로 앞이에요")
+    assert ms and ms[0]["key"] != k("명동"), ms           # 더 좁은 말은 그대로
+    assert any(r[0] == "r" for r in G.ix[k("종로")]) and any(r[0] == "r" for r in G.ix[k("을지로")])      # 같은 이름의 길은 덮지 않음
+    print("hood 스스로 시험 통과 (" + " · ".join(out) + f", 「명동역 6번 출구」는 {ms[0]['name']})")
 
 
 def selftest():
@@ -1730,6 +1924,8 @@ def selftest():
     under = [{"t": "in", "a": ["park", i_pk]}, {"t": "at", "k": k("양화대교"), "how": "바로"}]
     Ru, i_br = infer(under), resolve(k("양화대교"))["ids"][0]
     assert is_done(Ru) and bridge_dist(i_br, np.array([Ru["cx"]]), np.array([Ru["cy"]]))[0] <= 20 and math.hypot(Ru["cx"] - G.x[i_br], Ru["cy"] - G.y[i_br]) > 300, (Ru["r"], Ru["cx"], Ru["cy"])
+    had_bl = "bridgelong" in ON                               # (bridgelong, 기본 켬) 아래 다리 시험은 「다리만 댄 말은 가운데 한 점」인 끈 동작부터 본다. 켠 동작은 long1에서
+    ON.discard("bridgelong")
     path = [{"t": "at", "k": k("도림천 자전거길")}, {"t": "at", "k": k("도림천고가도로교"), "how": "바로"}]      # 길 이름 + 다리 밑: 그 길이 다리 면 아래를 지나는 구간(이 고가는 하천 위로 길게 놓여 한 점이 아니다). 다리 가운데 한 점으로 끝내지 않는다
     had_br = "bridgeroad" in ON                               # (bridgeroad) 끄면 길 이름과 함께 나온 다리는 전처럼 가운데 한 점
     ON.discard("bridgeroad")
@@ -1741,13 +1937,13 @@ def selftest():
     (ON.add if had_br else ON.discard)("bridgeroad")
     Rsolo = infer(under[1:])
     assert math.hypot(Rsolo["cx"] - G.x[i_br], Rsolo["cy"] - G.y[i_br]) < 30      # 다리만 댄 말은 전처럼 가운데 점
-    long1, short1 = [{"t": "at", "k": k("보라매고가"), "how": "바로"}], [{"t": "at", "k": k("묵동교"), "how": "바로"}]      # (bridgelong, 기본 끔) 긴 다리 · 고가는 혼자 나와도 면으로
-    assert is_done(infer(long1)) and "bridgelong" not in ON      # 끄면 전처럼 가운데 한 점으로 끝난다(1.6km 고가의 가운데)
+    long1, short1 = [{"t": "at", "k": k("보라매고가"), "how": "바로"}], [{"t": "at", "k": k("묵동교"), "how": "바로"}]      # (bridgelong, 기본 켬) 긴 다리 · 고가는 혼자 나와도 면으로
+    assert is_done(infer(long1))                                 # 끄면 전처럼 가운데 한 점으로 끝난다(1.6km 고가의 가운데)
     ON.add("bridgelong")
     Rl, i_bl = infer(long1), resolve(k("보라매고가"))["ids"][0]
     assert not is_done(Rl) and Rl["r"] > 300 and float(np.percentile(bridge_dist(i_bl, Rl["x"][Rl["cred"]], Rl["y"][Rl["cred"]]), 90)) <= 40, (Rl["r"], Rl["r_cover"])      # 범위 = 고가를 따라 난 띠(가운데 한 점이 아니다)
     assert is_done(infer(short1))                                # 짧은 다리(75m)는 켜도 한 점
-    ON.discard("bridgelong")
+    (ON.add if had_bl else ON.discard)("bridgelong")
     # (ASK_ON · 75번 후보 2, 기본 켬) 질문 다듬기 — 스위치마다 끈 동작 · 켠 동작
     had_ask = ON & (set(ASK_ON.split(",")) | {"sameopts"})                     # 기본으로 켜져 있든 꺼져 있든: 다 끄고 하나씩 켜 본 뒤 되돌린다
     ON.difference_update(had_ask)
@@ -1793,9 +1989,46 @@ def selftest():
     assert "closest" not in [q for q, _ in ask(twice)], ask(twice)
     ON.discard("closestcap")
     assert "closest" in [q for q, _ in ask(twice)], ask(twice)      # 그 스위치가 없으면 세 번째도 묻는다
+    had_gn = "genericname" in ON                          # (genericname · 83번) 되짚기: 80번에서 곳 이름 없이 흔한 낱말만 댄 첫마디가 한 곳으로 묶이던 이름들
+    alone = ["쓰레기통", "따릉이대여소", "시장입구", "말동상", "입구광장", "잔디밭", "빠지는길", "버스정류장앞"]
+    ON.discard("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is not None for w in alone)      # 끄면 그 낱말 하나로 서울 어딘가에 범위가 선다
+    ON.add("genericname")
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is None for w in alone), [w for w in alone if infer([{"t": "at", "k": w, "how": "가까이"}]) is not None]
+    i_sf = next(i for i, a in enumerate(G.parks) if a["name"] == "서울숲")
+    Rg = infer([{"t": "in", "a": ["park", i_sf]}, {"t": "at", "k": "잔디밭", "how": "가까이"}])       # 「서울숲 … 잔디밭」: 그 공원 안이라 남는다(시연 노점 장면)
+    i_fm = resolve("잔디밭")["ids"][0]
+    assert Rg is not None and math.hypot(Rg["cx"] - G.x[i_fm], Rg["cy"] - G.y[i_fm]) < 150, Rg and (Rg["cx"], Rg["cy"])
+    Ry = infer([{"t": "at", "k": "잔디밭", "how": "가까이"}, {"t": "at", "k": gaz.norm("여의도공원")}])     # 「공원 잔디밭 … 여의도공원이요」: 서울숲 가족마당은 빠지고 여의도에 선다(80번 c15 10km)
+    assert Ry is not None and math.hypot(Ry["cx"] - G.x[i_fm], Ry["cy"] - G.y[i_fm]) > 5000
+    assert not generic_key(gaz.norm("광장시장")) and not generic_key(gaz.norm("서울숲")) and not generic_key(gaz.norm("호수약국"))
+    demo = [gaz.norm(w) for w in ("큰 연못", "얕은 연못", "보행교", "사슴 있는 데", "2번 출입구")]      # 시연 장면용 표의 장소 · 별명: 혼자서는 서지 않고, 서울숲 안이면 남는다
+    assert all(demo_key(w) for w in demo) and not demo_key(gaz.norm("서울숲")) and not demo_key(gaz.norm("상도역"))
+    assert all(infer([{"t": "at", "k": w, "how": "가까이"}]) is None for w in demo)
+    Rd = infer([{"t": "in", "a": ["park", i_sf]}, {"t": "at", "k": gaz.norm("큰 연못"), "how": "바로"}])
+    i_lk = resolve(gaz.norm("큰 연못"))["ids"][0]
+    assert Rd is not None and math.hypot(Rd["cx"] - G.x[i_lk], Rd["cy"] - G.y[i_lk]) < 100
+    Rsd = infer([{"t": "at", "k": gaz.norm("상도역")}, {"t": "at", "k": gaz.norm("2번 출입구"), "how": "바로"}])      # 다른 곳 이름과 같이 나온 별명은 서울숲으로 끌지 않는다
+    i_sd = resolve(gaz.norm("상도역"))["ids"][0]
+    assert Rsd is not None and math.hypot(Rsd["cx"] - G.x[i_sd], Rsd["cy"] - G.y[i_sd]) < 600
+    (ON.add if had_gn else ON.discard)("genericname")
+    had_fs = "farshop" in ON                              # (farshop · 83번) 「명동역 6번 출구 나와서 밀리오레 앞」: 자료의 밀리오레 둘은 모두 2km 넘게 떨어져 있다
+    mg = [{"t": "at", "k": gaz.norm("명동역 6번 출구")}, {"t": "at", "k": gaz.norm("밀리오레"), "how": "바로"}]
+    i_mx = resolve(gaz.norm("명동역 6번 출구"))["ids"][0]
+    ON.discard("farshop")
+    Rm0 = infer(mg)
+    assert math.hypot(Rm0["cx"] - G.x[i_mx], Rm0["cy"] - G.y[i_mx]) > 1500 or Rm0["r"] > 1500, (Rm0["r"],)      # 끄면 먼 밀리오레 쪽으로 끌려 넓게 퍼진다
+    ON.add("farshop")
+    Rm1 = infer(mg)
+    assert math.hypot(Rm1["cx"] - G.x[i_mx], Rm1["cy"] - G.y[i_mx]) < 100 and Rm1["r"] < 300, (Rm1["cx"], Rm1["cy"], Rm1["r"])
+    assert infer([mg[1]]) is not None                      # 가게 이름만 댄 말은 그대로 쓴다(어긋날 기준점이 없다)
+    (ON.add if had_fs else ON.discard)("farshop")
     ON.clear(), ON.update(had)
     print(f"locate 스스로 시험 통과 (강변북로 {R1['r']:.0f}m → {R2['r']:.0f}m → {R3['r']:.0f}m, 서울숲 {Ra['r']:.0f}m → {Rb['r']:.0f}m → {Rc['r']:.0f}m, 스타벅스 {Rs['r']:.0f}m → 뚝섬역과 겹쳐 {Rt['r']:.0f}m)")
 
 
 if __name__ == "__main__":
     selftest()
+    selftest_stop()
+    selftest_road()
+    selftest_hood()
