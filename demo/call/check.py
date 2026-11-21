@@ -1089,7 +1089,7 @@ def cross_check():
         assert qs[-1] == "confirm", qs
         print("  ✓ 확정 전 교차 확인(cross False): 올리브영 강남역점 바로 앞 → 곧바로 확인 질문")
         return
-    assert qs[-1] == "check" and "올리브영 강남역점" in v0["question"]["say"] and v0["question"].get("why") == ["여러 곳"], (qs, v0["question"])
+    assert qs[-1] == "check" and "올리브영 강남역점" in v0["question"]["say"] and v0["question"].get("cross_why") == ["여러 곳"] and v0["question"]["why"] == S.tab("이렇게 물어보세요", "질문", 2)["cross"], (qs, v0["question"])      # 화면의 「까닭」은 문구 파일 글(켜진 까닭 낱말은 cross_why)
     qs, v = run(*head, "헤이데이의원 바로 옆이에요")
     assert qs[-1] == "confirm" and v["center"] == v0["center"] and v["matter"].get("cross") == "ok", (qs, v["center"], v0["center"], v["matter"].get("cross"))
     qs, v = run(*head, "잘 모르겠어요")

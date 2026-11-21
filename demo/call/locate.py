@@ -1285,7 +1285,7 @@ def questions(R, clues, matter, asked=(), same=None):
             else:
                 h, why = _cross(R, clues, asked)
                 if h:
-                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "why": why, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "cross_why": why, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
         elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
