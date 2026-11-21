@@ -213,6 +213,7 @@ def _open(name):
 
 
 HOOD_AFTER = re.compile(r"^(이에요|예요|이요|에요|이고|인데|이라|이랑|에서|에있|쪽|근처|일대|부근|주변|인근|방면|방향|쯤|요(?!양|리|가|금|청|즘)|$)")      # (hood, 87번) 동네 말 바로 뒤에 와도 되는 말(공백 · 부호를 지운 글)
+HOOD_KEY = "일대"      # (hood) 동네 범위를 둔 키의 꼬리: 「명동」 → 「명동일대」(지명 자료에 없는 키, 확인함)
 
 
 class Gazetteer:
@@ -368,8 +369,7 @@ class Gazetteer:
             k = norm(word)
             add = [("dong", dong[a]) for a in areas if a in dong] + [("gu", gu[a]) for a in areas if a in gu]
             if add:
-                self.ix[k] = [r for r in self.ix.get(k, []) if r[0] != "p"] + add
-                ALIAS_KEYS.add(k)
+                self.ix[k + HOOD_KEY] = [r for r in self.ix.get(k, []) if r[0] != "p"] + add      # 동네 범위는 따로 둔 키(「명동일대」)에: 원래 이름(「광화문」 점 · 「을지로」 길)은 main 그대로 둔다(PR #150 리뷰)
                 self.hood_keys = getattr(self, "hood_keys", set()) | {k}
         return len(self.HOODS)
 
@@ -489,6 +489,9 @@ class Gazetteer:
             hit = None
             for ln in range(min(self.maxlen, len(t) - i), 1, -1):
                 key = t[i:i + ln]
+                if key in getattr(self, "hood_keys", ()) and HOOD_AFTER.match(t[i + ln:i + ln + 8]):
+                    hit = (key + HOOD_KEY, ln)            # (hood, 87번) 동네 말이 혼자 나오면(뒤에 토씨 · 「쪽 · 근처」 · 말 끝) 그 동 범위로. 「광화문 앞」 · 「을지로 따라」는 아래에서 main 그대로 읽는다
+                    break
                 refs = self.ix.get(key)
                 if refs and self._accept(key, refs, t[i + ln:i + ln + 8]):
                     hit = (key, ln)
@@ -512,7 +515,7 @@ class Gazetteer:
                 if ("compass" in ON and key[-1] in "동서남북" and re.match(r"(쪽|편|측)", t[i + ln:]) and not (key[-1] == "남" and t[i + ln:i + ln + 1] == "편") and t[i:i + ln] == key and self._wide(key[:-1])
                         and not any(r[0] in ("gu", "dong") for r in self.ix[key])):
                     key, ln = key[:-1], ln - 1            # (compass · 75번) 「석촌호수 남쪽」: 「석촌호수[남]」이라는 정류장 + 「쪽」이 아니라 「석촌호수」 + 「남쪽」으로 읽는다(넓은 곳의 이름일 때만)
-                out.append(self._mention(key, key, False, t[i + ln:i + ln + 14]))
+                out.append(self._mention(key, t[i:i + ln] if key.endswith(HOOD_KEY) and key[:-len(HOOD_KEY)] in getattr(self, "hood_keys", ()) else key, False, t[i + ln:i + ln + 14]))
                 covered.append((i, i + ln))
                 i += ln
             else:
@@ -578,8 +581,6 @@ class Gazetteer:
         return None
 
     def _accept(self, key, refs, after):
-        if key in getattr(self, "hood_keys", ()) and not HOOD_AFTER.match(after):
-            return False                                  # (hood, 87번) 동네 말은 혼자 나왔을 때만: 「CU 신촌피어점」 · 「압구정엮」처럼 더 긴 이름의 일부면 동네로 읽지 않는다(600통 1114 #92)
         if "trailword" in ON and key in TRAIL:
             return False                                  # (trailword · 75번) 「석촌호수 산책로예요」 · 「올림픽공원 둘레길이에요」의 길 낱말은 이름이 아니다
         if self.cross0 < self.cross1 and key in ("교차로", "로터리", "네거리", "오거리"):

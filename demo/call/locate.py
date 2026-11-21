@@ -1835,12 +1835,16 @@ def selftest_hood():
     out = []
     for word, tail in (("명동", "이에요"), ("신촌", "이요"), ("종로", "요"), ("광화문", "이요"), ("압구정", "이요"), ("동대문", "이요"), ("성수", "요"), ("망원", "이요")):
         ms = G.mentions(word + tail)
-        assert ms and ms[0]["key"] == k(word), (word, ms)
-        R = infer([{"t": "at", "k": k(word)}])
+        assert ms and ms[0]["key"] == k(word) + gaz.HOOD_KEY, (word, ms)
+        R = infer([{"t": "at", "k": ms[0]["key"]}])
         assert R and R["r"] > 200, (word, R and R["r"])  # 한 점이 아니라 그 동 일대
         out.append(f"{word} {R['r']:.0f}m")
     for said, word in (("CU 신촌피어 근처예요", "신촌"), ("압구정엮 근처예요", "압구정"), ("명동스타벅스 앞이에요", "명동")):
-        assert all(m["key"] != k(word) for m in G.mentions(said)), (said, G.mentions(said))      # 더 긴 이름의 일부인 동네 말은 동네로 읽지 않음(600통 1114 #92)
+        assert all(m["key"] != k(word) + gaz.HOOD_KEY for m in G.mentions(said)), (said, G.mentions(said))      # 더 긴 이름의 일부인 동네 말은 동네로 읽지 않음(600통 1114 #92)
+    for said, word, main in (("광화문 앞이에요", "광화문", True), ("동대문 옆이요", "동대문", True), ("광화문 건너편이요", "광화문", True), ("을지로 따라 가다가요", "을지로", True),
+                             ("종로 따라 걷다가 봤어요", "종로", False), ("명동 앞인데요", "명동", False)):
+        keys = [m["key"] for m in G.mentions(said)]      # (PR #150 리뷰) 관계 말이 붙으면 동 범위로 넓히지 않고 main이 읽던 대로(광화문 · 동대문 점, 을지로 길 / 종로 · 명동 두 글자는 main도 안 읽음)
+        assert k(word) + gaz.HOOD_KEY not in keys and (k(word) in keys) == main, (said, keys)
     ms = G.mentions("명동역 6번 출구 바로 앞이에요")
     assert ms and ms[0]["key"] != k("명동"), ms           # 더 좁은 말은 그대로
     assert any(r[0] == "r" for r in G.ix[k("종로")]) and any(r[0] == "r" for r in G.ix[k("을지로")])      # 같은 이름의 길은 덮지 않음
