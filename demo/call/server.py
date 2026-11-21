@@ -48,6 +48,7 @@ KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대�
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
+PARK_TO = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("park_to", {})      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
 UNKNOWN = "확인 불가"
 G = L.G
 lock = threading.Lock()
@@ -1372,7 +1373,8 @@ def route_of(matter, R):
     cls, cname = L.place_class(R)
     W = tab("일의 종류와 갈림")
     gu = L._area_at(G.gu, R["cx"], R["cy"]) or W["구 모름"]
-    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
+    park = next((v for k, v in PARK_TO.items() if cname and cname.startswith(k)), None) if cls == "시 공원" else None      # 공원마다 맡는 곳(어린이대공원 = 서울시설공단 등)
+    put = lambda s, c: s.replace("{공원 관리}", (c == cls and park) or "{공원} 관리사무소(서울시 공원여가센터)").replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
     names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
