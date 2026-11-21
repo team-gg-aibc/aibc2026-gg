@@ -34,7 +34,7 @@
 
 ## Screens
 
-<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from the script PR #151 version (beb3d63 = main 16d57be + the new script, with the step 2 question "who rescues it and where is it cared for?"), so they match the main screen once #151 is merged. If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
+<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from a version whose scene and screen code are the same as main 13a9fb3 (#151 merged, with the step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
 
 > [!NOTE]
 > The service and these screenshots are in Korean. The call is a made-up call the team wrote. It is not a real complaint or a real person, the agent's name tag is "상담사 A" (Agent A), and the caller's phone number ("민원인 연락처") is made up with the middle digits hidden. The bottom left of the screen also says "This call and question flow is a made-up flow the team built from public material and the ordinance text. It is not connected to the 120 standard consultation database." The scripted scene was played in "saved answers" mode: the team ran the script once with real calls, saved the Upstage model responses, and replays them for the same words.
