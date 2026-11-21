@@ -856,6 +856,32 @@ def hangul_options():
     print(f"  ✓ 보기의 영어 이름(hangulopt {'hangulopt' in L.ON}): 롯데월드타워 「바로 앞」 보기 {labels}")
 
 
+def neg_keep():
+    """(negkeep, 91번) Solar가 「아님」이라 답했는데 dropcheck가 받지 않은 이름(그 말에 「아니 · 말고 · 없 …」가 없음): 켜면 없던 말로 치고 코드가 읽은 그대로 둔다. 끄면 main 그대로 「있음 · 바로 앞」으로 뒤집혀 들어간다(88번 c14 이태원, 4.5km 튐)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    said = "그건 모르겠고요, 바로 앞에 이태원폰마트라는 휴대폰 가게가 있어요"
+    short = S.shortlist(said, None)
+    mid = next(m["id"] for m in short if m.get("key") == "휴대폰가게")
+    code = S.code_read(said, None, short, None)
+    real, mode = S._solar, S.MODE
+    S._solar = lambda system, user, schema: {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "places": [{"id": mid, "rel": "아님", "how": "바로"}], "choice": "없음", "confirm": "없음", "outside": False, "said_place": ""}
+    S.MODE = "live"
+    try:
+        st = {"id": "check-neg", "lines": [{"who": "시민", "text": said}], "turns": [{"said": said, "asked": None}]}
+        read, _, _ = S.model_read(st, short, "없음")
+        merged = S._merge(code, read)
+    finally:
+        S._solar, S.MODE = real, mode
+    phone = [c for c in merged["clues"] if c.get("k") == "휴대폰가게"]
+    if "negkeep" in S.L.ON:
+        assert phone and all(c.get("how") != "바로" for c in phone) and phone == [c for c in code["clues"] if c.get("k") == "휴대폰가게"], phone      # 코드가 읽은 그대로(「바로」 없음 — 먼 곳이면 튐 막기가 막는다)
+    else:
+        assert any(c.get("how") == "바로" for c in phone), phone                                                    # 끄면 main 그대로: 받지 않은 「아님」이 「바로 앞」으로
+    print(f"  ✓ 받지 않은 Solar 「아님」(negkeep {'negkeep' in S.L.ON}): 「휴대폰 가게」 단서 {[(c.get('label'), c.get('how')) for c in phone]}")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -893,6 +919,7 @@ def main():
         records(ends["roadkill"])
         switches()
         bind_choice()
+        neg_keep()
         reread_guards()
         seen_wide()
         hangul_options()

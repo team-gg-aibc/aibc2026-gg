@@ -1143,6 +1143,9 @@ def model_read(st, short, known):
         if pl.get("rel") == "아님" and not ("dropcheck" in L.ON and not NEGWORD.search((turn_.get("said") or "") + " " + prev_said)):
             read["drop"].append(m.get("key") or m["name"])
             continue
+        if pl.get("rel") == "아님" and "negkeep" in L.ON:
+            read["negkeep"] = list(read.get("negkeep") or []) + [m.get("key") or m["name"]]
+            continue                                      # (negkeep, 91번) dropcheck가 받지 않은 「아님」은 없던 말로 친다: 그 이름은 코드가 읽은 그대로 둔다(_merge). 안 그러면 아래로 흘러 관계가 기본 「있음」이 되고 Solar의 「바로」가 붙어 「바로 앞」 단서가 된다(88번 c14 이태원: 「휴대폰 가게」를 먼 가게 「휴대폰가게 3호점」 바로 앞으로 4.5km 튐 — 튐 막기는 「바로」 단서를 일부러 통과시킨다)
         if "placebind" in L.ON and "key" not in m and not str(m.get("by", "")).startswith(("#", "≈", "@")):
             read["catkeep"] = list(read.get("catkeep") or []) + [m["name"]]
             continue                                      # (placebind, 79번 · 81번 r01) 종류만 말했는데(「편의점 바로 앞이에요」) Solar가 코드가 넘긴 그 종류 후보 가운데 하나(「위드미」)를 장소로 적었다: 시민이 말하지 않은 이름이라 받지 않는다(넓게 둔 코드 읽기를 쓴다, _merge)
@@ -1838,6 +1841,9 @@ def _merge(code, model):
     if "choicekeep" in L.ON:                              # (choicekeep, 기본 끔 · 53번) 「○○ 지나고 1분쯤 됐어요」: 코드는 시민이 말한 정도(1분쯤 · 조금)로 읽어 두는데, Solar가 보기를 고르면 그 보기에 미리 든 「방금 지남」 단서가 다시 들어와 이겼다(47번 pastfix가 실제 호출 길에서 풀리던 일). 같은 표지의 「지났다 · 못 미쳤다」를 코드가 뚜렷이 읽었으면 보기 단서는 버린다
         nl = lambda c: gaz.norm(str(c.get("label") or c.get("k") or "").split(" → ")[0])      # noqa: E731
         model = dict(model, clues=[c for c in model.get("clues") or [] if not (c.get("t") in ("past", "before") and nl(c) and any(x.get("t") == c["t"] and nl(x) and (nl(c) in nl(x) or nl(x) in nl(c)) for x in sure))])      # 이름이 겹치는 것도(시민은 「상계교 나가는 길 조금 지나서」라고 했는데 Solar가 다리 「상계교 방금 지남」을 더 넣어 600m 틀린 확정, 씨앗 1201 #17)
+    if model.get("negkeep"):                              # (negkeep) Solar가 「아님」이라 했지만 받지 않은 이름: 코드가 이 말에서 읽은 그 단서를 그대로 둔다
+        have = {c.get("k") or c.get("label") for c in model.get("clues") or []}
+        model = dict(model, clues=list(model.get("clues") or []) + [c for c in code.get("clues") or [] if (c.get("k") in model["negkeep"] or c.get("label") in model["negkeep"]) and (c.get("k") or c.get("label")) not in have])
     if model.get("catkeep") is not None:                  # (placebind) Solar가 고른 종류 후보를 버렸으면, 코드가 그 종류 말로 읽은 단서(「편의점 바로 옆」 · 후보가 하나뿐이면 그 한 곳)를 둔다
         have = {c.get("label") for c in model.get("clues") or []}
         model = dict(model, clues=list(model.get("clues") or []) + [c for c in code.get("clues") or [] if (c.get("t") == "cat" or c.get("label") in model["catkeep"]) and c.get("label") not in have])
