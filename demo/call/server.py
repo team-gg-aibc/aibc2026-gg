@@ -1978,7 +1978,7 @@ def build(st, extra=None):
                 "others": [q["id"] for q in qs[1:3]]}
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
     if pick.get("cross"):
-        question["cross"], question["wide"] = pick["cross"], pick.get("wide")      # (cross) 교차 확인(True) · 둘 중 가르기("pick")
+        question["cross"], question["wide"], question["why"] = pick["cross"], pick.get("wide"), pick.get("why")      # (cross) 교차 확인(True) · 둘 중 가르기("pick"), 켜진 까닭
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
@@ -2260,7 +2260,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide"), "why": q.get("why")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 

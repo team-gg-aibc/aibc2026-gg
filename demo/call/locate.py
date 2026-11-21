@@ -1175,43 +1175,46 @@ def _cross_pick(R, clues):
 
 
 def _many_here(name, p, cx, cy):
-    """(cross) 그 이름이 범위 둘레 300m에 또 있나(같은 이름 · 같은 상표의 다른 지점)."""
-    if twins(name, p, np.array([cx]), np.array([cy]), 300.0):
-        return True
+    """(cross) 그 이름이 상표이고 범위 둘레 300m에 같은 상표의 다른 지점이 있나(99번 4-3절 ①). 같은 이름의 정류장 · 건물(「상도1동주민센터」)은 「same」 질문이 따로 묻는다."""
     b = next((G.brand[int(i)] for i in G.near(p[0], p[1], 30) if gaz.norm(G.name[int(i)]) == gaz.norm(name) and G.brand[int(i)]), None)
     return bool(b) and bool(twins(b, p, np.array([cx]), np.array([cy]), 300.0))
 
 
 def _cross(R, clues, asked):
-    """(cross, 99번 4-3절) 위험한 확정인가 → 교차 확인에서 「○○ 말고」로 댈 이름(받치는 이름) 또는 None.
-    켜는 때: 받치는 말이 하나뿐이고 약함(_hinge) · 그 이름이 둘레에 또 있음(같은 이름 · 같은 상표 · 넓은 장소) · 앞서 「아니요」가 있었음.
+    """(cross, 99번 4-3절) 위험한 확정인가 → (교차 확인에서 「○○ 말고」로 댈 이름, 까닭들) 또는 (None, []).
+    켜는 때 셋(11-22 02시 좁힘 — 「받치는 말이 하나뿐」은 뺐다: 평가 774통에서 거의 맞게 좁힌 통화에 질문이 붙어 한 점 −4 · −2 · −8 · −3):
+    여러 곳(그 이름이 둘레 300m에 또 있음 · 같은 이름이 300m 넘게 떨어져 또 있음 · 넓은 장소 · 긴 다리) · 흔들림(앞서 「아니요」 · 「X 아니에요」 · 어긋나는 말 경고) · 갈라짐(mainblob이 남긴 다른 덩어리).
     켜지 않는 때: 자동차전용도로 위 · 번호를 읽어 줬음 · 위치 질문을 여덟 번 넘게 함 · 이번 좁힘에서 이미 물음 · 한 통화 상한(CROSS_MAX) · 서로 다른 이름 둘 이상이 받침."""
     ids = [(a or "").rstrip("!") for a in asked]
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
     if ids.count("check") + ids.count("crosspick") >= CROSS_MAX or {"check", "crosspick"} & set(ids[since + 1:]) or sum(1 for a in ids if a in LOCQ) > 8:
-        return None
+        return None, []
     if R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"]):
-        return None
-    labs = [c.get("label") or "" for c in clues]
-    if any(lab.startswith(("가로등", "국가지점번호")) for lab in labs):
-        return None
+        return None, []
+    if any((c.get("label") or "").startswith(("가로등", "국가지점번호")) for c in clues):
+        return None, []
+    near = set()                                          # 둘레 80m 안에 닿는 서로 다른 시민 이름
+    for c in clues:
+        if c["t"] in ("at", "pt") and (c.get("label") or c.get("k")):
+            pts = [c["p"]] if "p" in c else list(zip(resolve(c["k"])["x"], resolve(c["k"])["y"])) if "k" in c else []
+            if pts and min(math.hypot(px - R["cx"], py - R["cy"]) for px, py in pts) <= 80:
+                near.add(gaz.norm((c.get("label") or c["k"]).split(" → ")[0]))
+    if len(near) >= 2:
+        return None, []
     anc = anchor(R, clues)
-    hinge = _hinge(R, clues)
-    if hinge is None:                                     # 받치는 말이 하나뿐이 아니면, 둘레 80m 안에 닿는 서로 다른 이름이 둘 이상인가
-        near = set()
-        for c in clues:
-            if c["t"] in ("at", "pt") and (c.get("label") or c.get("k")):
-                pts = [c["p"]] if "p" in c else list(zip(resolve(c["k"])["x"], resolve(c["k"])["y"])) if "k" in c else []
-                if pts and min(math.hypot(px - R["cx"], py - R["cy"]) for px, py in pts) <= 80:
-                    near.add(gaz.norm((c.get("label") or c["k"]).split(" → ")[0]))
-        if len(near) >= 2:
-            return None
-    many = bool(anc) and (bool(anc.get("ext")) or _many_here(anc["name"], anc["p"], R["cx"], R["cy"]))
-    split = "crosspick" in ON and R.get("blob_alt") is not None      # (crosspick) 가능성이 갈라짐: mainblob이 좁혔는데 다른 덩어리가 남음
-    if hinge or many or split or since >= 0:
-        return (anc or {}).get("name") or hinge or "이 자리"
-    return None
+    many = bool(anc) and (bool(anc.get("ext")) or _many_here(anc["name"], anc["p"], R["cx"], R["cy"]) or _far_same(anc))
+    shaky = since >= 0 or any(c["t"] == "not" for c in clues) or any(v < 0.35 for v in R["trust"].values())
+    split = R.get("blob_alt") is not None
+    why = [t for t, ok in (("여러 곳", many), ("흔들림", shaky), ("갈라짐", split)) if ok]
+    if not why:
+        return None, []
+    return (anc or {}).get("name") or _hinge(R, clues) or "이 자리", why
 
+
+def _far_same(anc):
+    """(cross) 브랜드가 아닌 그 이름이 300m 넘게 떨어진 곳에 또 있나(먼 같은 이름: 다른 동네의 같은 이름으로 잘못 잡았을 수 있다)."""
+    r = resolve(gaz.norm(anc["name"]))
+    return len(r["x"]) >= 2 and float(np.hypot(r["x"] - anc["p"][0], r["y"] - anc["p"][1]).max()) > 300
 
 def _fresh(asked):
     """마지막 「아니요」(confirm! · check!) 뒤에 새 위치 단서(「!」 없는 위치 질문)를 받았나. 「아니요」가 없었으면 참."""
@@ -1280,9 +1283,9 @@ def questions(R, clues, matter, asked=(), same=None):
             if matter.get("cross") == "ok" and any((a or "").rstrip("!") in ("check", "crosspick") for a in list(asked)[since_ + 1:]):
                 last = dict(confirm, name=matter.get("cross_name")) if "crossname" in ON else confirm      # 맞음: 핀은 그대로. crossname이면 그 이름까지 되말한다(confirm_named — 그 이름이 보여서 「네」가 나오기 쉬워 따로 잰다)
             else:
-                h = _cross(R, clues, asked)
+                h, why = _cross(R, clues, asked)
                 if h:
-                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "why": why, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
         elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
