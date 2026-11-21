@@ -1001,6 +1001,24 @@ def pair_seen():
     print(f"  ✓ 보기 밖의 이름 둘을 함께 댄 말(pairseen {on}): 장한평역 {v['radius']}m(가운데 {moved:.0f}m 옮김) · 마들역 {m['radius']}m {[c for c in m['chips'] if '옆' in c]}")
 
 
+def main_blob():
+    """(mainblob, 93번 다음 방향) 동규 장한평역 통화(11-21)의 마지막 단서 그대로: 우리은행 바로 앞 · 가장 가까운 역 장한평역 · CU 가까이 · 신한은행 가까이.
+    가능성 89%가 실제 자리(장한평역(중) 정류장) 52m 안 한 덩어리인데, 끄면 543m 밖 4% 덩어리까지 덮어 범위가 넓게 남는다(같은 간판 질문). 켜면 그 덩어리로 좁혀 끝낸다.
+    덩어리가 하나뿐(우리은행 · 장한평역 둘만)일 때는 켜도 그대로다."""
+    import math
+    sys.path.insert(0, str(HERE))
+    import locate as L
+    tx, ty = 5931.0, 1238.0                               # 장한평역(중) 정류장(그 통화의 확정 자리)
+    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True}, {"t": "at", "k": "장한평역", "nearest": True}, {"t": "at", "k": "cu", "how": "가까이"}, {"t": "at", "k": "신한은행", "how": "가까이"}]
+    R2, R4 = L.infer(cl[:2]), L.infer(cl)
+    if "mainblob" in L.ON:
+        assert L.is_done(R4) and R4["r"] <= 50 and math.hypot(R4["cx"] - tx, R4["cy"] - ty) <= 80, (R4["r"], R4["cx"], R4["cy"])
+    else:
+        assert not L.is_done(R4) and L.size_of(R4)["m"] > 300, (R4["r"], R4["r_cover"])
+    assert not L.is_done(R2) and R2["r"] > 150, R2["r"]
+    print(f"  ✓ 가능성이 한 덩어리에 몰린 범위(mainblob {'mainblob' in L.ON}): 동규 장한평역 통화 마지막 차례 반지름 {R4['r']:.0f}m · 화면 {L.size_of(R4)['m']}m · 가운데가 확정 자리에서 {math.hypot(R4['cx'] - tx, R4['cy'] - ty):.0f}m")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -1044,6 +1062,7 @@ def main():
         bridge_end()
         reread_guards()
         seen_wide()
+        main_blob()
         edge_reads()
         ask_fixes()
         chain_said()

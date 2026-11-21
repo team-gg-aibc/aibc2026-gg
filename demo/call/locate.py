@@ -833,6 +833,17 @@ def infer(clues):
     pk = any(_pk(resolve(c["k"])) for c in clues if "k" in c and c["t"] in ("at", "past", "before"))       # 면 · 선으로 된 공원 안 이름(park_names)이 범위를 받치고 있나
     named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof", "rim", "core")]
     heard_only = bool(named) and all(c.get("heard") for c in named)      # 자리 단서가 모두 비슷한 이름으로 이은 것뿐이다(11-15)
+    if "mainblob" in ON and not on_road and n90 > 1:     # (mainblob, 93번 다음 방향) 90% 범위가 떨어진 덩어리 여럿이고 한 덩어리가 가능성 대부분을 가지면 범위 = 그 덩어리
+        part = _blobs(x[cred], y[cred])                   # 동규 장한평역 통화(11-21): 「CU랑 신한은행이요」 뒤 89%가 실제 자리 52m 안 덩어리인데 543m 밖 4% 덩어리까지 덮어 498m → 같은 간판 질문
+        mass = np.bincount(part, weights=w[cred])
+        top = int(mass.argmax())
+        if len(mass) > 1 and mass[top] >= BLOB_SHARE * float(w.sum()):
+            cred = cred[part == top]
+            cw = w[cred] / w[cred].sum()
+            cx, cy = float((x[cred] * cw).sum()), float((y[cred] * cw).sum())
+            half = math.hypot(x[cred].max() - x[cred].min(), y[cred].max() - y[cred].min()) / 2
+            radius = max(math.sqrt(float(cell[cred].sum()) / math.pi), 0.6 * half, STEP / 2)
+            r_cover = float(np.hypot(x[cred] - cx, y[cred] - cy).max())
     R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
     if ON & {"ringdone", "rimask", "rimline"}:                       # (75번) 범위를 받치는 단서 가운데 「둘레」로 읽은 곳(호수 테두리 · 구역의 테두리 띠)의 이름. 다른 단서와 어긋나 버려진 것(믿음 0.35 아래)은 뺀다
         ring_k = next((c["k"] for n, c in enumerate(clues) if trust.get(n, 1.0) >= 0.35 and "k" in c and (c["t"] == "rim" or (
@@ -851,6 +862,30 @@ def infer(clues):
         R0 = infer([c for c in clues if c["t"] != "half"])
         R["needs_half"] = R0 is None or not is_done(R0)
     return R
+
+
+BLOB_LINK, BLOB_SHARE = 60.0, 0.85     # (mainblob) 이 칸(m)으로 묶어 이웃 칸끼리 이은 것이 한 덩어리 · 범위를 그 덩어리로 좁히는 몫(전체 가능성 가운데)
+
+
+def _blobs(x, y):
+    """(mainblob) 점들을 BLOB_LINK 칸에 넣고 이웃 칸(8방향)끼리 이어 덩어리 번호를 매긴다 → 점마다 번호."""
+    keys = list(zip(np.floor(x / BLOB_LINK).astype(int).tolist(), np.floor(y / BLOB_LINK).astype(int).tolist()))
+    cells = {c: n for n, c in enumerate(dict.fromkeys(keys))}
+    up = list(range(len(cells)))
+
+    def find(a):
+        while up[a] != a:
+            up[a] = up[up[a]]
+            a = up[a]
+        return a
+    for (i, j), n in cells.items():
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                m = cells.get((i + di, j + dj))
+                if m is not None:
+                    up[find(m)] = find(n)
+    roots = {}
+    return np.array([roots.setdefault(find(cells[c]), len(roots)) for c in keys])
 
 
 def size_of(R):
