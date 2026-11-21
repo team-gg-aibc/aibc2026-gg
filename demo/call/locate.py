@@ -1126,6 +1126,47 @@ def _hinge(R, clues):
     return None
 
 
+CROSS_MAX = int(os.environ.get("CALL_CROSS_MAX", "3"))     # (cross) 한 통화에 교차 확인을 묻는 횟수의 상한(동규 11-21 23시: 세 번까지)
+
+
+def _many_here(name, p, cx, cy):
+    """(cross) 그 이름이 범위 둘레 300m에 또 있나(같은 이름 · 같은 상표의 다른 지점)."""
+    if twins(name, p, np.array([cx]), np.array([cy]), 300.0):
+        return True
+    b = next((G.brand[int(i)] for i in G.near(p[0], p[1], 30) if gaz.norm(G.name[int(i)]) == gaz.norm(name) and G.brand[int(i)]), None)
+    return bool(b) and bool(twins(b, p, np.array([cx]), np.array([cy]), 300.0))
+
+
+def _cross(R, clues, asked):
+    """(cross, 99번 4-3절) 위험한 확정인가 → 교차 확인에서 「○○ 말고」로 댈 이름(받치는 이름) 또는 None.
+    켜는 때: 받치는 말이 하나뿐이고 약함(_hinge) · 그 이름이 둘레에 또 있음(같은 이름 · 같은 상표 · 넓은 장소) · 앞서 「아니요」가 있었음.
+    켜지 않는 때: 자동차전용도로 위 · 번호를 읽어 줬음 · 위치 질문을 여덟 번 넘게 함 · 이번 좁힘에서 이미 물음 · 한 통화 상한(CROSS_MAX) · 서로 다른 이름 둘 이상이 받침."""
+    ids = [(a or "").rstrip("!") for a in asked]
+    since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
+    if ids.count("check") >= CROSS_MAX or "check" in ids[since + 1:] or sum(1 for a in ids if a in LOCQ) > 8:
+        return None
+    if R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"]):
+        return None
+    labs = [c.get("label") or "" for c in clues]
+    if any(lab.startswith(("가로등", "국가지점번호")) for lab in labs):
+        return None
+    anc = anchor(R, clues)
+    hinge = _hinge(R, clues)
+    if hinge is None:                                     # 받치는 말이 하나뿐이 아니면, 둘레 80m 안에 닿는 서로 다른 이름이 둘 이상인가
+        near = set()
+        for c in clues:
+            if c["t"] in ("at", "pt") and (c.get("label") or c.get("k")):
+                pts = [c["p"]] if "p" in c else list(zip(resolve(c["k"])["x"], resolve(c["k"])["y"])) if "k" in c else []
+                if pts and min(math.hypot(px - R["cx"], py - R["cy"]) for px, py in pts) <= 80:
+                    near.add(gaz.norm((c.get("label") or c["k"]).split(" → ")[0]))
+        if len(near) >= 2:
+            return None
+    many = bool(anc) and (bool(anc.get("ext")) or _many_here(anc["name"], anc["p"], R["cx"], R["cy"]))
+    if hinge or many or since >= 0:
+        return (anc or {}).get("name") or hinge
+    return None
+
+
 def _fresh(asked):
     """마지막 「아니요」(confirm! · check!) 뒤에 새 위치 단서(「!」 없는 위치 질문)를 받았나. 「아니요」가 없었으면 참."""
     asked = list(asked)
@@ -1188,7 +1229,15 @@ def questions(R, clues, matter, asked=(), same=None):
     if is_done(R) and not rejected and not more:          # 가운데가 막힌 도로는 방향까지 받아야 찾아간다
         pin = [] if "pinq" in OFF else [q for q in _pin_questions(R, clues, matter) if q["id"] + "!" not in asked]     # 마무리: 이름 붙은 한 점 + 상대 위치 + 일의 종류마다 하나
         last = dict(confirm, name=named) if named else confirm
-        if check2 and not named:
+        if "cross" in ON and not named:                   # (cross, 99번 4절) 위험한 확정이면 「맞으실까요?」 앞에 다른 이름 하나를 묻는다. 답은 맞음 · 어긋남 판정에만(server.read 「check」)
+            since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
+            if matter.get("cross") == "ok" and any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
+                last = dict(confirm, name=matter.get("cross_name"))      # 맞음: 핀은 그대로, 그 이름까지 되말한다(confirm_named)
+            else:
+                h = _cross(R, clues, asked)
+                if h:
+                    last = {"id": "check", "bits": None, "name": h, "cross": True, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+        elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
                 h = _hinge(R, clues) if "check2all" not in ON else (anchor(R, clues) or {}).get("name")

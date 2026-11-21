@@ -709,6 +709,32 @@ def code_read(said, asked, short, R):
         pick = steps if steps is not None else 0 if close else 2 if re.search(r"꽤|좀 ?떨어", said) else 1 if re.search(r"몇 ?걸음|조금", said) else 3 if re.search(r"저기", said) else None   # 걸음 수를 댔으면 그것을 먼저(「스무 걸음쯤, 화장실 바로 앞」 · 「바로 앞은 아니고 스무 걸음」)
     elif q.get("id") == "near":
         pick = 1 if re.search(r"떨어|멀|조금|좀|아니|안 ?보", said) else 0 if re.search(r"바로|코앞|^\s*(네|예|응)|맞아|맞습|앞이", said) else None
+    elif q.get("id") == "check" and q.get("cross") and R is not None:      # (cross, 99번 4-5절) 교차 확인의 답: 확정 전의 넓은 범위(90%, 남은 덩어리 포함) 안에서만 찾아 맞음 · 어긋남 · 답 없음
+        read["clues"], verdict, name, np_ = [], "none", None, L.np
+        vis = 150.0 if R["on_road"] else 60.0
+        o = R["order"]
+        k = int(np_.searchsorted(np_.cumsum(R["w"][o]) / float(R["w"].sum()), L.MASS)) + 1
+        wx, wy = R["x"][o[:k]], R["y"][o[:k]]
+        for m in short:
+            if "key" in m:
+                r = L.resolve(m["key"])
+                pts = [(float(a), float(b)) for a, b in zip(r["x"], r["y"]) if wx.min() - vis <= a <= wx.max() + vis and wy.min() - vis <= b <= wy.max() + vis]
+            elif str(m.get("by", "")).startswith(("#", "≈", "@")):
+                pts = [(float(m["p"][0]), float(m["p"][1]))]
+            else:
+                continue
+            one = []
+            for a, b in pts:
+                if float(((wx - a) ** 2 + (wy - b) ** 2).min()) <= vis * vis and all(math.hypot(a - c, b - e) > 40 for c, e in one):
+                    one.append((a, b))
+            if len(one) == 1:                             # 넓은 범위 안에 한 곳뿐인 이름만 판정에 쓴다(여러 곳 · 범위 밖 · 자료에 없음은 답 없음)
+                if math.hypot(one[0][0] - R["cx"], one[0][1] - R["cy"]) <= vis:
+                    verdict, name = "ok", m["name"]       # 맞음: 핀을 옮기지 않고 단서로도 더하지 않는다
+                else:
+                    verdict = "off"                       # 어긋남: 그 이름을 단서로 더해 다시 좁힌다(「거기는 아니다」는 붙이지 않음)
+                    read["clues"] = [{"t": "pt", "p": [round(one[0][0], 1), round(one[0][1], 1)], "r": L.SIG["가까이"] if re.search(r"바로|옆|앞", said) else L.SIG["보임"], "via": "cross", "sure": True, "label": m["name"]}]
+            break
+        read["matter"]["cross"], read["matter"]["cross_name"] = verdict, name
     elif q.get("id") == "check" and R is not None and ("check2" in L.ON or "check2all" in L.ON):      # 열린 확인 2판: 이름은 판정이 아니라 증거(33번 4-2)
         sig, read["clues"] = (75.0 if R["on_road"] else 30.0), []
         for m in short:
@@ -1948,6 +1974,8 @@ def build(st, extra=None):
                 "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
+    if pick.get("cross"):
+        question["cross"] = True                          # (cross) 교차 확인
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
@@ -1976,6 +2004,8 @@ def build(st, extra=None):
     cites = (engine or {}).get("citations") or [] if in_scope else []
     region = (parts or {}).get("region")
     size_line = fill(tab("위치 범위")["구역 전체"], 곳=L.area_of(region)["name"]) if region else size_text(size) if size else None      # 구역으로 말할 때는 반지름 대신 「○○공원 전체」
+    if size_line and done and matter.get("cross") == "none":
+        size_line += " · " + S["한 가지 말"]          # (cross) 교차 확인에서 답을 못 얻은 확정: 한 가지 말에 기댄 위치
     summary = {"from": S["받은 곳 값"], "by": S["접수 담당자 값"], "where": line, "size": size_line, "matter": matter_line,
                "point": None, "to": assigned["hit"]["to"] if assigned else None,
                "cites": [f"{c['label']} ({fill(T['시행'], 날짜=c['effective'])})" for c in cites], "said_place": next((t["model"]["said_place"] for t in reversed(st["turns"]) if (t.get("model") or {}).get("said_place")), None)}
@@ -2126,6 +2156,10 @@ def turn(st, ev):
                 _tag_drive(read, last.get("said") or "")
                 if asked.get("id") == "check":
                     read["confirm"] = (last.get("code") or {}).get("confirm")      # 열린 확인은 코드가 거리로 가린 것을 쓴다(Solar의 확인 칸은 「맞습니까」에만)
+                    if asked.get("cross"):                # (cross) 교차 확인의 답은 코드 판정 그대로: Solar가 그 이름을 단서로 더해 핀을 옮기지 않게
+                        code_ = last.get("code") or {}
+                        read["clues"] = list(code_.get("clues") or [])
+                        read.setdefault("matter", {}).update({k: v for k, v in (code_.get("matter") or {}).items() if k in ("cross", "cross_name")})
                 if "yesno" in L.ON and asked.get("id") == "confirm" and not any(c.get("partyes") for c in read["clues"]):
                     read["confirm"] = _confirm_pair((last.get("code") or {}).get("confirm"), read.get("confirm"))      # (yesno, 81번) 「네? 뭐라고요?」(코드 예 · Solar 없음) · 「그쪽 말고 반대쪽」(Solar 예)이 확정되던 것
                     if read["confirm"] is None:
@@ -2220,7 +2254,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = {"id": q["id"], "options": q["options"]} if q else None
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": True} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 

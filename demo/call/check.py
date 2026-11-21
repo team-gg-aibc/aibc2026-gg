@@ -1062,6 +1062,38 @@ def follow_said():
     print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']} · 둘레에 없는 여러 지점 상표는 범위를 끌지 않음(saidin)")
 
 
+def cross_check():
+    """(cross, 99번 4절) 확정 전 교차 확인. 「강남역 근처 → 아트박스 바로 앞」: 켜면 확인 질문 앞에 「아트박스 강남점 말고 …」를 묻는다.
+    강남새로치과의원(그 자리 50m 안, 넓은 범위 안에 한 곳) → 맞음: 핀 그대로, 확인 질문에 그 이름까지. 「잘 모르겠어요」 → 답 없음: 그대로 확인 질문,
+    접수 카드 범위 줄에 「한 가지 말에 기댄 위치」. 끄면 곧바로 확인 질문."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = "cross" in S.L.ON
+
+    def run(*lines):
+        st, v = S.turn({"id": "check-cross"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+        qs = []
+        for said in lines:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": said}})
+            qs.append(v["question"]["id"] if v["question"] else None)
+            if v["question"]:
+                st, v = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
+        return qs, v
+    head = ("강남역 근처에 쓰레기가 많이 버려져 있어요", "아트박스 바로 앞이에요")
+    qs, v0 = run(*head)
+    if not on:
+        assert qs[-1] == "confirm", qs
+        print("  ✓ 확정 전 교차 확인(cross False): 아트박스 바로 앞 → 곧바로 확인 질문")
+        return
+    assert qs[-1] == "check" and "아트박스" in v0["question"]["say"] and v0["question"].get("cross"), (qs, v0["question"])
+    qs, v = run(*head, "강남새로치과의원이요")
+    assert qs[-1] == "confirm" and "강남새로치과의원도 보이는 곳" in v["question"]["say"] and v["center"] == v0["center"], (qs, v["question"]["say"], v["center"], v0["center"])
+    qs, v = run(*head, "잘 모르겠어요")
+    assert qs[-1] == "confirm" and "한 가지 말에 기댄 위치" in (v["summary"]["size"] or "") and v["center"] == v0["center"], (qs, v["summary"]["size"])
+    print("  ✓ 확정 전 교차 확인(cross True): 아트박스 바로 앞 → 「아트박스 강남점 말고 …」 → 강남새로치과의원 맞음(핀 그대로, 이름까지 되말함) · 「잘 모르겠어요」 답 없음(카드에 「한 가지 말에 기댄 위치」)")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -1107,6 +1139,7 @@ def main():
         seen_wide()
         main_blob()
         follow_said()
+        cross_check()
         edge_reads()
         ask_fixes()
         chain_said()
