@@ -896,6 +896,39 @@ def _one_spot(key):
     return (float(x.mean()), float(y.mean())) if float(np.ptp(x) + np.ptp(y)) <= 250 else None
 
 
+END_WORD = re.compile(r"^\s*(쪽|방향)?\s*(끝|끄트머리)")      # (bridgeend) 「○○ 쪽 끝」 · 「○○ 끝」
+
+
+def _bridge_end(read, keyed, clues):
+    """(bridgeend, 91번) 「(다리 위인데) 강남 쪽 끝이 더 가까워요」: 앞 차례나 이 말에 면을 아는 다리가 있으면, 「○○ 쪽 끝」을 ○○ 둘레(「쪽」 450m)가 아니라
+    그 다리의 두 끝 가운데 ○○에 가까운 끝 쪽 절반으로 읽는다(그 끝에서 4분의 1 지점, 폭 = 다리 길이의 4분의 1). 88번 r23: 「강남역 쪽」으로 읽어 한남대교와 맞서 서초구 잠원동 2.8km.
+    ponytail: 방위 말(「남쪽 끝」)과 다리 이름에 붙은 끝(「한남대교 남단」)은 다루지 않는다 — 지명 자료의 이름으로 댄 쪽만."""
+    bridge = getattr(L.G, "bridge", {})
+    br = None
+    for c in list(clues) + list(read["clues"]):
+        k = str(c.get("k") or "").split("|")[0]
+        ids = [i for i in (L.resolve(k).get("ids") or ()) if i in bridge] if k else []
+        if ids:
+            br = (ids[0], c.get("label") or k)
+    if br is None:
+        return
+    p = np.vstack(bridge[br[0]])
+    c0 = p.mean(axis=0)
+    ax = np.linalg.svd(p - c0)[2][0]
+    t = (p - c0) @ ax
+    ends = (c0 + ax * t.min(), c0 + ax * t.max())
+    for m in keyed:
+        r = L.resolve(m["key"])
+        if not END_WORD.match(m.get("own", m["after"])) or not len(r["x"]) or br[0] in (r.get("ids") or ()):
+            continue
+        side = min(zip(r["x"], r["y"]), key=lambda q: math.hypot(q[0] - c0[0], q[1] - c0[1]))
+        near, far = sorted(ends, key=lambda e: math.hypot(e[0] - side[0], e[1] - side[1]))
+        q = near + 0.25 * (far - near)
+        clue = {"t": "pt", "p": [round(float(q[0]), 1), round(float(q[1]), 1)], "r": round(max(40.0, 0.25 * float(np.hypot(*(far - near)))), 1), "sure": True, "label": f"{br[1]} {m.get('said') or m['name']} 쪽 끝"}
+        read["clues"] = [c for c in read["clues"] if str(c.get("k") or "").split("|")[0] != m["key"]] + [clue]
+        read["skip"] = list(read.get("skip") or []) + [m["key"]]      # Solar가 「○○ 쪽」으로 되살리지 않게(_merge)
+
+
 def speech_fix(said, read, short, clues):
     """실제 말투 고침(53번). 모두 스위치(기본 끔)라 끄면 read를 그대로 돌려준다. clues = 앞 차례까지의 단서."""
     on, keyed, t = L.ON, [m for m in short if "key" in m], gaz.norm(said)
@@ -1005,6 +1038,8 @@ def speech_fix(said, read, short, clues):
             skip.append(read["over"][0])
     if skip:
         read["skip"] = list(dict.fromkeys(skip))
+    if "bridgeend" in on:
+        _bridge_end(read, keyed, clues)
     return read
 
 

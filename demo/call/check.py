@@ -882,6 +882,23 @@ def neg_keep():
     print(f"  ✓ 받지 않은 Solar 「아님」(negkeep {'negkeep' in S.L.ON}): 「휴대폰 가게」 단서 {[(c.get('label'), c.get('how')) for c in phone]}")
 
 
+def bridge_end():
+    """(bridgeend, 91번) 「한남대교요 → 다리 위라 아무것도 없어요. 강남 쪽 끝이 더 가까워요」: 켜면 다리의 강남 쪽 끝 절반으로 읽어 다리 둘레에 머문다. 끄면 main 그대로 「강남역 쪽」으로 읽어 서초구 잠원동 수 km로 넓어진다(88번 r23)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    st, view = S.turn({"id": "check-bridge-end"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+    for said in ("한강 다리 위에서 차가 고장 나서 서 있어요", "한남대교요. 강남 쪽으로 가는 방향이요", "다리 위라 아무것도 없어요. 강남 쪽 끝이 더 가까워요"):
+        st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+        if view["question"]:
+            st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+    if "bridgeend" in S.L.ON:
+        assert view["radius"] <= 300 and "한남대교 강남 쪽 끝" in view["chips"], (view["radius"], view["chips"])
+    else:
+        assert view["radius"] > 1000, view["radius"]
+    print(f"  ✓ 다리의 「○○ 쪽 끝」(bridgeend {'bridgeend' in S.L.ON}): 한남대교 「강남 쪽 끝이 더 가까워요」 → {view['summary']['where']} {view['radius']}m")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -920,6 +937,7 @@ def main():
         switches()
         bind_choice()
         neg_keep()
+        bridge_end()
         reread_guards()
         seen_wide()
         hangul_options()
