@@ -245,6 +245,8 @@ class Gazetteer:
             rows += [r[:4] + ["", ""] for r in (ln.rstrip("\n").split("\t") for ln in gzip.open(DIR / "cross_nodes.tsv.gz", "rt", encoding="utf-8"))]
         self.cross1 = len(rows)
         extra = json.loads((HERE / "data" / "extra_places.json").read_text(encoding="utf-8"))["places"] if (HERE / "data" / "extra_places.json").exists() else []
+        self.demo0 = len(rows)                # (genericname · 83번) 여기부터 시연 장면용 표(extra_places.json)의 줄 — 서울숲 장면을 위해 단 장소 · 별명이라 장면 밖 통화를 그쪽으로 끌지 않게 한다
+        self.demo1 = self.demo0 + len(extra)  # 그 뒤의 상담사 저장 별명(ALIAS_FILE)은 혼자 쓰는 것이 목적이라 넣지 않는다
         if ALIAS_FILE.exists():                       # 상담사가 저장한 별명(사람들이 부르는 이름 → 확인받은 자리). 레포에 올리지 않는 로컬 파일
             extra += [dict(a, kind="별명") for a in json.loads(ALIAS_FILE.read_text(encoding="utf-8"))]
         rows += [[e["name"], e["kind"], str(e["lon"]), str(e["lat"]), "", ""] for e in extra]
@@ -346,6 +348,26 @@ class Gazetteer:
                 self.ix[k] = near or [("p", ids[0])]       # 정식 이름을 댄 것과 같게: 같은 곳의 행을 모두(「인덕대학」 → 인덕대학교의 캠퍼스 넓이 267m 행까지, 600통 #116)
                 n += 1
         return n
+
+    HOODS = {"명동": ["명동"], "신촌": ["신촌동"], "종로": ["종로1·2·3·4가동", "종로5·6가동"], "광화문": ["사직동", "종로1·2·3·4가동"],
+             "압구정": ["압구정동"], "동대문": ["종로5·6가동", "광희동"], "대학로": ["이화동", "혜화동"], "성수": ["성수1가1동", "성수1가2동", "성수2가1동", "성수2가3동"],
+             "을지로": ["을지로동"], "북촌": ["가회동", "삼청동"], "서촌": ["청운효자동", "사직동"], "연남": ["연남동"], "망원": ["망원1동", "망원2동"],
+             "노량진": ["노량진1동", "노량진2동"], "청담": ["청담동"], "합정": ["합정동"], "영등포": ["영등포구"], "용산": ["용산구"]}
+
+    def add_hoods(self):
+        """(hood, 기본 끔 · 87번) 「명동이에요」 · 「신촌이요」 · 「광화문이요」: 누구나 아는 동네 말을 그 동(들) · 구의 범위로 읽는다.
+        두 글자 이름(명동 · 신촌 · 종로)은 별명 · 자치구 · 역이 아니면 받지 않고, 세 글자(광화문 · 동대문)는 뒤에 「근처 · 앞」이 올 때만 받아
+        첫마디가 「『명동』 이름을 지도에서 찾지 못했습니다」가 됐다(80번 c03 · c05 · c06 · c08). 같은 이름의 가게 · 정류장 점은 빼고 길 · 구역은 그대로 둔다
+        (「종로」 길 · 「을지로」 길). 「명동역」 · 「종로3가역」처럼 다른 이름은 건드리지 않는다. 경계가 모호한 「용산」 · 「영등포」는 구 전체로 넓게."""
+        dong = {d["name"]: i for i, d in enumerate(self.dong)}
+        gu = {g["name"]: i for i, g in enumerate(self.gu)}
+        for word, areas in self.HOODS.items():
+            k = norm(word)
+            add = [("dong", dong[a]) for a in areas if a in dong] + [("gu", gu[a]) for a in areas if a in gu]
+            if add:
+                self.ix[k] = [r for r in self.ix.get(k, []) if r[0] != "p"] + add
+                ALIAS_KEYS.add(k)
+        return len(self.HOODS)
 
     def add_bridges(self):
         """(bridgeline · 75번) 다리의 면(data/seoul/bridges.json.gz, tools/build_bridges.py)을 지명 표의 다리 줄에 잇는다 → self.bridge = {장소 번호: [면 테두리(x, y m) …]}. 한 번만."""
