@@ -1590,10 +1590,9 @@ def _heard(st):
     for c in ((t.get("model") or t.get("code") or {}).get("clues") or []):
         lab = (c.get("label") or "").strip()
         if len(gaz.norm(lab)) >= 2 and gaz.norm(lab) in said:
-            m = re.search(r"\s*".join(map(re.escape, lab.replace(" ", ""))), t["said"], re.I)
-            lab = m.group(0) if m else lab                # 시민이 쓴 글자 그대로(「C U」가 아니라 「CU」)
-            if lab not in out:
-                out.append(lab)
+            m = re.search(r"(?<![가-힣A-Za-z0-9])" + r"\s*".join(map(re.escape, lab.replace(" ", ""))), t["said"], re.I)
+            if m and m.group(0) not in out:               # 시민이 쓴 글자 그대로(「C U」가 아니라 「CU」), 낱말 첫머리에서 시작할 때만(「한솔분식」 속의 「솔분식」은 시민이 말한 이름이 아니다)
+                out.append(m.group(0))
     return out[:2]
 
 
