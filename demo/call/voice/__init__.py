@@ -1,6 +1,7 @@
 """통화의 두 스위치. server.py는 둘 가운데 하나라도 켜졌을 때만 이 꾸러미를 불러온다(기본 끔).
 
   CALL_VOICE=1   음성 통화(받아쓰기 · 읽어 주기)            hub.py · README.md
+  CALL_VOICE_LINE=sdk · 1  (CALL_VOICE와 함께) 070 번호로 건 전화를 받는 다리   line.py
   CALL_DIRECT=1  직접 통화(배포 판: 방문자가 민원인이 되어 글을 치거나 말하고, 상담사 말은 화면으로만)   direct.py
 """
 import os
@@ -35,6 +36,9 @@ def attach(Handler):
         from . import heard, hub
         hub.attach(Handler)
         heard.attach(sys.modules[Handler.__module__])      # 저장된 답 방식에서만: 받아쓴 글에 대한 읽기(영상 · heard.py)
+        if os.environ.get("CALL_VOICE_LINE") in ("1", "sdk"):           # 070 다리(전화 회선이 소리 쪽으로 들어온다 · line.py)
+            from . import line
+            line.start()
     if os.environ.get("CALL_DIRECT") == "1":
         from . import direct
         direct.attach(Handler)

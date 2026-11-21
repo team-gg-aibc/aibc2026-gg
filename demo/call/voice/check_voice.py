@@ -12,6 +12,7 @@
      일레븐랩스: 지명을 알려 주면 줄을 새로 열어 keyterms로 넘긴다.
   ⑤ 일레븐랩스 음성 합성: 통화에서 읽어 달라고 한 글만 만들고, 만든 소리는 남겨 다시 쓴다(가짜 서버와).
   ⑥ 휴대폰이 먼저 거는 통화: 방이 「기다림」으로 열리고 한 화면만 받는다. 휴대폰은 글로만 붙어(받아쓰기 없음) 친 글을 보내고, 상담사 말을 받는다.
+  ⑧ 070 다리(line.py): 회선의 말(start · media · mark · stop)로 걸면 방이 「기다림」으로 열리고, 읽어 줄 말이 전화 소리 꼴로 회선에 돌아가고, 끊으면 방이 닫힌다(가짜 회선 · 가짜 합성 서버와).
   ⑦ 영상용으로 받아 둔 「받아쓴 글의 읽기」(heard.py): 받아쓴 글 · 띄어쓰기와 부호를 바꾼 글 · 대본 글 모두 저장된 읽기를 찾고 대본 순서대로 묻는다.
 """
 import base64
@@ -311,6 +312,80 @@ def check_tts():
     print("  ✓ 일레븐랩스 음성 합성: 통화에서 요청한 글만 만들고, 만든 소리를 남겨 다시 쓴다 (가짜 서버와)")
 
 
+def check_line():
+    """070 다리: 가짜 회선이 문서의 말대로 걸어 온다. 토큰이 다르면 받지 않는다."""
+    from websockets.sync.client import connect
+    made = []
+
+    class Tts(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            made.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"])).decode())["text"]))
+            self.send_response(200)
+            self.send_header("Content-Length", "8000")
+            self.end_headers()
+            self.wfile.write(b"\x7f" * 8000)                                          # 1초짜리 전화 소리
+
+    p, _ = server(CALL_VOICE="1", CALL_VOICE_LINE="1", CALL_VOICE_LINE_PORT=str(PORT + 3), CALL_VOICE_LINE_TOKEN="tok", ELEVENLABS_API_BASE=f"http://127.0.0.1:{PORT + 4}", ELEVENLABS_API_KEY="check-key", ELEVENLABS_ENV_FILE="/nonexistent")
+    mock = HTTPServer(("127.0.0.1", PORT + 4), Tts)
+    threading.Thread(target=mock.serve_forever, daemon=True).start()
+    frame = {"event": "media", "media": {"track": "inbound", "payload": base64.b64encode(b"\x55" * 160).decode()}}
+    try:
+        for _ in range(50):                                                            # 다리가 뜰 때까지
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", PORT + 3)) == 0:
+                    break
+            time.sleep(0.1)
+        with connect(f"ws://127.0.0.1:{PORT + 3}") as bad:                              # 토큰이 다르면 방을 열지 않는다
+            bad.send(json.dumps({"event": "start", "start": {"customParameters": {"token": "x"}}}))
+            time.sleep(0.3)
+            assert call("/api/voice/waiting")["rooms"] == [], "토큰이 다른 회선을 받았다"
+        with connect(f"ws://127.0.0.1:{PORT + 3}") as ws:
+            ws.send(json.dumps({"event": "connected", "protocol": "Call", "version": "1.0.0"}))
+            ws.send(json.dumps({"event": "start", "start": {"streamId": "MZ1", "callId": "CA1", "customParameters": {"token": "tok"}}}))
+            for _ in range(30):
+                rooms = call("/api/voice/waiting")["rooms"]
+                if rooms:
+                    break
+                time.sleep(0.1)
+            assert len(rooms) == 1, "회선이 걸어 왔는데 기다리는 통화가 없다"
+            room = rooms[0]
+            for _ in range(30):                                                        # 받아쓰기가 열릴 때까지
+                if call(f"/api/voice/desk?room={room}")["joined"]:
+                    break
+                time.sleep(0.1)
+            assert call(f"/api/voice/desk?room={room}")["joined"] is True, "회선이 붙었는데 받아쓰기가 열리지 않았다"
+            assert code_of(f"/api/voice/claim?room={room}", {}) == 200
+            call(f"/api/voice/pick?room={room}", {})
+            for _ in range(20):                                                        # 0.4초의 소리
+                ws.send(json.dumps(frame))
+            time.sleep(0.3)
+            assert call(f"/api/voice/desk?room={room}")["heard_sec"] == 0.4
+            n = call(f"/api/voice/ask?room={room}", {"text": "바로 앞에 뭐가 보이세요?"})["n"]
+            got, mark = b"", None
+            while mark is None:
+                m = json.loads(ws.recv(timeout=5))
+                if m["event"] == "media":
+                    got += base64.b64decode(m["media"]["payload"])
+                elif m["event"] == "mark":
+                    mark = m["mark"]["name"]
+            assert got == b"\x7f" * 8000 and mark == "say-1" and n == 1, (len(got), mark)
+            assert len(made) == 1 and "output_format=ulaw_8000" in made[0][0] and made[0][1] == "바로 앞에 뭐가 보이세요?", made
+            assert call(f"/api/voice/desk?room={room}")["played"] == 0, "회선이 다 틀기 전에 다 읽었다고 함"
+            ws.send(json.dumps({"event": "mark", "mark": {"name": mark}}))
+            time.sleep(0.3)
+            assert call(f"/api/voice/desk?room={room}")["played"] == 1
+            ws.send(json.dumps({"event": "stop", "stop": {"callId": "CA1"}}))
+            time.sleep(0.3)
+            assert code_of(f"/api/voice/desk?room={room}") == 404, "회선이 끊겼는데 방이 남았다"
+    finally:
+        stop(p)
+        mock.shutdown()
+    print("  ✓ 070 다리: 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
+
+
 def check_phone_text():
     room = call("/api/voice/room", {"from": "phone"})["room"]                     # 휴대폰이 먼저 건다
     assert room in call("/api/voice/waiting")["rooms"], "기다리는 통화에 없음"
@@ -368,6 +443,7 @@ def main():
     check_rtzr()                                          # ④
     check_eleven()
     check_tts()                                           # ⑤
+    check_line()                                          # ⑧
     r = subprocess.run([sys.executable, str(HERE / "heard.py"), "--check"], capture_output=True, text=True, env={**os.environ, "OPENBLAS_NUM_THREADS": "1"})      # ⑦
     assert r.returncode == 0, "받아쓴 글의 저장된 읽기: " + (r.stdout + r.stderr)[-800:]
     print("\n".join(ln for ln in r.stdout.splitlines() if "✓" in ln))

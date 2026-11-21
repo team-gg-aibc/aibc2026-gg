@@ -3,13 +3,13 @@
 전화처럼 걸고 받는 길이다. 말을 받아써서 통화 글로 넣고, 화면이 띄운 질문을 읽어 준다. 위치 좁히기 · 질문 고르기 · 조례 답은 건드리지 않는다.
 
 - **기본은 끔이다.** 끄면 이 폴더는 읽히지도 않고, 화면 · 점검(`check.py`)은 그대로다.
-- **받아쓰기 · 음성 합성은 업스테이지 모델이 아니다**(일레븐랩스 · 이 컴퓨터 안의 Whisper · 리턴제로). 그래서 **개발 실험용**이고, 대회 규칙(「서비스에 들어가는 모델은 업스테이지 제공 모델」, `docs/decisions.md` 10-26 · 11-19)에 대한 운영사무국 답이 올 때까지 **배포 · 채점에는 쓰지 않는다**. 현장 테스트 · 평가자 판은 글로만 돈다(받아쓰기 · 읽어 주기 스위치를 비워 두면 바깥 모델을 부르지 않는다). 아래 일레븐랩스 한 세트는 **시연 영상을 만들 때만 쓰는 도구**이고, 서비스가 부르는 모델이 아니다(운영사무국에 물어 둠).
+- **받아쓰기 · 음성 합성은 업스테이지 모델이 아니다**(일레븐랩스 · 이 컴퓨터 안의 Whisper · 리턴제로). **받아쓰기 · 읽어 주기는 일레븐랩스로 하고, 발표용 서버에서만 켠다(11-20 결정).** 시연용(평가자 판) · 채점용 서버는 글로만 돈다(받아쓰기 · 읽어 주기 스위치를 비워 두면 바깥 모델을 부르지 않는다). 위치 좁히기 · 질문 고르기 · 조례 답은 업스테이지 모델만 쓴다.
 - 진짜 전화번호는 없다. 휴대폰 브라우저가 전화기 노릇을 한다(보이스톡처럼 주소를 열어 「전화 걸기」).
 
 ## 켜는 법 (레포 맨 위에서)
 
 ```bash
-# 시연 영상을 만들 때만(서비스가 부르는 모델이 아님 · 운영사무국 답 전까지 배포에 안 씀): AI 음성이 묻는 한 세트, 받아쓰기 · 음성은 일레븐랩스. 열쇠 ~/.config/gg-team/elevenlabs.env
+# 시연 영상 · 발표용 서버에서만: AI 음성이 묻는 한 세트, 받아쓰기 · 음성은 일레븐랩스. 열쇠 ~/.config/gg-team/elevenlabs.env
 OPENBLAS_NUM_THREADS=1 python3 demo/call/voice/tts_lines.py --citizen cat_street      # 처음 한 번: 시민 역 소리 파일(web/voice/citizen/)
 OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_VOICE_STT=elevenlabs CALL_VOICE_TTS=elevenlabs CALL_MODE=saved CALL_PORT=8780 python3 demo/call/server.py
 #   → http://127.0.0.1:8780/?scene=cat_street 에서 「대본을 음성 길로」(사람이 말하려면 「이 기기 마이크로 통화」)
@@ -39,7 +39,7 @@ OPENBLAS_NUM_THREADS=1 CALL_VOICE=1 CALL_MODE=saved CALL_PORT=8780 python3 demo/
 ## 직접 통화 (배포 판, `CALL_DIRECT=1`)
 
 ```bash
-# 실제 호출(배포 판 기본). 팀 열쇠를 환경 변수로만 넣는다(엔진이 레포 .env를 읽지 않게). 배포 판은 글로만 — 받아쓰기 · 읽어 주기는 운영사무국 답 전까지 켜지 않는다
+# 실제 호출(배포 판 기본). 팀 열쇠를 환경 변수로만 넣는다(엔진이 레포 .env를 읽지 않게). 시연용 · 채점용 판은 글로만 — 받아쓰기 · 읽어 주기는 발표용 서버에서만 켠다(11-20 결정)
 UPSTAGE_API_KEY=… ENGINE_CONFIG=eval/configs/release.json CALL_DIRECT=1 CALL_DIRECT_CODE=… CALL_PORT=8781 python3 demo/call/server.py
 # 앞에 문지기를 두고 접근 코드 없이 열 때(mini 현장 테스트 · 11/22 평가자용): CALL_DIRECT_CODE를 비우고 CALL_DIRECT_OPEN=1. 둘 다 없으면 실제 호출 판은 뜨지 않는다
 ```
@@ -60,6 +60,9 @@ UPSTAGE_API_KEY=… ENGINE_CONFIG=eval/configs/release.json CALL_DIRECT=1 CALL_D
 | `CALL_VOICE_POLL_MS` | 통화 중 휴대폰 · 상담 화면이 서버에 묻는 간격 | 직접 통화 600(아니면 250) |
 | `CALL_VOICE_PICK_SEC` | 휴대폰이 건 통화를 이만큼 아무도 안 받으면 「다른 통화 중」(받은 통화가 있을 때) · 「받을 사람 없음」을 띄우고 끊는다 | 20 |
 | `CALL_VOICE_CALLER_GONE_SEC` | 휴대폰이 끊기 없이 창을 닫는 등 이만큼 소식이 없으면 상담 화면이 「연결이 끊겨 통화를 마쳤습니다」로 마치고 다음 통화를 받는다(휴대폰은 망이 끊겨도 60초까지 다시 묻는다) | 75 |
+| `CALL_VOICE_SPEAK_DIRECT` | 1이면 직접 통화에서도 휴대폰이 상담사 말을 소리로 읽는다(글도 그대로 보인다). 읽는 동안 휴대폰 마이크는 막힌다. 발표용 서버에서만 | 끔(글로만) |
+| `CALL_VOICE_TAIL_MS` | 다 읽은 뒤 이만큼 더 마이크를 막는다(발표장 스피커 울림이 받아써지지 않게). 0~3000 | 0 |
+| `CALL_VOICE_UNLOCK` | 1이면 「전화 걸기」 · 「마이크로도 말하기」를 누른 자리에서 소리 길을 미리 연다(아이폰이 누르지 않은 재생을 막는 것을 피한다). 그래도 막히면 글 길이만큼 기다린다 | 끔 |
 | `CALL_VOICE_MAX_ROOMS` · `CALL_VOICE_ROOM_SEC` · `CALL_VOICE_OPENS_PER_HOUR` | 한꺼번에 여는 통화 · 한 통화 최대 초 · 한 시간에 여는 수 | 직접 통화 20 · 1800 · 제한 없음 |
 
 망이 잠깐 끊기면(응답 없음 · 5xx · 408 · 429) 휴대폰 · 상담 화면 모두 간격을 늘려 다시 묻고, 3초 넘게 이어지면 「연결이 불안정합니다. 다시 잇는 중…」을 띄우며, 다시 붙으면 통화를 그대로 잇는다. 60초 넘게 안 되면 「연결이 끊겨 통화를 마쳤습니다」. 친 글은 다시 보내도 서버가 한 번만 받는다. 글로만 붙은 휴대폰은 소리를 올리지 않는다(본문 없는 `GET /api/voice/poll`).
@@ -135,3 +138,21 @@ python3 demo/call/voice/heard.py --check      # 열쇠 없이(check_voice ⑦)
 - 밖에 내놓을 때는 직접 통화(`CALL_DIRECT=1`)와 함께 켠다. 그러면 모든 `POST /api/…`와 통화방 `GET /api/voice/…`(info 말고)가 표(접근 코드, 또는 문지기를 앞에 둘 때 `CALL_DIRECT_OPEN=1`)를 거치고, 한 통화(방)는 그 방을 연 표와 받은 표만 읽고 쓴다. 음성만 켠 판(`CALL_VOICE`만)은 `/api/turn`에 표가 없으니 밖에 내놓지 않는다.
 - 직접 통화에서 상담 기록은 표(방문자)마다 따로 서버 메모리에만 남는다(기록 파일에 쓰지 않고, 다시 띄우면 비워진다). 방문자는 예시 기록과 자기가 확인받은 통화만 보고, 상태 바꾸기 · 「처음 상태로」도 자기 것만 바뀐다. 표 없는 `GET /api/records`는 예시 기록만이다. 별명 저장(`/api/alias`)은 모든 방문자의 위치 읽기를 바꾸므로 직접 통화에서는 막는다(403).
 - 판 안 횟수 상한(`CALL_DIRECT_MAX_TURNS` · `MAX_ALL`, 기본 제한 없음)은 민원인의 말 줄만 센다. 다시 읽기(phase=model) · 엔진(`/api/view`)은 세지 않으니 Upstage 호출을 막는 장치가 아니다. 실제 배포에서 호출을 세고 막는 것은 앞의 문지기(레포 밖)다. 화면이 보내는 통화 상태 속 말은 한 차례 글 길이(2,000자)로 자른다.
+
+## 070 번호로 진짜 전화 (스위치, 기본 끔 · 11-21)
+
+전화 회선이 「소리 쪽」(휴대폰 브라우저가 있던 자리)에 들어온다. 받아쓰기 · 읽어 주기는 그대로 일레븐랩스이고, 번호를 주는 곳(한국AI통신)은 전화 소리를 나르기만 한다(그 회사의 AI 기능은 쓰지 않는다). 상담 화면은 직접 통화 판(`CALL_DIRECT=1 CALL_VOICE=1`)이어야 기다리는 통화를 스스로 받는다. 코드와 환경 변수 표는 `line.py` 맨 위.
+
+```bash
+# 꾸러미: uv pip install "koreaaitel[agent]"   (파이썬에서는 import clawops)
+# 열쇠: ~/.config/gg-team/koreaaitel.env 에 CLAWOPS_API_KEY · CLAWOPS_ACCOUNT_ID · CALL_VOICE_LINE_FROM(받을 070 번호) 한 줄씩. 레포에 넣지 않는다
+OPENBLAS_NUM_THREADS=1 CALL_DIRECT=1 CALL_DIRECT_OPEN=1 CALL_VOICE=1 CALL_VOICE_STT=elevenlabs CALL_VOICE_TTS=elevenlabs CALL_VOICE_LINE=sdk CALL_MODE=saved CALL_PORT=8781 python3 demo/call/server.py
+```
+
+서버 기록에 「070 다리: 한국AI통신에 이어짐」이 찍힌 뒤 휴대폰 전화 앱으로 그 번호에 건다.
+
+- `CALL_VOICE_LINE=sdk`는 우리 쪽에서 밖으로 잇는다(새 주소 · 포트가 필요 없다). `CALL_VOICE_LINE=1`은 VoiceML `<Connect><Stream>`이 우리 WebSocket으로 걸어 오는 길이라 밖에서 닿는 `wss://` 주소가 있어야 한다. 이 길은 가짜 회선 점검(`check_voice.py` ⑧)만 했다.
+- `CALL_VOICE_LINE_ALLOW=번호,번호`를 주면 그 번호에서 건 전화만 받는다(나머지는 받기 전에 거절). 안 주면 번호를 아는 누구나 건다.
+- 전화 음질(8000Hz)이라 지명이 틀리기 쉽다. `CALL_VOICE_TERMS`로 나올 이름을 미리 알려 준다(11-21 맥북: 알려 주기 전 「롯데월드타워 → 도토리우대타워」, 알려 준 뒤 지명은 다 맞음).
+- 상담 화면이 둘 이상 열려 있으면 그중 한 화면만 받는다. 070 번호는 다리를 켠 한 곳에서만 받는다.
+- 알려진 한계: 민원인이 AI 말에 끼어들기는 없다(읽는 동안 회선 소리를 받아쓰기에 넣지 않는다). 발표용 서버(국외)에서 이어지는지는 확인하지 않았다.
