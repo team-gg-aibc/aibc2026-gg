@@ -833,6 +833,7 @@ def infer(clues):
     pk = any(_pk(resolve(c["k"])) for c in clues if "k" in c and c["t"] in ("at", "past", "before"))       # 면 · 선으로 된 공원 안 이름(park_names)이 범위를 받치고 있나
     named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof", "rim", "core")]
     heard_only = bool(named) and all(c.get("heard") for c in named)      # 자리 단서가 모두 비슷한 이름으로 이은 것뿐이다(11-15)
+    blob_alt = None
     if "mainblob" in ON and not on_road and n90 > 1:     # (mainblob, 93번 다음 방향) 90% 범위가 떨어진 덩어리 여럿이고 한 덩어리가 가능성 대부분을 가지면 범위 = 그 덩어리
         part = _blobs(x[cred], y[cred])                   # 동규 장한평역 통화(11-21): 「CU랑 신한은행이요」 뒤 89%가 실제 자리 52m 안 덩어리인데 543m 밖 4% 덩어리까지 덮어 498m → 같은 간판 질문
         mass = np.bincount(part, weights=w[cred])
@@ -844,9 +845,13 @@ def infer(clues):
             half = math.hypot(x[c1].max() - x[c1].min(), y[c1].max() - y[c1].min()) / 2
             r1 = max(math.sqrt(float(cell[c1].sum()) / math.pi), 0.6 * half, STEP / 2)
             if r1 <= DONE_M:                              # 그 덩어리로 끝낼 수 있을 때만(넓은 덩어리로 좁히면 가상 600통 「네」로 기우는 시민에서 틀린 확정이 늘었다: 93번 다음 방향)
+                g2 = max((g for g in range(len(mass)) if g != top), key=lambda g: mass[g])
+                c2 = cred[part == g2]
+                w2 = w[c2] / w[c2].sum()
+                blob_alt = [round(float((x[c2] * w2).sum()), 1), round(float((y[c2] * w2).sum()), 1)]      # (crosspick) 남은 덩어리 가운데 가장 무거운 것: 둘 중 가르기의 견줄 자리
                 cred, (cx, cy), radius = c1, m1, r1
                 r_cover = float(np.hypot(x[cred] - cx, y[cred] - cy).max())
-    R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
+    R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike, "blob_alt": blob_alt}
     if ON & {"ringdone", "rimask", "rimline"}:                       # (75번) 범위를 받치는 단서 가운데 「둘레」로 읽은 곳(호수 테두리 · 구역의 테두리 띠)의 이름. 다른 단서와 어긋나 버려진 것(믿음 0.35 아래)은 뺀다
         ring_k = next((c["k"] for n, c in enumerate(clues) if trust.get(n, 1.0) >= 0.35 and "k" in c and (c["t"] == "rim" or (
             c["t"] == "at" and c.get("how") != "쪽" and not c.get("across") and "lakerim" in ON and water_ring(resolve(c["k"])) is not None))), None)
@@ -1072,8 +1077,9 @@ ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 �
 C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
 FIX_ON = "genericname,yesno,whichkeep,choicebind,placebind,codekeep,keeptype,stationbind,stoponly,roadcls,hood,seenwide,handsaid,dupshop,negkeep,bridgeend,hangulopt2"      # (88번 둘째 묶음 — chainpick은 확인용 묶음 옛 잣대 93통 테두리 틀린 확정 7 → 8로 끔, 정확도 세션 17:45) 「보여요」 넓게 · 넘길 때 시민 말 · 같은 가게 두 줄 · 받지 않은 「아님」 · 다리 쪽 끝 · 보기의 영어 이름 좁힌 판 · 체인 가게 「어느 지점」 묻기를 더함(체인 가게를 기준에서 빼기 chainref · 영어 이름 첫 판 hangulopt는 평가 · 600통 틀린 확정 +1로 끔) —      # (84번, 기본 켬) 고침 모은 판에서 모든 기준을 넘은 열 + 동네 이름(hood, 87번 — 더 긴 이름 속 동네 말은 읽지 않게 고친 d12d88e로 기본 켬, 84번 5절) — 기준점과 어긋난 가게(farshop, 83번)는 확인용 묶음 93통 테두리 둘에서 틀린 확정 +1로 걸려 끔(11-21 07시). 동네 이름(hood, 87번)은 가게 지점 이름 속 동네 말(「CU 신촌피어점」의 신촌)을 동네로 읽어 600통 #92가 맞는 한 점 → 넘김이 되어 끔. 그 밖에 정류장으로만 있는 기관 이름(stoponly, 85번 좁힌 판) · 양재대로 · 언주로의 일반 구간(roadcls, 86번) 더함. 덜 묻기의 dunnoboth는 옛 잣대 한 점 −9 · −12로 끔. 처음 아홉: 흔한 낱말 이름 · 기준점과 어긋난 가게(83번) · 되묻기 답의 헛 「예」 · 「○○은 맞아요」(81번) · Solar가 말에 없는 이름을 쓰지 않기 다섯(79번). seenwide · 긴 다리 · 덜 묻기는 「정할 것」으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 BRIDGE_ON = "bridgelong"      # (75번 9절 · 10절, 모은 판에서는 기본 끔 — 켜는 판은 donggyu/locate-bridge) 길이 120m를 넘는 다리 · 고가는 이름 하나만 대도(「보라매고가 바로 앞」) 가운데 한 점이 아니라 다리의 면으로. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+CROSS_ON = "cross,chainpick"      # (99번 조각 1 · 3, 동규 11-21 23시 승인) 확정 전 교차 확인 + 체인 가게 「어느 지점」(교차 확인을 켠 판 위에서만 다시 켬). 둘 중 가르기(crosspick)는 가상 600통 틀린 확정 4 → 6으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록
 FOLLOW_ON = "pairseen,mainblob,saidanchor,nhalias"      # (93번, 기본 켬 후보) 보기 밖의 답을 따라가기: 함께 댄 이름 둘의 짝 · 한 덩어리에 몰린 범위 · 시민이 최근에 댄 이름을 확정 기준으로 · 「농협」 별명. 하나씩 끄려면 CALL_ON에 그 이름을 뺀 목록을 준다.  saidin(이름 하나도 둘레에서 먼저 찾기)은 기본 끔: 가상 600통에서 틀리게 답한 시민의 범위를 바로잡을 이름까지 빼서 한 점 −2 · −6, 못 끝냄 +9(93번 8절)
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON + "," + BRIDGE_ON + "," + FOLLOW_ON      # BRIDGE_ON(긴 다리)은 88번 둘째 묶음에서 기본 켬. FOLLOW_ON은 93번(동규 11-21 21시 결정)(동규 11-21 10:1x 「긴 다리 읽기는 이번에 넣자」)     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON + "," + BRIDGE_ON + "," + FOLLOW_ON + "," + CROSS_ON      # BRIDGE_ON(긴 다리)은 88번 둘째 묶음에서 기본 켬. FOLLOW_ON은 93번(동규 11-21 21시 결정)(동규 11-21 10:1x 「긴 다리 읽기는 이번에 넣자」)     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
@@ -1125,6 +1131,90 @@ def _hinge(R, clues):
             return lab.split(" → ")[0].removesuffix(" 쪽")
     return None
 
+
+CROSS_MAX = int(os.environ.get("CALL_CROSS_MAX", "3"))     # (cross) 한 통화에 교차 확인을 묻는 횟수의 상한(동규 11-21 23시: 세 번까지)
+
+
+CROSS_WIDE = (600.0, 1500.0)     # (cross) 교차 확인의 답을 찾는 둘레(m): 보통 · 길 위. 가상 600통 첫 판에서 놓친 진짜 자리가 확정하려던 곳에서 280~553m였다
+
+
+def _cross_wide(R, clues):
+    """(cross) 교차 확인의 답을 찾을 넓은 범위 → [가운데 x, y, 반지름]: 지금 가운데 둘레 CROSS_WIDE.
+    확정 직전의 90% 범위는 40m 안팎이라, 틀린 자리였으면 시민이 댄 진짜 둘레의 이름이 그 밖에 있다(첫 판: 「답 없음」으로 틀린 확정 4 → 8).
+    받치는 말을 뺀 범위로 잡으면 체인 이름이 서울 전체로 퍼져 엉뚱한 원이 된다(아트박스: 6km 밖)."""
+    return [round(R["cx"], 1), round(R["cy"], 1), CROSS_WIDE[1] if R["on_road"] else CROSS_WIDE[0]]
+
+
+def _cross_pick(R, clues):
+    """(crosspick, 99번 4-4절) 견줄 다른 자리가 있으면 「둘 중 가르기」: 남은 덩어리(mainblob) 또는 둘레 300m의 같은 이름 · 같은 상표 다른 지점.
+    A = 확정하려는 자리 60m 안에만 있는 이름, B = 견줄 자리 60m 안에만 있는 이름(둘 다 자료에 한 곳뿐 · 상표 아님 · 시민이 댄 이름 아님) → closest 질문 또는 None.
+    A를 고르면 맞음(핀 그대로), B를 고르면 갈아탐(B 쪽으로 다시 셈)."""
+    P, anc = (R["cx"], R["cy"]), anchor(R, clues)
+    Q = R.get("blob_alt")
+    if Q is None and anc:
+        t = twins(anc["name"], anc["p"], np.array([R["cx"]]), np.array([R["cy"]]), 300.0)
+        b = next((G.brand[int(i)] for i in G.near(anc["p"][0], anc["p"][1], 30) if gaz.norm(G.name[int(i)]) == gaz.norm(anc["name"]) and G.brand[int(i)]), None)
+        t = t or (twins(b, anc["p"], np.array([R["cx"]]), np.array([R["cy"]]), 300.0) if b else None)
+        Q = min((q for q in t or [] if math.hypot(q[0] - anc["p"][0], q[1] - anc["p"][1]) > 40), key=lambda q: math.hypot(q[0] - P[0], q[1] - P[1]), default=None)
+    if Q is None or math.hypot(Q[0] - P[0], Q[1] - P[1]) < 120:
+        return None                                       # 견줄 자리가 없거나 너무 가까우면 가를 수 없다
+    said = {gaz.norm((c.get("label") or c.get("k") or "").split(" → ")[0]) for c in clues}
+
+    def only(near, far):
+        idx = [int(i) for i in G.near(near[0], near[1], 60) if len(G.name[i]) >= 3 and not G.brand[i] and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
+               and G.kind[i] not in ("동네", "산") and math.hypot(G.x[i] - far[0], G.y[i] - far[1]) > 120 and gaz.norm(G.name[i]) not in said
+               and len(resolve(gaz.norm(G.name[i]))["x"]) == 1]
+        return min(idx, key=lambda i: math.hypot(G.x[i] - near[0], G.y[i] - near[1]) / PROM.get(G.kind[i], 1.0), default=None)
+    a, b = only(P, Q), only(Q, P)
+    if a is None or b is None:
+        return None
+    pa, pb = [round(float(G.x[a]), 1), round(float(G.y[a]), 1)], [round(float(G.x[b]), 1), round(float(G.y[b]), 1)]
+    opt = lambda i, p, o, v: {"label": G.name[i], "set": {"clues": [{"t": "closest", "p": p, "others": [o], "s": round(1.5 * R["r"], 1), "sure": True, "via": "cross", "near": G.name[i], "label": G.name[i]}],      # noqa: E731  label은 server가 문구 파일(위치 범위 「더 가까움」)로 채운다
+                                                          "matter": {"cross": v, "cross_name": G.name[i] if v == "ok" else None}}}
+    return {"id": "closest", "bits": None, "cross": "pick", "options": [opt(a, pa, pb, "ok"), opt(b, pb, pa, "switch")]}
+
+
+def _many_here(name, p, cx, cy):
+    """(cross) 그 이름이 상표이고 범위 둘레 300m에 같은 상표의 다른 지점이 있나(99번 4-3절 ①). 같은 이름의 정류장 · 건물(「상도1동주민센터」)은 「same」 질문이 따로 묻는다."""
+    b = next((G.brand[int(i)] for i in G.near(p[0], p[1], 30) if gaz.norm(G.name[int(i)]) == gaz.norm(name) and G.brand[int(i)]), None)
+    return bool(b) and bool(twins(b, p, np.array([cx]), np.array([cy]), 300.0))
+
+
+def _cross(R, clues, asked):
+    """(cross, 99번 4-3절) 위험한 확정인가 → (교차 확인에서 「○○ 말고」로 댈 이름, 까닭들) 또는 (None, []).
+    켜는 때 셋(11-22 02시 좁힘 — 「받치는 말이 하나뿐」은 뺐다: 평가 774통에서 거의 맞게 좁힌 통화에 질문이 붙어 한 점 −4 · −2 · −8 · −3):
+    여러 곳(그 이름이 둘레 300m에 또 있음 · 같은 이름이 300m 넘게 떨어져 또 있음 · 넓은 장소 · 긴 다리) · 흔들림(앞서 「아니요」 · 「X 아니에요」 · 어긋나는 말 경고) · 갈라짐(mainblob이 남긴 다른 덩어리).
+    켜지 않는 때: 자동차전용도로 위 · 번호를 읽어 줬음 · 위치 질문을 여덟 번 넘게 함 · 이번 좁힘에서 이미 물음 · 한 통화 상한(CROSS_MAX) · 서로 다른 이름 둘 이상이 받침."""
+    ids = [(a or "").rstrip("!") for a in asked]
+    since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
+    if ids.count("check") + ids.count("crosspick") >= CROSS_MAX or {"check", "crosspick"} & set(ids[since + 1:]) or sum(1 for a in ids if a in LOCQ) > 8:
+        return None, []
+    if R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"]):
+        return None, []
+    if any((c.get("label") or "").startswith(("가로등", "국가지점번호")) for c in clues):
+        return None, []
+    near = set()                                          # 둘레 80m 안에 닿는 서로 다른 시민 이름
+    for c in clues:
+        if c["t"] in ("at", "pt") and (c.get("label") or c.get("k")):
+            pts = [c["p"]] if "p" in c else list(zip(resolve(c["k"])["x"], resolve(c["k"])["y"])) if "k" in c else []
+            if pts and min(math.hypot(px - R["cx"], py - R["cy"]) for px, py in pts) <= 80:
+                near.add(gaz.norm((c.get("label") or c["k"]).split(" → ")[0]))
+    if len(near) >= 2:
+        return None, []
+    anc = anchor(R, clues)
+    many = bool(anc) and (bool(anc.get("ext")) or _many_here(anc["name"], anc["p"], R["cx"], R["cy"]) or _far_same(anc))
+    shaky = since >= 0 or any(c["t"] == "not" for c in clues) or any(v < 0.35 for v in R["trust"].values())
+    split = R.get("blob_alt") is not None
+    why = [t for t, ok in (("여러 곳", many), ("흔들림", shaky), ("갈라짐", split)) if ok]
+    if not why:
+        return None, []
+    return (anc or {}).get("name") or _hinge(R, clues), why      # 기준 이름이 없으면 None — 질문 글은 server가 문구 파일(cross_noname)로
+
+
+def _far_same(anc):
+    """(cross) 브랜드가 아닌 그 이름이 300m 넘게 떨어진 곳에 또 있나(먼 같은 이름: 다른 동네의 같은 이름으로 잘못 잡았을 수 있다)."""
+    r = resolve(gaz.norm(anc["name"]))
+    return len(r["x"]) >= 2 and float(np.hypot(r["x"] - anc["p"][0], r["y"] - anc["p"][1]).max()) > 300
 
 def _fresh(asked):
     """마지막 「아니요」(confirm! · check!) 뒤에 새 위치 단서(「!」 없는 위치 질문)를 받았나. 「아니요」가 없었으면 참."""
@@ -1188,7 +1278,16 @@ def questions(R, clues, matter, asked=(), same=None):
     if is_done(R) and not rejected and not more:          # 가운데가 막힌 도로는 방향까지 받아야 찾아간다
         pin = [] if "pinq" in OFF else [q for q in _pin_questions(R, clues, matter) if q["id"] + "!" not in asked]     # 마무리: 이름 붙은 한 점 + 상대 위치 + 일의 종류마다 하나
         last = dict(confirm, name=named) if named else confirm
-        if check2 and not named:
+        if "cross" in ON and not named:                   # (cross, 99번 4절) 위험한 확정이면 「맞으실까요?」 앞에 다른 이름 하나를 묻는다. 답은 맞음 · 어긋남 판정에만(server.read 「check」)
+            since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
+            if matter.get("cross") == "ok" and any((a or "").rstrip("!") in ("check", "crosspick") for a in list(asked)[since_ + 1:]):
+                last = dict(confirm, name=matter.get("cross_name")) if "crossname" in ON else confirm      # 맞음: 핀은 그대로. crossname이면 그 이름까지 되말한다(confirm_named — 그 이름이 보여서 「네」가 나오기 쉬워 따로 잰다)
+            else:
+                h, why = _cross(R, clues, asked)
+                if why:
+                    prior = sorted({gaz.norm((c.get("label") or c.get("k") or "").split(" → ")[0]) for c in clues if c.get("label") or c.get("k")} - {""})      # 이미 받은 이름: 교차 확인의 답에서 건너뛴다
+                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "cross_why": why, "prior": prior, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+        elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
                 h = _hinge(R, clues) if "check2all" not in ON else (anchor(R, clues) or {}).get("name")

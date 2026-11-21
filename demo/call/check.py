@@ -1062,6 +1062,46 @@ def follow_said():
     print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']} · 둘레에 없는 여러 지점 상표는 범위를 끌지 않음(saidin)")
 
 
+def cross_check():
+    """(cross, 99번 4절 · 11-22 좁힌 판) 확정 전 교차 확인. 「강남역 근처 → 올리브영 강남역점 바로 앞」: 둘레 300m에 올리브영 지점이 또 있어(여러 곳) 켜면
+    확인 질문 앞에 「올리브영 강남역점 말고 …」를 묻는다. 헤이데이의원(그 자리 1m, 한 곳뿐) → 맞음: 핀 그대로 확인 질문. 「잘 모르겠어요」 → 답 없음: 확인 질문,
+    접수 카드 범위 줄에 「한 가지 말에 기댄 위치」. 강남엔터치과(264m) 「바로 옆」 → 어긋남: 「아니요」와 같이 「어느 말이 달랐을까요?」.
+    「아트박스 바로 앞」(둘레에 같은 상표 없음, 받치는 말 하나뿐)은 켜도 묻지 않는다(평가 774통 한 점 −8로 좁힘). 끄면 곧바로 확인 질문."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = "cross" in S.L.ON
+
+    def run(*lines):
+        st, v = S.turn({"id": "check-cross"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+        qs = []
+        for said in lines:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": said}})
+            qs.append(v["question"]["id"] if v["question"] else None)
+            if v["question"]:
+                st, v = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
+        return qs, v
+    qs, _ = run("강남역 근처에 쓰레기가 많이 버려져 있어요", "아트박스 바로 앞이에요")
+    assert qs[-1] == "confirm", qs
+    head = ("강남역 근처에 쓰레기가 많이 버려져 있어요", "올리브영 강남역점 바로 앞이에요")
+    qs, v0 = run(*head)
+    if not on:
+        assert qs[-1] == "confirm", qs
+        print("  ✓ 확정 전 교차 확인(cross False): 올리브영 강남역점 바로 앞 → 곧바로 확인 질문")
+        return
+    assert qs[-1] == "check" and "올리브영 강남역점" in v0["question"]["say"] and v0["question"].get("cross_why") == ["여러 곳"] and v0["question"]["why"] == S.tab("이렇게 물어보세요", "질문", 2)["cross"], (qs, v0["question"])      # 화면의 「까닭」은 문구 파일 글(켜진 까닭 낱말은 cross_why)
+    qs, v = run(*head, "헤이데이의원 바로 옆이에요")
+    assert qs[-1] == "confirm" and v["center"] == v0["center"] and v["matter"].get("cross") == "ok", (qs, v["center"], v0["center"], v["matter"].get("cross"))
+    for said in ("올리브영 강남역점 말고는 헤이데이의원이 보여요", "올리브영 말고 헤이데이의원 바로 옆이에요"):      # 질문의 기준 이름을 되받아 말해도 그 다음 이름으로 판정한다(#161 리뷰)
+        qs, v = run(*head, said)
+        assert qs[-1] == "confirm" and v["matter"].get("cross") == "ok" and v["matter"].get("cross_name") == "헤이데이의원", (said, qs, v["matter"].get("cross"), v["matter"].get("cross_name"))
+    qs, v = run(*head, "잘 모르겠어요")
+    assert qs[-1] == "confirm" and "한 가지 말에 기댄 위치" in (v["summary"]["size"] or "") and v["center"] == v0["center"], (qs, v["summary"]["size"])
+    qs, v = run(*head, "강남엔터치과 바로 옆이에요")
+    assert qs[-1] == "which" and v["matter"].get("cross") == "off", (qs, v["matter"].get("cross"))
+    print("  ✓ 확정 전 교차 확인(cross True): 올리브영 강남역점(둘레에 같은 상표) → 「… 말고 …」 → 헤이데이의원 맞음(핀 그대로) · 「잘 모르겠어요」 답 없음(카드에 「한 가지 말에 기댄 위치」) · 강남엔터치과 264m 어긋남(「어느 말이 달랐을까요?」) · 아트박스(말 하나뿐)는 묻지 않음")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -1107,6 +1147,7 @@ def main():
         seen_wide()
         main_blob()
         follow_said()
+        cross_check()
         edge_reads()
         ask_fixes()
         chain_said()
