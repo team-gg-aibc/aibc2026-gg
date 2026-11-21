@@ -27,7 +27,6 @@
 | `docs/evaluation.md` | 평가 기준: 대회 100점이 어떻게 나뉘고 누가 무엇을 보고 매기나 |
 | `docs/work-method.md` | 일하는 방식: 이슈 · 보고 · 검수 · 이어받기 |
 | `docs/meetings/` | 회의 자료와 회의 요약 (안건 · 정한 것 · 할 일 · 일정) |
-| `docs/education/` | 특화교육 정리 |
 | `docs/research/field/` | 현장 조사와 사용자 평가 준비물(누구에게 물을지 · 질문지 · 기록지 · 한 주 일정) |
 | `docs/schedule.md` | 일정과 불참 |
 | `docs/` | 문제 정의, PRD(원본 `PRD.md`와 팀원용 5분 요약 `PRD-요약.md`, 함께 고친다 · 6절), 화면 목록 · 흐름, 화면 문구(`docs/content/`), 디자인, 발표 자료가 생기는 대로 여기에 |
