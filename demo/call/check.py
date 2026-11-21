@@ -434,6 +434,42 @@ def ask_less():
           + (" — 켬, 하나씩 끄면 지금 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
+def chain_said():
+    """(89번) chainref · handsaid: 켜져 있으면 그 동작을, 꺼져 있으면 main 동작을 보고, 켠 것은 하나씩 끄면 main 동작으로 돌아가는지 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+
+    def chain():                                          # 왕십리역 r27: 「역 앞 스벅」 — 범위 둘레에 스타벅스가 다섯 곳
+        cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
+        return L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]["id"]
+
+    def said():                                           # 신촌 r12(코드 읽기): 셋째 말에서 넘길 때의 한 줄
+        st, v = S.turn({"id": "check-handsaid"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
+        for line in ["신촌 세브란스병원 앞인데요, 버스정류장 쪽에 오토바이가 인도에 계속 서 있어요", "병원 정문 앞 버스정류장이요", "잘 모르겠어요. 병원 정문 바로 앞에 있는 정류장이에요"]:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": line}})
+            if (v["question"] or {}).get("id") == "handoff":
+                break
+            st, _ = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
+        assert (v["question"] or {}).get("id") == "handoff", v["question"]
+        return "아름다운미소" in (v["summary"]["go"] or "")
+
+    looks, want = {"chainref": chain, "handsaid": said}, {"chainref": ("finer", "dist"), "handsaid": (False, True)}
+    for sw, f in looks.items():
+        on = sw in L.ON
+        got = f()
+        assert got == want[sw][0 if on else 1], (sw, on, got)
+        if on:
+            L.ON.discard(sw)
+            try:
+                assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
+            finally:
+                L.ON.add(sw)
+    print("  ✓ 체인 가게 · 넘기는 말: 둘레에 여럿인 상표는 거리 질문의 기준이 아님 · 넘길 때는 시민이 말한 이름만"
+          + (" — 켬, 하나씩 끄면 main 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -844,6 +880,7 @@ def main():
         seen_wide()
         edge_reads()
         ask_fixes()
+        chain_said()
         ask_less()
         print("통화로 위치 좁히기 점검 통과")
     finally:
