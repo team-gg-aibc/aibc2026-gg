@@ -931,6 +931,57 @@ def _bridge_end(read, keyed, clues):
         read["skip"] = list(read.get("skip") or []) + [m["key"]]      # Solar가 「○○ 쪽」으로 되살리지 않게(_merge)
 
 
+PAIR_M = 60.0      # (pairseen) 「A랑 B가 보여요」의 A · B가 서로 이만큼 안에 있으면 함께 보이는 자리로 본다
+
+
+def _pair_seen(said, read, keyed, clues):
+    """(pairseen, 93번) 보기 밖의 가게 · 건물 이름 둘 이상을 함께 댄 말(「CU랑 신한은행이요」): 앞 차례까지의 범위 둘레(1.5배, 300m 이상)에서 그 이름들을 찾아
+    1) 둘레에 한 곳도 없는 이름은 범위를 끌지 않게 뺀다 — 다른 이름이 둘레에 있을 때만(동규 시험 통화 11-21: 장한평역 둘레에 지명 자료의 신한은행이 0곳이라
+       1.2km 밖 군자동 쪽 「CU와 신한은행이 함께 가까운 곳」으로 끌려 565 → 1,088m),
+    2) 둘레에 남은 이름이 둘 이상이면 서로 PAIR_M 안에 함께 있는 자리만 남긴다: 한 곳이면 그 자리(이름표 = 실제 지점 이름 「신한은행 ○○지점 옆 CU ○○점」),
+       여러 곳이면 그 가운데 하나(anyof, 이름표 = 시민이 말한 그대로 「신한은행 옆 CU」), 없으면 이름 단서 그대로.
+    시민이 말한 이름만 쓰고, Solar가 같은 이름을 다시 넣지 않게 한다(skip). 구 · 동 · 역 · 길 같은 넓은 이름과 비슷한 이름으로 이은 것은 다루지 않는다."""
+    seen = [c for c in read["clues"] if c.get("t") == "at" and c.get("k") and c.get("how") != "쪽" and not c.get("heard")]
+    if len(seen) < 2 or not clues:
+        return
+    R0 = L.infer(clues)
+    if R0 is None:
+        return
+    zone = max(1.5 * R0["r"], 300.0)
+    raw = said.replace(" ", "")
+    said_of = {m["key"]: (re.search(re.escape(m["key"]), raw, re.I) or re.search(re.escape(m.get("said") or m["name"]), raw, re.I) or re.search(".+", m["name"])).group() for m in keyed}      # 시민이 친 글자 그대로(「CU」)
+    near = {}
+    for c in seen:
+        r = L.resolve(c["k"])
+        if r["areas"] or r["roads"] or any(k in L.KIND_SIG for k in r["kinds"]) or not r.get("ids"):
+            continue
+        near[c["k"]] = [(int(i), float(x), float(y)) for i, x, y in zip(r["ids"], r["x"], r["y"]) if math.hypot(x - R0["cx"], y - R0["cy"]) <= zone]
+    keep = {k: v for k, v in near.items() if v}
+    if not keep:
+        return                                            # 모두 둘레에 없으면 지금처럼
+    drop = [k for k, v in near.items() if not v]
+    if len(keep) >= 2:
+        ks = list(keep)
+        spots = []
+        for p in keep[ks[0]]:
+            mates = [min(keep[k], key=lambda q: math.hypot(q[1] - p[1], q[2] - p[2])) for k in ks[1:]]
+            if all(math.hypot(q[1] - p[1], q[2] - p[2]) <= PAIR_M for q in mates):
+                m = (sum(q[1] for q in [p] + mates) / len(ks), sum(q[2] for q in [p] + mates) / len(ks))
+                if all(math.hypot(m[0] - s[0][0], m[1] - s[0][1]) > 40 for s in spots):
+                    spots.append((m, [p] + mates))
+        if spots:
+            if len(spots) == 1:
+                ids = [q[0] for q in spots[0][1]]
+                clue = {"t": "pt", "p": [round(spots[0][0][0], 1), round(spots[0][0][1], 1)], "r": L.SIG["가까이"], "sure": True, "label": " · ".join(G.name[i] for i in ids[1:]) + " 옆 " + G.name[ids[0]]}
+            else:
+                clue = {"t": "anyof", "ps": [[round(m[0], 1), round(m[1], 1)] for m, _ in spots[:12]], "r": L.SIG["가까이"], "sure": True, "label": " · ".join(said_of.get(k, k) for k in ks[1:]) + " 옆 " + said_of.get(ks[0], ks[0])}
+            read["clues"].append(clue)
+            drop += ks
+    if drop:
+        read["clues"] = [c for c in read["clues"] if not (c.get("k") in drop and c.get("t") == "at")]
+        read["skip"] = list(read.get("skip") or []) + drop
+
+
 def speech_fix(said, read, short, clues):
     """실제 말투 고침(53번). 모두 스위치(기본 끔)라 끄면 read를 그대로 돌려준다. clues = 앞 차례까지의 단서."""
     on, keyed, t = L.ON, [m for m in short if "key" in m], gaz.norm(said)
@@ -1042,6 +1093,8 @@ def speech_fix(said, read, short, clues):
         read["skip"] = list(dict.fromkeys(skip))
     if "bridgeend" in on:
         _bridge_end(read, keyed, clues)
+    if "pairseen" in on:
+        _pair_seen(said, read, keyed, clues)
     return read
 
 

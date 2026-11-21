@@ -7,6 +7,7 @@
         단추만 눌러도, 대본에 없는 말(코드만으로 읽음)로도 끝까지 가는지 본다.
 """
 import json
+import math
 import re
 import shutil
 import os
@@ -963,6 +964,37 @@ def hangul_say():
     print(f"  ✓ 말로 읽는 보기의 영어 이름(hangulopt2 {on}): 롯데월드타워 「바로 앞」 읽는 넷 {said}")
 
 
+def pair_seen():
+    """(pairseen, 93번) 보기 밖의 이름 둘을 함께 댄 말 「CU랑 신한은행이요」. 장한평역: 둘레에 신한은행이 없어 켜면 범위를 끌지 않는다(끄면 main 그대로 동쪽 군자동 쪽으로 끌려 1km 넘게).
+    마들역: CU와 신한은행이 붙은 자리가 한 곳이라 켜면 그 자리로 좁힌다(이름표 = 실제 지점 이름)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = "pairseen" in S.L.ON
+
+    def run(stn):
+        st, view = S.turn({"id": f"check-pair-{stn}"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+        for said in ("여기 길에 쓰레기가 많이 버려져 있어요", f"{stn}이요", "CU랑 신한은행이요"):
+            st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+            if view["question"]:
+                st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        return view
+    v = run("장한평역")
+    x0, y0 = S.gaz.xy(*S.gaz.lonlat(*S.L.resolve("장한평역")["x"][:1], *S.L.resolve("장한평역")["y"][:1]))
+    cx, cy = S.gaz.xy(*v["center"])
+    moved = math.hypot(float(cx) - float(x0), float(cy) - float(y0))
+    if on:
+        assert v["radius"] < 700 and "신한은행" not in v["chips"], (v["radius"], v["chips"])
+    else:
+        assert v["radius"] > 1000, v["radius"]
+    m = run("마들역")
+    if on:
+        assert m["radius"] <= 100 and any("옆 CU" in c for c in m["chips"]), (m["radius"], m["chips"])
+    else:
+        assert m["radius"] > 100, m["radius"]
+    print(f"  ✓ 보기 밖의 이름 둘을 함께 댄 말(pairseen {on}): 장한평역 {v['radius']}m(가운데 {moved:.0f}m 옮김) · 마들역 {m['radius']}m {[c for c in m['chips'] if '옆' in c]}")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -1000,6 +1032,7 @@ def main():
         records(ends["roadkill"])
         switches()
         hangul_say()
+        pair_seen()
         bind_choice()
         neg_keep()
         bridge_end()
