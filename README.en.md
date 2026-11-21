@@ -271,7 +271,7 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 <!-- The 600-call values are the "가상 600통" rows of the #161 description (423 · 400 · 420 / 0 · 0 · 2; at 447548b they were 421 · 397 · 416 / 0 · 0 · 5). The 93-case values are the 93-case circle and boundary values in the "새 잣대 774통" row of #161 (105/0 · 134/3, sum of three seeds); the wrong fixes before the second batch (7 · 10) are from #157. Held-out check set numbers are not copied into the README (orchestrator 11-22). "우리 측정" in docs/call-locate/README.md has the same values -->
 
-These come from simulated calls, 600 per condition, measured with the defaults of main with #161 merged (all location-reading fixes on, 2026-11-22). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
+These come from simulated calls, 600 per condition, measured with the defaults of main 62f73ea (#161 merged, all location-reading fixes on, 2026-11-22). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
 
 | Caller (600 calls each) | Calls narrowed to one point | Calls fixed at a wrong place |
 | --- | --- | --- |
