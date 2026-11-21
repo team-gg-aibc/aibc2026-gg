@@ -31,7 +31,7 @@ Four steps at the top of the screen show where the call is.
 | --- | --- |
 | Hear the situation | The caller's words come in one line at a time. In the demo, they come from a script or are typed in. |
 | Narrow down the place | For each line, code reads names and relations and shows the area and the next question right away. Then solar-pro4 reads the same line once more and corrects the place name, relation, and what happened. If the case is one to ask the ordinances about, the screen asks the engine once the case type and place type are known. |
-| Confirm | When the area is within a 50 m radius (a 200 m stretch on a road), the screen reads the narrowed place back ("…is that right?"). The pin drops only after the caller says yes. If the caller says no, it lowers the chance of that place and keeps narrowing. |
+| Confirm | When the area is within a 50 m radius (a 200 m stretch on a road), the screen reads the narrowed place back ("…is that right?"). If the place relies on a name found in several places (such as a chain store), the caller said no earlier, or the likelihood is split into two clusters, it first asks for "one other name you can see from there" to cross-check. The pin drops only after the caller says yes. If the caller says no, it lowers the chance of that place and keeps narrowing. |
 | Hand off | From the fixed place it decides the lot number and the office, fills the intake card, and saves the case to the records. The agent sets the status to "handed to the office" (the scripted scene shows it as already chosen). When the call ends, "다음 전화 받기" (Take next call) and "상담 기록 보기" (View records) buttons appear. The demo does not file or send anything for real; the status changes only inside the screen. |
 
 <p align="center">
@@ -81,6 +81,8 @@ So we narrow down the place during the call. Each source and how to use it caref
 - **Building heights.** The buildings in the script get a roof outline. The heights in Seoul's data are not measured; they are floors × 3.5 m.
 - **Phone.** Upright (width under 600 px) or sideways (height under 500 px), the boxes stack in this order: the chat (with the input box), what to ask now, the ordinance answer, the location area, and the intake card.
 - **Records.** Each record keeps what was said in the call, and "the conversation at the time" starts folded.
+- **Following what the caller says (11-21, on by default).** When the caller gives a name that is not among the options, the screen re-centers the area on that name. For example, in the Janghanpyeong call it goes to a 41 m question "Right in front of CU Janghanpyeong 2?" instead of repeating the same signboard question at 498 m. Of two names given together, a name not found nearby no longer pulls the area, and "농협" (Nonghyup) is read as NH Nonghyup Bank.
+- **Cross-check before fixing the place (11-22, on by default).** As in the confirm step of "One call, step by step", it asks for one more name only before risky fixes (at most 3 times per call). If a chain store has several branches nearby, it first asks "Which ○○ is closest?".
 - **Second batch on 11-21 (on by default).** A bridge or overpass longer than 120 m is read as the whole bridge when the caller gives only its name, not as its center point, and "the ○○ end" is read as that end of the bridge. When the same kind of location question would come twice in a row, the screen acknowledges what it heard and asks in different words. Options read aloud are swapped for Korean names (for example "Possibilites" → "롯데콘서트홀"). If the caller only says "I can see ○○", it is taken as the distance at which it can be seen, not "right in front".
 - **Handoff fixes (11-21).** Road damage and streetlights on Han River bridges go to the Seoul Metropolitan Government, cases inside Olympic Park to the Korea Sports Promotion Foundation, Cheonggyecheon to the Seoul Facilities Corporation, and cases the caller says are inside a subway station to the operator of that station.
 - **Calls you turn on with a switch (off by default).** `CALL_DIRECT=1` is the direct call: a visitor plays the caller and types, and the next line the screen picked and the ordinance answer appear in the chat as the agent's words (an access code and usage limits can be set). `CALL_VOICE=1` is a voice call placed and answered from a phone browser, turned on only on the presentation server (see "What you should know" 4). Details are in [`demo/call/voice/README.md`](demo/call/voice/README.md) (Korean).
@@ -267,22 +269,24 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 ### Narrowing the location
 
-<!-- The 600-call values in this section were measured on the 11-21 baseline (location code the same as main 5000e28), run r75-c2m (report 78, "바탕" row: 421 · 397 · 416 / 0 · 0 · 5). The ten location fixes (#149, main 16d57be) and the second batch (#157, main 08bd360) did not change these 600 calls either (#149 · #157 descriptions: same). The 93-case values are the "new yardstick" row of the #157 description (sum of three seeds, circle 110/7 → 110/0 · boundary 136/10 → 136/3). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
+<!-- The 600-call values are the "가상 600통" rows of the #161 description (423 · 400 · 420 / 0 · 0 · 2; at 447548b they were 421 · 397 · 416 / 0 · 0 · 5). The 93-case values are the 93-case circle and boundary values in the "새 잣대 774통" row of #161 (105/0 · 134/3, sum of three seeds); the wrong fixes before the second batch (7 · 10) are from #157. Held-out check set numbers are not copied into the README (orchestrator 11-22). "우리 측정" in docs/call-locate/README.md has the same values -->
 
-These come from simulated calls, 600 per condition, measured with the defaults of main 08bd360 (all location-reading fixes on, 2026-11-21). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
+These come from simulated calls, 600 per condition, measured with the defaults of main with #161 merged (all location-reading fixes on, 2026-11-22). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
 
 | Caller (600 calls each) | Calls narrowed to one point | Calls fixed at a wrong place |
 | --- | --- | --- |
-| Answers what they see | **421 (70.2%)** | **0** |
-| 10% wrong answers and 10% "I don't know" | 397 (66.2%) | 0 |
-| 10% wrong answers and easily says yes to a wrong place | 416 (69.3%) | 5 |
+| Answers what they see | **423 (70.5%)** | **0** |
+| 10% wrong answers and 10% "I don't know" | 400 (66.7%) | 0 |
+| 10% wrong answers and easily says yes to a wrong place | 420 (70.0%) | 2 |
 
 We also ran a separate set of 93 cases, built without looking at the code being fixed (the kinds of places that failed in the field: behind or beside large buildings, event sites, bridges, nicknames), with three seeds (279 calls in all). The simulated caller judges distance to a large building either by approximating it as a circle or by its real boundary.
 
 | 93 cases × 3 seeds | Calls narrowed to one point | Calls fixed at a wrong place (before → after the second batch) |
 | --- | --- | --- |
-| Building approximated as a circle | 110 | 7 → **0** |
-| Building's real boundary | 136 | 10 → **3** |
+| Building approximated as a circle | 105 | 7 → **0** |
+| Building's real boundary | 134 | 10 → **3** |
+
+Turning on the cross-check before fixing the place (11-22) lowered the one-point count of this set a little (110 → 105 · 136 → 134), because one more cross-check question came before some places were fixed. Wrong fixes did not go up. It went in because wrong fixes went down in the 600 simulated calls and in a separate held-out check set (the rule: keep a change that lowers wrong fixes even if one-point results drop a little, PM 11-22).
 
 - "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the caller confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
 - Distance to the lot number (from the true location to the nearest lot number): median 18 m in alleys and shopping streets, 25 m around station exits, 39 m on main roads. Share more than 100 m away: 48% on motorways, 80% inside parks.
@@ -290,7 +294,8 @@ We also ran a separate set of 93 cases, built without looking at the code being 
 <details>
 <summary>How we measured</summary>
 
-- Measured on 2026-11-21 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 6.4 exchanges on average.
+- Measured on 2026-11-22 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 5.57 questions on average.
+- Following what the caller says (#159, 11-21) and the cross-check before fixing the place (#161, 11-22) moved the 600 calls from 421 · 397 · 416 to 423 · 400 · 420 one-point calls, and wrong fixes from 0 · 0 · 5 to 0 · 0 · 2. We checked once more with a separate held-out check set.
 - The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases. The 11-20 fixes (fixes for the field test failures, reading perimeters, and more) also barely changed these 600 calls (398 → 397, 417 → 416); their effect was checked by feeding the words of real calls back in and with a separate set of cases. The second batch on 11-21 (long bridges, "I can see …", Korean option names, and more) did not change these 600 calls either; its effect shows in the wrong fixes of the 93-case set above.
 - Measurements up to 11-18 and how we fixed things are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
 - On 11-18, before we found and fixed four causes of wrong fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes when the caller answers what they see.
