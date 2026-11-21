@@ -1398,7 +1398,8 @@ def route_of(matter, R):
             if len({x["to"] for x in rows}) == 1:
                 rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
             fate += rows
-    spot = next((v for k, v in SPOTS.items() if (k == matter.get("spot") or (cname and cname.startswith(tuple(v.get("names", [k]))))) and gu in v.get("gu", [gu])), None)
+    said = [SPOTS[matter["spot"]]] if matter.get("spot") in SPOTS else []      # 시민이 말한 자리(「올림픽공원역 승강장」)가 지도 이름(올림픽공원)보다 먼저
+    spot = next((v for v in said + [v for k, v in SPOTS.items() if cname and cname.startswith(tuple(v.get("names", [k])))] if gu in v.get("gu", [gu])), None)
     if spot and matter["type"] not in spot["keep"]:
         hit, others, fate = dict(hit, to=spot["to"], note=spot["note"], basis="확인"), [], []      # 넘길 곳만 그 기관으로(조례 6종 안팎은 자리 줄 그대로). 다른 자리 표는 그 기관과 어긋나 보이지 않게 뺀다
     scope = hit.get("scope", t["scope"])
