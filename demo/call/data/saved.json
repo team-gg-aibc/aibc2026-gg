@@ -709,6 +709,116 @@
    "sec": 1.15,
    "said": "네, 맞아요. 거기예요.",
    "asked": "confirm"
+  },
+  "156600ba6dd65303": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray",
+     "animal": "고양이",
+     "alive": true
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 3.13,
+   "said": "여보세요, 길가 화단 옆에 고양이가 한 마리 웅크리고 있는데요, 다리를 다쳤는지 절뚝거려요.",
+   "asked": "where"
+  },
+  "994bc2884d8ef4fa": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "롯데월드타워",
+      "label": "롯데월드타워"
+     },
+     {
+      "t": "past",
+      "k": "잠실역",
+      "label": "잠실역",
+      "how": "모름"
+     }
+    ],
+    "matter": {},
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.57,
+   "said": "롯데월드타워 근처 길가예요. 잠실역에서 걸어 나오는 길이요. 번지는 모르겠어요.",
+   "asked": "where"
+  },
+  "5a301d8db717e32d": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "leash": false,
+     "type": "stray",
+     "animal": "고양이"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 0.65,
+   "said": "목줄은 없어요. 다친 고양이를 신고하면 누가 데려가나요?",
+   "asked": "leash"
+  },
+  "b2b0f9ceb874c9c0": {
+   "out": {
+    "clues": [
+     {
+      "t": "at",
+      "k": "잠실역1번출구",
+      "label": "잠실역 1번 출구",
+      "how": "바로"
+     }
+    ],
+    "matter": {},
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 2.01,
+   "said": "잠실역 1번 출구 바로 앞이에요.",
+   "asked": "finer"
+  },
+  "28278e11a2d421d5": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "went": "그 자리",
+     "type": "stray"
+    },
+    "confirm": null,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 1.58,
+   "said": "지금도 그 자리에 있어요.",
+   "asked": "went"
+  },
+  "bde0f4afee907c69": {
+   "out": {
+    "clues": [],
+    "matter": {
+     "type": "stray"
+    },
+    "confirm": true,
+    "outside": false,
+    "drop": [],
+    "said_place": ""
+   },
+   "sec": 0.66,
+   "said": "네, 맞아요.",
+   "asked": "confirm"
   }
  },
  "engine": {
@@ -868,6 +978,35 @@
    "say": "다친 고양이를 신고하면 구청장이 구조·보호 조치를 합니다. 실제 구조는 구청장이나 동물보호센터장이 안전한 방법으로 하고, 구조한 동물은 동물보호센터에 보호됩니다. 치료·보호를 위해 민간단체 소속자나 명예동물보호관에게 보호조치를 요청하고 예산 범위에서 경비를 지원할 수도 있습니다.",
    "sec": 6.0,
    "settings": "4fb47ff9df76"
+  },
+  "stray|송파구의 길가|ca273d": {
+   "response": {
+    "answer": "다친 고양이를 신고하면 구청장이 접수해 구조·보호 조치를 합니다. 구조된 고양이는 동물보호센터에 보호되며, 누가 직접 데려가서 구조하는지는 조례에 정해져 있지 않습니다.",
+    "citation": [
+     "서울특별시 동물보호 조례 제10조 제1항",
+     "서울특별시 동물보호 조례 제10조 제3항"
+    ],
+    "source_url": "https://www.law.go.kr/ordinInfoP.do?ordinSeq=2171829",
+    "effective_date": "2026-10-01"
+   },
+   "reason": null,
+   "error": null,
+   "evidence": [
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제1항",
+     "quote": "구청장은 유기동물 또는 피학대동물을 발견하거나 유기동물 또는 피학대동물의 발견신고를 받은 때에는 이를 지체없이 구조ㆍ보호할 수 있도록 필요한 조치를 하여야 한다."
+    },
+    {
+     "label": "서울특별시 동물보호 조례 제10조 제3항",
+     "quote": "구청장 또는 동물보호센터의 장은 제1항에 따라 구조한 동물을 동물보호센터에 보호조치하여야 한다. 다만, 시장 또는 구청장은 동물의 치료와 보호를 위해 영 제6조에 따른 민간단체에 소속된 자 또는 법 제90조에 따른 명예동물보호관에게 보호조치를 하도록 요청할 수 있으며 예산의 범위에서 필요한 경비를 지원할 수 있다."
+    }
+   ],
+   "ask": "길가 화단 옆에 다리를 다쳐 절뚝거리는 고양이가 있는데, 다친 고양이를 신고하면 누가 데려가나요?",
+   "ask_sec": 0.8,
+   "question": "다친 고양이를 신고하면 누가 데려가나요?",
+   "say": "다친 고양이를 신고하면 구청장이 접수해 구조·보호 조치를 합니다. 구조된 고양이는 동물보호센터에 보호되며, 누가 직접 데려가서 구조하는지는 조례에 정해져 있지 않습니다.",
+   "sec": 6.5,
+   "settings": "7327ca7e355b"
   }
  },
  "made": {
@@ -1105,72 +1244,72 @@
   }
  },
  "made_cat_street": {
-  "at": "2026-11-17T21:27:56+09:00",
+  "at": "2026-11-21T04:04:42+09:00",
   "read_model": "solar-pro4",
-  "engine_settings": "4fb47ff9df76",
+  "engine_settings": "7327ca7e355b",
   "engine_config": "eval/configs/release.json",
   "calls": {
    "read": 6,
    "ask": 1,
    "engine": 1,
-   "tokens_in": 25996,
-   "tokens_out": 1354
+   "tokens_in": 23956,
+   "tokens_out": 1153
   },
   "steps": {
    "cat_street": [
     {
-     "said": "여보세요, 집 앞 골목에 고양이가 한 마리 웅크리고 있는데요, 다리를 다쳤는지 절뚝거려요.",
+     "said": "여보세요, 길가 화단 옆에 고양이가 한 마리 웅크리고 있는데요, 다리를 다쳤는지 절뚝거려요.",
      "m": null,
      "code_next": "where",
      "next": "where",
-     "code_ms": 3,
+     "code_ms": 65,
      "read": "live",
-     "read_sec": 1.83
+     "read_sec": 3.13
     },
     {
-     "said": "상도1동 주민센터 근처 골목이에요. 상도역에서 올라오는 길이요. 번지는 모르겠어요.",
+     "said": "롯데월드타워 근처 길가예요. 잠실역에서 걸어 나오는 길이요. 번지는 모르겠어요.",
      "m": 210,
      "code_next": "leash",
      "next": "leash",
-     "code_ms": 17,
+     "code_ms": 537,
      "read": "live",
-     "read_sec": 1.93
+     "read_sec": 1.57
     },
     {
-     "said": "목줄은 없어요. 근데 이런 고양이는 신고하면 누가 와서 데려가는 거예요?",
+     "said": "목줄은 없어요. 다친 고양이를 신고하면 누가 데려가나요?",
      "m": 210,
      "code_next": "finer",
      "next": "finer",
-     "code_ms": 66,
+     "code_ms": 75,
      "read": "live",
-     "read_sec": 1.75
+     "read_sec": 0.65
     },
     {
-     "said": "상도1동 주민센터 바로 앞이에요.",
+     "said": "잠실역 1번 출구 바로 앞이에요.",
      "m": 40,
      "code_next": "went",
      "next": "went",
-     "code_ms": 272,
+     "code_ms": 16,
      "read": "live",
-     "read_sec": 1.26
+     "read_sec": 2.01
     },
     {
      "said": "지금도 그 자리에 있어요.",
      "m": 40,
      "code_next": "confirm",
      "next": "confirm",
-     "code_ms": 9,
+     "code_ms": 13,
      "read": "live",
-     "read_sec": 2.25
+     "read_sec": 1.58
     },
     {
      "said": "네, 맞아요.",
      "m": 40,
      "code_next": null,
      "next": null,
-     "code_ms": 7,
+     "code_ms": 16,
      "read": "live",
-     "read_sec": 1.93
+     "read_sec": 0.66
     }
    ]
   }
