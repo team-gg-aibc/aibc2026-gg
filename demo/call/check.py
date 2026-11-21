@@ -1088,7 +1088,7 @@ def cross_check():
         return
     assert qs[-1] == "check" and "아트박스" in v0["question"]["say"] and v0["question"].get("cross"), (qs, v0["question"])
     qs, v = run(*head, "강남새로치과의원이요")
-    assert qs[-1] == "confirm" and "강남새로치과의원도 보이는 곳" in v["question"]["say"] and v["center"] == v0["center"], (qs, v["question"]["say"], v["center"], v0["center"])
+    assert qs[-1] == "confirm" and ("강남새로치과의원도 보이는 곳" in v["question"]["say"]) == ("crossname" in S.L.ON) and v["center"] == v0["center"], (qs, v["question"]["say"], v["center"], v0["center"])
     qs, v = run(*head, "잘 모르겠어요")
     assert qs[-1] == "confirm" and "한 가지 말에 기댄 위치" in (v["summary"]["size"] or "") and v["center"] == v0["center"], (qs, v["summary"]["size"])
     print("  ✓ 확정 전 교차 확인(cross True): 아트박스 바로 앞 → 「아트박스 강남점 말고 …」 → 강남새로치과의원 맞음(핀 그대로, 이름까지 되말함) · 「잘 모르겠어요」 답 없음(카드에 「한 가지 말에 기댄 위치」)")

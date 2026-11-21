@@ -1129,6 +1129,19 @@ def _hinge(R, clues):
 CROSS_MAX = int(os.environ.get("CALL_CROSS_MAX", "3"))     # (cross) 한 통화에 교차 확인을 묻는 횟수의 상한(동규 11-21 23시: 세 번까지)
 
 
+def _cross_wide(R, clues):
+    """(cross) 교차 확인의 답을 찾을 넓은 범위 → [가운데 x, y, 반지름]: 받치는 말 하나를 뺀 범위(덮는 반지름의 1.5배), 그 범위가 없거나 좁으면 지금 가운데 둘레 300m.
+    확정 직전의 90% 범위는 40m 안팎이라, 틀린 자리였으면 시민이 댄 진짜 둘레의 이름이 그 밖에 있다(가상 600통 첫 판: 「답 없음」으로 틀린 확정 4 → 8)."""
+    best = [round(R["cx"], 1), round(R["cy"], 1), 300.0]
+    for n, c in enumerate(clues):
+        if c["t"] not in ("at", "pt", "past", "before", "between"):
+            continue
+        R1 = infer(clues[:n] + clues[n + 1:])
+        if R1 is not None and not is_done(R1) and 1.5 * R1["r_cover"] > best[2]:
+            best = [round(R1["cx"], 1), round(R1["cy"], 1), round(min(1.5 * R1["r_cover"], 1500.0), 1)]
+    return best
+
+
 def _many_here(name, p, cx, cy):
     """(cross) 그 이름이 범위 둘레 300m에 또 있나(같은 이름 · 같은 상표의 다른 지점)."""
     if twins(name, p, np.array([cx]), np.array([cy]), 300.0):
@@ -1232,11 +1245,11 @@ def questions(R, clues, matter, asked=(), same=None):
         if "cross" in ON and not named:                   # (cross, 99번 4절) 위험한 확정이면 「맞으실까요?」 앞에 다른 이름 하나를 묻는다. 답은 맞음 · 어긋남 판정에만(server.read 「check」)
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if matter.get("cross") == "ok" and any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
-                last = dict(confirm, name=matter.get("cross_name"))      # 맞음: 핀은 그대로, 그 이름까지 되말한다(confirm_named)
+                last = dict(confirm, name=matter.get("cross_name")) if "crossname" in ON else confirm      # 맞음: 핀은 그대로. crossname이면 그 이름까지 되말한다(confirm_named — 그 이름이 보여서 「네」가 나오기 쉬워 따로 잰다)
             else:
                 h = _cross(R, clues, asked)
                 if h:
-                    last = {"id": "check", "bits": None, "name": h, "cross": True, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+                    last = {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
         elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):

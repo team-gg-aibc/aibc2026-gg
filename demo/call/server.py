@@ -710,22 +710,20 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "near":
         pick = 1 if re.search(r"떨어|멀|조금|좀|아니|안 ?보", said) else 0 if re.search(r"바로|코앞|^\s*(네|예|응)|맞아|맞습|앞이", said) else None
     elif q.get("id") == "check" and q.get("cross") and R is not None:      # (cross, 99번 4-5절) 교차 확인의 답: 확정 전의 넓은 범위(90%, 남은 덩어리 포함) 안에서만 찾아 맞음 · 어긋남 · 답 없음
-        read["clues"], verdict, name, np_ = [], "none", None, L.np
+        read["clues"], verdict, name = [], "none", None
         vis = 150.0 if R["on_road"] else 60.0
-        o = R["order"]
-        k = int(np_.searchsorted(np_.cumsum(R["w"][o]) / float(R["w"].sum()), L.MASS)) + 1
-        wx, wy = R["x"][o[:k]], R["y"][o[:k]]
+        wcx, wcy, wr = q.get("wide") or [R["cx"], R["cy"], 300.0]      # 받치는 말 하나를 뺀 넓은 범위(locate._cross_wide)
         for m in short:
             if "key" in m:
                 r = L.resolve(m["key"])
-                pts = [(float(a), float(b)) for a, b in zip(r["x"], r["y"]) if wx.min() - vis <= a <= wx.max() + vis and wy.min() - vis <= b <= wy.max() + vis]
+                pts = [(float(a), float(b)) for a, b in zip(r["x"], r["y"]) if math.hypot(float(a) - wcx, float(b) - wcy) <= wr]
             elif str(m.get("by", "")).startswith(("#", "≈", "@")):
                 pts = [(float(m["p"][0]), float(m["p"][1]))]
             else:
                 continue
             one = []
             for a, b in pts:
-                if float(((wx - a) ** 2 + (wy - b) ** 2).min()) <= vis * vis and all(math.hypot(a - c, b - e) > 40 for c, e in one):
+                if all(math.hypot(a - c, b - e) > 40 for c, e in one):
                     one.append((a, b))
             if len(one) == 1:                             # 넓은 범위 안에 한 곳뿐인 이름만 판정에 쓴다(여러 곳 · 범위 밖 · 자료에 없음은 답 없음)
                 if math.hypot(one[0][0] - R["cx"], one[0][1] - R["cy"]) <= vis:
@@ -1975,7 +1973,7 @@ def build(st, extra=None):
                 "others": [q["id"] for q in qs[1:3]]}
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
     if pick.get("cross"):
-        question["cross"] = True                          # (cross) 교차 확인
+        question["cross"], question["wide"] = True, pick.get("wide")      # (cross) 교차 확인
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
@@ -2254,7 +2252,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": True} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지도 남긴다: 답 읽기가 그것으로 가른다
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": True, "wide": q.get("wide")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 
