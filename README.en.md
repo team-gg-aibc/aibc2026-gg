@@ -3,16 +3,9 @@
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
-| Ordinance engine score (out of 100) | Calls narrowed to one point | Calls fixed at a wrong place | Handoff offices confirmed in official guidance |
-| :---: | :---: | :---: | :---: |
-| **93.1** | **70.2%** | **0** / 600 calls | **24** / 30 rows |
-
-<p align="center"><sub>Engine: average of 12 runs on 174 questions never used in development (the team's own measurement, not the contest's scoring). Location: 600 simulated calls where the caller answers what they see. Results under other conditions are in <a href="#measurements">Measurements</a>.</sub><br>
-<b>Try it</b> — the address of the demo screen for judges is in the LMS submission. To run it on your own computer without an API key, see <a href="#getting-started">Getting started</a>.</p>
-
 <!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from a version whose scene and screen code are the same as main 13a9fb3 (#151 merged, with the step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
 <p align="center">
-  <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="92%">
+  <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="100%">
   <br>
   <sub>The agent screen during a call (in Korean). It replays a made-up call the team wrote, in "saved answers" mode (see <a href="#how-one-call-goes">How one call goes</a>).</sub>
 </p>
@@ -20,6 +13,7 @@
 <p align="center">General complaint lines such as 120 cannot get the caller's location, so the call agent hears the place in words. This screen reads location clues from what the caller says, shrinks the area on the map, and shows one next question to ask. When the place is fixed, the intake card gets the lot number and the office in charge, and if the case falls under one of the six Seoul ordinances, the screen adds an answer based on the ordinance.</p>
 
 <p align="center">
+  <b>Try it</b> — the address of the demo screen for judges is in the LMS submission. To run it on your own computer without an API key, follow <a href="#getting-started">Getting started</a>.<br>
   This is Team GG's repository for the Upstage track, "Public law Q&A AI with Upstage AI Studio", of the 2026 AI Bootcamp Competition. It holds the <b>ordinance Q&A engine</b> (<code>engine/</code>, the API the contest scores) and the <b>demo screen</b> built on it (<code>demo/call/</code>).
 </p>
 
@@ -238,7 +232,7 @@ The ordinances are the versions in force on 2026-10-01, as the contest set. Each
 
 ### Ordinance engine
 
-Scores on questions never used in development (unseen questions) and on development questions. These are the team's own measurements, not the contest's hidden scoring.
+Scores of the submitted version (settings fingerprint `7327ca7e355b`), measured on 2026-11-20 on questions never used in development (unseen questions) and on development questions. These are the team's own measurements, not the contest's hidden scoring.
 
 | | 174 unseen questions, 12 runs | 693 development questions, 2 runs |
 | --- | --- | --- |
@@ -289,7 +283,7 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 <!-- The 600-call values in this section were measured on the 11-21 baseline (location code the same as main 5000e28), run r75-c2m (report 78, "바탕" row: 421 · 397 · 416 / 0 · 0 · 5). The ten location fixes (#149, main 16d57be) did not change these 600 calls either (#149 description: same, three calls differ). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
 
-These come from simulated calls. Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
+These come from simulated calls, 600 per condition, measured on 2026-11-21 with the defaults on main (all location-reading fixes on). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
 
 | Caller (600 calls each) | Calls narrowed to one point | Calls fixed at a wrong place |
 | --- | --- | --- |
@@ -402,7 +396,7 @@ The demo's other environment variables are in [`demo/call/README.md`](demo/call/
 
 1. **The demo calls are made up.** This call and question flow is a made-up flow the team built from public material and the ordinance text, and it is not connected to the 120 standard consultation database (the bottom left of the screen says the same). The team wrote the call scripts and question wording, and chose the complaint types from Seoul's field complaint handling standard. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
 2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured by distance yet.
-3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 24 were confirmed in official guidance or the ordinance text, and 6 are guesses. The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
+3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 24 were confirmed in official guidance or the ordinance text, and 6 are guesses (handoff table `demo/call/data/routes.json`, as of 2026-11-21). The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
 4. **Every model that makes an answer is an Upstage model.**
    - Narrowing the place, picking questions, and the ordinance answer use only Upstage models.
    - Only speech-to-text (sound to text) and reading aloud (text to sound) use another company's models (ElevenLabs: `scribe_v2_realtime` for speech-to-text, `eleven_multilingual_v2` for reading aloud), because Upstage offers no speech-to-text or speech synthesis model.
