@@ -7,6 +7,7 @@
         단추만 눌러도, 대본에 없는 말(코드만으로 읽음)로도 끝까지 가는지 본다.
 """
 import json
+import math
 import re
 import shutil
 import os
@@ -64,7 +65,7 @@ def check_end(name, view, sizes):
     if r.get("fate"):       # 동물의 일: 「살았나 · 죽었나 × 자리」 표(11-18). 표의 줄 그대로, 지금 통화의 줄 하나만 칠함
         f, dead = r["fate"], [x for x in r["fate"] if not x["alive"]]
         assert sum(x["here"] for x in f) == 1 and {x["alive"] for x in f} == {True, False} and all(x["to"] and "{" not in x["to"] and (x["scope"] == "in") == x["alive"] for x in f), f"{name}: 살았나 표 {f}"
-        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "추측"), ("자동차전용도로", "추측")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
+        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "확인"), ("자동차전용도로", "확인")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
     eng = view["engine"]
     assert eng["status"] == "ready" and not eng["error"] and eng["ask"], f"{name}: 엔진 {eng}"
     if e["cite"]:       # 6종 안: 근거 조항이 붙은 추천 답
@@ -303,6 +304,21 @@ def edge_reads():
     sys.path.insert(0, str(HERE))
     import server as S
     on = set(S.L.EDGE_ON.split(",")) <= S.L.ON
+    x, y = S.gaz.xy(126.93626, 37.53345)      # 마포대교 한가운데(11-21 「다리」 갈래): 포트홀은 서울시 교량안전과, 쓰레기는 다리 줄이 없어 전처럼 구청
+    deck = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert S.L.place_class(deck) == ("다리", "마포대교") and "교량안전과" in S.route_of({"type": "road"}, deck)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, deck)["hit"]["to"]
+    x, y = S.gaz.xy(127.1215, 37.5206)      # 올림픽공원 안(11-21 spots): 노점은 국민체육진흥공단, 유기 동물은 그대로 송파구청
+    olp = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert "국민체육진흥공단" in S.route_of({"type": "vendor"}, olp)["hit"]["to"] and "송파구청 동물보호" in S.route_of({"type": "stray"}, olp)["hit"]["to"]
+    x, y = S.gaz.xy(126.9850, 37.5690)      # 청계천 광교 둘레: 시민이 「청계천 산책로」라고 했을 때만 서울시설공단 청계천관리처, 길(청계천로)은 그대로 구청
+    cgc = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert "청계천관리처" in S.route_of({"type": "litter", "spot": "청계천"}, cgc)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, cgc)["hit"]["to"]
+    assert S.understood(S.turn({"id": "check-cgc"}, {"line": {"who": "시민", "text": "청계천 산책로예요, 쓰레기가 잔뜩 버려져 있어요"}})[0])[1]["spot"] == "청계천"
+    sub = lambda said: S.understood(S.turn({"id": "check-sub"}, {"line": {"who": "시민", "text": said}})[0])[1]["spot"]      # noqa: E731  지하철 역 안: 시민이 역 안 · 승강장 등을 말했을 때만 운영 기관
+    assert all(sub(x) is None for x in ("어린이보호구역 안에 차가 서 있어요", "버스 승강장에 쓰레기가 많아요", "이 지역 안에 쓰레기가 많아요")), "역 아닌 「…역 안」 · 버스 승강장이 지하철로 감(리뷰 P1)"
+    assert all(sub(x) == "지하철 역사 안" for x in ("역 안이에요, 쓰레기가 많아요", "강남역 안 화장실이 고장났어요", "2호선 승강장에 쓰레기가 많아요"))
+    assert not re.search(r"(?<!\d)(?:0\d{1,2}-\d{3,4}-\d{4}|1\d{3}-\d{4})(?!\d)", (HERE / "data" / "routes.json").read_text(encoding="utf-8")), "넘길 곳 표에 전화번호(리뷰 P1)"
+    assert sub("잠실역 안에 쓰레기가 많아요") == "지하철 역사 안" and sub("잠실역 1번 출구 앞에 쓰레기가 많아요") is None and "서울교통공사" in S.route_of({"type": "litter", "spot": "지하철 역사 안"}, olp)["hit"]["to"]
 
     def read(said, asked=None):
         short = S.shortlist(said, None, (asked or {}).get("id"))
@@ -432,6 +448,58 @@ def ask_less():
                 L.ON.add(sw)
     print("  ✓ 덜 묻기: 같은 가게 두 줄은 한 곳 · 「둘 다 잘 모르겠어요」는 모름 · 좁혀진 뒤 방향 질문은 두 번까지"
           + (" — 켬, 하나씩 끄면 지금 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
+
+
+def chain_said():
+    """(89번) chainref · handsaid: 켜져 있으면 그 동작을, 꺼져 있으면 main 동작을 보고, 켠 것은 하나씩 끄면 main 동작으로 돌아가는지 본다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+
+    def chain():                                          # 왕십리역 r27: 「역 앞 스벅」 — 범위 둘레에 스타벅스가 다섯 곳(chainpick은 잠시 끄고 봄)
+        had = "chainpick" in L.ON
+        L.ON.discard("chainpick")
+        try:
+            cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
+            return L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]["id"]
+        finally:
+            L.ON.add("chainpick") if had else None
+
+    def said():                                           # 신촌 r12(코드 읽기): 셋째 말에서 넘길 때의 한 줄
+        st, v = S.turn({"id": "check-handsaid"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
+        for line in ["신촌 세브란스병원 앞인데요, 버스정류장 쪽에 오토바이가 인도에 계속 서 있어요", "병원 정문 앞 버스정류장이요", "잘 모르겠어요. 병원 정문 바로 앞에 있는 정류장이에요"]:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": line}})
+            if (v["question"] or {}).get("id") == "handoff":
+                break
+            st, _ = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
+        assert (v["question"] or {}).get("id") == "handoff", v["question"]
+        return "아름다운미소" in (v["summary"]["go"] or "")
+
+    def pick():                                           # (chainpick) 같은 순간: 거리 질문 대신 「어느 스타벅스가 가장 가까우세요?」(chainref는 잠시 끄고 봄 — 켜져 있으면 체인을 기준에서 빼 버린다)
+        had = "chainref" in L.ON
+        L.ON.discard("chainref")
+        try:
+            cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
+            q = L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]
+            return q["id"], len(q["options"]) - 1 if q.get("chain") else None      # 체인 질문이면 지점 보기 수(「잘 모르겠음」 뺌)
+        finally:
+            L.ON.add("chainref") if had else None
+
+    looks = {"chainref": chain, "handsaid": said, "chainpick": pick}
+    want = {"chainref": ("finer", "dist"), "handsaid": (False, True), "chainpick": (("closest", 4), ("dist", None))}
+    for sw, f in looks.items():
+        on = sw in L.ON
+        got = f()
+        assert got == want[sw][0 if on else 1], (sw, on, got)
+        if on:
+            L.ON.discard(sw)
+            try:
+                assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
+            finally:
+                L.ON.add(sw)
+    print("  ✓ 체인 가게 · 넘기는 말: 둘레에 여럿인 상표는 거리 질문의 기준이 아님 · 어느 지점인지 먼저 · 넘길 때는 시민이 말한 이름만"
+          + (" — 켬, 하나씩 끄면 main 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
 def again_words():
@@ -733,7 +801,7 @@ def bind_choice():
         os.environ.pop("CALL_NO_ENGINE") if eng is None else os.environ.update(CALL_NO_ENGINE=eng)
     q, where = view["question"] or {}, view["summary"]["where"] or ""
     if on:
-        assert q.get("id") != "confirm" and "강남새로치과의원" in where and "강남이룸안과의원" not in where, (q.get("say"), where)      # 시민이 댄 곳(아트박스에서 50m)에 머문다
+        assert q.get("id") != "confirm" and ("강남새로치과의원" in where or "아트박스" in where) and "강남이룸안과의원" not in where, (q.get("say"), where)      # 시민이 댄 곳(아트박스 · 거기서 50m의 새로치과의원)에 머문다. dupshop을 켜면 아트박스 강남점 두 줄이 한 곳이 되어 「아트박스 앞」(89번)
     else:
         assert q.get("id") == "confirm" and "강남이룸안과의원" in q.get("say", ""), (q.get("say"), where)      # 끄면 그 통화 그대로: 700m 떨어진 보기로 확정 질문
     sh = lambda said: S.shortlist(said, None)      # noqa: E731
@@ -833,6 +901,106 @@ def seen_wide():
     print(f"  ✓ 「○○ 보여요」만 답한 차례의 Solar 보기 고르기(seenwide {'seenwide' in S.L.ON}): 「보여요」 {r['서울놀이마당 보여요']:.0f}m 폭 · 「바로 앞이에요」 {r['서울놀이마당 바로 앞이에요']:.0f}m 폭")
 
 
+def neg_keep():
+    """(negkeep, 91번) Solar가 「아님」이라 답했는데 dropcheck가 받지 않은 이름(그 말에 「아니 · 말고 · 없 …」가 없음): 켜면 없던 말로 치고 코드가 읽은 그대로 둔다. 끄면 main 그대로 「있음 · 바로 앞」으로 뒤집혀 들어간다(88번 c14 이태원, 4.5km 튐)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    said = "그건 모르겠고요, 바로 앞에 이태원폰마트라는 휴대폰 가게가 있어요"
+    short = S.shortlist(said, None)
+    mid = next(m["id"] for m in short if m.get("key") == "휴대폰가게")
+    code = S.code_read(said, None, short, None)
+    real, mode = S._solar, S.MODE
+    S._solar = lambda system, user, schema: {"type": "모름", "animal": "모름", "alive": "모름", "leash": "모름", "places": [{"id": mid, "rel": "아님", "how": "바로"}], "choice": "없음", "confirm": "없음", "outside": False, "said_place": ""}
+    S.MODE = "live"
+    try:
+        st = {"id": "check-neg", "lines": [{"who": "시민", "text": said}], "turns": [{"said": said, "asked": None}]}
+        read, _, _ = S.model_read(st, short, "없음")
+        merged = S._merge(code, read)
+    finally:
+        S._solar, S.MODE = real, mode
+    phone = [c for c in merged["clues"] if c.get("k") == "휴대폰가게"]
+    if "negkeep" in S.L.ON:
+        assert phone and all(c.get("how") != "바로" for c in phone) and phone == [c for c in code["clues"] if c.get("k") == "휴대폰가게"], phone      # 코드가 읽은 그대로(「바로」 없음 — 먼 곳이면 튐 막기가 막는다)
+    else:
+        assert any(c.get("how") == "바로" for c in phone), phone                                                    # 끄면 main 그대로: 받지 않은 「아님」이 「바로 앞」으로
+    print(f"  ✓ 받지 않은 Solar 「아님」(negkeep {'negkeep' in S.L.ON}): 「휴대폰 가게」 단서 {[(c.get('label'), c.get('how')) for c in phone]}")
+
+
+def bridge_end():
+    """(bridgeend, 91번) 「한남대교요 → 다리 위라 아무것도 없어요. 강남 쪽 끝이 더 가까워요」: 켜면 다리의 강남 쪽 끝 절반으로 읽어 다리 둘레에 머문다. 끄면 main 그대로 「강남역 쪽」으로 읽어 서초구 잠원동 수 km로 넓어진다(88번 r23)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    st, view = S.turn({"id": "check-bridge-end"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+    for said in ("한강 다리 위에서 차가 고장 나서 서 있어요", "한남대교요. 강남 쪽으로 가는 방향이요", "다리 위라 아무것도 없어요. 강남 쪽 끝이 더 가까워요"):
+        st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+        if view["question"]:
+            st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+    if "bridgeend" in S.L.ON:
+        limit = 500 if "bridgelong" in S.L.ON else 300      # (88번) 긴 다리 읽기(bridgelong)와 함께 켜면 「한남대교요」가 다리 면으로 읽혀 강남 쪽 끝 범위가 465m(끄면 197m) — 다리 둘레에 머무는 것은 같다
+        assert view["radius"] <= limit and "한남대교 강남 쪽 끝" in view["chips"], (view["radius"], view["chips"])
+    else:
+        assert view["radius"] > 1000, view["radius"]
+    print(f"  ✓ 다리의 「○○ 쪽 끝」(bridgeend {'bridgeend' in S.L.ON}): 한남대교 「강남 쪽 끝이 더 가까워요」 → {view['summary']['where']} {view['radius']}m")
+
+
+def hangul_say():
+    """(hangulopt2, 90번 2절) 롯데월드타워 둘레 「바로 앞에 뭐가 보이세요?」: 켜면 말로 읽는 앞 넷이 모두 한글 이름이고, 보기는 끈 판과 같은 곳들(순서만 다름)이다. 끄면 main 그대로(읽는 넷에 영어 이름)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    clues = [{"t": "at", "k": S.gaz.norm("롯데월드타워"), "how": "근처", "label": "롯데월드타워"}]
+    R = L.infer(clues)
+    x, y, w = L._sample(R)
+    on = "hangulopt2" in L.ON
+    q = L._q_marks(R, x, y, w, "finer", clues)
+    L.ON.discard("hangulopt2")
+    q0 = L._q_marks(R, x, y, w, "finer", clues)
+    if on:
+        L.ON.add("hangulopt2")
+    said = S.say_options(q["options"])
+    eng = [n for n in said if not re.search(r"[가-힣]", n)]
+    assert sorted(o["label"] for o in q["options"]) == sorted(o["label"] for o in q0["options"]) and q["bits"] == q0["bits"], (q["options"], q0["options"])      # 같은 곳 · 같은 수 · 같은 몫
+    assert bool(eng) != on, said
+    print(f"  ✓ 말로 읽는 보기의 영어 이름(hangulopt2 {on}): 롯데월드타워 「바로 앞」 읽는 넷 {said}")
+
+
+def pair_seen():
+    """(pairseen, 93번) 보기 밖의 이름 둘을 함께 댄 말 「CU랑 신한은행이요」. 장한평역: 둘레에 신한은행이 없어 켜면 범위를 끌지 않는다(끄면 main 그대로 동쪽 군자동 쪽으로 끌려 1km 넘게).
+    마들역: CU와 신한은행이 붙은 자리가 한 곳이라 켜면 그 자리로 좁힌다(이름표 = 실제 지점 이름)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    on = "pairseen" in S.L.ON
+
+    def run(stn):
+        st, view = S.turn({"id": f"check-pair-{stn}"}, {"line": {"who": "상담사", "text": "네, 민원 콜센터입니다. 무엇을 도와드릴까요?"}})
+        for said in ("여기 길에 쓰레기가 많이 버려져 있어요", f"{stn}이요", "CU랑 신한은행이요"):
+            st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
+            if view["question"]:
+                st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        return view
+    v = run("장한평역")
+    x0, y0 = S.gaz.xy(*S.gaz.lonlat(*S.L.resolve("장한평역")["x"][:1], *S.L.resolve("장한평역")["y"][:1]))
+    cx, cy = S.gaz.xy(*v["center"])
+    moved = math.hypot(float(cx) - float(x0), float(cy) - float(y0))
+    if on:
+        assert v["radius"] < 700 and "신한은행" not in v["chips"], (v["radius"], v["chips"])
+    else:
+        assert v["radius"] > 1000, v["radius"]
+    m = run("마들역")
+    if on:
+        assert m["radius"] <= 100 and any("옆 CU" in c for c in m["chips"]), (m["radius"], m["chips"])
+    else:
+        assert m["radius"] > 100, m["radius"]
+    one = {"clues": [{"t": "at", "k": "gs25"}, {"t": "at", "k": "창덕궁"}]}       # 이음말 없이 붙은 이름 = 지점 이름 하나(600통 1114 #56): 짝 짓지 않는다
+    S._pair_seen("GS25 종로창덕궁 근처예요", one, [{"key": "gs25", "said": "gs25", "name": "GS25"}, {"key": "창덕궁", "said": "창덕궁", "name": "창덕궁"}], [{"t": "at", "k": "안국역"}])
+    assert len(one["clues"]) == 2 and "skip" not in one, one
+    print(f"  ✓ 보기 밖의 이름 둘을 함께 댄 말(pairseen {on}): 장한평역 {v['radius']}m(가운데 {moved:.0f}m 옮김) · 마들역 {m['radius']}m {[c for c in m['chips'] if '옆' in c]}")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -869,11 +1037,18 @@ def main():
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         switches()
+        hangul_say()
+        pair_seen()
         bind_choice()
+        neg_keep()
+        bridge_end()
         reread_guards()
         seen_wide()
         edge_reads()
         ask_fixes()
+        chain_said()
+
+
         again_words()
         ask_less()
         print("통화로 위치 좁히기 점검 통과")
