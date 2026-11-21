@@ -20,6 +20,10 @@
 | CALL_VOICE_MAX_ROOMS · CALL_VOICE_ROOM_SEC · CALL_VOICE_OPENS_PER_HOUR | 한꺼번에 열리는 통화 수 · 한 통화의 최대 초 · 한 시간에 여는 횟수(0 = 제한 없음) | 4 · 600 · 40. 직접 통화와 함께면 20 · 1800 · 0(정상 이용을 막지 않게, 동규 11/19) |
 | CALL_VOICE_POLL_MS | 통화 중 양쪽이 서버에 묻는 간격(소리 쪽은 이 간격으로 소리 토막을 올린다) | 250. 직접 통화와 함께면 600(요청 수를 줄인다) |
 | CALL_VOICE_PICK_SEC | 휴대폰이 건 통화를 이만큼 아무도 받지 않으면 휴대폰이 「다른 통화 중」 · 「받을 사람 없음」을 띄우고 끊는다(직접 통화) | 20 |
+| CALL_VOICE_SPEAK_DIRECT | 1이면 직접 통화(배포 판)와 함께일 때도 휴대폰이 상담사 말을 소리로 읽는다(글도 그대로 보인다). 발표용 서버에서만 켠다 | 끔(글로만) |
+| CALL_VOICE_TAIL_MS | 다 읽은 뒤 이만큼 더 마이크를 막는다(스피커 울림이 받아써지지 않게). 0~3000 | 0 |
+| CALL_VOICE_UNLOCK | 1이면 「전화 걸기」 · 「마이크로도 말하기」를 누른 자리에서 소리 길을 미리 열어 둔다(아이폰이 누르지 않은 재생을 막는 것을 피한다). 그래도 막히면 글 길이만큼 기다린다 | 끔 |
+| CALL_VOICE_TERMS | 받아쓰기에 늘 알려 줄 이름(쉼표로). 화면이 그때그때 알려 주는 지명 앞에 붙는다. 전화 음질에서 자주 틀리는 이름을 넣는다(일레븐랩스만, 모두 합쳐 50개 · 한 이름 20자까지) | 없음 |
 | CALL_VOICE_CALLER_GONE_SEC | 소리 쪽(휴대폰)이 이만큼 아무 소식이 없으면 상담 화면이 통화를 마친다(끊기 없이 창을 닫은 휴대폰). 휴대폰은 망이 끊겨도 60초까지 다시 묻으니 그보다 길게 | 75 |
 """
 import hashlib
@@ -53,6 +57,15 @@ POLL_MS = int(os.environ.get("CALL_VOICE_POLL_MS") or (600 if DIRECT else 250))
 PICK_SEC = int(os.environ.get("CALL_VOICE_PICK_SEC") or 20)
 CALLER_GONE_SEC = int(os.environ.get("CALL_VOICE_CALLER_GONE_SEC") or 75)
 TEXT_MAX = int(os.environ.get("CALL_DIRECT_SAID_MAX") or 2000) if DIRECT else 500           # 휴대폰이 친 글 한 줄(직접 통화는 서버가 한 차례에 읽는 자 수와 같게)
+SPEAK_DIRECT = DIRECT and os.environ.get("CALL_VOICE_SPEAK_DIRECT") == "1"      # 직접 통화에서도 읽어 준다(발표용 서버)
+try:
+    TAIL_MS = max(0, min(3000, int(os.environ.get("CALL_VOICE_TAIL_MS") or 0)))        # 다 읽은 뒤 더 막는 시간
+except ValueError:
+    TAIL_MS = 0
+UNLOCK = os.environ.get("CALL_VOICE_UNLOCK") == "1"                                  # 누른 자리에서 소리 길을 미리 연다(아이폰)
+SAY_MAX = TEXT_MAX if SPEAK_DIRECT else 500                                          # 읽어 줄 글 한 줄의 자 수(직접 통화의 상담사 말은 길 수 있다)
+BASE_TERMS = [t.strip() for t in os.environ.get("CALL_VOICE_TERMS", "").split(",") if t.strip()]                 # 받아쓰기에 늘 알려 줄 이름
+LIVE = {k: v for k, v in (("speak_direct", SPEAK_DIRECT), ("tail_ms", TAIL_MS), ("unlock", UNLOCK)) if v}      # 켠 것만 info에 싣는다(끈 판은 지금 그대로)
 IDLE_SEC = 90                                                            # 양쪽 다 이만큼 소식이 없으면 방을 닫는다
 rooms, opens, lock = {}, [], threading.Lock()
 
@@ -80,6 +93,11 @@ def join(r, rate=16000, encoding="LINEAR16"):
         r["stt"].close()
     r["stt"] = STT(lambda final, text: r["events"].append({"final": final, "text": text}), rate=rate, encoding=encoding)
     r["down"], r["bps"] = False, rate * (1 if encoding in ("MULAW", "ALAW") else 2)      # 1초의 바이트 수
+    if BASE_TERMS and hasattr(r["stt"], "hint"):
+        try:
+            r["stt"].hint(BASE_TERMS)
+        except Exception as e:  # noqa: BLE001  이름을 못 알려 줘도 통화는 간다
+            print(f"지명을 알려 주지 못함: {type(e).__name__}")
 
 
 def feed(r, pcm):
@@ -185,9 +203,9 @@ def _api(h, body):
     p, q = u.path[len("/api/voice/"):], {k: v[0] for k, v in parse_qs(u.query).items()}
     if p == "info":
         return h.send_json({"on": True, "direct": DIRECT, "stt": STT.name, "tts": TTS, "ask": ASK, "used": {k: round(v, 1) for k, v in stt.used.items()}, "gap_ms": GAP_MS, "code": bool(CODE), "room_sec": ROOM_SEC,
-                            "poll_ms": POLL_MS, "pick_sec": PICK_SEC, "caller_gone_sec": CALLER_GONE_SEC})
+                            "poll_ms": POLL_MS, "pick_sec": PICK_SEC, "caller_gone_sec": CALLER_GONE_SEC, **LIVE})
     if p == "say":
-        return _say(h, q.get("text", "")[:500])
+        return _say(h, q.get("text", "")[:SAY_MAX])
     if p == "line":
         return _line(h, q.get("text", "")[:500])
     try:
@@ -275,7 +293,7 @@ def _api(h, body):
         terms = b.get("terms")
         if isinstance(terms, list) and r["stt"] and hasattr(r["stt"], "hint"):
             try:
-                r["stt"].hint(terms[:60])
+                r["stt"].hint(BASE_TERMS + terms[:60])
             except Exception as e:  # noqa: BLE001  지명을 못 알려 줘도 통화는 간다
                 print(f"지명을 알려 주지 못함: {type(e).__name__}")
         return h.send_json({"n": len(r["says"])})
