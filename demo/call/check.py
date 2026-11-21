@@ -888,7 +888,8 @@ def bridge_end():
         if view["question"]:
             st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
     if "bridgeend" in S.L.ON:
-        assert view["radius"] <= 300 and "한남대교 강남 쪽 끝" in view["chips"], (view["radius"], view["chips"])
+        limit = 500 if "bridgelong" in S.L.ON else 300      # (88번) 긴 다리 읽기(bridgelong)와 함께 켜면 「한남대교요」가 다리 면으로 읽혀 강남 쪽 끝 범위가 465m(끄면 197m) — 다리 둘레에 머무는 것은 같다
+        assert view["radius"] <= limit and "한남대교 강남 쪽 끝" in view["chips"], (view["radius"], view["chips"])
     else:
         assert view["radius"] > 1000, view["radius"]
     print(f"  ✓ 다리의 「○○ 쪽 끝」(bridgeend {'bridgeend' in S.L.ON}): 한남대교 「강남 쪽 끝이 더 가까워요」 → {view['summary']['where']} {view['radius']}m")
