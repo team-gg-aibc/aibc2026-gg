@@ -1049,7 +1049,17 @@ def follow_said():
             assert nh[said] and len(L.resolve(S.gaz.norm(said.split()[0]))["x"]) == len(L.resolve(S.gaz.norm("NH농협은행"))["x"]), (said, nh[said])
         else:
             assert not nh[said], (said, nh[said])
-    print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']}")
+    here = [{"t": "at", "k": "장한평역", "label": "장한평역"}]        # (saidin) 장한평역 둘레(범위 1.5배)에 지명 자료의 신한은행 0곳 · CU 여럿
+    far = {"clues": [{"t": "at", "k": "신한은행", "label": "신한은행", "how": "바로"}]}
+    S._said_in(far, here)
+    assert not far["clues"] and far["said_only"] == ["신한은행"] and "신한은행" in far["skip"], far      # 범위를 끌지 않게 빼고, 받아 주는 말에는 남긴다
+    near = {"clues": [{"t": "at", "k": "cu", "label": "C U", "how": "바로"}]}
+    S._said_in(near, here)
+    assert len(near["clues"]) == 1 and "said_only" not in near, near                                   # 둘레에 있는 이름은 그대로
+    one = {"clues": [{"t": "at", "k": "강남역", "label": "강남역"}]}
+    S._said_in(one, here)
+    assert len(one["clues"]) == 1, one                                                                 # 한 곳뿐인 이름은 멀어도 둔다(범위가 틀렸다는 말일 수 있다)
+    print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']} · 둘레에 없는 여러 지점 상표는 범위를 끌지 않음(saidin)")
 
 
 def main():

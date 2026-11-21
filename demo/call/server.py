@@ -943,6 +943,31 @@ PAIR_M = 60.0      # (pairseen) 「A랑 B가 보여요」의 A · B가 서로 �
 PAIR_JOIN = re.compile(r"(이?랑|하고|와|과|,|및|그리고|도)")   # (pairseen) 두 이름 사이 이음말 — 없으면 이름 하나로 본다. 「A나 B」는 둘 중 하나라 넣지 않음
 
 
+SAIDIN_SPREAD = 3000.0     # (saidin) 이름의 장소들이 이만큼(m, 서로 가장 먼 두 곳 사이) 넘게 흩어져 있으면 여러 지점 상표로 본다
+
+
+def _said_in(read, clues):
+    """(saidin, 93번 · 동규 11-21 21시 「사용자는 자신이 본 것 위주로 답한다 — 처음 범위에서 본인이 답한 범위 안으로 줄여 나가야」)
+    시민이 댄 이름은 지금 범위 둘레(1.5배, 300m 이상)에서 먼저 찾는다. 여러 지점이 있는 상표 · 은행인데 둘레에 한 곳도 없으면(지명 자료에 빠진 지점일 수 있다)
+    범위를 끌지 않게 빼고 받아 주는 말에는 남긴다. 보기에서 고른 답 · 보기 밖 답 모두. 한 곳뿐인 이름(역 · 큰 건물)은 멀어도 둔다 — 범위가 틀렸다는 말일 수 있다."""
+    R0 = L.infer(clues) if clues else None
+    if R0 is None:
+        return
+    zone, drop = max(1.5 * R0["r"], 300.0), []
+    for c in read["clues"]:
+        if c.get("t") != "at" or not c.get("k") or c.get("how") == "쪽" or c.get("heard"):
+            continue
+        r = L.resolve(c["k"])
+        if r["areas"] or r["roads"] or any(k in L.KIND_SIG for k in r["kinds"]) or len(r["x"]) < 2:
+            continue
+        if math.hypot(float(r["x"].max() - r["x"].min()), float(r["y"].max() - r["y"].min())) >= SAIDIN_SPREAD and float(((r["x"] - R0["cx"]) ** 2 + (r["y"] - R0["cy"]) ** 2).min()) > zone * zone:
+            drop.append(c["k"])
+    if drop:
+        read["said_only"] = list(read.get("said_only") or []) + [c.get("label") or c["k"] for c in read["clues"] if c.get("k") in drop and c.get("t") == "at"]
+        read["clues"] = [c for c in read["clues"] if not (c.get("k") in drop and c.get("t") == "at")]
+        read["skip"] = list(read.get("skip") or []) + drop
+
+
 def _pair_seen(said, read, keyed, clues):
     """(pairseen, 93번) 보기 밖의 가게 · 건물 이름 둘 이상을 함께 댄 말(「CU랑 신한은행이요」): 앞 차례까지의 범위 둘레(1.5배, 300m 이상)에서 그 이름들을 찾아
     1) 둘레에 한 곳도 없는 이름은 범위를 끌지 않게 뺀다 — 다른 이름이 둘레에 있을 때만(동규 시험 통화 11-21: 장한평역 둘레에 지명 자료의 신한은행이 0곳이라
@@ -996,7 +1021,7 @@ def _pair_seen(said, read, keyed, clues):
             read["clues"].append(clue)
             drop += ks
     if drop:
-        read["said_only"] = [c.get("label") or c["k"] for c in read["clues"] if c.get("k") in drop and c.get("t") == "at"]      # 받아 주는 말에는 시민이 댄 이름을 그대로 둔다(범위만 고친다)
+        read["said_only"] = list(read.get("said_only") or []) + [c.get("label") or c["k"] for c in read["clues"] if c.get("k") in drop and c.get("t") == "at"]      # 받아 주는 말에는 시민이 댄 이름을 그대로 둔다(범위만 고친다)
         read["clues"] = [c for c in read["clues"] if not (c.get("k") in drop and c.get("t") == "at")]
         read["skip"] = list(read.get("skip") or []) + drop
 
@@ -1112,6 +1137,8 @@ def speech_fix(said, read, short, clues):
         read["skip"] = list(dict.fromkeys(skip))
     if "bridgeend" in on:
         _bridge_end(read, keyed, clues)
+    if "saidin" in on:
+        _said_in(read, clues)
     if "pairseen" in on:
         _pair_seen(said, read, keyed, clues)
     return read
@@ -1711,7 +1738,7 @@ def _heard(st):
         return []
     said, out = gaz.norm(t["said"]), []
     rd = t.get("model") or t.get("code") or {}
-    extra = [{"label": n} for n in (rd.get("said_only") or (t.get("code") or {}).get("said_only") or [])] if "pairseen" in L.ON else []      # (pairseen) 둘레에 없어 범위에서 뺀 이름도 시민이 한 말이다
+    extra = [{"label": n} for n in (rd.get("said_only") or (t.get("code") or {}).get("said_only") or [])] if L.ON & {"pairseen", "saidin"} else []      # (pairseen · saidin) 둘레에 없어 범위에서 뺀 이름도 시민이 한 말이다
     for c in (rd.get("clues") or []) + extra:
         lab = (c.get("label") or "").strip()
         if len(gaz.norm(lab)) >= 2 and gaz.norm(lab) in said:
