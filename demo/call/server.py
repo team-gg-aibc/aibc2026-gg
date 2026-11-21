@@ -1974,11 +1974,11 @@ def build(st, extra=None):
     # 「say」의 {위치}는 상담사가 말로 읽는 꼴(괄호 · 가운뎃점 없이)로 넣는다: 화면의 글과 목소리가 같은 글에서 나오게
     question = {"id": pick["id"], "why": why.get(pick["id"], ""), "options": opts, "bits": pick.get("bits"),
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
-                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
+                "say": fill(Q.get("cross_pick" if pick.get("cross") == "pick" else "confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
     if pick.get("cross"):
-        question["cross"], question["wide"] = True, pick.get("wide")      # (cross) 교차 확인
+        question["cross"], question["wide"] = pick["cross"], pick.get("wide")      # (cross) 교차 확인(True) · 둘 중 가르기("pick")
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
@@ -2095,6 +2095,8 @@ def _reject(R):
 
 def _log_id(asked, read, prev):
     """시민이 답한 질문을 적어 둘 이름. 위치를 좁히려고 물었는데 새 단서를 못 얻었거나, 확인에 「아니요」면 끝에 !를 붙인다(같은 질문을 되풀이하지 않게)."""
+    if (asked or {}).get("cross") == "pick":
+        return "crosspick"                                # (crosspick) 둘 중 가르기는 「어디가 가장 가까우세요?」와 따로 센다
     qid = (asked or {}).get("id")
     same = lambda c: (c.get("t"), (tuple(c["k"]) if isinstance(c.get("k"), list) else c.get("k")) or c.get("label"), tuple(c["p"]) if isinstance(c.get("p"), list) and c["p"] and not isinstance(c["p"][0], list) else None)      # noqa: E731
     known = {same(c) for c in prev}
@@ -2258,7 +2260,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": True, "wide": q.get("wide")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 

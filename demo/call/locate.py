@@ -833,6 +833,7 @@ def infer(clues):
     pk = any(_pk(resolve(c["k"])) for c in clues if "k" in c and c["t"] in ("at", "past", "before"))       # 면 · 선으로 된 공원 안 이름(park_names)이 범위를 받치고 있나
     named = [c for c in clues if c["t"] in ("at", "pt", "past", "before", "between", "in", "out", "closest", "anyof", "rim", "core")]
     heard_only = bool(named) and all(c.get("heard") for c in named)      # 자리 단서가 모두 비슷한 이름으로 이은 것뿐이다(11-15)
+    blob_alt = None
     if "mainblob" in ON and not on_road and n90 > 1:     # (mainblob, 93번 다음 방향) 90% 범위가 떨어진 덩어리 여럿이고 한 덩어리가 가능성 대부분을 가지면 범위 = 그 덩어리
         part = _blobs(x[cred], y[cred])                   # 동규 장한평역 통화(11-21): 「CU랑 신한은행이요」 뒤 89%가 실제 자리 52m 안 덩어리인데 543m 밖 4% 덩어리까지 덮어 498m → 같은 간판 질문
         mass = np.bincount(part, weights=w[cred])
@@ -844,9 +845,13 @@ def infer(clues):
             half = math.hypot(x[c1].max() - x[c1].min(), y[c1].max() - y[c1].min()) / 2
             r1 = max(math.sqrt(float(cell[c1].sum()) / math.pi), 0.6 * half, STEP / 2)
             if r1 <= DONE_M:                              # 그 덩어리로 끝낼 수 있을 때만(넓은 덩어리로 좁히면 가상 600통 「네」로 기우는 시민에서 틀린 확정이 늘었다: 93번 다음 방향)
+                g2 = max((g for g in range(len(mass)) if g != top), key=lambda g: mass[g])
+                c2 = cred[part == g2]
+                w2 = w[c2] / w[c2].sum()
+                blob_alt = [round(float((x[c2] * w2).sum()), 1), round(float((y[c2] * w2).sum()), 1)]      # (crosspick) 남은 덩어리 가운데 가장 무거운 것: 둘 중 가르기의 견줄 자리
                 cred, (cx, cy), radius = c1, m1, r1
                 r_cover = float(np.hypot(x[cred] - cx, y[cred] - cy).max())
-    R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
+    R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike, "blob_alt": blob_alt}
     if ON & {"ringdone", "rimask", "rimline"}:                       # (75번) 범위를 받치는 단서 가운데 「둘레」로 읽은 곳(호수 테두리 · 구역의 테두리 띠)의 이름. 다른 단서와 어긋나 버려진 것(믿음 0.35 아래)은 뺀다
         ring_k = next((c["k"] for n, c in enumerate(clues) if trust.get(n, 1.0) >= 0.35 and "k" in c and (c["t"] == "rim" or (
             c["t"] == "at" and c.get("how") != "쪽" and not c.get("across") and "lakerim" in ON and water_ring(resolve(c["k"])) is not None))), None)
@@ -1139,6 +1144,35 @@ def _cross_wide(R, clues):
     return [round(R["cx"], 1), round(R["cy"], 1), CROSS_WIDE[1] if R["on_road"] else CROSS_WIDE[0]]
 
 
+def _cross_pick(R, clues):
+    """(crosspick, 99번 4-4절) 견줄 다른 자리가 있으면 「둘 중 가르기」: 남은 덩어리(mainblob) 또는 둘레 300m의 같은 이름 · 같은 상표 다른 지점.
+    A = 확정하려는 자리 60m 안에만 있는 이름, B = 견줄 자리 60m 안에만 있는 이름(둘 다 자료에 한 곳뿐 · 상표 아님 · 시민이 댄 이름 아님) → closest 질문 또는 None.
+    A를 고르면 맞음(핀 그대로), B를 고르면 갈아탐(B 쪽으로 다시 셈)."""
+    P, anc = (R["cx"], R["cy"]), anchor(R, clues)
+    Q = R.get("blob_alt")
+    if Q is None and anc:
+        t = twins(anc["name"], anc["p"], np.array([R["cx"]]), np.array([R["cy"]]), 300.0)
+        b = next((G.brand[int(i)] for i in G.near(anc["p"][0], anc["p"][1], 30) if gaz.norm(G.name[int(i)]) == gaz.norm(anc["name"]) and G.brand[int(i)]), None)
+        t = t or (twins(b, anc["p"], np.array([R["cx"]]), np.array([R["cy"]]), 300.0) if b else None)
+        Q = min((q for q in t or [] if math.hypot(q[0] - anc["p"][0], q[1] - anc["p"][1]) > 40), key=lambda q: math.hypot(q[0] - P[0], q[1] - P[1]), default=None)
+    if Q is None or math.hypot(Q[0] - P[0], Q[1] - P[1]) < 120:
+        return None                                       # 견줄 자리가 없거나 너무 가까우면 가를 수 없다
+    said = {gaz.norm((c.get("label") or c.get("k") or "").split(" → ")[0]) for c in clues}
+
+    def only(near, far):
+        idx = [int(i) for i in G.near(near[0], near[1], 60) if len(G.name[i]) >= 3 and not G.brand[i] and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
+               and G.kind[i] not in ("동네", "산") and math.hypot(G.x[i] - far[0], G.y[i] - far[1]) > 120 and gaz.norm(G.name[i]) not in said
+               and len(resolve(gaz.norm(G.name[i]))["x"]) == 1]
+        return min(idx, key=lambda i: math.hypot(G.x[i] - near[0], G.y[i] - near[1]) / PROM.get(G.kind[i], 1.0), default=None)
+    a, b = only(P, Q), only(Q, P)
+    if a is None or b is None:
+        return None
+    pa, pb = [round(float(G.x[a]), 1), round(float(G.y[a]), 1)], [round(float(G.x[b]), 1), round(float(G.y[b]), 1)]
+    opt = lambda i, p, o, v: {"label": G.name[i], "set": {"clues": [{"t": "closest", "p": p, "others": [o], "s": round(1.5 * R["r"], 1), "sure": True, "via": "cross", "label": f"{G.name[i]}이 더 가까움"}],      # noqa: E731
+                                                          "matter": {"cross": v, "cross_name": G.name[i] if v == "ok" else None}}}
+    return {"id": "closest", "bits": None, "cross": "pick", "options": [opt(a, pa, pb, "ok"), opt(b, pb, pa, "switch")]}
+
+
 def _many_here(name, p, cx, cy):
     """(cross) 그 이름이 범위 둘레 300m에 또 있나(같은 이름 · 같은 상표의 다른 지점)."""
     if twins(name, p, np.array([cx]), np.array([cy]), 300.0):
@@ -1153,7 +1187,7 @@ def _cross(R, clues, asked):
     켜지 않는 때: 자동차전용도로 위 · 번호를 읽어 줬음 · 위치 질문을 여덟 번 넘게 함 · 이번 좁힘에서 이미 물음 · 한 통화 상한(CROSS_MAX) · 서로 다른 이름 둘 이상이 받침."""
     ids = [(a or "").rstrip("!") for a in asked]
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
-    if ids.count("check") >= CROSS_MAX or "check" in ids[since + 1:] or sum(1 for a in ids if a in LOCQ) > 8:
+    if ids.count("check") + ids.count("crosspick") >= CROSS_MAX or {"check", "crosspick"} & set(ids[since + 1:]) or sum(1 for a in ids if a in LOCQ) > 8:
         return None
     if R["on_road"] and any(_xw(i) for i in R["ctx"]["roads"]):
         return None
@@ -1172,8 +1206,9 @@ def _cross(R, clues, asked):
         if len(near) >= 2:
             return None
     many = bool(anc) and (bool(anc.get("ext")) or _many_here(anc["name"], anc["p"], R["cx"], R["cy"]))
-    if hinge or many or since >= 0:
-        return (anc or {}).get("name") or hinge
+    split = "crosspick" in ON and R.get("blob_alt") is not None      # (crosspick) 가능성이 갈라짐: mainblob이 좁혔는데 다른 덩어리가 남음
+    if hinge or many or split or since >= 0:
+        return (anc or {}).get("name") or hinge or "이 자리"
     return None
 
 
@@ -1241,12 +1276,12 @@ def questions(R, clues, matter, asked=(), same=None):
         last = dict(confirm, name=named) if named else confirm
         if "cross" in ON and not named:                   # (cross, 99번 4절) 위험한 확정이면 「맞으실까요?」 앞에 다른 이름 하나를 묻는다. 답은 맞음 · 어긋남 판정에만(server.read 「check」)
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
-            if matter.get("cross") == "ok" and any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
+            if matter.get("cross") == "ok" and any((a or "").rstrip("!") in ("check", "crosspick") for a in list(asked)[since_ + 1:]):
                 last = dict(confirm, name=matter.get("cross_name")) if "crossname" in ON else confirm      # 맞음: 핀은 그대로. crossname이면 그 이름까지 되말한다(confirm_named — 그 이름이 보여서 「네」가 나오기 쉬워 따로 잰다)
             else:
                 h = _cross(R, clues, asked)
                 if h:
-                    last = {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
         elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):
