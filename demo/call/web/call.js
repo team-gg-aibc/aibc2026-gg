@@ -470,7 +470,7 @@ function refBlock() {      // 참고 자료(범용): 일의 종류마다 다르�
   }
   if (r && r.fate && r.fate.length) place = fateTable(r, true);
   else if (r && r.others.length > 1) {      // 같은 일이 다른 자리였다면 + 그 자리의 조례 6종 안팎(넘길 곳 표의 scope · law). 지금 자리와 같은 줄 · 서로 같은 줄은 묶는다
-    const cls = Object.fromEntries(['자동차전용도로', '한강공원', '시 공원', '공원', '길'].map((c) => [M['다른 자리 · ' + c], c]));
+    const cls = Object.fromEntries(['자동차전용도로', '다리', '한강공원', '시 공원', '공원', '길'].map((c) => [M['다른 자리 · ' + c], c]));
     const sc6 = (p) => { const c = cls[p.split(' · ')[0]], rt = T.routes.find((x) => !x.class || x.class === c) || {}, s = rt.scope || T.scope, l = rt.law || T.law;
       return s === 'out' ? F['6종 밖 줄'] : l ? fill(F['6종 안 줄'], { 조례: shortLaw(l) }) : M['6종 후보']; };
     const here = r.others.find((o) => o.here), same = (o) => here && o.to === here.to && sc6(o.place) === sc6(here.place);

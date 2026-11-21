@@ -303,6 +303,9 @@ def edge_reads():
     sys.path.insert(0, str(HERE))
     import server as S
     on = set(S.L.EDGE_ON.split(",")) <= S.L.ON
+    x, y = S.gaz.xy(126.93626, 37.53345)      # 마포대교 한가운데(11-21 「다리」 갈래): 포트홀은 서울시 교량안전과, 쓰레기는 다리 줄이 없어 전처럼 구청
+    deck = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert S.L.place_class(deck) == ("다리", "마포대교") and "교량안전과" in S.route_of({"type": "road"}, deck)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, deck)["hit"]["to"]
 
     def read(said, asked=None):
         short = S.shortlist(said, None, (asked or {}).get("id"))

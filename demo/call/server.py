@@ -1377,9 +1377,11 @@ def route_of(matter, R):
     put = lambda s, c: s.replace("{공원 관리}", (c == cls and park) or "{공원} 관리사무소(서울시 공원여가센터)").replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
-    names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
+    names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "다리", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
     others, seen = [], set()
     for c in names:
+        if c == "다리" and cls != c and not any(r.get("class") == c for r in t["routes"]):
+            continue      # 다리 줄이 없는 일은 다리 위도 「그 밖」 줄이라 표에 넣지 않는다(11-21)
         r = next((r for r in t["routes"] if ok(r, c)), None)
         if r and (c, r["to"]) not in seen:
             seen.add((c, r["to"]))
@@ -1704,6 +1706,8 @@ def place_phrase(R, route):
     """엔진에 넣을 큰 장소(잘게 좁힌 자리까지는 넣지 않는다)."""
     if route["class"] == "자동차전용도로":
         return f"{route['class_name']}(자동차전용도로) 위"
+    if route["class"] == "다리":
+        return f"{route['class_name']} 위"
     if route["class_name"]:
         return f"{route['class_name']} 안"
     return f"{L._area_at(G.gu, R['cx'], R['cy']) or '서울'}의 길가"
