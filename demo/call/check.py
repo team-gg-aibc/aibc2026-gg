@@ -313,6 +313,8 @@ def edge_reads():
     cgc = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
     assert "청계천관리처" in S.route_of({"type": "litter", "spot": "청계천"}, cgc)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, cgc)["hit"]["to"]
     assert S.understood(S.turn({"id": "check-cgc"}, {"line": {"who": "시민", "text": "청계천 산책로예요, 쓰레기가 잔뜩 버려져 있어요"}})[0])[1]["spot"] == "청계천"
+    sub = lambda said: S.understood(S.turn({"id": "check-sub"}, {"line": {"who": "시민", "text": said}})[0])[1]["spot"]      # noqa: E731  지하철 역 안: 시민이 역 안 · 승강장 등을 말했을 때만 운영 기관
+    assert sub("잠실역 안에 쓰레기가 많아요") == "지하철 역사 안" and sub("잠실역 1번 출구 앞에 쓰레기가 많아요") is None and "서울교통공사" in S.route_of({"type": "litter", "spot": "지하철 역사 안"}, olp)["hit"]["to"]
 
     def read(said, asked=None):
         short = S.shortlist(said, None, (asked or {}).get("id"))
