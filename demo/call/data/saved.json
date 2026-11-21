@@ -981,7 +981,7 @@
   },
   "stray|송파구의 길가|ca273d": {
    "response": {
-    "answer": "다친 고양이를 신고하면 구청장이 접수해 구조·보호 조치를 합니다. 구조된 고양이는 동물보호센터에 보호되며, 누가 직접 데려가서 구조하는지는 조례에 정해져 있지 않습니다.",
+    "answer": "다친 고양이를 신고하면 구청장이 지체 없이 구조·보호하도록 필요한 조치를 해야 합니다. 구조된 고양이는 동물보호센터에 보호되며, 필요하면 민간단체나 명예동물보호관에게 보호조치를 요청하고 예산을 지원할 수 있습니다.",
     "citation": [
      "서울특별시 동물보호 조례 제10조 제1항",
      "서울특별시 동물보호 조례 제10조 제3항"
@@ -1002,10 +1002,10 @@
     }
    ],
    "ask": "길가 화단 옆에 다리를 다쳐 절뚝거리는 고양이가 있는데, 다친 고양이를 신고하면 누가 데려가나요?",
-   "ask_sec": 0.8,
+   "ask_sec": 1.6,
    "question": "다친 고양이를 신고하면 누가 데려가나요?",
-   "say": "다친 고양이를 신고하면 구청장이 접수해 구조·보호 조치를 합니다. 구조된 고양이는 동물보호센터에 보호되며, 누가 직접 데려가서 구조하는지는 조례에 정해져 있지 않습니다.",
-   "sec": 6.5,
+   "say": "다친 고양이를 신고하면 구청장이 지체 없이 구조·보호하도록 필요한 조치를 해야 합니다. 구조된 고양이는 동물보호센터에 보호되며, 필요하면 민간단체나 명예동물보호관에게 보호조치를 요청하고 예산을 지원할 수 있습니다.",
+   "sec": 6.8,
    "settings": "7327ca7e355b"
   }
  },
@@ -1244,16 +1244,17 @@
   }
  },
  "made_cat_street": {
-  "at": "2026-11-21T04:04:42+09:00",
+  "at": "2026-11-21T10:58:25+09:00",
   "read_model": "solar-pro4",
   "engine_settings": "7327ca7e355b",
   "engine_config": "eval/configs/release.json",
   "calls": {
-   "read": 6,
+   "read": 0,
    "ask": 1,
    "engine": 1,
-   "tokens_in": 23956,
-   "tokens_out": 1153
+   "tokens_in": 16238,
+   "tokens_out": 545,
+   "reused": 6
   },
   "steps": {
    "cat_street": [
@@ -1262,25 +1263,25 @@
      "m": null,
      "code_next": "where",
      "next": "where",
-     "code_ms": 65,
+     "code_ms": 78,
      "read": "live",
      "read_sec": 3.13
     },
     {
      "said": "롯데월드타워 근처 길가예요. 잠실역에서 걸어 나오는 길이요. 번지는 모르겠어요.",
-     "m": 210,
+     "m": 200,
      "code_next": "leash",
      "next": "leash",
-     "code_ms": 537,
+     "code_ms": 675,
      "read": "live",
      "read_sec": 1.57
     },
     {
      "said": "목줄은 없어요. 다친 고양이를 신고하면 누가 데려가나요?",
-     "m": 210,
+     "m": 200,
      "code_next": "finer",
      "next": "finer",
-     "code_ms": 75,
+     "code_ms": 84,
      "read": "live",
      "read_sec": 0.65
     },
@@ -1289,7 +1290,7 @@
      "m": 40,
      "code_next": "went",
      "next": "went",
-     "code_ms": 16,
+     "code_ms": 21,
      "read": "live",
      "read_sec": 2.01
     },
@@ -1298,7 +1299,7 @@
      "m": 40,
      "code_next": "confirm",
      "next": "confirm",
-     "code_ms": 13,
+     "code_ms": 12,
      "read": "live",
      "read_sec": 1.58
     },
@@ -1307,7 +1308,7 @@
      "m": 40,
      "code_next": null,
      "next": null,
-     "code_ms": 16,
+     "code_ms": 12,
      "read": "live",
      "read_sec": 0.66
     }
