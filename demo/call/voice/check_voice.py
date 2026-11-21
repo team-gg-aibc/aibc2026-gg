@@ -383,7 +383,17 @@ def check_line():
     finally:
         stop(p)
         mock.shutdown()
-    print("  ✓ 070 다리: 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
+    probe = "import sys; sys.path.insert(0, sys.argv[1]); from voice import line; a = line.allowed(); print(repr(line.guard()), line.permit('+82 10-1234-5678', a), line.permit('01099998888', a), line.permit('', a))"
+    def ask(**env):
+        keep = {k: v for k, v in os.environ.items() if not k.startswith("CALL_VOICE_LINE")}
+        r = subprocess.run([sys.executable, "-c", probe, str(HERE.parent)], capture_output=True, text=True, env={**keep, "KOREAAITEL_ENV_FILE": "/nonexistent", **env})
+        assert r.returncode == 0, r.stderr[-400:]
+        return r.stdout.split()
+    out = ask(CALL_VOICE_LINE="sdk")
+    assert out[0] != "''" and out[-3:] == ["False", "False", "False"], f"받을 번호가 없는데 다리가 뜨거나 전화를 받는다: {out}"
+    assert ask(CALL_VOICE_LINE="sdk", CALL_VOICE_LINE_ALLOW="010-1234-5678") == ["''", "True", "False", "False"], "받을 번호만 받아야 한다(나라 번호 꼴도 같은 번호로)"
+    assert ask(CALL_VOICE_LINE="1")[0] != "''" and ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok")[0] == "''", "토큰이 없는데 Stream 다리가 뜬다"
+    print("  ✓ 070 다리: 받을 번호(sdk) · 토큰(Stream)이 없으면 뜨지 않음 · 정해 둔 번호만 받음(숨긴 번호는 거절) · 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
 
 
 def check_phone_text():

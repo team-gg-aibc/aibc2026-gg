@@ -14,9 +14,9 @@
 | 환경 변수 | 뜻 | 기본 |
 | CALL_VOICE_LINE | sdk 또는 1(CALL_VOICE=1과 함께) | 끔 |
 | CLAWOPS_API_KEY · CLAWOPS_ACCOUNT_ID · CALL_VOICE_LINE_FROM | (sdk) 한국AI통신 열쇠 · 계정 · 받을 070 번호. 환경 변수 또는 ~/.config/gg-team/koreaaitel.env(다른 파일이면 KOREAAITEL_ENV_FILE)에 한 줄씩. 레포에 넣지 않는다 | 없음 |
-| CALL_VOICE_LINE_ALLOW | (sdk) 값이 있으면 이 번호들(쉼표)에서 건 전화만 받는다. 나머지는 받기 전에 거절한다(우리만 걸게) | 없음(모두 받음) |
+| CALL_VOICE_LINE_ALLOW | (sdk) 꼭 준다. 이 번호들(쉼표)에서 건 전화만 받고 나머지는 받기 전에 거절한다(밖의 사람은 전화로 들어오지 못하게, docs/decisions.md 11-21). 비어 있으면 다리가 뜨지 않는다 | 없음(다리가 뜨지 않음) |
 | CALL_VOICE_LINE_PORT · CALL_VOICE_LINE_HOST | (1) 다리가 듣는 포트 · 주소. 밖에서는 앞단이 wss(443)를 받아 이 포트로 넘긴다 | 8790 · 127.0.0.1 |
-| CALL_VOICE_LINE_TOKEN | (1) 값이 있으면 start의 customParameters.token이 같아야 받는다(<Parameter name="token" value="…"/>). 회선 연결에는 서명이 없으니 밖에 열 때는 꼭 준다 | 없음 |
+| CALL_VOICE_LINE_TOKEN | (1) 꼭 준다. start의 customParameters.token이 같아야 받는다(<Parameter name="token" value="…"/>). 회선 연결에는 서명이 없다. 비어 있으면 다리가 뜨지 않는다 | 없음(다리가 뜨지 않음) |
 
 읽는 동안과 받기 전에는 회선 소리 대신 조용한 소리를 받아쓰기에 넣는다(브라우저 길의 「마이크 막기」와 같다). 다 읽은 뒤 더 막는 시간은 CALL_VOICE_TAIL_MS(hub.py).
 """
@@ -42,6 +42,29 @@ BATCH = 1600             # 받아쓰기에는 0.2초씩 모아 넣는다(회선�
 SEND = 3200              # 회선에는 0.4초씩 끊어 보낸다(회선이 20ms씩 맞춰 튼다)
 sounds = {}              # 글 → 전화 소리 꼴(μ-law 8000Hz). 같은 말은 다시 만들지 않는다
 digits = lambda s: re.sub(r"\D", "", str(s or ""))      # noqa: E731
+
+
+def number(s):
+    """전화번호를 한 꼴로: 숫자만, 나라 번호 82는 0으로(+82 10-… → 010…)."""
+    d = digits(s)
+    return "0" + d[2:] if d.startswith("82") else d
+
+
+def allowed():
+    """받을 번호들(CALL_VOICE_LINE_ALLOW)."""
+    return {number(x) for x in os.environ.get("CALL_VOICE_LINE_ALLOW", "").split(",") if number(x)}
+
+
+def permit(caller, allow):
+    """이 번호에서 건 전화를 받나. 정해 둔 번호가 아니면(번호를 숨긴 전화 포함) 받지 않는다."""
+    return bool(allow) and number(caller) in allow
+
+
+def guard():
+    """다리를 띄워도 되나 → 안 되면 까닭(되면 빈 글). 밖의 사람이 전화로 들어오지 못하게, 막는 값이 없으면 띄우지 않는다."""
+    if MODE == "sdk":
+        return "" if allowed() else "CALL_VOICE_LINE_ALLOW(받을 번호)가 비어 있다"
+    return "" if TOKEN else "CALL_VOICE_LINE_TOKEN이 비어 있다"
 
 
 def sound(text):
@@ -143,7 +166,7 @@ async def stream(ws):
             ev = m.get("event")
             if ev == "start" and not line:
                 got = str(((m.get("start") or {}).get("customParameters") or {}).get("token", ""))
-                if TOKEN and not hmac.compare_digest(got.encode(), TOKEN.encode()):
+                if not TOKEN or not hmac.compare_digest(got.encode(), TOKEN.encode()):
                     print("070 다리: 토큰이 달라 받지 않음")
                     return
                 line = Line(lambda a: ws.send(json.dumps({"event": "media", "media": {"payload": base64.b64encode(a).decode()}})),
@@ -219,22 +242,27 @@ def env_file():
 
 async def serve_sdk():
     from clawops.agent import BuiltinTool, ClawOpsAgent
-    env_file()
-    allow = {digits(x) for x in os.environ.get("CALL_VOICE_LINE_ALLOW", "").split(",") if digits(x)}
+    allow = allowed()
     agent = ClawOpsAgent(from_=digits(os.environ.get("CALL_VOICE_LINE_FROM")), session_factory=Session, builtin_tools=BuiltinTool.NONE, prewarm_enabled=False)
 
     @agent.on_incoming
     async def screen(c):      # 우리만 걸게: 정해 둔 번호가 아니면 받기 전에 거절한다
-        if allow and digits(c.from_number) not in allow:
+        if not permit(c.from_number, allow):
             print("070 다리: 정해 두지 않은 번호라 받지 않음")
             await c.reject()
 
     await agent.connect()
-    print(f"070 다리: 한국AI통신에 이어짐 · 받는 번호 끝자리 {digits(os.environ.get('CALL_VOICE_LINE_FROM'))[-4:]} · 거는 번호 제한 {'있음' if allow else '없음'}")
+    print(f"070 다리: 한국AI통신에 이어짐 · 받는 번호 끝자리 {digits(os.environ.get('CALL_VOICE_LINE_FROM'))[-4:]} · 받을 번호 {len(allow)}개")
     await asyncio.Future()
 
 
 def run():
+    if MODE == "sdk":
+        env_file()
+    why = guard()
+    if why:
+        print(f"070 다리를 띄우지 않음: {why}")
+        return
     try:
         asyncio.run(serve_sdk() if MODE == "sdk" else serve_stream())
     except Exception as e:  # noqa: BLE001  다리가 못 떠도 화면 서버는 그대로 돈다
