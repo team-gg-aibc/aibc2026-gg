@@ -3,7 +3,7 @@
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
-<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from a version whose scene and screen code are the same as main 13a9fb3 (#151 merged, with the step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
+<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from main 08bd360 (second batch #157, Korean option names; step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
 <p align="center">
   <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="80%">
   <br>
@@ -56,7 +56,7 @@ Four steps at the top of the screen show where the call is.
   <img src="docs/img/readme/call-handoff.png" alt="The light agent screen after the call. The map has a fixed pin, the next-question box shows the closing words, the bottom left has Take next call and View records buttons, and the intake card on the right shows the lot number, the office in charge, past records nearby, the status, and a reference table." width="100%">
 </p>
 
-- **During the call (the image at the top).** "It's by the street near Lotte World Tower, on the way out from Jamsil Station. I don't know the lot number." shrinks the area from all of Seoul to a radius of about 200 m, and the next question ("What do you see right in front of you?") appears in "지금 물을 말" (What to ask now) with landmark names to pick from (English names appear as written in the map data). For "If I report an injured cat, who rescues it and where is it cared for?", the "조례 근거 답" (Ordinance answer) box shows a draft and the cited articles (Animal Protection Ordinance, Article 10(1) and 10(3)). Even before the place is fixed, the intake card already shows "민원인이 한 말" (what the caller said).
+- **During the call (the image at the top).** "It's by the street near Lotte World Tower, on the way out from Jamsil Station. I don't know the lot number." shrinks the area from all of Seoul to a radius of about 200 m, and the next question ("What do you see right in front of you?") appears in "지금 물을 말" (What to ask now) with landmark names to pick from (the options read aloud are Korean names; the landmark chips also show English names as written in the map data). For "If I report an injured cat, who rescues it and where is it cared for?", the "조례 근거 답" (Ordinance answer) box shows a draft and the cited articles (Animal Protection Ordinance, Article 10(1) and 10(3)). Even before the place is fixed, the intake card already shows "민원인이 한 말" (what the caller said).
 - **After the call (this image).** "Right in front of Jamsil Station Exit 1" shrinks the area to a radius of about 40 m. The caller says yes to "Songpa-gu, Jamsil 6-dong, right in front of Jamsil Station Exit 1, is that right?", so the place is fixed. The intake card shows the lot number "near 8 Sincheon-dong, Songpa-gu (nearest building, about 90 m)" and the office "Songpa-gu Office animal protection team · the animal shelter the district office designated". At the bottom, a reference table shows how the handoff changes with "alive or dead, and where it is".
 
 ## Why we built it
@@ -97,6 +97,8 @@ So we narrow down the place during the call. Each source and how to use it caref
 - **Building heights.** The buildings in the script get a roof outline. The heights in Seoul's data are not measured; they are floors × 3.5 m.
 - **Phone.** Upright (width under 600 px) or sideways (height under 500 px), the boxes stack in this order: the chat (with the input box), what to ask now, the ordinance answer, the location area, and the intake card.
 - **Records.** Each record keeps what was said in the call, and "the conversation at the time" starts folded.
+- **Second batch on 11-21 (on by default).** A bridge or overpass longer than 120 m is read as the whole bridge when the caller gives only its name, not as its center point, and "the ○○ end" is read as that end of the bridge. When the same kind of location question would come twice in a row, the screen acknowledges what it heard and asks in different words. Options read aloud are swapped for Korean names (for example "Possibilites" → "롯데콘서트홀"). If the caller only says "I can see ○○", it is taken as the distance at which it can be seen, not "right in front".
+- **Handoff fixes (11-21).** Road damage and streetlights on Han River bridges go to the Seoul Metropolitan Government, cases inside Olympic Park to the Korea Sports Promotion Foundation, Cheonggyecheon to the Seoul Facilities Corporation, and cases the caller says are inside a subway station to the operator of that station.
 - **Calls you turn on with a switch (off by default).** `CALL_DIRECT=1` is the direct call: a visitor plays the caller and types, and the next line the screen picked and the ordinance answer appear in the chat as the agent's words (an access code and usage limits can be set). `CALL_VOICE=1` is a voice call placed and answered from a phone browser, turned on only on the presentation server (see "What you should know" 4). Details are in [`demo/call/voice/README.md`](demo/call/voice/README.md) (Korean).
 
 </details>
@@ -281,15 +283,22 @@ The stages and switches of the new flow are in [`docs/engine/flow2.md`](docs/eng
 
 ### Narrowing the location
 
-<!-- The 600-call values in this section were measured on the 11-21 baseline (location code the same as main 5000e28), run r75-c2m (report 78, "바탕" row: 421 · 397 · 416 / 0 · 0 · 5). The ten location fixes (#149, main 16d57be) did not change these 600 calls either (#149 description: same, three calls differ). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
+<!-- The 600-call values in this section were measured on the 11-21 baseline (location code the same as main 5000e28), run r75-c2m (report 78, "바탕" row: 421 · 397 · 416 / 0 · 0 · 5). The ten location fixes (#149, main 16d57be) and the second batch (#157, main 08bd360) did not change these 600 calls either (#149 · #157 descriptions: same). The 93-case values are the "new yardstick" row of the #157 description (sum of three seeds, circle 110/7 → 110/0 · boundary 136/10 → 136/3). "우리 측정" in docs/call-locate/README.md still has the 11-18 values -->
 
-These come from simulated calls, 600 per condition, measured on 2026-11-21 with the defaults on main (all location-reading fixes on). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
+These come from simulated calls, 600 per condition, measured with the defaults of main 08bd360 (all location-reading fixes on, 2026-11-21). Code picks a true location in Seoul, and a simulated caller answers the screen's questions with what can be seen from that spot. No call with a real person speaking has been measured by distance yet.
 
 | Caller (600 calls each) | Calls narrowed to one point | Calls fixed at a wrong place |
 | --- | --- | --- |
 | Answers what they see | **421 (70.2%)** | **0** |
 | 10% wrong answers and 10% "I don't know" | 397 (66.2%) | 0 |
 | 10% wrong answers and easily says yes to a wrong place | 416 (69.3%) | 5 |
+
+We also ran a separate set of 93 cases, built without looking at the code being fixed (the kinds of places that failed in the field: behind or beside large buildings, event sites, bridges, nicknames), with three seeds (279 calls in all). The simulated caller judges distance to a large building either by approximating it as a circle or by its real boundary.
+
+| 93 cases × 3 seeds | Calls narrowed to one point | Calls fixed at a wrong place (before → after the second batch) |
+| --- | --- | --- |
+| Building approximated as a circle | 110 | 7 → **0** |
+| Building's real boundary | 136 | 10 → **3** |
 
 - "One point" means the area was narrowed within a 50 m radius (a 200 m stretch on a road), the caller confirmed it, and the point is within 60 m (120 m on a road) of the true location. A "wrong fix" means the confirmed point is farther than that.
 - Distance to the lot number (from the true location to the nearest lot number): median 18 m in alleys and shopping streets, 25 m around station exits, 39 m on main roads. Share more than 100 m away: 48% on motorways, 80% inside parks.
@@ -298,7 +307,7 @@ These come from simulated calls, 600 per condition, measured on 2026-11-21 with 
 <summary><b>How we measured</b></summary>
 
 - Measured on 2026-11-21 with the current defaults (all location-reading fixes on). The 600 calls are four runs of 150. Two of the four random seeds that pick true locations were never used in development. When the caller answers what they see, a call has 6.4 exchanges on average.
-- The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases. The 11-20 fixes (fixes for the field test failures, reading perimeters, and more) also barely changed these 600 calls (398 → 397, 417 → 416); their effect was checked by feeding the words of real calls back in and with a separate set of cases.
+- The simulated caller never says speech-to-text mistakes or intersection names, and names a large place like a school only when standing near its point. So the fixes turned on on 11-19 (speech-to-text mistakes, large places, intersection names) did not change the one-point or wrong-fix counts of these 600 calls; their effect was checked with separate sets of made-up phrases. The 11-20 fixes (fixes for the field test failures, reading perimeters, and more) also barely changed these 600 calls (398 → 397, 417 → 416); their effect was checked by feeding the words of real calls back in and with a separate set of cases. The second batch on 11-21 (long bridges, "I can see …", Korean option names, and more) did not change these 600 calls either; its effect shows in the wrong fixes of the 93-case set above.
 - Measurements up to 11-18 and how we fixed things are in "우리 측정" (Our measurements) in [`docs/call-locate/README.md`](docs/call-locate/README.md) (Korean).
 - On 11-18, before we found and fixed four causes of wrong fixes, the same 600 calls gave 414 (69.0%) and 4 wrong fixes when the caller answers what they see.
 
@@ -396,7 +405,7 @@ The demo's other environment variables are in [`demo/call/README.md`](demo/call/
 
 1. **The demo calls are made up.** This call and question flow is a made-up flow the team built from public material and the ordinance text, and it is not connected to the 120 standard consultation database (the bottom left of the screen says the same). The team wrote the call scripts and question wording, and chose the complaint types from Seoul's field complaint handling standard. The line "표준 답변 자료와 맞춰 본 뒤 안내하세요" (check against the standard answers before you tell the caller) leaves that check to the agent. The 14 past records on the records screen are also examples the team made.
 2. **The call accuracy numbers come from simulated calls.** No call with a real person speaking has been measured by distance yet.
-3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 30 rows across 12 case types, 24 were confirmed in official guidance or the ordinance text, and 6 are guesses (handoff table `demo/call/data/routes.json`, as of 2026-11-21). The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
+3. **The handoff table mixes "confirmed" and "guessed" rows.** Of 32 rows across 12 case types, 31 were confirmed in official guidance or the ordinance text, and 1 is a guess (handoff table `demo/call/data/routes.json`, main 08bd360 · as of 2026-11-21). The screen shows them as "확인 전(추측)" (not yet confirmed, a guess), and team names may differ by district.
 4. **Every model that makes an answer is an Upstage model.**
    - Narrowing the place, picking questions, and the ordinance answer use only Upstage models.
    - Only speech-to-text (sound to text) and reading aloud (text to sound) use another company's models (ElevenLabs: `scribe_v2_realtime` for speech-to-text, `eleven_multilingual_v2` for reading aloud), because Upstage offers no speech-to-text or speech synthesis model.
