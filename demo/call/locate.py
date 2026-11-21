@@ -998,7 +998,7 @@ SAMEQ = ("finer", "passed", "closest", "from", "either", "between")      # (same
 ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 다듬기: samename = 질문 글에서 같은 이름의 보기는 한 번만 말함(보기 자체는 그대로: 같은 이름의 두 곳이 모두 범위에 남는다, server.say_options) · closestnew = 「다 멀어요」로 지운 곳은 보기로 다시 내밀지 않음: 「어디가 가장 가까우세요」를 다시 물을 때는 새 보기로(셋이 안 되면 묻지 않음), 간판 · 바로 앞 질문의 보기에서도 뺌 · josa = 「카페(이)가」를 받침에 맞춰 「카페가 · 정류장이」로(server.fill)
 # sameopts(기본 끔 · 75번): 시민이 보기에서 골라 답한 질문을 같은 보기로 다시 고르지 않음(questions의 same, server.asked_same). 영동1교 통화의 같은 「어느 쪽」 질문 되풀이는 없어지지만 가상 600통에서 한 점 421 · 397 · 416 → 414 · 390 · 405, 틀린 확정 0 · 0 · 5 → 0 · 0 · 6이라 켜지 않았다(같은 질문을 다시 물어 같은 답을 한 번 더 세는 것이 지금은 범위를 좁히는 데 쓰이고 있다)
 C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
-FIX_ON = "genericname,yesno,whichkeep,choicebind,placebind,codekeep,keeptype,stationbind,stoponly,roadcls"      # (84번, 기본 켬) 고침 모은 판에서 모든 기준을 넘은 열 — 기준점과 어긋난 가게(farshop, 83번)는 확인용 묶음 93통 테두리 둘에서 틀린 확정 +1로 걸려 끔(11-21 07시). 동네 이름(hood, 87번)은 가게 지점 이름 속 동네 말(「CU 신촌피어점」의 신촌)을 동네로 읽어 600통 #92가 맞는 한 점 → 넘김이 되어 끔. 그 밖에 정류장으로만 있는 기관 이름(stoponly, 85번 좁힌 판) · 양재대로 · 언주로의 일반 구간(roadcls, 86번) 더함. 덜 묻기의 dunnoboth는 옛 잣대 한 점 −9 · −12로 끔. 처음 아홉: 흔한 낱말 이름 · 기준점과 어긋난 가게(83번) · 되묻기 답의 헛 「예」 · 「○○은 맞아요」(81번) · Solar가 말에 없는 이름을 쓰지 않기 다섯(79번). seenwide · 긴 다리 · 덜 묻기는 「정할 것」으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
+FIX_ON = "genericname,yesno,whichkeep,choicebind,placebind,codekeep,keeptype,stationbind,stoponly,roadcls,hood"      # (84번, 기본 켬) 고침 모은 판에서 모든 기준을 넘은 열 + 동네 이름(hood, 87번 — 더 긴 이름 속 동네 말은 읽지 않게 고친 d12d88e로 기본 켬, 84번 5절) — 기준점과 어긋난 가게(farshop, 83번)는 확인용 묶음 93통 테두리 둘에서 틀린 확정 +1로 걸려 끔(11-21 07시). 동네 이름(hood, 87번)은 가게 지점 이름 속 동네 말(「CU 신촌피어점」의 신촌)을 동네로 읽어 600통 #92가 맞는 한 점 → 넘김이 되어 끔. 그 밖에 정류장으로만 있는 기관 이름(stoponly, 85번 좁힌 판) · 양재대로 · 언주로의 일반 구간(roadcls, 86번) 더함. 덜 묻기의 dunnoboth는 옛 잣대 한 점 −9 · −12로 끔. 처음 아홉: 흔한 낱말 이름 · 기준점과 어긋난 가게(83번) · 되묻기 답의 헛 「예」 · 「○○은 맞아요」(81번) · Solar가 말에 없는 이름을 쓰지 않기 다섯(79번). seenwide · 긴 다리 · 덜 묻기는 「정할 것」으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 BRIDGE_ON = "bridgelong"      # (75번 9절 · 10절, 모은 판에서는 기본 끔 — 켜는 판은 donggyu/locate-bridge) 길이 120m를 넘는 다리 · 고가는 이름 하나만 대도(「보라매고가 바로 앞」) 가운데 한 점이 아니라 다리의 면으로. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON      # BRIDGE_ON(긴 다리)은 모은 판에서 끈 채(84번 — 동규 09:30 판정). 켜려면 CALL_ON에 bridgelong을 더한다     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
@@ -1835,10 +1835,16 @@ def selftest_hood():
     out = []
     for word, tail in (("명동", "이에요"), ("신촌", "이요"), ("종로", "요"), ("광화문", "이요"), ("압구정", "이요"), ("동대문", "이요"), ("성수", "요"), ("망원", "이요")):
         ms = G.mentions(word + tail)
-        assert ms and ms[0]["key"] == k(word), (word, ms)
-        R = infer([{"t": "at", "k": k(word)}])
+        assert ms and ms[0]["key"] == k(word) + gaz.HOOD_KEY, (word, ms)
+        R = infer([{"t": "at", "k": ms[0]["key"]}])
         assert R and R["r"] > 200, (word, R and R["r"])  # 한 점이 아니라 그 동 일대
         out.append(f"{word} {R['r']:.0f}m")
+    for said, word in (("CU 신촌피어 근처예요", "신촌"), ("압구정엮 근처예요", "압구정"), ("명동스타벅스 앞이에요", "명동")):
+        assert all(m["key"] != k(word) + gaz.HOOD_KEY for m in G.mentions(said)), (said, G.mentions(said))      # 더 긴 이름의 일부인 동네 말은 동네로 읽지 않음(600통 1114 #92)
+    for said, word, main in (("광화문 앞이에요", "광화문", True), ("동대문 옆이요", "동대문", True), ("광화문 건너편이요", "광화문", True), ("을지로 따라 가다가요", "을지로", True),
+                             ("종로 따라 걷다가 봤어요", "종로", False), ("명동 앞인데요", "명동", False)):
+        keys = [m["key"] for m in G.mentions(said)]      # (PR #150 리뷰) 관계 말이 붙으면 동 범위로 넓히지 않고 main이 읽던 대로(광화문 · 동대문 점, 을지로 길 / 종로 · 명동 두 글자는 main도 안 읽음)
+        assert k(word) + gaz.HOOD_KEY not in keys and (k(word) in keys) == main, (said, keys)
     ms = G.mentions("명동역 6번 출구 바로 앞이에요")
     assert ms and ms[0]["key"] != k("명동"), ms           # 더 좁은 말은 그대로
     assert any(r[0] == "r" for r in G.ix[k("종로")]) and any(r[0] == "r" for r in G.ix[k("을지로")])      # 같은 이름의 길은 덮지 않음
