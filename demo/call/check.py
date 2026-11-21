@@ -1063,9 +1063,10 @@ def follow_said():
 
 
 def cross_check():
-    """(cross, 99번 4절) 확정 전 교차 확인. 「강남역 근처 → 아트박스 바로 앞」: 켜면 확인 질문 앞에 「아트박스 강남점 말고 …」를 묻는다.
-    강남새로치과의원(그 자리 50m 안, 넓은 범위 안에 한 곳) → 맞음: 핀 그대로, 확인 질문에 그 이름까지. 「잘 모르겠어요」 → 답 없음: 그대로 확인 질문,
-    접수 카드 범위 줄에 「한 가지 말에 기댄 위치」. 끄면 곧바로 확인 질문."""
+    """(cross, 99번 4절 · 11-22 좁힌 판) 확정 전 교차 확인. 「강남역 근처 → 올리브영 강남역점 바로 앞」: 둘레 300m에 올리브영 지점이 또 있어(여러 곳) 켜면
+    확인 질문 앞에 「올리브영 강남역점 말고 …」를 묻는다. 헤이데이의원(그 자리 1m, 한 곳뿐) → 맞음: 핀 그대로 확인 질문. 「잘 모르겠어요」 → 답 없음: 확인 질문,
+    접수 카드 범위 줄에 「한 가지 말에 기댄 위치」. 강남엔터치과(264m) 「바로 옆」 → 어긋남: 「아니요」와 같이 「어느 말이 달랐을까요?」.
+    「아트박스 바로 앞」(둘레에 같은 상표 없음, 받치는 말 하나뿐)은 켜도 묻지 않는다(평가 774통 한 점 −8로 좁힘). 끄면 곧바로 확인 질문."""
     os.environ.setdefault("CALL_MODE", "saved")
     sys.path.insert(0, str(HERE))
     import server as S
@@ -1080,18 +1081,22 @@ def cross_check():
             if v["question"]:
                 st, v = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
         return qs, v
-    head = ("강남역 근처에 쓰레기가 많이 버려져 있어요", "아트박스 바로 앞이에요")
+    qs, _ = run("강남역 근처에 쓰레기가 많이 버려져 있어요", "아트박스 바로 앞이에요")
+    assert qs[-1] == "confirm", qs
+    head = ("강남역 근처에 쓰레기가 많이 버려져 있어요", "올리브영 강남역점 바로 앞이에요")
     qs, v0 = run(*head)
     if not on:
         assert qs[-1] == "confirm", qs
-        print("  ✓ 확정 전 교차 확인(cross False): 아트박스 바로 앞 → 곧바로 확인 질문")
+        print("  ✓ 확정 전 교차 확인(cross False): 올리브영 강남역점 바로 앞 → 곧바로 확인 질문")
         return
-    assert qs[-1] == "check" and "아트박스" in v0["question"]["say"] and v0["question"].get("cross"), (qs, v0["question"])
-    qs, v = run(*head, "강남새로치과의원이요")
-    assert qs[-1] == "confirm" and ("강남새로치과의원도 보이는 곳" in v["question"]["say"]) == ("crossname" in S.L.ON) and v["center"] == v0["center"], (qs, v["question"]["say"], v["center"], v0["center"])
+    assert qs[-1] == "check" and "올리브영 강남역점" in v0["question"]["say"] and v0["question"].get("why") == ["여러 곳"], (qs, v0["question"])
+    qs, v = run(*head, "헤이데이의원 바로 옆이에요")
+    assert qs[-1] == "confirm" and v["center"] == v0["center"] and v["matter"].get("cross") == "ok", (qs, v["center"], v0["center"], v["matter"].get("cross"))
     qs, v = run(*head, "잘 모르겠어요")
     assert qs[-1] == "confirm" and "한 가지 말에 기댄 위치" in (v["summary"]["size"] or "") and v["center"] == v0["center"], (qs, v["summary"]["size"])
-    print("  ✓ 확정 전 교차 확인(cross True): 아트박스 바로 앞 → 「아트박스 강남점 말고 …」 → 강남새로치과의원 맞음(핀 그대로, 이름까지 되말함) · 「잘 모르겠어요」 답 없음(카드에 「한 가지 말에 기댄 위치」)")
+    qs, v = run(*head, "강남엔터치과 바로 옆이에요")
+    assert qs[-1] == "which" and v["matter"].get("cross") == "off", (qs, v["matter"].get("cross"))
+    print("  ✓ 확정 전 교차 확인(cross True): 올리브영 강남역점(둘레에 같은 상표) → 「… 말고 …」 → 헤이데이의원 맞음(핀 그대로) · 「잘 모르겠어요」 답 없음(카드에 「한 가지 말에 기댄 위치」) · 강남엔터치과 264m 어긋남(「어느 말이 달랐을까요?」) · 아트박스(말 하나뿐)는 묻지 않음")
 
 
 def main():
