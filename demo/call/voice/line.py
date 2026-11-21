@@ -14,9 +14,9 @@
 | 환경 변수 | 뜻 | 기본 |
 | CALL_VOICE_LINE | sdk 또는 1(CALL_VOICE=1과 함께) | 끔 |
 | CLAWOPS_API_KEY · CLAWOPS_ACCOUNT_ID · CALL_VOICE_LINE_FROM | (sdk) 한국AI통신 열쇠 · 계정 · 받을 070 번호. 환경 변수 또는 ~/.config/gg-team/koreaaitel.env(다른 파일이면 KOREAAITEL_ENV_FILE)에 한 줄씩. 레포에 넣지 않는다 | 없음 |
-| CALL_VOICE_LINE_ALLOW | (sdk) 꼭 준다. 이 번호들(쉼표)에서 건 전화만 받고 나머지는 받기 전에 거절한다(밖의 사람은 전화로 들어오지 못하게, docs/decisions.md 11-21). 비어 있으면 다리가 뜨지 않는다 | 없음(다리가 뜨지 않음) |
+| CALL_VOICE_LINE_ALLOW | (sdk · 1 둘 다) 꼭 준다. 이 번호들(쉼표)에서 건 전화만 받고 나머지는 받기 전에 거절한다(밖의 사람은 전화로 들어오지 못하게, docs/decisions.md 11-21). 비어 있으면 다리가 뜨지 않는다. Stream 길은 회선이 거는 번호를 따로 주지 않으니 VoiceML이 `<Parameter name="from" value="거는 번호"/>`로 넘겨야 하고, 없거나 정해 둔 번호가 아니면 받지 않는다 | 없음(다리가 뜨지 않음) |
 | CALL_VOICE_LINE_PORT · CALL_VOICE_LINE_HOST | (1) 다리가 듣는 포트 · 주소. 밖에서는 앞단이 wss(443)를 받아 이 포트로 넘긴다 | 8790 · 127.0.0.1 |
-| CALL_VOICE_LINE_TOKEN | (1) 꼭 준다. start의 customParameters.token이 같아야 받는다(<Parameter name="token" value="…"/>). 회선 연결에는 서명이 없다. 비어 있으면 다리가 뜨지 않는다 | 없음(다리가 뜨지 않음) |
+| CALL_VOICE_LINE_TOKEN | (1) 꼭 준다. start의 customParameters.token이 같아야 받는다(<Parameter name="token" value="…"/>). 회선 연결에는 서명이 없다. 토큰은 「회선이 보낸 연결인가」만 가리고 「누가 걸었나」는 못 가리니 ALLOW와 함께 본다. 비어 있으면 다리가 뜨지 않는다 | 없음(다리가 뜨지 않음) |
 
 읽는 동안과 받기 전에는 회선 소리 대신 조용한 소리를 받아쓰기에 넣는다(브라우저 길의 「마이크 막기」와 같다). 다 읽은 뒤 더 막는 시간은 CALL_VOICE_TAIL_MS(hub.py).
 """
@@ -62,9 +62,9 @@ def permit(caller, allow):
 
 def guard():
     """다리를 띄워도 되나 → 안 되면 까닭(되면 빈 글). 밖의 사람이 전화로 들어오지 못하게, 막는 값이 없으면 띄우지 않는다."""
-    if MODE == "sdk":
-        return "" if allowed() else "CALL_VOICE_LINE_ALLOW(받을 번호)가 비어 있다"
-    return "" if TOKEN else "CALL_VOICE_LINE_TOKEN이 비어 있다"
+    if not allowed():
+        return "CALL_VOICE_LINE_ALLOW(받을 번호)가 비어 있다"
+    return "" if MODE == "sdk" or TOKEN else "CALL_VOICE_LINE_TOKEN이 비어 있다"
 
 
 def sound(text):
@@ -165,9 +165,13 @@ async def stream(ws):
                 continue
             ev = m.get("event")
             if ev == "start" and not line:
-                got = str(((m.get("start") or {}).get("customParameters") or {}).get("token", ""))
+                params = (m.get("start") or {}).get("customParameters") or {}
+                got = str(params.get("token", ""))
                 if not TOKEN or not hmac.compare_digest(got.encode(), TOKEN.encode()):
                     print("070 다리: 토큰이 달라 받지 않음")
+                    return
+                if not permit(params.get("from"), allowed()):      # 거는 번호를 모르거나 정해 두지 않은 번호면 방을 열지 않는다
+                    print("070 다리: 정해 두지 않은 번호라 받지 않음")
                     return
                 line = Line(lambda a: ws.send(json.dumps({"event": "media", "media": {"payload": base64.b64encode(a).decode()}})),
                             lambda: ws.send(json.dumps({"event": "clear"})), ws.close,

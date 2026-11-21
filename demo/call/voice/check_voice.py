@@ -328,7 +328,7 @@ def check_line():
             self.end_headers()
             self.wfile.write(b"\x7f" * 8000)                                          # 1초짜리 전화 소리
 
-    p, _ = server(CALL_VOICE="1", CALL_VOICE_LINE="1", CALL_VOICE_LINE_PORT=str(PORT + 3), CALL_VOICE_LINE_TOKEN="tok", ELEVENLABS_API_BASE=f"http://127.0.0.1:{PORT + 4}", ELEVENLABS_API_KEY="check-key", ELEVENLABS_ENV_FILE="/nonexistent")
+    p, _ = server(CALL_VOICE="1", CALL_VOICE_LINE="1", CALL_VOICE_LINE_PORT=str(PORT + 3), CALL_VOICE_LINE_TOKEN="tok", CALL_VOICE_LINE_ALLOW="010-1234-5678", ELEVENLABS_API_BASE=f"http://127.0.0.1:{PORT + 4}", ELEVENLABS_API_KEY="check-key", ELEVENLABS_ENV_FILE="/nonexistent")
     mock = HTTPServer(("127.0.0.1", PORT + 4), Tts)
     threading.Thread(target=mock.serve_forever, daemon=True).start()
     frame = {"event": "media", "media": {"track": "inbound", "payload": base64.b64encode(b"\x55" * 160).decode()}}
@@ -342,9 +342,14 @@ def check_line():
             bad.send(json.dumps({"event": "start", "start": {"customParameters": {"token": "x"}}}))
             time.sleep(0.3)
             assert call("/api/voice/waiting")["rooms"] == [], "토큰이 다른 회선을 받았다"
+        for who in ({"from": "01099998888"}, {}):                                      # 정해 두지 않은 번호 · 거는 번호를 모르는 연결도 방을 열지 않는다
+            with connect(f"ws://127.0.0.1:{PORT + 3}") as other:
+                other.send(json.dumps({"event": "start", "start": {"customParameters": {"token": "tok", **who}}}))
+                time.sleep(0.3)
+                assert call("/api/voice/waiting")["rooms"] == [], f"정해 두지 않은 번호의 회선을 받았다: {who}"
         with connect(f"ws://127.0.0.1:{PORT + 3}") as ws:
             ws.send(json.dumps({"event": "connected", "protocol": "Call", "version": "1.0.0"}))
-            ws.send(json.dumps({"event": "start", "start": {"streamId": "MZ1", "callId": "CA1", "customParameters": {"token": "tok"}}}))
+            ws.send(json.dumps({"event": "start", "start": {"streamId": "MZ1", "callId": "CA1", "customParameters": {"token": "tok", "from": "+821012345678"}}}))
             for _ in range(30):
                 rooms = call("/api/voice/waiting")["rooms"]
                 if rooms:
@@ -392,8 +397,9 @@ def check_line():
     out = ask(CALL_VOICE_LINE="sdk")
     assert out[0] != "''" and out[-3:] == ["False", "False", "False"], f"받을 번호가 없는데 다리가 뜨거나 전화를 받는다: {out}"
     assert ask(CALL_VOICE_LINE="sdk", CALL_VOICE_LINE_ALLOW="010-1234-5678") == ["''", "True", "False", "False"], "받을 번호만 받아야 한다(나라 번호 꼴도 같은 번호로)"
-    assert ask(CALL_VOICE_LINE="1")[0] != "''" and ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok")[0] == "''", "토큰이 없는데 Stream 다리가 뜬다"
-    print("  ✓ 070 다리: 받을 번호(sdk) · 토큰(Stream)이 없으면 뜨지 않음 · 정해 둔 번호만 받음(숨긴 번호는 거절) · 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
+    assert ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_ALLOW="01012345678")[0] != "''" and ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok")[0] != "''", "토큰이나 받을 번호가 없는데 Stream 다리가 뜬다"
+    assert ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok", CALL_VOICE_LINE_ALLOW="01012345678")[0] == "''"
+    print("  ✓ 070 다리: 받을 번호(sdk · Stream) · 토큰(Stream)이 없으면 뜨지 않음 · 정해 둔 번호만 받음(숨긴 번호 · 모르는 번호는 거절) · 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
 
 
 def check_phone_text():

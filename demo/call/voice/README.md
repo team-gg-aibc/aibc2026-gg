@@ -152,7 +152,7 @@ OPENBLAS_NUM_THREADS=1 CALL_DIRECT=1 CALL_DIRECT_OPEN=1 CALL_VOICE=1 CALL_VOICE_
 서버 기록에 「070 다리: 한국AI통신에 이어짐」이 찍힌 뒤 휴대폰 전화 앱으로 그 번호에 건다.
 
 - `CALL_VOICE_LINE=sdk`는 우리 쪽에서 밖으로 잇는다(새 주소 · 포트가 필요 없다). `CALL_VOICE_LINE=1`은 VoiceML `<Connect><Stream>`이 우리 WebSocket으로 걸어 오는 길이라 밖에서 닿는 `wss://` 주소가 있어야 한다. 이 길은 가짜 회선 점검(`check_voice.py` ⑧)만 했다.
-- **`CALL_VOICE_LINE_ALLOW=번호,번호`를 꼭 준다.** 그 번호에서 건 전화만 받고 나머지(번호를 숨긴 전화 포함)는 받기 전에 거절한다. 비어 있으면 다리가 뜨지 않는다(밖의 사람은 전화로 들어오지 못하게, `docs/decisions.md` 11-21). Stream 길은 `CALL_VOICE_LINE_TOKEN`이 비어 있으면 뜨지 않는다.
+- **`CALL_VOICE_LINE_ALLOW=번호,번호`를 꼭 준다.** 그 번호에서 건 전화만 받고 나머지(번호를 숨긴 전화 포함)는 받기 전에 거절한다. 비어 있으면 다리가 뜨지 않는다(밖의 사람은 전화로 들어오지 못하게, `docs/decisions.md` 11-21). Stream 길도 같은 번호 목록을 보고(VoiceML이 `<Parameter name="from" …>`로 거는 번호를 넘겨야 한다), `CALL_VOICE_LINE_TOKEN`까지 있어야 뜬다.
 - 전화 음질(8000Hz)이라 지명이 틀리기 쉽다. `CALL_VOICE_TERMS`로 나올 이름을 미리 알려 준다(11-21 맥북: 알려 주기 전 「롯데월드타워 → 도토리우대타워」, 알려 준 뒤 지명은 다 맞음).
 - 상담 화면이 둘 이상 열려 있으면 그중 한 화면만 받는다. 070 번호는 다리를 켠 한 곳에서만 받는다.
 - 알려진 한계: 민원인이 AI 말에 끼어들기는 없다(읽는 동안 회선 소리를 받아쓰기에 넣지 않는다). 발표용 서버(국외)에서 이어지는지는 확인하지 않았다.
