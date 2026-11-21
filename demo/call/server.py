@@ -711,8 +711,7 @@ def code_read(said, asked, short, R):
         pick = 1 if re.search(r"떨어|멀|조금|좀|아니|안 ?보", said) else 0 if re.search(r"바로|코앞|^\s*(네|예|응)|맞아|맞습|앞이", said) else None
     elif q.get("id") == "check" and q.get("cross") and R is not None:      # (cross, 99번 4-5절) 교차 확인의 답: 확정 전의 넓은 범위(90%, 남은 덩어리 포함) 안에서만 찾아 맞음 · 어긋남 · 답 없음
         read["clues"], verdict, name = [], "none", None
-        vis = 150.0 if R["on_road"] else 60.0
-        wcx, wcy, wr = q.get("wide") or [R["cx"], R["cy"], 300.0]      # 받치는 말 하나를 뺀 넓은 범위(locate._cross_wide)
+        wcx, wcy, wr = q.get("wide") or [R["cx"], R["cy"], 600.0]      # 지금 가운데 둘레(locate._cross_wide)
         for m in short:
             if "key" in m:
                 r = L.resolve(m["key"])
@@ -725,12 +724,18 @@ def code_read(said, asked, short, R):
             for a, b in pts:
                 if all(math.hypot(a - c, b - e) > 40 for c, e in one):
                     one.append((a, b))
-            if len(one) == 1:                             # 넓은 범위 안에 한 곳뿐인 이름만 판정에 쓴다(여러 곳 · 범위 밖 · 자료에 없음은 답 없음)
-                if math.hypot(one[0][0] - R["cx"], one[0][1] - R["cy"]) <= vis:
-                    verdict, name = "ok", m["name"]       # 맞음: 핀을 옮기지 않고 단서로도 더하지 않는다
-                else:
-                    verdict = "off"                       # 어긋남: 그 이름을 단서로 더해 다시 좁힌다(「거기는 아니다」는 붙이지 않음)
-                    read["clues"] = [{"t": "pt", "p": [round(one[0][0], 1), round(one[0][1], 1)], "r": L.SIG["가까이"] if re.search(r"바로|옆|앞", said) else L.SIG["보임"], "via": "cross", "sure": True, "label": m["name"]}]
+            if not one:
+                break                                     # 넓은 범위 밖 · 자료에 없음: 답 없음(자료의 빈 곳으로 맞는 자리를 물리지 않는다)
+            near_said = bool(re.search(r"바로|옆|앞", said))
+            ok_m, off_m = (150.0, 250.0) if R["on_road"] else (60.0, 100.0) if near_said else (150.0, 200.0)      # 「바로 옆」과 「보여요」의 폭. 그 사이는 답 없음
+            d = min(math.hypot(a - R["cx"], b - R["cy"]) for a, b in one)
+            if len(one) == 1 and d <= ok_m:
+                verdict, name = "ok", m["name"]           # 맞음: 넓은 범위 안에 한 곳뿐이고 그 자리 가까이 — 핀을 옮기지 않고 단서로도 더하지 않는다
+            elif d > off_m:
+                verdict = "off"                           # 어긋남: 시민 둘레에 보인다는 그 이름이 지금 자리 둘레에 없다 → 확인 질문에 「아니요」를 들은 것과 같이(「어느 말이 달랐을까요?」 바로잡기)
+                read["confirm"] = False                   # 받치는 말을 짐작해 빼면 엉뚱한 말을 뺀다(가상 600통 1114 #103: 「불광2동」을 짚음) — 어느 말이 틀렸는지는 시민에게 묻는다
+                if len(one) == 1:
+                    read["clues"] = [{"t": "pt", "p": [round(one[0][0], 1), round(one[0][1], 1)], "r": L.SIG["가까이"] if near_said else L.SIG["보임"], "via": "cross", "sure": True, "label": m["name"]}]
             break
         read["matter"]["cross"], read["matter"]["cross_name"] = verdict, name
     elif q.get("id") == "check" and R is not None and ("check2" in L.ON or "check2all" in L.ON):      # 열린 확인 2판: 이름은 판정이 아니라 증거(33번 4-2)
@@ -2157,6 +2162,7 @@ def turn(st, ev):
                     if asked.get("cross"):                # (cross) 교차 확인의 답은 코드 판정 그대로: Solar가 그 이름을 단서로 더해 핀을 옮기지 않게
                         code_ = last.get("code") or {}
                         read["clues"] = list(code_.get("clues") or [])
+                        read["confirm"] = code_.get("confirm")
                         read.setdefault("matter", {}).update({k: v for k, v in (code_.get("matter") or {}).items() if k in ("cross", "cross_name")})
                 if "yesno" in L.ON and asked.get("id") == "confirm" and not any(c.get("partyes") for c in read["clues"]):
                     read["confirm"] = _confirm_pair((last.get("code") or {}).get("confirm"), read.get("confirm"))      # (yesno, 81번) 「네? 뭐라고요?」(코드 예 · Solar 없음) · 「그쪽 말고 반대쪽」(Solar 예)이 확정되던 것
