@@ -1599,6 +1599,18 @@ def where_line(p, done, matter=None, anc=None):
     return ", ".join([head] + ([near] if near else []) + lane) if near or p.get("park") or p["m"] <= 1500 else fill(W["넓음"], 곳=head)
 
 
+def _said_line(p, clues, done, matter, anc):
+    """(handsaid · 89번) 자리를 정하지 못하고 넘길 때의 한 줄에는 시민이 말한 이름만 쓴다(신촌 r12: 코드가 고른 「아름다운미소 치과의원 앞」을 시민은 말한 적이 없다).
+    지금 한 줄의 표지가 시민 말에 없으면, 시민이 말한 가장 가까운 이름(400m 안)으로 다시 쓰고, 그것도 없으면 이름 없이(구 · 동 · 공원) → 새 한 줄. 바꿀 것이 없으면 None."""
+    said = {gaz.norm(str(v)) for c in clues for v in (c.get("label"), c.get("name"), c.get("dist_of"), *str(c.get("k") or "").split("|")) if v}
+    known = lambda name: any(len(s) >= 3 and (s in gaz.norm(name) or gaz.norm(name) in s) for s in said)     # noqa: E731
+    shown = anc["name"] if done and anc else None if p.get("rim") else p.get("near")
+    if not shown or known(shown):
+        return None
+    sb = p.get("said_best") if p.get("said_best_m", 1e9) <= 400 and known(p.get("said_best") or "") else None
+    return where_line(dict(p, near=sb, near_m=p.get("said_best_m"), m=min(p["m"], 400) if sb else p["m"]), False, matter, None)
+
+
 def size_text(size):
     R = tab("위치 범위")
     return fill(R["구간" if size["kind"] == "length" else "반지름"], m=f"{size['m']:,}")
@@ -1737,6 +1749,8 @@ def build(st, extra=None):
     if confirmed:
         question = None
     handoff = bool(question) and question["id"] == "handoff"      # 솔직한 끝(CALL_ON=loop): 자리 미확정으로 넘긴다
+    if handoff and line and "handsaid" in L.ON and parts:
+        line = _said_line(parts, clues, done, matter, anc) or line
     if handoff and line:
         line = fill(tab("위치 범위", "위치 한 줄")["미확정"], 위치=line)
     # 일의 종류 · 넘길 곳 · 엔진
