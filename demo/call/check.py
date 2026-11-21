@@ -739,7 +739,7 @@ def bind_choice():
         os.environ.pop("CALL_NO_ENGINE") if eng is None else os.environ.update(CALL_NO_ENGINE=eng)
     q, where = view["question"] or {}, view["summary"]["where"] or ""
     if on:
-        assert q.get("id") != "confirm" and "강남새로치과의원" in where and "강남이룸안과의원" not in where, (q.get("say"), where)      # 시민이 댄 곳(아트박스에서 50m)에 머문다
+        assert q.get("id") != "confirm" and ("강남새로치과의원" in where or "아트박스" in where) and "강남이룸안과의원" not in where, (q.get("say"), where)      # 시민이 댄 곳(아트박스 · 거기서 50m의 새로치과의원)에 머문다. dupshop을 켜면 아트박스 강남점 두 줄이 한 곳이 되어 「아트박스 앞」(89번)
     else:
         assert q.get("id") == "confirm" and "강남이룸안과의원" in q.get("say", ""), (q.get("say"), where)      # 끄면 그 통화 그대로: 700m 떨어진 보기로 확정 질문
     sh = lambda said: S.shortlist(said, None)      # noqa: E731
