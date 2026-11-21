@@ -1417,6 +1417,8 @@ def _q_near(R, clues):
             r = resolve(c["k"])
             if not len(r["x"]) or r["areas"] or r["roads"] or any(k in KIND_SIG for k in r["kinds"]) or _pk(r):
                 continue                                   # 역 · 동네처럼 넓은 것에는 「바로 앞」을 묻지 않는다
+            if "chainref" in ON and _branches(r, R) >= 2:
+                continue                                   # (chainref · 89번) 같은 상표가 범위 둘레에 여럿이면 그 가운데 한 지점을 두고 「바로 앞입니까」를 묻지 않는다
             px, py, ext = r["x"], r["y"], [_big(i) for i in r["ids"]]
         else:
             continue
@@ -1473,6 +1475,16 @@ def _q_closest(R, x, y, w, clues):
     return {"id": "closest", "bits": _bits(shares) * 0.8, "name": ", ".join(G.name[i] for i in keep), "options": opts + [{"label": "다 멀어요", "set": {"clues": far}}], **({"area": ringed} if ringed else {})}
 
 
+def _branches(r, R):
+    """(chainref · 89번) resolve() 결과 가운데 지금 범위 둘레(덮는 반지름 + 100m)에 있는 서로 40m 넘게 떨어진 자리 수."""
+    near = np.hypot(r["x"] - R["cx"], r["y"] - R["cy"]) <= R["r_cover"] + 100
+    keep = []
+    for x, y in zip(r["x"][near], r["y"][near]):
+        if all(math.hypot(x - a, y - b) > 40 for a, b in keep):
+            keep.append((x, y))
+    return len(keep)
+
+
 def _said_anchor(R, clues):
     """시민이 말한 표지 가운데 지금 범위의 가운데에 가장 가까운 것 → (거리, 이름, [x, y]) 또는 None. 역 · 동네처럼 넓은 것은 뺀다."""
     best = None
@@ -1483,6 +1495,8 @@ def _said_anchor(R, clues):
             r = resolve(c["k"])
             if not len(r["x"]) or r["areas"] or r["roads"] or any(k in KIND_SIG for k in r["kinds"]) or _pk(r):
                 continue
+            if "chainref" in ON and _branches(r, R) >= 2:
+                continue                                  # (chainref · 89번) 같은 상표가 지금 범위 둘레에 여럿: 어느 지점인지 모르니 거리 · 방향 질문의 기준으로 잡지 않는다(왕십리역 r27: 역사 3층 스타벅스를 기준으로 「바로 앞」 → 226m 떨어진 곳으로 확인 질문)
             px, py, ext = r["x"], r["y"], (G.ext[r["ids"]] if r.get("ids") else np.zeros(len(r["x"])))
         else:
             continue
