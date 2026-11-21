@@ -1129,17 +1129,14 @@ def _hinge(R, clues):
 CROSS_MAX = int(os.environ.get("CALL_CROSS_MAX", "3"))     # (cross) 한 통화에 교차 확인을 묻는 횟수의 상한(동규 11-21 23시: 세 번까지)
 
 
+CROSS_WIDE = (600.0, 1500.0)     # (cross) 교차 확인의 답을 찾는 둘레(m): 보통 · 길 위. 가상 600통 첫 판에서 놓친 진짜 자리가 확정하려던 곳에서 280~553m였다
+
+
 def _cross_wide(R, clues):
-    """(cross) 교차 확인의 답을 찾을 넓은 범위 → [가운데 x, y, 반지름]: 받치는 말 하나를 뺀 범위(덮는 반지름의 1.5배), 그 범위가 없거나 좁으면 지금 가운데 둘레 300m.
-    확정 직전의 90% 범위는 40m 안팎이라, 틀린 자리였으면 시민이 댄 진짜 둘레의 이름이 그 밖에 있다(가상 600통 첫 판: 「답 없음」으로 틀린 확정 4 → 8)."""
-    best = [round(R["cx"], 1), round(R["cy"], 1), 300.0]
-    for n, c in enumerate(clues):
-        if c["t"] not in ("at", "pt", "past", "before", "between"):
-            continue
-        R1 = infer(clues[:n] + clues[n + 1:])
-        if R1 is not None and not is_done(R1) and 1.5 * R1["r_cover"] > best[2]:
-            best = [round(R1["cx"], 1), round(R1["cy"], 1), round(min(1.5 * R1["r_cover"], 1500.0), 1)]
-    return best
+    """(cross) 교차 확인의 답을 찾을 넓은 범위 → [가운데 x, y, 반지름]: 지금 가운데 둘레 CROSS_WIDE.
+    확정 직전의 90% 범위는 40m 안팎이라, 틀린 자리였으면 시민이 댄 진짜 둘레의 이름이 그 밖에 있다(첫 판: 「답 없음」으로 틀린 확정 4 → 8).
+    받치는 말을 뺀 범위로 잡으면 체인 이름이 서울 전체로 퍼져 엉뚱한 원이 된다(아트박스: 6km 밖)."""
+    return [round(R["cx"], 1), round(R["cy"], 1), CROSS_WIDE[1] if R["on_road"] else CROSS_WIDE[0]]
 
 
 def _many_here(name, p, cx, cy):
