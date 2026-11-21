@@ -117,28 +117,43 @@ class Line:
 
     async def speak(self):      # 읽어 줄 말을 온 순서대로 회선에 튼다
         r, rid, seen, cut = self.r, self.rid, 0, self.r["cut"]
+
+        async def taken():      # 상담사가 넘겨받았나 → 틀던 소리를 버리고, 회선 소리를 바로 다시 받아쓴다(브라우저 길의 interrupt와 같게)
+            nonlocal cut
+            if r["cut"] == cut:
+                return False
+            cut = r["cut"]
+            await self.clear()
+            self.mute = time.time() + hub.TAIL_MS / 1000
+            return True
+
         while rid in hub.rooms:
-            if r["cut"] > cut:                                    # 상담사가 넘겨받음: 틀던 소리를 버린다
-                cut = r["cut"]
-                await self.clear()
-            for s in hub.says(r, seen):
+            await taken()
+            batch = hub.says(r, seen)
+            for k, s in enumerate(batch):
                 seen = s["n"]
                 try:
                     audio = await asyncio.to_thread(sound, s["text"])
                 except Exception as e:  # noqa: BLE001  못 만들면 그 말은 건너뛴다(화면에는 글이 있다)
                     print(f"070 다리: 음성 합성 실패: {type(e).__name__}")
-                    r["played"] = max(r["played"], s["n"])
-                    continue
-                sec = len(audio) / 8000
-                self.mute = time.time() + sec + hub.TAIL_MS / 1000
-                for i in range(0, len(audio), SEND):
-                    await self.send(audio[i:i + SEND])
-                if self.mark:
-                    await self.mark(s["n"])
-                t0, wait = time.time(), sec + (1.5 if self.mark else 0.2)      # 회선이 알려 주지 않아도 소리 길이만큼만 기다린다
-                while rid in hub.rooms and r["played"] < s["n"] and r["cut"] == cut and time.time() - t0 < wait:
-                    await asyncio.sleep(0.05)
+                    audio = b""
+                gone = await taken()                              # 만드는 동안 넘겨받았으면 이 말부터 틀지 않는다
+                if audio and not gone:
+                    sec = len(audio) / 8000
+                    self.mute = time.time() + sec + hub.TAIL_MS / 1000
+                    for i in range(0, len(audio), SEND):
+                        await self.send(audio[i:i + SEND])
+                    if self.mark:
+                        await self.mark(s["n"])
+                    t0, wait = time.time(), sec + (1.5 if self.mark else 0.2)      # 회선이 알려 주지 않아도 소리 길이만큼만 기다린다
+                    while rid in hub.rooms and r["played"] < s["n"] and r["cut"] == cut and time.time() - t0 < wait:
+                        await asyncio.sleep(0.05)
+                    gone = await taken()                          # 읽는 중에 넘겨받음
                 r["played"] = max(r["played"], s["n"])
+                if gone:                                          # 같이 받은 남은 말은 버린다(브라우저 길의 todo.length = 0)
+                    seen = batch[-1]["n"]
+                    r["played"] = max(r["played"], seen)
+                    break
             await asyncio.sleep(0.1)
         await self.hang()                                         # 상담 화면이 통화를 마쳤다 → 회선을 놓는다
 

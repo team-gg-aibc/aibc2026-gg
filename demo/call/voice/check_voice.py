@@ -382,6 +382,22 @@ def check_line():
             ws.send(json.dumps({"event": "mark", "mark": {"name": mark}}))
             time.sleep(0.3)
             assert call(f"/api/voice/desk?room={room}")["played"] == 1
+            call(f"/api/voice/ask?room={room}", {"text": "넘겨받기 전에 읽던 말"})          # 읽는 중에 상담사가 넘겨받으면: 틀던 소리를 버리고(clear), 같이 받은 남은 말은 틀지 않는다
+            call(f"/api/voice/ask?room={room}", {"text": "넘겨받아 버려질 말"})
+            seen_ev = []
+            while "mark" not in seen_ev:
+                seen_ev.append(json.loads(ws.recv(timeout=5))["event"])
+            call(f"/api/voice/cut?room={room}", {})
+            t0 = time.time()
+            while json.loads(ws.recv(timeout=3))["event"] != "clear":
+                pass
+            assert time.time() - t0 < 1, "넘겨받았는데 틀던 소리를 바로 버리지 않았다"
+            time.sleep(0.5)
+            assert call(f"/api/voice/desk?room={room}")["played"] == 3 and [t for _, t in made] == ["바로 앞에 뭐가 보이세요?", "넘겨받기 전에 읽던 말"], (made, "넘겨받은 뒤 남은 말을 만들었다")
+            call(f"/api/voice/ask?room={room}", {"text": "넘겨받은 뒤의 새 말"})                  # 그 뒤에 온 새 말은 다시 읽는다
+            while json.loads(ws.recv(timeout=5))["event"] != "mark":
+                pass
+            assert made[-1][1] == "넘겨받은 뒤의 새 말"
             ws.send(json.dumps({"event": "stop", "stop": {"callId": "CA1"}}))
             time.sleep(0.3)
             assert code_of(f"/api/voice/desk?room={room}") == 404, "회선이 끊겼는데 방이 남았다"
@@ -399,7 +415,7 @@ def check_line():
     assert ask(CALL_VOICE_LINE="sdk", CALL_VOICE_LINE_ALLOW="010-1234-5678") == ["''", "True", "False", "False"], "받을 번호만 받아야 한다(나라 번호 꼴도 같은 번호로)"
     assert ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_ALLOW="01012345678")[0] != "''" and ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok")[0] != "''", "토큰이나 받을 번호가 없는데 Stream 다리가 뜬다"
     assert ask(CALL_VOICE_LINE="1", CALL_VOICE_LINE_TOKEN="tok", CALL_VOICE_LINE_ALLOW="01012345678")[0] == "''"
-    print("  ✓ 070 다리: 받을 번호(sdk · Stream) · 토큰(Stream)이 없으면 뜨지 않음 · 정해 둔 번호만 받음(숨긴 번호 · 모르는 번호는 거절) · 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
+    print("  ✓ 070 다리: 받을 번호(sdk · Stream) · 토큰(Stream)이 없으면 뜨지 않음 · 정해 둔 번호만 받음(숨긴 번호 · 모르는 번호는 거절) · 토큰이 다르면 안 받음 · 걸면 기다리는 통화 · 회선 소리가 받아쓰기로 · 읽어 줄 말이 전화 소리 꼴(ulaw_8000)로 회선에 · mark로 다 읽음 · 넘겨받으면 바로 clear, 남은 말은 버리고 새 말은 읽음 · 끊으면 방 닫힘 (가짜 회선과)")
 
 
 def check_phone_text():
