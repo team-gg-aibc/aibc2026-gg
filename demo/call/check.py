@@ -315,6 +315,9 @@ def edge_reads():
     assert "청계천관리처" in S.route_of({"type": "litter", "spot": "청계천"}, cgc)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, cgc)["hit"]["to"]
     assert S.understood(S.turn({"id": "check-cgc"}, {"line": {"who": "시민", "text": "청계천 산책로예요, 쓰레기가 잔뜩 버려져 있어요"}})[0])[1]["spot"] == "청계천"
     sub = lambda said: S.understood(S.turn({"id": "check-sub"}, {"line": {"who": "시민", "text": said}})[0])[1]["spot"]      # noqa: E731  지하철 역 안: 시민이 역 안 · 승강장 등을 말했을 때만 운영 기관
+    assert all(sub(x) is None for x in ("어린이보호구역 안에 차가 서 있어요", "버스 승강장에 쓰레기가 많아요", "이 지역 안에 쓰레기가 많아요")), "역 아닌 「…역 안」 · 버스 승강장이 지하철로 감(리뷰 P1)"
+    assert all(sub(x) == "지하철 역사 안" for x in ("역 안이에요, 쓰레기가 많아요", "강남역 안 화장실이 고장났어요", "2호선 승강장에 쓰레기가 많아요"))
+    assert not re.search(r"(?<!\d)(?:0\d{1,2}-\d{3,4}-\d{4}|1\d{3}-\d{4})(?!\d)", (HERE / "data" / "routes.json").read_text(encoding="utf-8")), "넘길 곳 표에 전화번호(리뷰 P1)"
     assert sub("잠실역 안에 쓰레기가 많아요") == "지하철 역사 안" and sub("잠실역 1번 출구 앞에 쓰레기가 많아요") is None and "서울교통공사" in S.route_of({"type": "litter", "spot": "지하철 역사 안"}, olp)["hit"]["to"]
 
     def read(said, asked=None):

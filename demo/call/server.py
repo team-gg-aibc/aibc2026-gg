@@ -49,7 +49,15 @@ TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
 PARK_TO = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("park_to", {})
-SPOTS = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("spots", {})      # 한 기관이 그 자리의 일을 받는 곳(올림픽공원 = 국민체육진흥공단 등, 11-21)      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
+SPOTS = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("spots", {})
+STATION_IN = re.compile(r"([가-힣0-9]*)역\s*(?:안(?:에|이|인데|\s|$)|승강장|대합실)")
+
+
+def in_station(said):
+    """「강남역 안」 · 「역 안이에요」 · 「잠실역 승강장」: 「○○역」이 지명 표의 역이거나 「역」 홀로일 때만. 「어린이보호구역 안」 · 「이 지역 안」은 아님(리뷰 P1, 11-21)."""
+    if not hasattr(in_station, "names"):
+        in_station.names = {G.name[i] for i in range(G.shop0) if G.kind[i] == "역"}
+    return any(m.group(1) in ("", "지하철", "전철") or m.group(1) + "역" in in_station.names for m in STATION_IN.finditer(said))      # 한 기관이 그 자리의 일을 받는 곳(올림픽공원 = 국민체육진흥공단 등, 11-21)      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
 UNKNOWN = "확인 불가"
 G = L.G
 lock = threading.Lock()
@@ -1451,7 +1459,7 @@ def understood(st):
         matter["type"] = "stray" if matter["alive"] else "carcass"        # 동물의 일은 살았는지로 갈린다
     if matter.get("type") is None and matter.get("told") and not matter.get("animal"):
         matter["type"] = "other"                          # 분류에 없는 일이라도 말했으면 「그 밖의 일」로 받고 위치로 넘어간다(「어떤 일로」를 다시 묻지 않는다, 11-15 동규)
-    matter["spot"] = next((k for k, v in SPOTS.items() if v.get("said") and any(re.search(v["said"], t.get("said") or "") for t in st["turns"])), None)      # 시민이 그 자리를 말했나(「청계천 산책로예요」, 11-21 spots)
+    matter["spot"] = next((k for k, v in SPOTS.items() if any((v.get("said") and re.search(v["said"], t.get("said") or "")) or (v.get("station") and in_station(t.get("said") or "")) for t in st["turns"])), None)      # 시민이 그 자리를 말했나(「청계천 산책로예요」, 11-21 spots)
     matter["ask_lamp"] = tab("이렇게 물어보세요").get("가로등 번호 묻기") == "켬"      # 자동차전용도로의 일은 끝에 가로등 기둥 번호를 묻는다(문구 파일 한 줄로 끈다)
     matter["by_place"] = bool(matter.get("type")) and any("class" in r for r in TYPES[matter["type"]]["routes"])       # 공원 안팎으로 넘길 곳이 갈리는 일인가
     matter["animal_matter"] = bool(matter.get("animal") or (matter.get("type") and TYPES[matter["type"]].get("animal")))
