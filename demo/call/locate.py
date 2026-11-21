@@ -838,12 +838,14 @@ def infer(clues):
         mass = np.bincount(part, weights=w[cred])
         top = int(mass.argmax())
         if len(mass) > 1 and mass[top] >= BLOB_SHARE * float(w.sum()):
-            cred = cred[part == top]
-            cw = w[cred] / w[cred].sum()
-            cx, cy = float((x[cred] * cw).sum()), float((y[cred] * cw).sum())
-            half = math.hypot(x[cred].max() - x[cred].min(), y[cred].max() - y[cred].min()) / 2
-            radius = max(math.sqrt(float(cell[cred].sum()) / math.pi), 0.6 * half, STEP / 2)
-            r_cover = float(np.hypot(x[cred] - cx, y[cred] - cy).max())
+            c1 = cred[part == top]
+            cw = w[c1] / w[c1].sum()
+            m1 = float((x[c1] * cw).sum()), float((y[c1] * cw).sum())
+            half = math.hypot(x[c1].max() - x[c1].min(), y[c1].max() - y[c1].min()) / 2
+            r1 = max(math.sqrt(float(cell[c1].sum()) / math.pi), 0.6 * half, STEP / 2)
+            if r1 <= DONE_M:                              # 그 덩어리로 끝낼 수 있을 때만(넓은 덩어리로 좁히면 가상 600통 「네」로 기우는 시민에서 틀린 확정이 늘었다: 93번 다음 방향)
+                cred, (cx, cy), radius = c1, m1, r1
+                r_cover = float(np.hypot(x[cred] - cx, y[cred] - cy).max())
     R = {"keys": base, "x": x, "y": y, "w": w, "order": order, "cred": cred, "cx": cx, "cy": cy, "r": radius, "r_cover": max(r_cover, radius), "has_past": any(c["t"] == "past" for c in clues), "trust": trust, "elsewhere": elsewhere, "ctx": ctx, "on_road": on_road, "pk": pk, "heard_only": heard_only, "alike": alike}
     if ON & {"ringdone", "rimask", "rimline"}:                       # (75번) 범위를 받치는 단서 가운데 「둘레」로 읽은 곳(호수 테두리 · 구역의 테두리 띠)의 이름. 다른 단서와 어긋나 버려진 것(믿음 0.35 아래)은 뺀다
         ring_k = next((c["k"] for n, c in enumerate(clues) if trust.get(n, 1.0) >= 0.35 and "k" in c and (c["t"] == "rim" or (
@@ -864,7 +866,7 @@ def infer(clues):
     return R
 
 
-BLOB_LINK, BLOB_SHARE = 60.0, 0.85     # (mainblob) 이 칸(m)으로 묶어 이웃 칸끼리 이은 것이 한 덩어리 · 범위를 그 덩어리로 좁히는 몫(전체 가능성 가운데)
+BLOB_LINK, BLOB_SHARE = 60.0, 0.85     # (mainblob) 이 칸(m)으로 묶어 이웃 칸끼리 이은 것이 한 덩어리 · 범위를 그 덩어리로 좁히는 몫(전체 가능성 가운데. 90% 범위 안에서는 94%). 좁힌 덩어리가 DONE_M 안일 때만
 
 
 def _blobs(x, y):
