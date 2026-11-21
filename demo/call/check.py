@@ -309,6 +309,10 @@ def edge_reads():
     x, y = S.gaz.xy(127.1215, 37.5206)      # 올림픽공원 안(11-21 spots): 노점은 국민체육진흥공단, 유기 동물은 그대로 송파구청
     olp = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
     assert "국민체육진흥공단" in S.route_of({"type": "vendor"}, olp)["hit"]["to"] and "송파구청 동물보호" in S.route_of({"type": "stray"}, olp)["hit"]["to"]
+    x, y = S.gaz.xy(126.9850, 37.5690)      # 청계천 광교 둘레: 시민이 「청계천 산책로」라고 했을 때만 서울시설공단 청계천관리처, 길(청계천로)은 그대로 구청
+    cgc = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert "청계천관리처" in S.route_of({"type": "litter", "spot": "청계천"}, cgc)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, cgc)["hit"]["to"]
+    assert S.understood(S.turn({"id": "check-cgc"}, {"line": {"who": "시민", "text": "청계천 산책로예요, 쓰레기가 잔뜩 버려져 있어요"}})[0])[1]["spot"] == "청계천"
 
     def read(said, asked=None):
         short = S.shortlist(said, None, (asked or {}).get("id"))

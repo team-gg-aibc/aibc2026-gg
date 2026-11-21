@@ -1350,6 +1350,7 @@ def understood(st):
         matter["type"] = "stray" if matter["alive"] else "carcass"        # 동물의 일은 살았는지로 갈린다
     if matter.get("type") is None and matter.get("told") and not matter.get("animal"):
         matter["type"] = "other"                          # 분류에 없는 일이라도 말했으면 「그 밖의 일」로 받고 위치로 넘어간다(「어떤 일로」를 다시 묻지 않는다, 11-15 동규)
+    matter["spot"] = next((k for k, v in SPOTS.items() if v.get("said") and any(re.search(v["said"], t.get("said") or "") for t in st["turns"])), None)      # 시민이 그 자리를 말했나(「청계천 산책로예요」, 11-21 spots)
     matter["ask_lamp"] = tab("이렇게 물어보세요").get("가로등 번호 묻기") == "켬"      # 자동차전용도로의 일은 끝에 가로등 기둥 번호를 묻는다(문구 파일 한 줄로 끈다)
     matter["by_place"] = bool(matter.get("type")) and any("class" in r for r in TYPES[matter["type"]]["routes"])       # 공원 안팎으로 넘길 곳이 갈리는 일인가
     matter["animal_matter"] = bool(matter.get("animal") or (matter.get("type") and TYPES[matter["type"]].get("animal")))
@@ -1397,7 +1398,7 @@ def route_of(matter, R):
             if len({x["to"] for x in rows}) == 1:
                 rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
             fate += rows
-    spot = next((v for k, v in SPOTS.items() if cname and cname.startswith(k)), None)
+    spot = next((v for k, v in SPOTS.items() if (k == matter.get("spot") or (cname and cname.startswith(tuple(v.get("names", [k]))))) and gu in v.get("gu", [gu])), None)
     if spot and matter["type"] not in spot["keep"]:
         hit, others, fate = dict(hit, to=spot["to"], note=spot["note"], basis="확인"), [], []      # 넘길 곳만 그 기관으로(조례 6종 안팎은 자리 줄 그대로). 다른 자리 표는 그 기관과 어긋나 보이지 않게 뺀다
     scope = hit.get("scope", t["scope"])
