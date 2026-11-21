@@ -55,6 +55,19 @@
 
   // ---- 읽어 주기: 미리 만든 파일(서버 web/voice/tts/) → 기기에 든 읽어 주기(CALL_VOICE_TTS=browser일 때만) → 소리 없이 글 길이만큼 기다림
   const player = new Audio();
+  let unlocked = false, readyCtx = null, liveCtx = null, liveSrc = null;      // liveCtx: 지금 마이크가 쓰는 소리 길. 스위치를 켠 판은 AI 목소리도 이 길로 튼다(아이폰은 다른 재생기가 소리를 내면 마이크 쪽을 멈춘다)
+  const hush = () => { player.pause(); if (liveSrc) { try { liveSrc.stop(); } catch { /* 이미 끝남 */ } } };      // readyCtx: 누른 자리에서 미리 만든 마이크용 소리 길(아이폰은 누르지 않고 만든 것을 멈춰 둔다)
+  // 누른 자리에서 소리 길을 미리 연다(CALL_VOICE_UNLOCK=1): 아이폰은 사람이 누른 재생만 허락하니, 누를 때 같은 재생기로 아주 짧은 조용한 소리를 한 번 틀어 둔다
+  function unlock(info) {
+    if (!info.unlock || QUIET) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC && !readyCtx) { try { readyCtx = new AC(); readyCtx.resume().catch(() => {}); } catch { readyCtx = null; } }
+    if (unlocked) return;
+    const b = new Uint8Array(44 + 800), v = new DataView(b.buffer), w = (at, s) => { for (let i = 0; i < s.length; i++) b[at + i] = s.charCodeAt(i); };      // 8kHz 16비트 한 줄기 0.05초, 모두 0
+    w(0, 'RIFF'); v.setUint32(4, 36 + 800, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, 800, true);
+    player.src = URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+    player.play().then(() => { unlocked = true; }).catch(() => {});
+  }
   let interrupt = () => {};      // 넘겨받기: 지금 읽는 말을 그 자리에서 끝낸다
   function speakOut(text, info) { return new Promise((done) => { interrupt = done; speakOn(text, info).then(done); }); }
   async function speakOn(text, info) {
@@ -62,9 +75,17 @@
     if (QUIET) return sleep(quietMs);
     try {
       const r = await fetch('/api/voice/say?text=' + encodeURIComponent(text));
+      if (r.ok && info.unlock && liveCtx) {      // 마이크와 같은 소리 길로 튼다
+        const ctx = liveCtx, buf = await ctx.decodeAudioData(await r.arrayBuffer());
+        if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+        await new Promise((done) => { const src = ctx.createBufferSource(); liveSrc = src; src.buffer = buf; src.connect(ctx.destination); src.onended = done; src.start(); setTimeout(done, buf.duration * 1000 + 1500); });
+        liveSrc = null;
+        if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+        return;
+      }
       if (r.ok) {
         player.src = URL.createObjectURL(await r.blob());
-        return await new Promise((done) => { player.onended = player.onerror = done; player.play().catch(done); });
+        return await new Promise((done) => { player.onended = player.onerror = done; player.play().catch(() => { if (info.unlock) { console.warn('voice: 재생이 막힘'); sleep(quietMs).then(done); } else done(); }); });      // 막히면: 스위치를 켠 판은 글 길이만큼 기다린다(읽을 틈)
       }
     } catch { /* 파일이 없으면 다음 길로 */ }
     if (info.tts === 'browser' && window.speechSynthesis) {
@@ -91,18 +112,20 @@
 
   // ---- 소리 쪽: 마이크 → 서버, 읽어 줄 말 → 스피커. 상담 화면이 받기 전과 읽어 주는 동안에는 마이크 소리를 0으로 보낸다(연결음 · 제 목소리를 받아쓰지 않게, 줄은 살아 있게)
   function Caller(room, info, on) {
-    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false, tape = null, tape0 = 0, sent = 0, cut = 0;      // tape: 마이크 대신 보낼 소리(16kHz)
+    let ctx = null, stream = null, chunks = [], alive = true, seen = 0, played = 0, picked = false, speaking = false, tail = 0, tape = null, tape0 = 0, sent = 0, cut = 0;      // tape: 마이크 대신 보낼 소리(16kHz)
     const me = { hold: false }, todo = [];
     async function mic() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx = readyCtx || new (window.AudioContext || window.webkitAudioContext)(); readyCtx = null;
+      if (info.unlock && ctx.state === 'suspended') await ctx.resume().catch(() => {});      // 멈춰 있으면 소리 토막이 하나도 오지 않는다(아이폰)
       const node = ctx.createScriptProcessor(4096, 1, 1);      // ponytail: 낡은 길(ScriptProcessor)이지만 파일 하나로 어디서나 돈다. 소리가 끊기면 AudioWorklet으로
       node.onaudioprocess = (e) => {
         const f = e.inputBuffer.getChannelData(0), o = new Int16Array(f.length);
-        if (picked && !speaking && !me.hold) for (let i = 0; i < f.length; i++) o[i] = Math.max(-1, Math.min(1, f[i])) * 32767;
+        if (picked && !speaking && !me.hold && performance.now() >= tail) for (let i = 0; i < f.length; i++) o[i] = Math.max(-1, Math.min(1, f[i])) * 32767;
         chunks.push(o);
       };
       ctx.createMediaStreamSource(stream).connect(node); node.connect(ctx.destination);      // 나가는 소리는 0이다(이어야 onaudioprocess가 돈다)
+      liveCtx = ctx;
       return ctx.sampleRate;      // 기기의 표본화 주파수를 그대로 알린다(서버가 맞춘다)
     }
     async function loop() {
@@ -122,7 +145,7 @@
           if (warned) on('steady');
           bad = 0; k = 0; warned = false; me.busy = d.busy;
           if (d.picked && !picked) { picked = true; on('picked'); }
-          if (d.cut > cut) { cut = d.cut; todo.length = 0; player.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); interrupt(); }      // 상담사가 넘겨받음: 읽던 말 · 남은 말을 버린다
+          if (d.cut > cut) { cut = d.cut; todo.length = 0; hush(); if (window.speechSynthesis) speechSynthesis.cancel(); interrupt(); }      // 상담사가 넘겨받음: 읽던 말 · 남은 말을 버린다
           for (const s of d.says) { seen = s.n; todo.push(s); }
           if (d.down) on('down');
         } catch (e) {
@@ -140,13 +163,15 @@
       while (alive) {
         const s = todo.shift();
         if (!s) { await sleep(80); continue; }
-        if (info.direct) { on('speak', s.text); played = s.n; on('listen', s.text); continue; }      // 직접 통화(배포 판): 읽어 주지 않고 글로만 바로 보인다
+        if (info.direct && !info.speak_direct) { on('speak', s.text); played = s.n; on('listen', s.text); continue; }      // 직접 통화(배포 판): 읽어 주지 않고 글로만 바로 보인다(CALL_VOICE_SPEAK_DIRECT=1이면 아래로 내려가 읽는다)
         speaking = true; on('speak', s.text);
         await speakOut(s.text, info);
+        if (info.tail_ms) tail = performance.now() + info.tail_ms;      // 다 읽은 뒤 잠깐 더 마이크를 막는다(스피커 울림)
+        if (info.unlock && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});      // 읽는 동안 멈췄으면 깨운다(아이폰)
         speaking = false; played = s.n; on('listen', s.text);
       }
     }
-    function stop() { alive = false; if (stream) stream.getTracks().forEach((t) => t.stop()); if (ctx) ctx.close().catch(() => {}); }
+    function stop() { alive = false; if (stream) stream.getTracks().forEach((t) => t.stop()); if (ctx) { if (liveCtx === ctx) liveCtx = null; ctx.close().catch(() => {}); } }
     return Object.assign(me, {
       async start(useMic, useTape, textOnly) {
         let rate = 16000;
@@ -193,6 +218,7 @@
     function over(line) { quietRing(); clearInterval(tick); clearTimeout(nopick); c = null; shaking = false; set('over', `${line || T.over}${t0 ? ' · ' + mmss(Date.now() - t0) : ''}`); t0 = 0; $('d-form').hidden = true; $('d-left').hidden = true; $('d-mic').hidden = true; if (info.direct) room = ''; requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; }); }      // 끝나면 위 그림이 다시 커져 마지막 말이 밀리니 한 번 더 내린다
     btn.onclick = async () => {
       if (c) { const x = c; c = null; x.hangup(); return over(); }
+      unlock(info);      // 누른 자리에서(첫 기다림 앞에서) 불러야 한다
       log.innerHTML = ''; $('d-said').textContent = '';
       if (!room) { try { room = (await vapi('room', { from: 'phone' })).room; } catch (e) { return set('over', failText(e)); } }      // 직접 통화: 상담 화면이 와서 받는다
       const mine = c = Caller(room, info, (s, text) => {
@@ -213,7 +239,7 @@
       const v = $('d-text').value.trim();
       if (v && c) { const li = bubble('me', v); c.text(v).catch(() => { li.classList.add('fail'); li.insertAdjacentHTML('beforeend', `<i>${esc(T.notsent)}</i>`); }); $('d-text').value = ''; redraw(); }
     };
-    $('d-mic').onclick = async () => { if (!c) return; try { await c.enableMic(); $('d-mic').disabled = true; } catch { $('d-said').textContent = T.nomic; } };
+    $('d-mic').onclick = async () => { if (!c) return; unlock(info); try { await c.enableMic(); $('d-mic').disabled = true; } catch { $('d-said').textContent = T.nomic; } };
     btn.disabled = !room && !info.direct;
   }
 
@@ -380,7 +406,7 @@
     };
     document.addEventListener('keydown', hold(true)); document.addEventListener('keyup', hold(false));
     Object.assign(window.VOICE, { st, start, hang, pickup, takeover, approve() { st.approved = true; emit(); },
-      relay(text) { if (st.alive && st.room) { const room = st.room; st.relayQ = (st.relayQ || Promise.resolve()).then(() => again(() => vapi(`ask?room=${room}`, { text }))).catch(() => {}); } } });      // 차례를 지켜 하나씩(망이 끊기면 다시)      // 화면 요소 · 점검이 쓰는 자리(56번 13절). relay = 상담사 말을 휴대폰 화면에 글로 넘긴다(직접 통화)
+      relay(text) { if (st.alive && st.room) { const room = st.room; let names = []; try { names = terms(); } catch { /* 지명을 못 모아도 말은 넘긴다 */ } st.relayQ = (st.relayQ || Promise.resolve()).then(() => again(() => vapi(`ask?room=${room}`, { text, terms: names }))).catch(() => {}); } } });      // 차례를 지켜 하나씩(망이 끊기면 다시)      // 화면 요소 · 점검이 쓰는 자리(56번 13절). relay = 상담사 말을 휴대폰 화면에 글로 넘긴다(직접 통화)
     Object.defineProperty(window.VOICE, 'ask', { get: () => st.ask, configurable: true });      // 지금 질문을 누가 말하나(넘겨받으면 agent)
     draw();
     if (window.DIRECT) watch();
