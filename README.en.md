@@ -3,23 +3,23 @@
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
-<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from a version whose scene and screen code are the same as main 13a9fb3 (#151 merged, with the step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
-<p align="center">
-  <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="100%">
-  <br>
-  <sub>The agent screen during a call (in Korean). It replays a made-up call the team wrote, in "saved answers" mode (see <a href="#how-one-call-goes">How one call goes</a>).</sub>
-</p>
-
 | Ordinance engine score (out of 100) | Calls narrowed to one point | Calls fixed at a wrong place | Handoff offices confirmed in official guidance |
 | :---: | :---: | :---: | :---: |
 | **93.1** | **70.2%** | **0** / 600 calls | **24** / 30 rows |
 
-<p align="center"><sub>Engine: average of 12 runs on 174 questions never used in development (the team's own measurement, not the contest's scoring). Location: 600 simulated calls where the caller answers what they see. Results under other conditions are in <a href="#measurements">Measurements</a>.</sub></p>
+<p align="center"><sub>Engine: average of 12 runs on 174 questions never used in development (the team's own measurement, not the contest's scoring). Location: 600 simulated calls where the caller answers what they see. Results under other conditions are in <a href="#measurements">Measurements</a>.</sub><br>
+<b>Try it</b> — the address of the demo screen for judges is in the LMS submission. To run it on your own computer without an API key, see <a href="#getting-started">Getting started</a>.</p>
+
+<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from a version whose scene and screen code are the same as main 13a9fb3 (#151 merged, with the step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
+<p align="center">
+  <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="92%">
+  <br>
+  <sub>The agent screen during a call (in Korean). It replays a made-up call the team wrote, in "saved answers" mode (see <a href="#how-one-call-goes">How one call goes</a>).</sub>
+</p>
 
 <p align="center">General complaint lines such as 120 cannot get the caller's location, so the call agent hears the place in words. This screen reads location clues from what the caller says, shrinks the area on the map, and shows one next question to ask. When the place is fixed, the intake card gets the lot number and the office in charge, and if the case falls under one of the six Seoul ordinances, the screen adds an answer based on the ordinance.</p>
 
 <p align="center">
-  <b>Try it</b> — the address of the demo screen for judges is in the LMS submission. To run it on your own computer without an API key, follow <a href="#getting-started">Getting started</a>.<br>
   This is Team GG's repository for the Upstage track, "Public law Q&A AI with Upstage AI Studio", of the 2026 AI Bootcamp Competition. It holds the <b>ordinance Q&A engine</b> (<code>engine/</code>, the API the contest scores) and the <b>demo screen</b> built on it (<code>demo/call/</code>).
 </p>
 
