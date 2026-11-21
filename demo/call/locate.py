@@ -1169,7 +1169,7 @@ def _cross_pick(R, clues):
     if a is None or b is None:
         return None
     pa, pb = [round(float(G.x[a]), 1), round(float(G.y[a]), 1)], [round(float(G.x[b]), 1), round(float(G.y[b]), 1)]
-    opt = lambda i, p, o, v: {"label": G.name[i], "set": {"clues": [{"t": "closest", "p": p, "others": [o], "s": round(1.5 * R["r"], 1), "sure": True, "via": "cross", "label": f"{G.name[i]}이 더 가까움"}],      # noqa: E731
+    opt = lambda i, p, o, v: {"label": G.name[i], "set": {"clues": [{"t": "closest", "p": p, "others": [o], "s": round(1.5 * R["r"], 1), "sure": True, "via": "cross", "near": G.name[i], "label": G.name[i]}],      # noqa: E731  label은 server가 문구 파일(위치 범위 「더 가까움」)로 채운다
                                                           "matter": {"cross": v, "cross_name": G.name[i] if v == "ok" else None}}}
     return {"id": "closest", "bits": None, "cross": "pick", "options": [opt(a, pa, pb, "ok"), opt(b, pb, pa, "switch")]}
 
@@ -1208,7 +1208,7 @@ def _cross(R, clues, asked):
     why = [t for t, ok in (("여러 곳", many), ("흔들림", shaky), ("갈라짐", split)) if ok]
     if not why:
         return None, []
-    return (anc or {}).get("name") or _hinge(R, clues) or "이 자리", why
+    return (anc or {}).get("name") or _hinge(R, clues), why      # 기준 이름이 없으면 None — 질문 글은 server가 문구 파일(cross_noname)로
 
 
 def _far_same(anc):
@@ -1284,8 +1284,9 @@ def questions(R, clues, matter, asked=(), same=None):
                 last = dict(confirm, name=matter.get("cross_name")) if "crossname" in ON else confirm      # 맞음: 핀은 그대로. crossname이면 그 이름까지 되말한다(confirm_named — 그 이름이 보여서 「네」가 나오기 쉬워 따로 잰다)
             else:
                 h, why = _cross(R, clues, asked)
-                if h:
-                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "cross_why": why, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+                if why:
+                    prior = sorted({gaz.norm((c.get("label") or c.get("k") or "").split(" → ")[0]) for c in clues if c.get("label") or c.get("k")} - {""})      # 이미 받은 이름: 교차 확인의 답에서 건너뛴다
+                    last = (_cross_pick(R, clues) if "crosspick" in ON else None) or {"id": "check", "bits": None, "name": h, "cross": True, "wide": _cross_wide(R, clues), "cross_why": why, "prior": prior, "options": [{"word": "잘 모르겠음", "set": {"clues": []}}]}
         elif check2 and not named:
             since_ = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)
             if not any((a or "").rstrip("!") == "check" for a in list(asked)[since_ + 1:]):

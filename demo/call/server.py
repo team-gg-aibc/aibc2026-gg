@@ -712,7 +712,11 @@ def code_read(said, asked, short, R):
     elif q.get("id") == "check" and q.get("cross") and R is not None:      # (cross, 99번 4-5절) 교차 확인의 답: 확정 전의 넓은 범위(90%, 남은 덩어리 포함) 안에서만 찾아 맞음 · 어긋남 · 답 없음
         read["clues"], verdict, name = [], "none", None
         wcx, wcy, wr = q.get("wide") or [R["cx"], R["cy"], 600.0]      # 지금 가운데 둘레(locate._cross_wide)
+        anc_n, prior = gaz.norm(q.get("anchor") or ""), set(q.get("prior") or ())
         for m in short:
+            nm = gaz.norm(m.get("name") or "")
+            if m.get("key") in prior or nm in prior or (anc_n and nm and (nm in anc_n or anc_n in nm)):
+                continue                                  # 질문의 「{표지} 말고」 표지 · 이미 받은 이름을 되받아 말한 것: 다음 이름을 본다(#161 리뷰)
             if "key" in m:
                 r = L.resolve(m["key"])
                 pts = [(float(a), float(b)) for a, b in zip(r["x"], r["y"]) if math.hypot(float(a) - wcx, float(b) - wcy) <= wr]
@@ -1979,6 +1983,13 @@ def build(st, extra=None):
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
     if pick.get("cross"):
         question["cross"], question["wide"], question["cross_why"] = pick["cross"], pick.get("wide"), pick.get("cross_why")      # (cross) 교차 확인(True) · 둘 중 가르기("pick") · 켜진 까닭(계측용 낱말 — 화면의 「까닭」은 문구 파일 그대로)
+        question["anchor"], question["prior"] = pick.get("name"), pick.get("prior")      # 답 읽기가 건너뛸 이름
+        if pick["cross"] is True and not pick.get("name"):
+            question["say"] = Q["cross_noname"]           # 기준 이름이 없는 교차 확인(흔들림 · 갈라짐만으로 켜짐): 「{표지} 말고」 없이 묻는다
+        for o in pick["options"]:
+            for c in (o.get("set") or {}).get("clues") or []:
+                if c.get("near"):
+                    c["label"] = fill(tab("위치 범위")["더 가까움"], 이름=c["near"])      # (crosspick) 고른 보기 단서의 이름표
         question["why"] = why.get("cross_pick" if pick["cross"] == "pick" else "cross", question["why"])      # 화면의 「까닭」: 문구 파일 A-05 「이렇게 물어보세요」의 cross · cross_pick 줄
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
@@ -2166,6 +2177,7 @@ def turn(st, ev):
                         code_ = last.get("code") or {}
                         read["clues"] = list(code_.get("clues") or [])
                         read["confirm"] = code_.get("confirm")
+                        read["drop"] = list(code_.get("drop") or [])
                         read.setdefault("matter", {}).update({k: v for k, v in (code_.get("matter") or {}).items() if k in ("cross", "cross_name")})
                 if "yesno" in L.ON and asked.get("id") == "confirm" and not any(c.get("partyes") for c in read["clues"]):
                     read["confirm"] = _confirm_pair((last.get("code") or {}).get("confirm"), read.get("confirm"))      # (yesno, 81번) 「네? 뭐라고요?」(코드 예 · Solar 없음) · 「그쪽 말고 반대쪽」(Solar 예)이 확정되던 것
@@ -2192,6 +2204,8 @@ def turn(st, ev):
             bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
+            if (asked or {}).get("cross") is True:
+                read["drop"] = []                         # (cross) 「○○ 말고 △△ 보여요」의 「말고」는 답에서 기준 이름을 빼는 말이지 앞서 받은 단서를 거두는 말이 아니다(#161 리뷰)
             if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
                 _partyes_undo(read, bare)     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
@@ -2261,7 +2275,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide"), "cross_why": q.get("cross_why")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide"), "cross_why": q.get("cross_why"), "anchor": q.get("anchor"), "prior": q.get("prior")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 
