@@ -517,18 +517,25 @@ def again_words():
             st, _ = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
         return out
 
-    new = call()
+    follow = [x for x in S.L.FOLLOW_ON.split(",") if x in S.L.ON]      # (93번) 시민이 한 말을 따라가면 이 통화는 간판 질문을 되풀이하지 않는다: 이 장면은 main 흐름(되풀이)의 말 바꾸기만 본다
+    S.L.ON.difference_update(follow)
+    try:
+        new = call()
+    finally:
+        S.L.ON.update(follow)
     assert new[1][0] == new[2][0] == "mark", new
     if "againwords" in S.L.OFF:
         assert new[2][1] == new[1][1], new
     else:
         assert new[2][1].startswith("네, CU와 신한은행이요.") and new[2][1] != new[1][1] and all(len(x) <= 60 for x in new[2][1].split(". ")), new[2][1]
         S.L.OFF.add("againwords")
+        S.L.ON.difference_update(follow)
         try:
             old = call()
             assert [q for q, _ in old] == [q for q, _ in new] and old[2][1] == old[1][1], old     # 끄면 옛 말 그대로, 질문 종류는 같음
         finally:
             S.L.OFF.discard("againwords")
+            S.L.ON.update(follow)
     print("  ✓ 같은 질문 다른 말: 둘째 간판 질문은 「네, CU와 신한은행이요. …」(질문 종류 · 차례는 그대로)" + (" — 꺼짐(옛 말)" if "againwords" in S.L.OFF else ""))
 
 
@@ -981,8 +988,11 @@ def pair_seen():
             st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
             if view["question"]:
                 st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        last["st"] = st
         return view
+    last = {}
     v = run("장한평역")
+    assert S._heard(last["st"]) == ["CU", "신한은행"], S._heard(last["st"])      # 받아 주는 말은 시민이 댄 이름 그대로(pairseen이 범위에서 뺀 「신한은행」도)
     x0, y0 = S.gaz.xy(*S.gaz.lonlat(*S.L.resolve("장한평역")["x"][:1], *S.L.resolve("장한평역")["y"][:1]))
     cx, cy = S.gaz.xy(*v["center"])
     moved = math.hypot(float(cx) - float(x0), float(cy) - float(y0))
@@ -999,6 +1009,57 @@ def pair_seen():
     S._pair_seen("GS25 종로창덕궁 근처예요", one, [{"key": "gs25", "said": "gs25", "name": "GS25"}, {"key": "창덕궁", "said": "창덕궁", "name": "창덕궁"}], [{"t": "at", "k": "안국역"}])
     assert len(one["clues"]) == 2 and "skip" not in one, one
     print(f"  ✓ 보기 밖의 이름 둘을 함께 댄 말(pairseen {on}): 장한평역 {v['radius']}m(가운데 {moved:.0f}m 옮김) · 마들역 {m['radius']}m {[c for c in m['chips'] if '옆' in c]}")
+
+
+def main_blob():
+    """(mainblob, 93번 다음 방향) 동규 장한평역 통화(11-21)의 마지막 단서 그대로: 우리은행 바로 앞 · 가장 가까운 역 장한평역 · CU 가까이 · 신한은행 가까이.
+    가능성 89%가 실제 자리(장한평역(중) 정류장) 52m 안 한 덩어리인데, 끄면 543m 밖 4% 덩어리까지 덮어 범위가 넓게 남는다(같은 간판 질문). 켜면 그 덩어리로 좁혀 끝낸다.
+    덩어리가 하나뿐(우리은행 · 장한평역 둘만)일 때는 켜도 그대로다."""
+    import math
+    sys.path.insert(0, str(HERE))
+    import locate as L
+    tx, ty = 5931.0, 1238.0                               # 장한평역(중) 정류장(그 통화의 확정 자리)
+    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True}, {"t": "at", "k": "장한평역", "nearest": True}, {"t": "at", "k": "cu", "how": "가까이"}, {"t": "at", "k": "신한은행", "how": "가까이"}]
+    R2, R4 = L.infer(cl[:2]), L.infer(cl)
+    if "mainblob" in L.ON:
+        assert L.is_done(R4) and R4["r"] <= 50 and math.hypot(R4["cx"] - tx, R4["cy"] - ty) <= 80, (R4["r"], R4["cx"], R4["cy"])
+    else:
+        assert not L.is_done(R4) and L.size_of(R4)["m"] > 300, (R4["r"], R4["r_cover"])
+    assert not L.is_done(R2) and R2["r"] > 150, R2["r"]
+    print(f"  ✓ 가능성이 한 덩어리에 몰린 범위(mainblob {'mainblob' in L.ON}): 동규 장한평역 통화 마지막 차례 반지름 {R4['r']:.0f}m · 화면 {L.size_of(R4)['m']}m · 가운데가 확정 자리에서 {math.hypot(R4['cx'] - tx, R4['cy'] - ty):.0f}m")
+
+
+def follow_said():
+    """(saidanchor · nhalias, 93번) 시민이 한 말을 따라가기. 동규 장한평역 통화 마지막 단서(main_blob과 같음)로 좁힌 범위의 확정 기준:
+    켜면 보기 밖에서 댄 「CU」의 가장 가까운 지점(「CU 장한평2호점」, 26m), 끄면 지점이 많은 상표는 기준 후보에서 빠져 다른 곳. 「농협 앞이요」 · 「농협은행 앞이요」는 켜면 NH농협은행 지점으로 읽는다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True, "label": "우리은행"}, {"t": "at", "k": "장한평역", "nearest": True, "label": "장한평역"}, {"t": "at", "k": "cu", "how": "가까이", "label": "C U", "offopt": True}]      # offopt: 내민 보기 밖에서 댄 이름(server.understood가 붙임)
+    R = L.infer(cl)
+    anc = (L.anchor(R, cl) or {}).get("name", "")
+    if {"saidanchor", "mainblob"} <= L.ON:
+        assert anc.startswith("CU "), anc
+    nh = {}
+    for said in ("농협 앞이요", "농협은행 앞이요"):
+        short = S.shortlist(said, None)
+        nh[said] = [c.get("label") for c in S.code_read(said, None, short, None)["clues"] if c.get("t") == "at"]
+        if "nhalias" in L.ON:
+            assert nh[said] and len(L.resolve(S.gaz.norm(said.split()[0]))["x"]) == len(L.resolve(S.gaz.norm("NH농협은행"))["x"]), (said, nh[said])
+        else:
+            assert not nh[said], (said, nh[said])
+    here = [{"t": "at", "k": "장한평역", "label": "장한평역"}]        # (saidin) 장한평역 둘레(범위 1.5배)에 지명 자료의 신한은행 0곳 · CU 여럿
+    far = {"clues": [{"t": "at", "k": "신한은행", "label": "신한은행", "how": "바로"}]}
+    S._said_in(far, here)
+    assert not far["clues"] and far["said_only"] == ["신한은행"] and "신한은행" in far["skip"], far      # 범위를 끌지 않게 빼고, 받아 주는 말에는 남긴다
+    near = {"clues": [{"t": "at", "k": "cu", "label": "C U", "how": "바로"}]}
+    S._said_in(near, here)
+    assert len(near["clues"]) == 1 and "said_only" not in near, near                                   # 둘레에 있는 이름은 그대로
+    one = {"clues": [{"t": "at", "k": "강남역", "label": "강남역"}]}
+    S._said_in(one, here)
+    assert len(one["clues"]) == 1, one                                                                 # 한 곳뿐인 이름은 멀어도 둔다(범위가 틀렸다는 말일 수 있다)
+    print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']} · 둘레에 없는 여러 지점 상표는 범위를 끌지 않음(saidin)")
 
 
 def main():
@@ -1044,6 +1105,8 @@ def main():
         bridge_end()
         reread_guards()
         seen_wide()
+        main_blob()
+        follow_said()
         edge_reads()
         ask_fixes()
         chain_said()
