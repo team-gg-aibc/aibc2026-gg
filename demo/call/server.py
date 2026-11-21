@@ -48,7 +48,8 @@ KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대�
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
-PARK_TO = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("park_to", {})      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
+PARK_TO = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("park_to", {})
+SPOTS = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("spots", {})      # 한 기관이 그 자리의 일을 받는 곳(올림픽공원 = 국민체육진흥공단 등, 11-21)      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
 UNKNOWN = "확인 불가"
 G = L.G
 lock = threading.Lock()
@@ -1396,6 +1397,9 @@ def route_of(matter, R):
             if len({x["to"] for x in rows}) == 1:
                 rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
             fate += rows
+    spot = next((v for k, v in SPOTS.items() if cname and cname.startswith(k)), None)
+    if spot and matter["type"] not in spot["keep"]:
+        hit, others, fate = dict(hit, to=spot["to"], note=spot["note"], basis="확인"), [], []      # 넘길 곳만 그 기관으로(조례 6종 안팎은 자리 줄 그대로). 다른 자리 표는 그 기관과 어긋나 보이지 않게 뺀다
     scope = hit.get("scope", t["scope"])
     return {"type": matter["type"], "name": t["name"], "item": t["item"], "scope": scope, "scope_why": hit.get("scope_why") or (t.get("scope_why") if scope == "out" else None),
             "law": hit.get("law") or t.get("law"), "class": cls, "class_name": cname, "ask_engine": scope == "in" or bool(t.get("ask_engine")),
