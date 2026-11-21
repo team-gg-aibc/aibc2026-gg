@@ -958,14 +958,37 @@ def _axis(x, y, w):
     return (math.cos(ang), math.sin(ang)), (mx, my)
 
 
-def _candidates(x, y, w, radius, kinds=None, skip=()):
+HANGUL = re.compile(r"[가-힣]")
+
+
+def _ko(i):
+    """(hangulopt2, 90번 2절) 보기로 바꿔 끼울 수 있는 이름인가: 한글이 한 글자라도 있다. 보기를 만드는 곳(바로 앞 · 간판 · 역 · 지나온 곳 · 가장 가까운 곳 · 둘 중 · 어느 쪽 · 간 쪽)이 모두 이것으로 가린다."""
+    return bool(HANGUL.search(G.name[i]))
+
+
+def _ko_swap(orig, alt, said=4):
+    """(hangulopt2) 보기(장소 번호들, 원래 순서)를 말로 읽는 앞 said개(server.say_options = 넷)가 한글 이름이 되게 고쳐 놓는다. 보기 수는 늘 원래와 같다.
+    1) 같은 곳들의 순서만 바꿔 한글 이름을 앞으로, 한글 없는 이름을 뒤(화면 단추에만)로. 2) 한글 이름이 읽는 자리 수에 모자라면 모자란 만큼만
+    한글 이름만으로 같은 규칙대로 다시 고른 alt에서 가져와 한글 없는 이름 자리에 넣는다. 3) 그래도 모자라면 원래 그대로.
+    질문 고르기(보기의 몫 · 기대 비트)는 늘 원래 후보로 셈해 켜도 질문의 종류가 같다(첫 판 hangulopt는 영어 보기를 빼 후보가 줄며 질문이 「둘 중」으로 새 600통 틀린 확정 +1)."""
+    if "hangulopt2" not in ON or all(_ko(i) for i in orig):
+        return orig
+    ko, en = [i for i in orig if _ko(i)], [i for i in orig if not _ko(i)]
+    need = max(0, min(said, len(orig)) - len(ko))
+    extra = [i for i in alt if _ko(i) and i not in orig]
+    if len(extra) < need:
+        return orig
+    return ko + extra[:need] + en[need:]
+
+
+def _candidates(x, y, w, radius, kinds=None, skip=(), ko=False):
     """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)
     skip = 이미 내밀었던 자리들((x, y) 소수 첫째 자리)."""
     idx = [i for i in _places_in(x.min() - radius, y.min() - radius, x.max() + radius, y.max() + radius, 6000 if kinds is None else 45000)
            if (kinds is None or G.kind[i] in kinds) and G.kind[i] not in ("동네", "산") and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
            and not G.pk0 <= i < G.rp1     # 공원 안 이름(park_names)은 시민이 말하면 알아듣되 보기로 먼저 내밀지 않는다: 넣어도 지금의 질문 흐름이 그대로(33번 2-5)
            and not (skip and (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) in skip)
-           and not ("selfname" in ON and self_area(i))]     # (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
+           and not ("selfname" in ON and self_area(i)) and (not ko or _ko(i))]     # ko = 한글 이름만(hangulopt2의 바꿔 끼울 후보). (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
     if not idx:
         return [], None
     idx = np.asarray(idx)
@@ -1305,7 +1328,10 @@ def _pin_questions(R, clues, matter):
         x, y = R["cx"], R["cy"]
         idx = [int(i) for i in G.near(x, y, 250) if math.hypot(G.x[i] - x, G.y[i] - y) >= 70 and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산")]
         idx.sort(key=lambda i: -PROM.get(G.kind[i], 1.0))
-        dirs = idx[:1] + [i for i in idx[1:] if idx and (G.x[i] - x) * (G.x[idx[0]] - x) + (G.y[i] - y) * (G.y[idx[0]] - y) < 0][:1]     # 서로 반대쪽의 두 곳
+        two = lambda idx: idx[:1] + [i for i in idx[1:] if idx and (G.x[i] - x) * (G.x[idx[0]] - x) + (G.y[i] - y) * (G.y[idx[0]] - y) < 0][:1]     # noqa: E731
+        dirs = two(idx)
+        if "hangulopt2" in ON and not all(_ko(i) for i in dirs):
+            dirs = _ko_swap(dirs, two([i for i in idx if _ko(i)]))      # (hangulopt2) 「○○ 쪽으로 감」 보기도 같은 수만큼 한글 이름이 있을 때만     # 서로 반대쪽의 두 곳
         out.append({"id": "went", "bits": None, "options": [{"word": "그 자리에 있음", "set": {"matter": {"went": "그 자리"}}}]
                     + [{"label": f"{G.name[i]} 쪽으로 감", "set": {"matter": {"went": G.name[i]}}} for i in dirs] + [{"word": "못 봄", "set": {"matter": {"went": "모름"}}}]})
     if R["on_road"] and G.lamps and matter.get("ask_lamp") and matter.get("plate") is None and any(_xw(i) for i in R["ctx"]["roads"]):
@@ -1407,10 +1433,13 @@ def _q_either(R, x, y, w, clues):
         if not cand:
             return None
         i = max(cand, key=lambda i: PROM.get(G.kind[i], 1.0) / (1 + math.hypot(G.x[i] - cx, G.y[i] - cy) / 50))
-        sides.append((p, cx, cy, rad, G.name[i]))
-    (p1, x1, y1, r1, n1), (p2, x2, y2, r2, n2) = sides
+        ko = max([j for j in cand if _ko(j)], key=lambda j: PROM.get(G.kind[j], 1.0) / (1 + math.hypot(G.x[j] - cx, G.y[j] - cy) / 50), default=None)      # (hangulopt2) 그쪽의 한글 이름(없으면 None)
+        sides.append((p, cx, cy, rad, G.name[i], ko))
+    (p1, x1, y1, r1, n1, k1), (p2, x2, y2, r2, n2, k2) = sides
     if n1 == n2 or math.hypot(x1 - x2, y1 - y2) < 60:
         return None
+    if "hangulopt2" in ON and not (HANGUL.search(n1) and HANGUL.search(n2)) and k1 is not None and k2 is not None and G.name[k1] != G.name[k2]:
+        n1, n2 = G.name[k1], G.name[k2]                   # (hangulopt2) 「○○ 쪽」의 단서는 그쪽 가운데라 이름표만 바꾼다(질문 · 단서 · 몫은 그대로). 어느 한쪽이라도 한글 이름이 없으면 원래 그대로
     half = lambda side: {"t": "half", "o": [round(mx, 1), round(my, 1)], "v": [round(ux, 4), round(uy, 4)], "cut": round(float(cut), 1), "side": side} if "half" in ON else {"t": "pt"}   # noqa: E731
     # (CALL_ON=half, 기본 끔) 고른 반을 고르게 보고 이 답 하나로는 끝내지 않는다(11-16 갈래 1). 300통 「네」 기욺의 틀린 확정이 7 → 8이라 넣는 기준에 못 미쳐 꺼 둠. 끄면 그 반의 가운데에 봉우리를 둔 원(pt)
     opt = lambda cx, cy, rad, name, side: {"label": f"{name} 쪽", "set": {"clues": [dict(half(side), p=[round(cx, 1), round(cy, 1)], r=round(max(25.0, 0.7 * rad), 1), sure=True, label=f"{name} 쪽")]}}   # noqa: E731  p · r는 그 반의 가운데 · 퍼짐(가상 시민도 씀)
@@ -1479,11 +1508,18 @@ def _q_closest(R, x, y, w, clues):
     if len(keep) < 3:
         return None
     pts = [[round(float(G.x[i]), 1), round(float(G.y[i]), 1)] for i in keep]
+    vx = np.array([[math.hypot(a - p[0], b - p[1]) for p in pts] for a, b in zip(x, y)])
+    shares = [float(w[vx.argmin(1) == k].sum()) for k in range(len(pts))]      # 질문 고르기는 원래 후보로
+    if "hangulopt2" in ON and not all(_ko(i) for i in keep):
+        alt = []
+        for i in _candidates(x, y, w, max(60.0, 0.3 * R["r"]) if ringed else max(100.0, 0.35 * R["r"]), gaz.ROADSIDE if _on_express(R) else None, old, ko=True)[0]:
+            if all(math.hypot(G.x[i] - G.x[j], G.y[i] - G.y[j]) > 0.5 * R["r"] for j in alt):
+                alt.append(i)
+        keep = _ko_swap(keep, alt)
+        pts = [[round(float(G.x[i]), 1), round(float(G.y[i]), 1)] for i in keep]
     s = 1.5 * R["r"]
     opts = [{"label": G.name[i], "set": {"clues": [{"t": "closest", "p": p, "others": [q for q in pts if q is not p], "s": round(s, 1), "sure": True, "label": f"{G.name[i]}이 가장 가까움"}]}} for i, p in zip(keep, pts)]
     far = [{"t": "not", "p": p, "r": 100.0, "f": 0.5, "label": f"{G.name[i]} 쪽 아님"} for i, p in zip(keep, pts)]
-    vx = np.array([[math.hypot(a - p[0], b - p[1]) for p in pts] for a, b in zip(x, y)])
-    shares = [float(w[vx.argmin(1) == k].sum()) for k in range(len(pts))]
     return {"id": "closest", "bits": _bits(shares) * 0.8, "name": ", ".join(G.name[i] for i in keep), "options": opts + [{"label": "다 멀어요", "set": {"clues": far}}], **({"area": ringed} if ringed else {})}
 
 
@@ -1543,20 +1579,27 @@ def _q_from(R, x, y, w, clues):
             dd = math.hypot(tx - ax, ty - ay)
             if dd >= 25:
                 extra.append((lab, ((tx - ax) / dd, (ty - ay) / dd), dd))
-    picked = []
-    for _, i, d in sorted(cand, reverse=True):
-        u = ((G.x[i] - ax) / d, (G.y[i] - ay) / d)
-        if all(u[0] * v[0] + u[1] * v[1] < (0.5 if wide else 0.34) for _, v, _ in picked + [(None, e[1], None) for e in extra]):       # 서로 70도(fromwide 60도) 넘게 다른 쪽
-            picked.append((i, u, d))
-        if len(picked) + len(extra) >= (4 if wide else 3):
-            break
+    def choose(ok):
+        picked = []
+        for _, i, d in sorted(cand, reverse=True):
+            u = ((G.x[i] - ax) / d, (G.y[i] - ay) / d)
+            if ok(i) and all(u[0] * v[0] + u[1] * v[1] < (0.5 if wide else 0.34) for _, v, _ in picked + [(None, e[1], None) for e in extra]):       # 서로 70도(fromwide 60도) 넘게 다른 쪽
+                picked.append((i, u, d))
+            if len(picked) + len(extra) >= (4 if wide else 3):
+                break
+        return picked
+    picked = choose(lambda i: True)
     if len(picked) + len(extra) < 2:
         return None
     vx, vy = x - ax, y - ay
     vn = np.hypot(vx, vy) + 1e-9
     dirs = [(G.name[i], u, d) for i, u, d in picked] + extra
     parts = [float(w[((vx * u[0] + vy * u[1]) / vn >= 0.5) & (vn >= 10)].sum()) for _, u, _ in dirs]
-    parts.append(max(0.0, 1 - sum(parts)))
+    parts.append(max(0.0, 1 - sum(parts)))               # 질문 고르기는 원래 후보로
+    if "hangulopt2" in ON and not all(_ko(i) for i, _, _ in picked):
+        alt = choose(_ko)                                 # (hangulopt2) 한글 이름만으로 같은 규칙대로 다시 고른 것에서 모자란 만큼만
+        at = {i: (i, u, d) for i, u, d in alt + picked}
+        dirs = [(G.name[i], at[i][1], at[i][2]) for i in _ko_swap([i for i, _, _ in picked], [i for i, _, _ in alt])] + extra
     opts = []
     for name, u, d in dirs:
         dd = min(max(0.5 * d, 20.0), 45.0)
@@ -1674,12 +1717,15 @@ def _q_marks(R, x, y, w, qid, clues):
     if qid == "passed" and len(picked) < 2:
         picked, parts = _candidates(x, y, w, radius, road)
     keep = [n for n, i in enumerate(picked) if (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) not in used]
+    show = [picked[n] for n in keep]
+    if "hangulopt2" in ON and not all(_ko(i) for i in show):
+        alt = _candidates(x, y, w, radius, passed_kinds if qid == "passed" else {"역"} if qid == "station" else road, ko=True)[0]
+        show = _ko_swap(show, [i for i in alt if (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) not in used])
     open_q = qid in ("mark", "station") and not (road and not keep)     # 보기가 없어도 묻는 열린 질문(이름을 대면 지명 표에서 찾는다). 자동차전용도로 위에서 길에서 보이는 보기가 없으면 「가게 간판」은 묻지 않는다
     if (not keep and not open_q) or (len(keep) < 2 and qid == "passed"):
         return None
     opts = []
-    for n in keep:
-        i = picked[n]
+    for i in show:                                        # 보기로 내미는 곳(hangulopt2를 끄면 원래 keep 그대로)
         p = [round(float(G.x[i]), 1), round(float(G.y[i]), 1)]
         clue = {"t": "past", "p": p, "how": "바로", "label": G.name[i]} if qid == "passed" else {"t": "pt", "p": p, "r": SIG["바로"] if qid == "finer" else 300.0 if qid == "station" else SIG["근처"], "label": G.name[i]}
         clue.update(_big(i) if qid != "passed" else {})      # (bigplace) 보기로 내민 넓은 장소의 크기

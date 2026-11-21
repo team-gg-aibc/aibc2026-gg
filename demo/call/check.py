@@ -894,6 +894,28 @@ def bridge_end():
     print(f"  ✓ 다리의 「○○ 쪽 끝」(bridgeend {'bridgeend' in S.L.ON}): 한남대교 「강남 쪽 끝이 더 가까워요」 → {view['summary']['where']} {view['radius']}m")
 
 
+def hangul_say():
+    """(hangulopt2, 90번 2절) 롯데월드타워 둘레 「바로 앞에 뭐가 보이세요?」: 켜면 말로 읽는 앞 넷이 모두 한글 이름이고, 보기는 끈 판과 같은 곳들(순서만 다름)이다. 끄면 main 그대로(읽는 넷에 영어 이름)."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    clues = [{"t": "at", "k": S.gaz.norm("롯데월드타워"), "how": "근처", "label": "롯데월드타워"}]
+    R = L.infer(clues)
+    x, y, w = L._sample(R)
+    on = "hangulopt2" in L.ON
+    q = L._q_marks(R, x, y, w, "finer", clues)
+    L.ON.discard("hangulopt2")
+    q0 = L._q_marks(R, x, y, w, "finer", clues)
+    if on:
+        L.ON.add("hangulopt2")
+    said = S.say_options(q["options"])
+    eng = [n for n in said if not re.search(r"[가-힣]", n)]
+    assert sorted(o["label"] for o in q["options"]) == sorted(o["label"] for o in q0["options"]) and q["bits"] == q0["bits"], (q["options"], q0["options"])      # 같은 곳 · 같은 수 · 같은 몫
+    assert bool(eng) != on, said
+    print(f"  ✓ 말로 읽는 보기의 영어 이름(hangulopt2 {on}): 롯데월드타워 「바로 앞」 읽는 넷 {said}")
+
+
 def main():
     tmp = Path(os.environ.get("TMPDIR", "/tmp"))
     env = {**os.environ, "CALL_MODE": "saved", "CALL_PORT": str(PORT), "CALL_REPLAY_SEC": "0", "CALL_ALIAS_FILE": str(tmp / f"call-check-alias-{os.getpid()}.json"),
@@ -930,6 +952,7 @@ def main():
         fix_and_copy(ends["cat_street"])
         records(ends["roadkill"])
         switches()
+        hangul_say()
         bind_choice()
         neg_keep()
         bridge_end()
