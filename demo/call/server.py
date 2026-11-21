@@ -932,7 +932,7 @@ def _bridge_end(read, keyed, clues):
 
 
 PAIR_M = 60.0      # (pairseen) 「A랑 B가 보여요」의 A · B가 서로 이만큼 안에 있으면 함께 보이는 자리로 본다
-PAIR_JOIN = re.compile(r"(이?랑|하고|와|과|,|및|그리고|도|이나|나)")   # (pairseen) 두 이름 사이 이음말 — 없으면 이름 하나로 본다
+PAIR_JOIN = re.compile(r"(이?랑|하고|와|과|,|및|그리고|도)")   # (pairseen) 두 이름 사이 이음말 — 없으면 이름 하나로 본다. 「A나 B」는 둘 중 하나라 넣지 않음
 
 
 def _pair_seen(said, read, keyed, clues):
