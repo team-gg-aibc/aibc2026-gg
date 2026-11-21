@@ -954,6 +954,16 @@ def _axis(x, y, w):
     return (math.cos(ang), math.sin(ang)), (mx, my)
 
 
+HANGUL = re.compile(r"[가-힣]")
+
+
+def _offer_ok(i):
+    """보기로 내밀 수 있는 이름인가 — 보기를 만드는 곳(_candidates · 둘 중 · 어느 쪽 · 지나왔나 · 사이 · 간 쪽)이 모두 이것을 거친다.
+    (hangulopt, 90번, 기본 끔) 켜면 한글이 한 글자도 없는 이름(「Possibilites」 · 「Light Forest」)은 내밀지 않는다: 목소리로 읽기 어렵고, 전화로 듣는 사람이 고르기 어렵다.
+    시민이 그 이름을 말하면 알아듣는 것은 그대로다(보기로 내미는 것만 뺀다)."""
+    return "hangulopt" not in ON or bool(HANGUL.search(G.name[i]))
+
+
 def _candidates(x, y, w, radius, kinds=None, skip=()):
     """범위 안에서 물어볼 만한 표지를 고른다: 둘레 radius 안에 가능성이 많이 걸려 있고, 눈에 띄고, 서로 떨어진 것부터 여섯 곳. → (장소 번호들, 갈린 몫들)
     skip = 이미 내밀었던 자리들((x, y) 소수 첫째 자리)."""
@@ -961,7 +971,7 @@ def _candidates(x, y, w, radius, kinds=None, skip=()):
            if (kinds is None or G.kind[i] in kinds) and G.kind[i] not in ("동네", "산") and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", ""))
            and not G.pk0 <= i < G.rp1     # 공원 안 이름(park_names)은 시민이 말하면 알아듣되 보기로 먼저 내밀지 않는다: 넣어도 지금의 질문 흐름이 그대로(33번 2-5)
            and not (skip and (round(float(G.x[i]), 1), round(float(G.y[i]), 1)) in skip)
-           and not ("selfname" in ON and self_area(i))]     # (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
+           and not ("selfname" in ON and self_area(i)) and _offer_ok(i)]     # (selfname · 75번) 공원 · 광장의 자기 이름 점은 보기로 내밀지 않는다: 고르면 그 구역 한가운데 한 점이 된다(광장 가장자리의 틀린 확정 90 · 134m)
     if not idx:
         return [], None
     idx = np.asarray(idx)
@@ -1299,7 +1309,7 @@ def _pin_questions(R, clues, matter):
         out.append({"id": "lane", "bits": None, "options": [{"word": w, "set": {"matter": {"lane": w}}} for w in ("차로", "갓길 · 길가", "보도")]})
     if kind == "went" and matter.get("alive") and matter.get("went") is None:      # 움직이는 동물: 마지막으로 본 곳에서 어디로 갔나
         x, y = R["cx"], R["cy"]
-        idx = [int(i) for i in G.near(x, y, 250) if math.hypot(G.x[i] - x, G.y[i] - y) >= 70 and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산")]
+        idx = [int(i) for i in G.near(x, y, 250) if math.hypot(G.x[i] - x, G.y[i] - y) >= 70 and len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _offer_ok(int(i))]
         idx.sort(key=lambda i: -PROM.get(G.kind[i], 1.0))
         dirs = idx[:1] + [i for i in idx[1:] if idx and (G.x[i] - x) * (G.x[idx[0]] - x) + (G.y[i] - y) * (G.y[idx[0]] - y) < 0][:1]     # 서로 반대쪽의 두 곳
         out.append({"id": "went", "bits": None, "options": [{"word": "그 자리에 있음", "set": {"matter": {"went": "그 자리"}}}]
@@ -1399,7 +1409,7 @@ def _q_either(R, x, y, w, clues):
         rad = math.sqrt(float((w[m] * ((x[m] - cx) ** 2 + (y[m] - cy) ** 2)).sum() / p))
         cand = [int(i) for i in G.near(cx, cy, max(60.0, 0.8 * rad)) if len(G.name[i]) >= 3 and G.kind[i] not in ("동네", "산") and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and _road_ok(int(i), R)
                 and f"{G.name[i]} 쪽" not in used and f"{G.name[i]} 쪽 아님" not in used and not ("selfname" in ON and self_area(int(i)))
-                and not ("rimask" in ON and G.name[i] == R.get("ringed"))]      # (rimask) 둘레로 읽은 곳 자체(「항동저수지 쪽」)는 보기가 아니다
+                and not ("rimask" in ON and G.name[i] == R.get("ringed")) and _offer_ok(int(i))]      # (rimask) 둘레로 읽은 곳 자체(「항동저수지 쪽」)는 보기가 아니다
         if not cand:
             return None
         i = max(cand, key=lambda i: PROM.get(G.kind[i], 1.0) / (1 + math.hypot(G.x[i] - cx, G.y[i] - cy) / 50))
@@ -1527,7 +1537,7 @@ def _q_from(R, x, y, w, clues):
     for i in G.near(ax, ay, 400 if wide else 150):          # fromwide: 25~400m의 큰 것까지(공원 안은 150m 안에 이름이 한두 개뿐, 33번 2-3)
         i = int(i)
         d = math.hypot(G.x[i] - ax, G.y[i] - ay)
-        if 25 <= d <= (400 if wide else 150) and len(G.name[i]) >= 3 and G.name[i] != anc[1] and G.kind[i] not in ("동네", "산") and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.name[i] not in used and _road_ok(int(i), R) and not ("selfname" in ON and self_area(i)):
+        if 25 <= d <= (400 if wide else 150) and len(G.name[i]) >= 3 and G.name[i] != anc[1] and G.kind[i] not in ("동네", "산") and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.name[i] not in used and _road_ok(int(i), R) and not ("selfname" in ON and self_area(i)) and _offer_ok(i):
             score = PROM.get(G.kind[i], 1.0) * (1.5 if G.kind[i] in BIGK else 1.0) / (1 + d / 150) if wide else PROM.get(G.kind[i], 1.0) / (1 + d / 60)
             cand.append((score, i, d))
     extra = []
@@ -1594,6 +1604,8 @@ def _q_next(R, x, y, w, clues):
     said = {gaz.norm(c.get("label") or "") for c in clues}
     best = None
     for i in _places_in(x.min() - 60, y.min() - 60, x.max() + 60, y.max() + 60, 8000):
+        if not _offer_ok(i):
+            continue
         nm = G.name[i]
         ramp = "nextramp" in ON and G.kind[i] == "진출입로" and getattr(G, "rp0", 0) <= i < getattr(G, "rp1", 0) and not (     # (nextramp, 기본 끔 · 49번) 같은 방향의 나가는 길 · 들어오는 길도 가르는 표지로(표지판으로 보인다)
             "ramp2" in ON and sum(1 for c in clues if c.get("flat") and ("나가는 길" in (c.get("label") or "") or "들어오는 길" in (c.get("label") or ""))) >= 2)     # (ramp2) 진출입로로 묻는 것은 한 통화 두 번까지
@@ -1627,7 +1639,7 @@ def _q_between(R, x, y, w, clues):
         return None
     express = any(_xw(i) for i in R["ctx"]["roads"])
     kinds = ("다리", "나들목", "터널") if express else ("다리", "교차로", "역", "역 출구", "정류장", "육교", "터널", "주유소")          # 큰길을 차로 지나간 통화: 교차로 · 역 출구 · 정류장 · 주유소까지(33번 5-2)
-    idx = [i for i in _places_in(x.min() - 100, y.min() - 100, x.max() + 100, y.max() + 100, 40000) if G.kind[i] in kinds]
+    idx = [i for i in _places_in(x.min() - 100, y.min() - 100, x.max() + 100, y.max() + 100, 40000) if G.kind[i] in kinds and _offer_ok(i)]
     if len(idx) < 2:
         return None
     big = [i for i in idx if "대교" in G.name[i]]
