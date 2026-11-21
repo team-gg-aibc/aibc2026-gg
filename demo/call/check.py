@@ -498,6 +498,36 @@ def chain_said():
           + (" — 켬, 하나씩 끄면 main 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
+def again_words():
+    """(92번) 같은 종류의 자리 질문이 바로 이어지면 말이 바뀐다(받아 주기 → 까닭 → 다르게 묻기). CALL_OFF=againwords면 옛 말 그대로. 질문 종류는 같다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+
+    def call():                                           # 동규가 걸어 본 장한평역 통화(코드 읽기)
+        st, v = S.turn({"id": "check-again"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
+        out = []
+        for line in ["여기 쓰레기가 많이 버려져 있어요", "장한평역이요", "CU랑 신한은행이요"]:
+            st, v = S.turn(st, {"line": {"who": "시민", "text": line}})
+            out.append((v["question"]["id"], v["question"]["say"]))
+            st, _ = S.turn(st, {"line": {"who": "상담사", "text": v["question"]["say"]}})
+        return out
+
+    new = call()
+    assert new[1][0] == new[2][0] == "mark", new
+    if "againwords" in S.L.OFF:
+        assert new[2][1] == new[1][1], new
+    else:
+        assert new[2][1].startswith("네, CU와 신한은행이요.") and new[2][1] != new[1][1] and all(len(x) <= 60 for x in new[2][1].split(". ")), new[2][1]
+        S.L.OFF.add("againwords")
+        try:
+            old = call()
+            assert [q for q, _ in old] == [q for q, _ in new] and old[2][1] == old[1][1], old     # 끄면 옛 말 그대로, 질문 종류는 같음
+        finally:
+            S.L.OFF.discard("againwords")
+    print("  ✓ 같은 질문 다른 말: 둘째 간판 질문은 「네, CU와 신한은행이요. …」(질문 종류 · 차례는 그대로)" + (" — 꺼짐(옛 말)" if "againwords" in S.L.OFF else ""))
+
+
 def free_text():
     """대본에 없는 곳 · 다른 일: 저장된 Solar 읽기가 없어도 코드가 읽어 끝까지 간다(서울 전체 지명 표)."""
     st, view = turn({"id": "check-free"}, line={"who": "상담사", "text": "인사"})
@@ -978,6 +1008,9 @@ def main():
         edge_reads()
         ask_fixes()
         chain_said()
+
+
+        again_words()
         ask_less()
         print("통화로 위치 좁히기 점검 통과")
     finally:

@@ -1620,6 +1620,54 @@ def engine_card(res):
             "sec": res.get("sec"), "ask": res.get("ask"), "ask_sec": res.get("ask_sec"), "question": res.get("question"), "say": res.get("say") if cites else None}
 
 
+# ---- 같은 질문이 이어질 때의 다른 말(92번, 기본 켬 · 끄려면 CALL_OFF=againwords)
+AGAIN_IDS = set(L.LOCQ) | {"same", "closest"}            # 자리를 좁히는 질문만(일의 칸 · 되묻기 · 넘김은 그대로)
+
+
+def _batchim(w):
+    ch = next((c for c in reversed(w or "") if "가" <= c <= "힣" or c.isalnum()), "")
+    return "가" <= ch <= "힣" and (ord(ch) - 0xAC00) % 28 != 0
+
+
+def _heard(st):
+    """시민이 방금 한 말에 글자 그대로 든 이름(그 차례에 읽은 단서의 이름 가운데) — 시스템이 고른 이름 · 보기 이름은 말에 없으면 빠진다. 둘까지."""
+    t = next((t for t in reversed(st.get("turns") or []) if t.get("said")), None)
+    if not t:
+        return []
+    said, out = gaz.norm(t["said"]), []
+    for c in ((t.get("model") or t.get("code") or {}).get("clues") or []):
+        lab = (c.get("label") or "").strip()
+        if len(gaz.norm(lab)) >= 2 and gaz.norm(lab) in said:
+            m = re.search(r"(?<![가-힣A-Za-z0-9])" + r"\s*".join(map(re.escape, lab.replace(" ", ""))), t["said"], re.I)
+            if m and m.group(0) not in out:               # 시민이 쓴 글자 그대로(「C U」가 아니라 「CU」), 낱말 첫머리에서 시작할 때만(「한솔분식」 속의 「솔분식」은 시민이 말한 이름이 아니다)
+                out.append(m.group(0))
+    return out[:2]
+
+
+def _again_say(pick, say, st, Q, opts, line):
+    """바로 앞 차례와 같은 종류의 자리 질문이 다시 나오면 말만 바꾼다: 들은 것 받아 주기 → 왜 하나 더 묻는지 → 다르게 묻기. 셋째는 다른 틀, 그다음은 돌려 씀.
+    질문 고르기 · 보기 · 차례는 그대로(문구는 A-05의 again_* · *_again 줄)."""
+    qid = pick["id"]
+    if "againwords" in L.OFF or qid not in AGAIN_IDS or pick.get("area"):
+        return say
+    run = 0
+    for a in reversed(st.get("asked_log") or []):
+        if (a or "").rstrip("!") != qid:
+            break
+        run += 1
+    if run == 0 or "again_2" not in Q:
+        return say
+    alt = {"mark": "mark_again2"}.get(qid, f"{qid}_again")
+    ask = fill(Q[alt], 보기=", ".join(say_options(opts)), 표지=pick.get("name", ""), 종류=pick.get("name", ""),
+               하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "") if alt in Q and run % 2 == 1 else say
+    names = _heard(st)
+    heard = ""
+    if names:
+        both = names[0] + ("과 " if _batchim(names[0]) else "와 ") + names[1] if len(names) > 1 else names[0]
+        heard = fill(Q["again_heard"], **{"들은 것": both + ("이요" if _batchim(names[-1]) else "요")}) + " "
+    return fill(Q["again_2" if run % 2 == 1 else "again_3"], **{"받아 주기": heard, "질문": ask})
+
+
 # ---- 화면에 보일 것 엮기
 def where_line(p, done, matter=None, anc=None):
     """위치를 사람이 읽는 한 줄로(틀은 문구 파일). 다 좁혀졌으면 「이름 붙은 한 점 + 상대 위치(+ 차로)」로 말한다."""
@@ -1795,6 +1843,7 @@ def build(st, extra=None):
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
                 "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
+    question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
