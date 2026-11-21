@@ -932,6 +932,7 @@ def _bridge_end(read, keyed, clues):
 
 
 PAIR_M = 60.0      # (pairseen) 「A랑 B가 보여요」의 A · B가 서로 이만큼 안에 있으면 함께 보이는 자리로 본다
+PAIR_JOIN = re.compile(r"(이?랑|하고|와|과|,|및|그리고|도|이나|나)")   # (pairseen) 두 이름 사이 이음말 — 없으면 이름 하나로 본다
 
 
 def _pair_seen(said, read, keyed, clues):
@@ -949,7 +950,16 @@ def _pair_seen(said, read, keyed, clues):
         return
     zone = max(1.5 * R0["r"], 300.0)
     raw = said.replace(" ", "")
-    said_of = {m["key"]: (re.search(re.escape(m["key"]), raw, re.I) or re.search(re.escape(m.get("said") or m["name"]), raw, re.I) or re.search(".+", m["name"])).group() for m in keyed}      # 시민이 친 글자 그대로(「CU」)
+    span = {}
+    for m in keyed:
+        hit = next((h for w in (m["key"], str(m.get("said") or "").replace(" ", "")) if w for h in [re.search(re.escape(w), raw, re.I)] if h), None)
+        if hit:
+            span[m["key"]] = hit
+    seen = [c for c in seen if c["k"] in span]                # 이 말에 시민이 친 이름만
+    order = sorted({span[c["k"]].span() for c in seen})
+    if len(order) < 2 or any(not PAIR_JOIN.fullmatch(raw[a[1]:b[0]]) for a, b in zip(order, order[1:])):
+        return                                                # 이름 사이에 「랑 · 하고 · 와 · ,」가 없으면 이름 하나(「GS25 종로창덕궁」 = 지점 하나, 600통 1114 #56)
+    said_of = {k: h.group() for k, h in span.items()}         # 시민이 친 글자 그대로(「CU」)
     near = {}
     for c in seen:
         r = L.resolve(c["k"])

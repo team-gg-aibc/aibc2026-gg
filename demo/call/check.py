@@ -992,6 +992,9 @@ def pair_seen():
         assert m["radius"] <= 100 and any("옆 CU" in c for c in m["chips"]), (m["radius"], m["chips"])
     else:
         assert m["radius"] > 100, m["radius"]
+    one = {"clues": [{"t": "at", "k": "gs25"}, {"t": "at", "k": "창덕궁"}]}       # 이음말 없이 붙은 이름 = 지점 이름 하나(600통 1114 #56): 짝 짓지 않는다
+    S._pair_seen("GS25 종로창덕궁 근처예요", one, [{"key": "gs25", "said": "gs25", "name": "GS25"}, {"key": "창덕궁", "said": "창덕궁", "name": "창덕궁"}], [{"t": "at", "k": "안국역"}])
+    assert len(one["clues"]) == 2 and "skip" not in one, one
     print(f"  ✓ 보기 밖의 이름 둘을 함께 댄 말(pairseen {on}): 장한평역 {v['radius']}m(가운데 {moved:.0f}m 옮김) · 마들역 {m['radius']}m {[c for c in m['chips'] if '옆' in c]}")
 
 
