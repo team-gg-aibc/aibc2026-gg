@@ -1,0 +1,64 @@
+저작권과 이용 조건
+
+Copyright © 2026 Team GG. All rights reserved.
+
+이 저장소에서 팀 GG가 쓴 코드와 문서의 권리는 팀 GG에 있습니다.
+
+
+따로 묻지 않고 해도 되는 것
+
+1. AIBC2026(2026 AI 부트캠프 경진대회)의 운영 · 심사 · 재현성 검증을 위해 이 저장소를 열람하고, 내려받고, 실행하는 것
+2. 개인이 배우고 연구하려고 코드를 읽고, 자기 기기에서 돌려 보는 것
+
+
+먼저 허락을 받아야 하는 것
+
+위 두 가지 밖의 이용은 모두 팀 GG의 사전 서면 허락이 필요합니다. 복제해 다시 배포하기, 고쳐서 쓰기, 서비스로 운영하기, 업무에 적용하기가 여기에 듭니다. 영리 · 비영리를 가리지 않으며, 국가 · 지방자치단체 · 공공기관이 업무에 쓰는 경우도 같습니다.
+
+쓰고 싶으시면 이 저장소의 GitHub Issues에 남겨 주세요. 어디에 어떻게 쓰려는지 알려 주시면 반갑게 함께 살펴보겠습니다.
+
+
+이 조건이 닿지 않는 것
+
+- 대회 스타터 킷에서 온 코드와 자료: engine/의 첫 판은 스타터 킷의 코드를 옮긴 것이고, engine/data/(조례 원문 · 조문 조각 · 임베딩 · 별표 읽은 결과)는 스타터 킷이 만든 그대로입니다. 팀 GG는 이 부분의 권리를 주장하지 않습니다.
+- README.md 「자료 출처와 이용 조건」 표의 자료: 각 자료의 원래 조건을 따릅니다. 오픈스트리트맵에서 뽑은 지명 · 길 · 공원 표 등은 ODbL 1.0을 따르므로, 그 조건(출처 표시 · 같은 조건으로 나누기)을 지키면 누구나 쓸 수 있습니다.
+- 글꼴(IBM Plex Sans KR, SIL Open Font License 1.1)과 바깥 라이브러리: 각자의 라이선스를 따릅니다.
+
+
+보증 없음
+
+이 저장소는 있는 그대로 제공합니다. 쓰면서 생긴 일에 팀 GG는 책임지지 않습니다.
+
+
+--------------------------------------------------------------------------------
+
+Copyright and terms of use (English)
+
+Copyright © 2026 Team GG. All rights reserved.
+
+Team GG holds the rights to the code and documents the team wrote in this repository.
+
+
+You may do these without asking
+
+1. View, download, and run this repository for the operation, judging, and reproducibility checks of AIBC2026 (the 2026 AI Bootcamp Competition).
+2. Read the code and run it on your own device to learn or do research as an individual.
+
+
+Ask us first for anything else
+
+Any other use needs Team GG's prior written permission. This includes copying and redistributing it, modifying and using it, running it as a service, and applying it to your work. It applies to commercial and non-commercial use alike, including use by national or local governments and public institutions in their work.
+
+If you would like to use it, please leave a note in this repository's GitHub Issues. Tell us where and how you plan to use it, and we will be glad to look at it with you.
+
+
+What these terms do not cover
+
+- Code and data from the contest starter kit: the first version of engine/ was moved over from the starter kit's code, and engine/data/ (the ordinance text, ordinance chunks, embeddings, and annex reading results) is as the starter kit made it. Team GG does not claim rights to these parts.
+- The data listed in "Data sources and terms" in README.en.md: each keeps its original terms. Tables extracted from OpenStreetMap (place names, roads, parks, and others) are under ODbL 1.0, so anyone may use them under those terms (attribution and share-alike).
+- The font (IBM Plex Sans KR, SIL Open Font License 1.1) and outside libraries: each follows its own license.
+
+
+No warranty
+
+This repository is provided as is. Team GG is not responsible for anything that results from using it.
