@@ -709,6 +709,39 @@ def code_read(said, asked, short, R):
         pick = steps if steps is not None else 0 if close else 2 if re.search(r"꽤|좀 ?떨어", said) else 1 if re.search(r"몇 ?걸음|조금", said) else 3 if re.search(r"저기", said) else None   # 걸음 수를 댔으면 그것을 먼저(「스무 걸음쯤, 화장실 바로 앞」 · 「바로 앞은 아니고 스무 걸음」)
     elif q.get("id") == "near":
         pick = 1 if re.search(r"떨어|멀|조금|좀|아니|안 ?보", said) else 0 if re.search(r"바로|코앞|^\s*(네|예|응)|맞아|맞습|앞이", said) else None
+    elif q.get("id") == "check" and q.get("cross") and R is not None:      # (cross, 99번 4-5절) 교차 확인의 답: 확정 전의 넓은 범위(90%, 남은 덩어리 포함) 안에서만 찾아 맞음 · 어긋남 · 답 없음
+        read["clues"], verdict, name = [], "none", None
+        wcx, wcy, wr = q.get("wide") or [R["cx"], R["cy"], 600.0]      # 지금 가운데 둘레(locate._cross_wide)
+        anc_n, prior = gaz.norm(q.get("anchor") or ""), set(q.get("prior") or ())
+        for m in short:
+            nm = gaz.norm(m.get("name") or "")
+            if m.get("key") in prior or nm in prior or (anc_n and nm and (nm in anc_n or anc_n in nm)):
+                continue                                  # 질문의 「{표지} 말고」 표지 · 이미 받은 이름을 되받아 말한 것: 다음 이름을 본다(#161 리뷰)
+            if "key" in m:
+                r = L.resolve(m["key"])
+                pts = [(float(a), float(b)) for a, b in zip(r["x"], r["y"]) if math.hypot(float(a) - wcx, float(b) - wcy) <= wr]
+            elif str(m.get("by", "")).startswith(("#", "≈", "@")):
+                pts = [(float(m["p"][0]), float(m["p"][1]))]
+            else:
+                continue
+            one = []
+            for a, b in pts:
+                if all(math.hypot(a - c, b - e) > 40 for c, e in one):
+                    one.append((a, b))
+            if not one:
+                break                                     # 넓은 범위 밖 · 자료에 없음: 답 없음(자료의 빈 곳으로 맞는 자리를 물리지 않는다)
+            near_said = bool(re.search(r"바로|옆|앞", said))
+            ok_m, off_m = (150.0, 250.0) if R["on_road"] else (60.0, 100.0) if near_said else (150.0, 200.0)      # 「바로 옆」과 「보여요」의 폭. 그 사이는 답 없음
+            d = min(math.hypot(a - R["cx"], b - R["cy"]) for a, b in one)
+            if len(one) == 1 and d <= ok_m:
+                verdict, name = "ok", m["name"]           # 맞음: 넓은 범위 안에 한 곳뿐이고 그 자리 가까이 — 핀을 옮기지 않고 단서로도 더하지 않는다
+            elif d > off_m:
+                verdict = "off"                           # 어긋남: 시민 둘레에 보인다는 그 이름이 지금 자리 둘레에 없다 → 확인 질문에 「아니요」를 들은 것과 같이(「어느 말이 달랐을까요?」 바로잡기)
+                read["confirm"] = False                   # 받치는 말을 짐작해 빼면 엉뚱한 말을 뺀다(가상 600통 1114 #103: 「불광2동」을 짚음) — 어느 말이 틀렸는지는 시민에게 묻는다
+                if len(one) == 1:
+                    read["clues"] = [{"t": "pt", "p": [round(one[0][0], 1), round(one[0][1], 1)], "r": L.SIG["가까이"] if near_said else L.SIG["보임"], "via": "cross", "sure": True, "label": m["name"]}]
+            break
+        read["matter"]["cross"], read["matter"]["cross_name"] = verdict, name
     elif q.get("id") == "check" and R is not None and ("check2" in L.ON or "check2all" in L.ON):      # 열린 확인 2판: 이름은 판정이 아니라 증거(33번 4-2)
         sig, read["clues"] = (75.0 if R["on_road"] else 30.0), []
         for m in short:
@@ -1945,9 +1978,19 @@ def build(st, extra=None):
     # 「say」의 {위치}는 상담사가 말로 읽는 꼴(괄호 · 가운뎃점 없이)로 넣는다: 화면의 글과 목소리가 같은 글에서 나오게
     question = {"id": pick["id"], "why": why.get(pick["id"], ""), "options": opts, "bits": pick.get("bits"),
                 "bits_text": fill(A["기대"], 비트=f"{pick['bits']:.1f}") if pick.get("bits") else "",
-                "say": fill(Q.get("confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
+                "say": fill(Q.get("cross_pick" if pick.get("cross") == "pick" else "confirm_named" if pick["id"] == "confirm" and pick.get("name") else "closest_rim" if pick["id"] == "closest" and pick.get("area") and "closest_rim" in Q else "closest_chain" if pick["id"] == "closest" and pick.get("chain") and "closest_chain" in Q else pick["id"], pick["id"]), 보기=", ".join(say_options(opts)), 구역=pick.get("area", ""), 표지=pick.get("name", ""), 종류=pick.get("name", ""), 하나=opts[0]["label"] if opts else "", 둘=opts[1]["label"] if len(opts) > 1 else "", 위치=re.sub(r"\s*\(([^)]*)\)", r", \1", line or "").replace(" · ", ", ")),
                 "others": [q["id"] for q in qs[1:3]]}
     question["say"] = _again_say(pick, question["say"], st, Q, opts, line)
+    if pick.get("cross"):
+        question["cross"], question["wide"], question["cross_why"] = pick["cross"], pick.get("wide"), pick.get("cross_why")      # (cross) 교차 확인(True) · 둘 중 가르기("pick") · 켜진 까닭(계측용 낱말 — 화면의 「까닭」은 문구 파일 그대로)
+        question["anchor"], question["prior"] = pick.get("name"), pick.get("prior")      # 답 읽기가 건너뛸 이름
+        if pick["cross"] is True and not pick.get("name"):
+            question["say"] = Q["cross_noname"]           # 기준 이름이 없는 교차 확인(흔들림 · 갈라짐만으로 켜짐): 「{표지} 말고」 없이 묻는다
+        for o in pick["options"]:
+            for c in (o.get("set") or {}).get("clues") or []:
+                if c.get("near"):
+                    c["label"] = fill(tab("위치 범위")["더 가까움"], 이름=c["near"])      # (crosspick) 고른 보기 단서의 이름표
+        question["why"] = why.get("cross_pick" if pick["cross"] == "pick" else "cross", question["why"])      # 화면의 「까닭」: 문구 파일 A-05 「이렇게 물어보세요」의 cross · cross_pick 줄
     confirmed = bool(st.get("confirmed")) and question["id"] == "confirm"
     if confirmed:
         question = None
@@ -1976,6 +2019,8 @@ def build(st, extra=None):
     cites = (engine or {}).get("citations") or [] if in_scope else []
     region = (parts or {}).get("region")
     size_line = fill(tab("위치 범위")["구역 전체"], 곳=L.area_of(region)["name"]) if region else size_text(size) if size else None      # 구역으로 말할 때는 반지름 대신 「○○공원 전체」
+    if size_line and done and matter.get("cross") == "none":
+        size_line += " · " + S["한 가지 말"]          # (cross) 교차 확인에서 답을 못 얻은 확정: 한 가지 말에 기댄 위치
     summary = {"from": S["받은 곳 값"], "by": S["접수 담당자 값"], "where": line, "size": size_line, "matter": matter_line,
                "point": None, "to": assigned["hit"]["to"] if assigned else None,
                "cites": [f"{c['label']} ({fill(T['시행'], 날짜=c['effective'])})" for c in cites], "said_place": next((t["model"]["said_place"] for t in reversed(st["turns"]) if (t.get("model") or {}).get("said_place")), None)}
@@ -2062,6 +2107,8 @@ def _reject(R):
 
 def _log_id(asked, read, prev):
     """시민이 답한 질문을 적어 둘 이름. 위치를 좁히려고 물었는데 새 단서를 못 얻었거나, 확인에 「아니요」면 끝에 !를 붙인다(같은 질문을 되풀이하지 않게)."""
+    if (asked or {}).get("cross") == "pick":
+        return "crosspick"                                # (crosspick) 둘 중 가르기는 「어디가 가장 가까우세요?」와 따로 센다
     qid = (asked or {}).get("id")
     same = lambda c: (c.get("t"), (tuple(c["k"]) if isinstance(c.get("k"), list) else c.get("k")) or c.get("label"), tuple(c["p"]) if isinstance(c.get("p"), list) and c["p"] and not isinstance(c["p"][0], list) else None)      # noqa: E731
     known = {same(c) for c in prev}
@@ -2126,6 +2173,12 @@ def turn(st, ev):
                 _tag_drive(read, last.get("said") or "")
                 if asked.get("id") == "check":
                     read["confirm"] = (last.get("code") or {}).get("confirm")      # 열린 확인은 코드가 거리로 가린 것을 쓴다(Solar의 확인 칸은 「맞습니까」에만)
+                    if asked.get("cross"):                # (cross) 교차 확인의 답은 코드 판정 그대로: Solar가 그 이름을 단서로 더해 핀을 옮기지 않게
+                        code_ = last.get("code") or {}
+                        read["clues"] = list(code_.get("clues") or [])
+                        read["confirm"] = code_.get("confirm")
+                        read["drop"] = list(code_.get("drop") or [])
+                        read.setdefault("matter", {}).update({k: v for k, v in (code_.get("matter") or {}).items() if k in ("cross", "cross_name")})
                 if "yesno" in L.ON and asked.get("id") == "confirm" and not any(c.get("partyes") for c in read["clues"]):
                     read["confirm"] = _confirm_pair((last.get("code") or {}).get("confirm"), read.get("confirm"))      # (yesno, 81번) 「네? 뭐라고요?」(코드 예 · Solar 없음) · 「그쪽 말고 반대쪽」(Solar 예)이 확정되던 것
                     if read["confirm"] is None:
@@ -2151,6 +2204,8 @@ def turn(st, ev):
             bare = numfix(bare) if "numword" in L.ON else bare
             short = shortlist(bare, R, (asked or {}).get("id"), [c["k"] for c in clues if "k" in c])
             read = speech_fix(bare, code_read(bare, asked, short, R), short, clues)
+            if (asked or {}).get("cross") is True:
+                read["drop"] = []                         # (cross) 「○○ 말고 △△ 보여요」의 「말고」는 답에서 기준 이름을 빼는 말이지 앞서 받은 단서를 거두는 말이 아니다(#161 리뷰)
             if any(c.get("partyes") for c in read["clues"]) and any(c.get("partyes") for c in clues):
                 _partyes_undo(read, bare)     # (partyes2) 두 번째 부분 긍정은 main 규칙(확정하지 않음 — #137 리뷰 2차: 아니라고 두 번 한 자리가 확정되지 않게)
             if not any(t.get("said") for t in st["turns"]) or (asked or {}).get("id") == "what":      # 시민의 첫 말(「무엇을 도와드릴까요」의 답)과 「어떤 일로」의 답: 무슨 일인지 말 그대로 받아 둔다(11-15 동규)
@@ -2220,7 +2275,7 @@ def turn(st, ev):
         st["history"][-1].update(m=view["size"]["m"], text=view["size_text"])       # 같은 말을 다시 읽어 더 줄었으면 마지막 칸의 숫자를 맞춘다
     st["labels"] = view["chips"]
     q = view["question"]
-    st["shown"] = {"id": q["id"], "options": q["options"]} if q else None
+    st["shown"] = ({"id": q["id"], "options": q["options"]} | ({"cross": q["cross"], "wide": q.get("wide"), "cross_why": q.get("cross_why"), "anchor": q.get("anchor"), "prior": q.get("prior")} if q.get("cross") else {})) if q else None      # (cross) 교차 확인인지 · 넓은 범위도 남긴다: 답 읽기가 그것으로 가른다
     view["history"] = st["history"]
     return st, view
 
