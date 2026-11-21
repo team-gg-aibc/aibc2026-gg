@@ -64,7 +64,7 @@ def check_end(name, view, sizes):
     if r.get("fate"):       # 동물의 일: 「살았나 · 죽었나 × 자리」 표(11-18). 표의 줄 그대로, 지금 통화의 줄 하나만 칠함
         f, dead = r["fate"], [x for x in r["fate"] if not x["alive"]]
         assert sum(x["here"] for x in f) == 1 and {x["alive"] for x in f} == {True, False} and all(x["to"] and "{" not in x["to"] and (x["scope"] == "in") == x["alive"] for x in f), f"{name}: 살았나 표 {f}"
-        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "추측"), ("자동차전용도로", "추측")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
+        assert [(x["class"], x["basis"]) for x in dead][:3] == [("길", "확인"), ("시 공원", "확인"), ("자동차전용도로", "확인")] and "청소" in dead[0]["to"] and "서울시설공단" in dead[2]["to"], f"{name}: 사체 줄 {dead}"
     eng = view["engine"]
     assert eng["status"] == "ready" and not eng["error"] and eng["ask"], f"{name}: 엔진 {eng}"
     if e["cite"]:       # 6종 안: 근거 조항이 붙은 추천 답
@@ -303,6 +303,18 @@ def edge_reads():
     sys.path.insert(0, str(HERE))
     import server as S
     on = set(S.L.EDGE_ON.split(",")) <= S.L.ON
+    x, y = S.gaz.xy(126.93626, 37.53345)      # 마포대교 한가운데(11-21 「다리」 갈래): 포트홀은 서울시 교량안전과, 쓰레기는 다리 줄이 없어 전처럼 구청
+    deck = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert S.L.place_class(deck) == ("다리", "마포대교") and "교량안전과" in S.route_of({"type": "road"}, deck)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, deck)["hit"]["to"]
+    x, y = S.gaz.xy(127.1215, 37.5206)      # 올림픽공원 안(11-21 spots): 노점은 국민체육진흥공단, 유기 동물은 그대로 송파구청
+    olp = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert "국민체육진흥공단" in S.route_of({"type": "vendor"}, olp)["hit"]["to"] and "송파구청 동물보호" in S.route_of({"type": "stray"}, olp)["hit"]["to"]
+    x, y = S.gaz.xy(126.9850, 37.5690)      # 청계천 광교 둘레: 시민이 「청계천 산책로」라고 했을 때만 서울시설공단 청계천관리처, 길(청계천로)은 그대로 구청
+    cgc = {"cx": x, "cy": y, "on_road": False, "ctx": {"roads": []}}
+    assert "청계천관리처" in S.route_of({"type": "litter", "spot": "청계천"}, cgc)["hit"]["to"] and "구청" in S.route_of({"type": "litter"}, cgc)["hit"]["to"]
+    assert S.understood(S.turn({"id": "check-cgc"}, {"line": {"who": "시민", "text": "청계천 산책로예요, 쓰레기가 잔뜩 버려져 있어요"}})[0])[1]["spot"] == "청계천"
+    sub = lambda said: S.understood(S.turn({"id": "check-sub"}, {"line": {"who": "시민", "text": said}})[0])[1]["spot"]      # noqa: E731  지하철 역 안: 시민이 역 안 · 승강장 등을 말했을 때만 운영 기관
+    assert sub("잠실역 안에 쓰레기가 많아요") == "지하철 역사 안" and sub("잠실역 1번 출구 앞에 쓰레기가 많아요") is None and "서울교통공사" in S.route_of({"type": "litter", "spot": "지하철 역사 안"}, olp)["hit"]["to"]
 
     def read(said, asked=None):
         short = S.shortlist(said, None, (asked or {}).get("id"))

@@ -48,6 +48,8 @@ KICK_DOCK = os.environ.get("CALL_KICK_DOCK", "1") != "0"       # 따릉이 대�
 TEXT_FILE = "A-05_통화위치좁히기"
 SAVED_FILE = HERE / "data" / "saved.json"
 TYPES = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8"))["types"]
+PARK_TO = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("park_to", {})
+SPOTS = json.loads((HERE / "data" / "routes.json").read_text(encoding="utf-8")).get("spots", {})      # 한 기관이 그 자리의 일을 받는 곳(올림픽공원 = 국민체육진흥공단 등, 11-21)      # 시 공원 이름 → 맡는 곳(「{공원 관리}」 자리, 11-21)
 UNKNOWN = "확인 불가"
 G = L.G
 lock = threading.Lock()
@@ -1386,6 +1388,7 @@ def understood(st):
         matter["type"] = "stray" if matter["alive"] else "carcass"        # 동물의 일은 살았는지로 갈린다
     if matter.get("type") is None and matter.get("told") and not matter.get("animal"):
         matter["type"] = "other"                          # 분류에 없는 일이라도 말했으면 「그 밖의 일」로 받고 위치로 넘어간다(「어떤 일로」를 다시 묻지 않는다, 11-15 동규)
+    matter["spot"] = next((k for k, v in SPOTS.items() if v.get("said") and any(re.search(v["said"], t.get("said") or "") for t in st["turns"])), None)      # 시민이 그 자리를 말했나(「청계천 산책로예요」, 11-21 spots)
     matter["ask_lamp"] = tab("이렇게 물어보세요").get("가로등 번호 묻기") == "켬"      # 자동차전용도로의 일은 끝에 가로등 기둥 번호를 묻는다(문구 파일 한 줄로 끈다)
     matter["by_place"] = bool(matter.get("type")) and any("class" in r for r in TYPES[matter["type"]]["routes"])       # 공원 안팎으로 넘길 곳이 갈리는 일인가
     matter["animal_matter"] = bool(matter.get("animal") or (matter.get("type") and TYPES[matter["type"]].get("animal")))
@@ -1410,12 +1413,15 @@ def route_of(matter, R):
     cls, cname = L.place_class(R)
     W = tab("일의 종류와 갈림")
     gu = L._area_at(G.gu, R["cx"], R["cy"]) or W["구 모름"]
-    put = lambda s, c: s.replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
+    park = next((v for k, v in PARK_TO.items() if cname and cname.startswith(k)), None) if cls == "시 공원" else None      # 공원마다 맡는 곳(어린이대공원 = 서울시설공단 등)
+    put = lambda s, c: s.replace("{공원 관리}", (c == cls and park) or "{공원} 관리사무소(서울시 공원여가센터)").replace("{구}", gu).replace("{공원}", cname if c == cls and cname else W["공원 모름"])   # noqa: E731  자리 이름(공원 · 길)은 그 장소 종류의 줄에만. 다른 종류의 줄은 어느 공원인지 모르니 「그 공원」(강변북로 위인데 「강변북로 관리사무소」가 나오던 일, 11-18)
     ok = lambda r, c: r.get("class") in (None, c) and r.get("animal") in (None, matter.get("animal"))   # noqa: E731
     hit = next(r for r in t["routes"] if ok(r, cls))
-    names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
+    names = {c: tab("일의 종류와 갈림")["다른 자리 · " + c] for c in ("자동차전용도로", "다리", "한강공원", "시 공원", "공원", "길")}      # 화면 「같은 일이 다른 자리였다면」 표의 장소 이름
     others, seen = [], set()
     for c in names:
+        if c == "다리" and cls != c and not any(r.get("class") == c for r in t["routes"]):
+            continue      # 다리 줄이 없는 일은 다리 위도 「그 밖」 줄이라 표에 넣지 않는다(11-21)
         r = next((r for r in t["routes"] if ok(r, c)), None)
         if r and (c, r["to"]) not in seen:
             seen.add((c, r["to"]))
@@ -1430,6 +1436,10 @@ def route_of(matter, R):
             if len({x["to"] for x in rows}) == 1:
                 rows = [dict(rows[0], **{"class": None, "here": k == matter["type"]})]      # 자리와 상관없이 같으면 한 줄(「어디서든」)
             fate += rows
+    said = [SPOTS[matter["spot"]]] if matter.get("spot") in SPOTS else []      # 시민이 말한 자리(「올림픽공원역 승강장」)가 지도 이름(올림픽공원)보다 먼저
+    spot = next((v for v in said + [v for k, v in SPOTS.items() if cname and cname.startswith(tuple(v.get("names", [k])))] if gu in v.get("gu", [gu])), None)
+    if spot and matter["type"] not in spot["keep"]:
+        hit, others, fate = dict(hit, to=spot["to"], note=spot["note"], basis="확인"), [], []      # 넘길 곳만 그 기관으로(조례 6종 안팎은 자리 줄 그대로). 다른 자리 표는 그 기관과 어긋나 보이지 않게 뺀다
     scope = hit.get("scope", t["scope"])
     return {"type": matter["type"], "name": t["name"], "item": t["item"], "scope": scope, "scope_why": hit.get("scope_why") or (t.get("scope_why") if scope == "out" else None),
             "law": hit.get("law") or t.get("law"), "class": cls, "class_name": cname, "ask_engine": scope == "in" or bool(t.get("ask_engine")),
@@ -1752,6 +1762,8 @@ def place_phrase(R, route):
     """엔진에 넣을 큰 장소(잘게 좁힌 자리까지는 넣지 않는다)."""
     if route["class"] == "자동차전용도로":
         return f"{route['class_name']}(자동차전용도로) 위"
+    if route["class"] == "다리":
+        return f"{route['class_name']} 위"
     if route["class_name"]:
         return f"{route['class_name']} 안"
     return f"{L._area_at(G.gu, R['cx'], R['cy']) or '서울'}의 길가"
