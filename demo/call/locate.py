@@ -1107,6 +1107,8 @@ def questions(R, clues, matter, asked=(), same=None):
     if R is None:
         return [{"id": "where", "bits": None, "options": []}] + conds
     confirm = {"id": "confirm", "bits": None, "options": [{"word": "맞음", "set": {"confirm": True}}, {"word": "아님", "set": {"confirm": False}}]}
+    if "chainpick" in ON and any((a or "").rstrip("!") == "closest" for a in asked):
+        R["chainskip"] = True                             # (chainpick · 89번) 어느 지점인지 이미 물었다: 고른 지점(한 점 단서)만 기준이 되고, 여러 지점의 상표 단서는 기준에서 뺀다(「모르겠어요」면 chainref처럼)
     x, y, w = _sample(R)
     ctx = R["ctx"]
     need_dir = R["on_road"] and ctx["head"] is None and any(_xw(i) for i in ctx["roads"])
@@ -1212,6 +1214,10 @@ def questions(R, clues, matter, asked=(), same=None):
                 "addr": lambda: {"id": "addr", "bits": math.log2(max(1.0, r / 15.0)), "options": []}}
         ask = lambda qid: make[qid]() if qid in make else _q_marks(R, x, y, w, qid, clues)   # noqa: E731
         loc = next(([q] for q in (ask(qid) for qid in order if qid not in miss) if q and _worth(q, R) and not dup(q)), [])
+        if "chainpick" in ON and not R.get("chainskip") and loc and loc[0]["id"] in ("dist", "from", "near"):
+            cq = _chain_q(R, clues, loc[0].get("name"))
+            if cq:
+                loc = [cq]                                # (chainpick · 89번) 기준이 될 상표가 범위 둘레에 여럿: 거리 · 방향 · 「바로 앞입니까」를 묻기 전에 어느 지점인지
     since = max((n for n, a in enumerate(asked) if a in ("confirm!", "check!")), default=-1)     # 「아니요」로 되돌아온 뒤에는 다시 센다
     n_loc = sum(1 for a in ids[since + 1:] if a in LOCQ)
     if rejected:                                          # 어느 말이 달랐는지부터 짚는다(한 걸음만 되돌리기)
@@ -1453,12 +1459,14 @@ def _q_near(R, clues):
     best = None
     for c in clues:
         if c["t"] == "pt" and c.get("r", 100.0) > SIG["바로"] and c.get("label") and not c["label"].endswith(" 쪽"):
+            if R.get("chainskip") and _big_named(c["label"], c["p"]):
+                continue                                   # (chainpick · 89번) 체인 상표를 기준에서 뺀 뒤 남은 것이 넓은 곳(크기가 빠진 한 점 단서)이면 묻지 않는다 — 74-016: 한국체육대학교 「바로 앞」 → 캠퍼스의 한 점으로 좁혀 178m 틀린 확정
             px, py, ext = np.array([c["p"][0]]), np.array([c["p"][1]]), [{"ext": c["ext"]} if c.get("ext") else {}]
         elif c["t"] == "at" and c.get("how") != "바로" and "k" in c:
             r = resolve(c["k"])
             if not len(r["x"]) or r["areas"] or r["roads"] or any(k in KIND_SIG for k in r["kinds"]) or _pk(r):
                 continue                                   # 역 · 동네처럼 넓은 것에는 「바로 앞」을 묻지 않는다
-            if "chainref" in ON and _branches(r, R) >= 2:
+            if ("chainref" in ON or R.get("chainskip")) and _branches(r, R) >= 2:
                 continue                                   # (chainref · 89번) 같은 상표가 범위 둘레에 여럿이면 그 가운데 한 지점을 두고 「바로 앞입니까」를 묻지 않는다
             px, py, ext = r["x"], r["y"], [_big(i) for i in r["ids"]]
         else:
@@ -1533,6 +1541,56 @@ def _branches(r, R):
     return len(keep)
 
 
+def _big_named(label, p):
+    """(chainpick · 89번) 그 이름의 장소가 p 둘레 1km 안에서 넓은 곳(크기가 BIG_M보다 큼)인가."""
+    r = resolve(gaz.norm(label))
+    return any(float(G.ext[i]) > BIG_M and math.hypot(G.x[i] - p[0], G.y[i] - p[1]) <= 1000 for i in r.get("ids") or [])
+
+
+def _landmark(x, y, brand):
+    """(chainpick · 89번) 그 지점 둘레 60m 안의 하나뿐인 표지 이름(역 출구 · 건물 등, 같은 상표는 뺌) 또는 None."""
+    b = gaz.norm(brand)
+    idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산")
+           and b not in gaz.norm(G.name[i]) and len(resolve(gaz.norm(G.name[i]))["x"]) == 1]
+    return G.name[min(idx, key=lambda i: math.hypot(G.x[i] - x, G.y[i] - y) / (3.0 if G.kind[i] == "역 출구" else PROM.get(G.kind[i], 1.0)))] if idx else None      # 역 출구를 먼저(시민이 흔히 출구로 말한다)
+
+
+def _chain_q(R, clues, name):
+    """(chainpick · 89번) name이 시민이 댄 상표이고 범위 둘레(덮는 반지름 + 100m)에 40m 넘게 떨어진 지점이 둘 이상이면, 가운데에 가까운 지점 넷까지를 보기로 「어느 ○○가 가장 가까우세요?」. 아니면 None.
+    고른 지점은 「그 지점이 다른 지점보다 가깝다」(가장 가까운 곳 단서)와, 시민이 그 상표를 말한 넓이 그대로의 한 점 단서가 되어 다음 거리 · 방향 · 「바로 앞입니까」의 기준이 된다."""
+    c = next((c for c in clues if c["t"] == "at" and "k" in c and "|" not in str(c["k"]) and (c.get("dist_of") or c.get("label") or G.display(c["k"])) == name), None)
+    if c is None:
+        return None
+    r = resolve(c["k"])
+    if not len(r["x"]) or not r.get("ids"):
+        return None
+    d = np.hypot(r["x"] - R["cx"], r["y"] - R["cy"])
+    keep = []
+    for j in np.argsort(d):
+        if d[j] > R["r_cover"] + 100 or len(keep) == 4:
+            break
+        if all(math.hypot(r["x"][j] - r["x"][k], r["y"][j] - r["y"][k]) > 40 for k in keep):
+            keep.append(int(j))
+    if len(keep) < 2:
+        return None
+    ids = [r["ids"][j] for j in keep]
+    labs = []
+    for j, i in zip(keep, ids):
+        lab = G.name[i]
+        if [G.name[k] for k in ids].count(lab) > 1 or gaz.norm(lab) == gaz.norm(name):
+            lm = _landmark(float(r["x"][j]), float(r["y"][j]), G.brand[i] or G.name[i])
+            lab = f"{lm} 옆 {G.name[i]}" if lm else None
+        labs.append(lab)
+    if None in labs or len(set(labs)) < len(labs):
+        return None                                       # 지점을 말로 가를 수 없으면 묻지 않고 main처럼 둔다(74-016: 따릉이 세 곳의 이름이 모두 「한국체육대학교」, 가장 가까운 곳 둘레에 가를 표지 없음)
+    pts = [[round(float(r["x"][j]), 1), round(float(r["y"][j]), 1)] for j in keep]
+    sig = min(_sigma(c, r["kinds"]), SIG["근처"])
+    return {"id": "closest", "chain": True, "bits": None, "name": name, "options": [
+        {"label": lab, "set": {"matter": {"chain": lab}, "clues": [{"t": "closest", "p": p, "others": [q for q in pts if q is not p], "s": round(1.5 * R["r"], 1), "sure": True, "label": f"{lab}이 가장 가까움"},
+                                                                  {"t": "pt", "p": p, "r": sig, "sure": True, "name": lab, "label": lab}]}}
+        for p, lab in zip(pts, labs)] + [{"word": "잘 모르겠음", "set": {"clues": []}}]}
+
+
 def _said_anchor(R, clues):
     """시민이 말한 표지 가운데 지금 범위의 가운데에 가장 가까운 것 → (거리, 이름, [x, y]) 또는 None. 역 · 동네처럼 넓은 것은 뺀다."""
     best = None
@@ -1543,7 +1601,7 @@ def _said_anchor(R, clues):
             r = resolve(c["k"])
             if not len(r["x"]) or r["areas"] or r["roads"] or any(k in KIND_SIG for k in r["kinds"]) or _pk(r):
                 continue
-            if "chainref" in ON and _branches(r, R) >= 2:
+            if ("chainref" in ON or R.get("chainskip")) and _branches(r, R) >= 2:
                 continue                                  # (chainref · 89번) 같은 상표가 지금 범위 둘레에 여럿: 어느 지점인지 모르니 거리 · 방향 질문의 기준으로 잡지 않는다(왕십리역 r27: 역사 3층 스타벅스를 기준으로 「바로 앞」 → 226m 떨어진 곳으로 확인 질문)
             px, py, ext = r["x"], r["y"], (G.ext[r["ids"]] if r.get("ids") else np.zeros(len(r["x"])))
         else:

@@ -453,9 +453,14 @@ def chain_said():
     import server as S
     L = S.L
 
-    def chain():                                          # 왕십리역 r27: 「역 앞 스벅」 — 범위 둘레에 스타벅스가 다섯 곳
-        cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
-        return L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]["id"]
+    def chain():                                          # 왕십리역 r27: 「역 앞 스벅」 — 범위 둘레에 스타벅스가 다섯 곳(chainpick은 잠시 끄고 봄)
+        had = "chainpick" in L.ON
+        L.ON.discard("chainpick")
+        try:
+            cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
+            return L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]["id"]
+        finally:
+            L.ON.add("chainpick") if had else None
 
     def said():                                           # 신촌 r12(코드 읽기): 셋째 말에서 넘길 때의 한 줄
         st, v = S.turn({"id": "check-handsaid"}, {"line": {"who": "상담사", "text": "민원 콜센터입니다."}})
@@ -467,7 +472,18 @@ def chain_said():
         assert (v["question"] or {}).get("id") == "handoff", v["question"]
         return "아름다운미소" in (v["summary"]["go"] or "")
 
-    looks, want = {"chainref": chain, "handsaid": said}, {"chainref": ("finer", "dist"), "handsaid": (False, True)}
+    def pick():                                           # (chainpick) 같은 순간: 거리 질문 대신 「어느 스타벅스가 가장 가까우세요?」(chainref는 잠시 끄고 봄 — 켜져 있으면 체인을 기준에서 빼 버린다)
+        had = "chainref" in L.ON
+        L.ON.discard("chainref")
+        try:
+            cl = [{"t": "at", "k": S.gaz.norm("왕십리역"), "label": "왕십리역"}, {"t": "at", "k": S.gaz.norm("스타벅스"), "label": "스타벅스", "how": "가까이"}]
+            q = L.questions(L.infer(cl), cl, {"type": "parking"}, asked=("station", "mark"))[0]
+            return q["id"], len(q["options"]) - 1 if q.get("chain") else None      # 체인 질문이면 지점 보기 수(「잘 모르겠음」 뺌)
+        finally:
+            L.ON.add("chainref") if had else None
+
+    looks = {"chainref": chain, "handsaid": said, "chainpick": pick}
+    want = {"chainref": ("finer", "dist"), "handsaid": (False, True), "chainpick": (("closest", 4), ("dist", None))}
     for sw, f in looks.items():
         on = sw in L.ON
         got = f()
@@ -478,7 +494,7 @@ def chain_said():
                 assert f() == want[sw][1], sw + ": 꺼도 결과가 같음"
             finally:
                 L.ON.add(sw)
-    print("  ✓ 체인 가게 · 넘기는 말: 둘레에 여럿인 상표는 거리 질문의 기준이 아님 · 넘길 때는 시민이 말한 이름만"
+    print("  ✓ 체인 가게 · 넘기는 말: 둘레에 여럿인 상표는 거리 질문의 기준이 아님 · 어느 지점인지 먼저 · 넘길 때는 시민이 말한 이름만"
           + (" — 켬, 하나씩 끄면 main 동작" if all(s in L.ON for s in looks) else f" — 켠 것 {sorted(s for s in looks if s in L.ON)}"))
 
 
