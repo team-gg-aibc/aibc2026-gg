@@ -981,8 +981,11 @@ def pair_seen():
             st, view = S.turn(st, {"line": {"who": "시민", "text": said}})
             if view["question"]:
                 st, view = S.turn(st, {"line": {"who": "상담사", "text": view["question"]["say"]}})
+        last["st"] = st
         return view
+    last = {}
     v = run("장한평역")
+    assert S._heard(last["st"]) == ["CU", "신한은행"], S._heard(last["st"])      # 받아 주는 말은 시민이 댄 이름 그대로(pairseen이 범위에서 뺀 「신한은행」도)
     x0, y0 = S.gaz.xy(*S.gaz.lonlat(*S.L.resolve("장한평역")["x"][:1], *S.L.resolve("장한평역")["y"][:1]))
     cx, cy = S.gaz.xy(*v["center"])
     moved = math.hypot(float(cx) - float(x0), float(cy) - float(y0))
@@ -1017,6 +1020,29 @@ def main_blob():
         assert not L.is_done(R4) and L.size_of(R4)["m"] > 300, (R4["r"], R4["r_cover"])
     assert not L.is_done(R2) and R2["r"] > 150, R2["r"]
     print(f"  ✓ 가능성이 한 덩어리에 몰린 범위(mainblob {'mainblob' in L.ON}): 동규 장한평역 통화 마지막 차례 반지름 {R4['r']:.0f}m · 화면 {L.size_of(R4)['m']}m · 가운데가 확정 자리에서 {math.hypot(R4['cx'] - tx, R4['cy'] - ty):.0f}m")
+
+
+def follow_said():
+    """(saidanchor · nhalias, 93번) 시민이 한 말을 따라가기. 동규 장한평역 통화 마지막 단서(main_blob과 같음)로 좁힌 범위의 확정 기준:
+    켜면 시민이 방금 댄 「CU」의 지점(「CU 장한평2호점」), 끄면 76m 떨어진 「장한평역」. 「농협 앞이요」 · 「농협은행 앞이요」는 켜면 NH농협은행 지점으로 읽는다."""
+    os.environ.setdefault("CALL_MODE", "saved")
+    sys.path.insert(0, str(HERE))
+    import server as S
+    L = S.L
+    cl = [{"t": "at", "k": "우리은행", "how": "바로", "sure": True, "label": "우리은행"}, {"t": "at", "k": "장한평역", "nearest": True, "label": "장한평역"}, {"t": "at", "k": "cu", "how": "가까이", "label": "C U"}]
+    R = L.infer(cl)
+    anc = (L.anchor(R, cl) or {}).get("name", "")
+    if {"saidanchor", "mainblob"} <= L.ON:
+        assert anc.startswith("CU "), anc
+    nh = {}
+    for said in ("농협 앞이요", "농협은행 앞이요"):
+        short = S.shortlist(said, None)
+        nh[said] = [c.get("label") for c in S.code_read(said, None, short, None)["clues"] if c.get("t") == "at"]
+        if "nhalias" in L.ON:
+            assert nh[said] and len(L.resolve(S.gaz.norm(said.split()[0]))["x"]) == len(L.resolve(S.gaz.norm("NH농협은행"))["x"]), (said, nh[said])
+        else:
+            assert not nh[said], (said, nh[said])
+    print(f"  ✓ 시민이 한 말을 따라가기(saidanchor {'saidanchor' in L.ON} · nhalias {'nhalias' in L.ON}): 확정 기준 「{anc}」 · 「농협 앞이요」 {nh['농협 앞이요']}")
 
 
 def main():
@@ -1063,6 +1089,7 @@ def main():
         reread_guards()
         seen_wide()
         main_blob()
+        follow_said()
         edge_reads()
         ask_fixes()
         chain_said()

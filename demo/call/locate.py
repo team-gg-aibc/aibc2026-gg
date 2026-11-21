@@ -1072,11 +1072,16 @@ ASK_ON = "samename,closestnew,josa"      # (75번 후보 2, 기본 켬) 질문 �
 C2_ON = "bridgeroad," + ASK_ON      # (75번 후보 2, 기본 켬) #138 뒤의 작은 고침 넷: bridgeroad = 길 이름과 함께 나온 다리(「도림천 자전거길 … 도림천고가도로교 밑」)도 다리의 면으로(bridgeline이 켜져 있을 때) + 질문 다듬기 셋. 이 묶음을 빼면 #138의 동작 그대로
 FIX_ON = "genericname,yesno,whichkeep,choicebind,placebind,codekeep,keeptype,stationbind,stoponly,roadcls,hood,seenwide,handsaid,dupshop,negkeep,bridgeend,hangulopt2"      # (88번 둘째 묶음 — chainpick은 확인용 묶음 옛 잣대 93통 테두리 틀린 확정 7 → 8로 끔, 정확도 세션 17:45) 「보여요」 넓게 · 넘길 때 시민 말 · 같은 가게 두 줄 · 받지 않은 「아님」 · 다리 쪽 끝 · 보기의 영어 이름 좁힌 판 · 체인 가게 「어느 지점」 묻기를 더함(체인 가게를 기준에서 빼기 chainref · 영어 이름 첫 판 hangulopt는 평가 · 600통 틀린 확정 +1로 끔) —      # (84번, 기본 켬) 고침 모은 판에서 모든 기준을 넘은 열 + 동네 이름(hood, 87번 — 더 긴 이름 속 동네 말은 읽지 않게 고친 d12d88e로 기본 켬, 84번 5절) — 기준점과 어긋난 가게(farshop, 83번)는 확인용 묶음 93통 테두리 둘에서 틀린 확정 +1로 걸려 끔(11-21 07시). 동네 이름(hood, 87번)은 가게 지점 이름 속 동네 말(「CU 신촌피어점」의 신촌)을 동네로 읽어 600통 #92가 맞는 한 점 → 넘김이 되어 끔. 그 밖에 정류장으로만 있는 기관 이름(stoponly, 85번 좁힌 판) · 양재대로 · 언주로의 일반 구간(roadcls, 86번) 더함. 덜 묻기의 dunnoboth는 옛 잣대 한 점 −9 · −12로 끔. 처음 아홉: 흔한 낱말 이름 · 기준점과 어긋난 가게(83번) · 되묻기 답의 헛 「예」 · 「○○은 맞아요」(81번) · Solar가 말에 없는 이름을 쓰지 않기 다섯(79번). seenwide · 긴 다리 · 덜 묻기는 「정할 것」으로 끔. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
 BRIDGE_ON = "bridgelong"      # (75번 9절 · 10절, 모은 판에서는 기본 끔 — 켜는 판은 donggyu/locate-bridge) 길이 120m를 넘는 다리 · 고가는 이름 하나만 대도(「보라매고가 바로 앞」) 가운데 한 점이 아니라 다리의 면으로. 끄려면 CALL_ON에 이것을 뺀 목록을 준다
-DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON + "," + BRIDGE_ON      # BRIDGE_ON(긴 다리)은 88번 둘째 묶음에서 기본 켬(동규 11-21 10:1x 「긴 다리 읽기는 이번에 넣자」)     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
+FOLLOW_ON = "pairseen,mainblob,saidanchor,nhalias"      # (93번, 기본 켬 후보) 보기 밖의 답을 따라가기: 함께 댄 이름 둘의 짝 · 한 덩어리에 몰린 범위 · 시민이 최근에 댄 이름을 확정 기준으로 · 「농협」 별명. 하나씩 끄려면 CALL_ON에 그 이름을 뺀 목록을 준다
+DEFAULT_ON = "loop,region,softnot,dist,closest,stallend,pastfix,areafix,fromcone," + SPEECH_ON + "," + STT_ON + "," + FIELD_ON + "," + CONFIRM_ON + "," + EDGE_ON + "," + C2_ON + "," + MATTER_ON + "," + FIX_ON + "," + BRIDGE_ON + "," + FOLLOW_ON      # BRIDGE_ON(긴 다리)은 88번 둘째 묶음에서 기본 켬. FOLLOW_ON은 93번(동규 11-21 21시 결정)(동규 11-21 10:1x 「긴 다리 읽기는 이번에 넣자」)     # 서비스 기본값(11-15 동규 「위치는 켜는 방향」): 33번 설계의 추천 묶음 + stallend(11-16) + 틀린 확정 고침 셋(11-18 동규, 47번 추천 1). CALL_ON을 주면 그것만(빈 값 = 모두 끔)
 LOCCAP = int(os.environ.get("CALL_LOCCAP", "10"))   # 위치 질문을 몇 번까지 묻나(11-18 동규 8 → 10, 47번 추천 1. 앞 값으로 재려면 CALL_LOCCAP=8)
 ON = gaz.ON = set(filter(None, os.environ.get("CALL_ON", DEFAULT_ON).split(",")))     # 켜 볼 것: check = 마지막 확인을 「○○ 말고 보이는 이름 하나」 열린 질문으로(동규가 정함, 11-15) 등
 if "bridgeline" in ON:
     G.add_bridges()                                       # (bridgeline · 75번) 다리의 면(data/seoul/bridges.json.gz)
+if "nhalias" in ON:                                       # (nhalias, 93번) 시민은 「농협 · 농협은행 앞이요」라고 한다: NH농협은행 지점(지명 자료 47곳)으로 잇는다. 지역 농 · 축협(「○○농협」)은 잇지 않는다
+    for _al in ("농협", "농협은행"):
+        G.ix[gaz.norm(_al)] = G.ix[gaz.norm("NH농협은행")]
+        gaz.ALIAS_KEYS.add(gaz.norm(_al))
 if "wikialias" in ON:
     G.add_wiki()                                          # (wikialias, 기본 끔 · 71번) 위키 별칭 사전(data/seoul/wiki_alias.tsv.gz)을 이름 색인에
 if "hood" in ON:
@@ -1283,6 +1288,9 @@ PIN_KEYS = ("side", "lane", "went", "plate", "same")     # 마무리 질문의 �
 KIND_WORD = {"역 출구": "지하철 출구", "정류장": "버스 정류장", "역": "역", "다리": "다리", "나들목": "나들목", "교차로": "교차로"}
 
 
+SAID_NEAR = 50.0     # (saidanchor) 시민이 최근에 댄 이름을 확정 문장의 기준으로 먼저 쓰는 거리(범위 가운데에서)
+
+
 def anchor(R, clues):
     """확정 문장의 기준이 될 「이름 붙은 한 점」: 시민이 말한 표지 가운데 가장 가까운 것(80m 안), 없으면 눈에 띄는 가까운 곳(60m 안).
     → {name, p, d, tight, ext} 또는 None. tight = 시민이 그 표지 「바로 앞 · 옆」이라고 이미 말했다. ext = (bigplace) 그 표지가 넓은 장소면 그 크기(m), 아니면 0 — 넓은 장소의 「바로 앞」은 p가 아니다."""
@@ -1299,7 +1307,8 @@ def anchor(R, clues):
             said.append((max(0.0, math.hypot(c["p"][0] - x, c["p"][1] - y) - e) if e else math.hypot(c["p"][0] - x, c["p"][1] - y), lab, [float(c["p"][0]), float(c["p"][1])], tight, _flat(c, SIG["바로"])))
         elif "k" in c:
             r = resolve(c["k"])
-            if 0 < len(r["x"]) <= 40 and not r["areas"] and not _pk(r):
+            many = "saidanchor" in ON and c["t"] == "at" and len(r["x"]) > 40      # (saidanchor) 지점이 많은 상표(CU 3,566곳 · 우리은행 211곳)도 가운데 가까운 지점이면 기준으로(지점 이름까지 되말함)
+            if (0 < len(r["x"]) <= 40 or many) and not r["areas"] and not _pk(r):
                 j = int(np.argmin(np.hypot(r["x"] - x, r["y"] - y)))
                 q = _pos_near(ctx, n, x, y) or (float(r["x"][j]), float(r["y"][j]))
                 if c["t"] == "at" and r["ids"][j] in _bridges(r, n, ctx) and float(bridge_dist(r["ids"][j], np.array([x]), np.array([y]))[0]) <= 40:
@@ -1312,6 +1321,8 @@ def anchor(R, clues):
                 e = float(ext[j]) if ext is not None else 0
                 said.append((max(0.0, math.hypot(q[0] - x, q[1] - y) - e) if e else math.hypot(q[0] - x, q[1] - y), lab, [float(q[0]), float(q[1])], tight, _flat(_big(r["ids"][j]), SIG["바로"]) if r.get("ids") else 0))
     best = min(said, default=None)
+    if "saidanchor" in ON and any(s[0] <= SAID_NEAR for s in said):
+        best = [s for s in said if s[0] <= SAID_NEAR][-1]      # (saidanchor, 93번) 시민이 가장 최근에 댄 이름(가운데 50m 안)을 기준으로: 보기 밖의 답 「CU랑 신한은행이요」 뒤 「장한평역 바로 앞입니까」가 아니라 「CU 장한평2호점 바로 앞입니까」
     if best and best[0] <= 80:
         return {"name": best[1], "p": [round(best[2][0], 1), round(best[2][1], 1)], "d": best[0], "tight": best[3], "ext": best[4]}
     idx = [int(i) for i in G.near(x, y, 60) if len(G.name[i]) >= 3 and not gaz.GENERIC.match(G.name[i].replace(" ", "")) and G.kind[i] not in ("동네", "산") and _road_ok(i, R) and not ("selfname" in ON and self_area(int(i)))]

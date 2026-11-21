@@ -996,6 +996,7 @@ def _pair_seen(said, read, keyed, clues):
             read["clues"].append(clue)
             drop += ks
     if drop:
+        read["said_only"] = [c.get("label") or c["k"] for c in read["clues"] if c.get("k") in drop and c.get("t") == "at"]      # 받아 주는 말에는 시민이 댄 이름을 그대로 둔다(범위만 고친다)
         read["clues"] = [c for c in read["clues"] if not (c.get("k") in drop and c.get("t") == "at")]
         read["skip"] = list(read.get("skip") or []) + drop
 
@@ -1706,13 +1707,15 @@ def _heard(st):
     if not t:
         return []
     said, out = gaz.norm(t["said"]), []
-    for c in ((t.get("model") or t.get("code") or {}).get("clues") or []):
+    rd = t.get("model") or t.get("code") or {}
+    extra = [{"label": n} for n in (rd.get("said_only") or (t.get("code") or {}).get("said_only") or [])] if "pairseen" in L.ON else []      # (pairseen) 둘레에 없어 범위에서 뺀 이름도 시민이 한 말이다
+    for c in (rd.get("clues") or []) + extra:
         lab = (c.get("label") or "").strip()
         if len(gaz.norm(lab)) >= 2 and gaz.norm(lab) in said:
             m = re.search(r"(?<![가-힣A-Za-z0-9])" + r"\s*".join(map(re.escape, lab.replace(" ", ""))), t["said"], re.I)
-            if m and m.group(0) not in out:               # 시민이 쓴 글자 그대로(「C U」가 아니라 「CU」), 낱말 첫머리에서 시작할 때만(「한솔분식」 속의 「솔분식」은 시민이 말한 이름이 아니다)
-                out.append(m.group(0))
-    return out[:2]
+            if m and m.group(0) not in [o.group(0) for o in out]:      # 시민이 쓴 글자 그대로(「C U」가 아니라 「CU」), 낱말 첫머리에서 시작할 때만(「한솔분식」 속의 「솔분식」은 시민이 말한 이름이 아니다)
+                out.append(m)
+    return [m.group(0) for m in (sorted(out, key=lambda m: m.start()) if extra else out)][:2]      # 뺀 이름을 더했으면 시민이 말한 차례대로
 
 
 def _again_say(pick, say, st, Q, opts, line):
