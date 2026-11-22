@@ -452,6 +452,7 @@ curl -s -X POST http://localhost:8000/ask -H 'Content-Type: application/json' -d
 | --- | --- |
 | 시연 화면을 띄우고 눌러 보는 법, 장면 주소, 환경 변수 | [`demo/call/README.md`](demo/call/README.md) |
 | 이 서비스의 소개와 측정 | [`docs/call-locate/README.md`](docs/call-locate/README.md) |
+| 위치 좁히기를 어떻게 고쳐 왔나(틀린 꼴 → 고침 · PR → 숫자 → 다음 가설, 버린 고침 포함) | [`docs/call-locate/tree.html`](docs/call-locate/tree.html)(내려받아 브라우저로 열기) · 자료 [`tree.json`](docs/call-locate/tree.json) |
 | 시스템 전체를 30분에 훑는 공부 자료 | [`docs/공부-자료-1120.md`](docs/공부-자료-1120.md) |
 | 문제가 실제로 있다는 근거와 출처 | [`docs/call-locate/근거.md`](docs/call-locate/근거.md) |
 | 화면에 보이는 말과 통화 대본(문구의 원본) | [`docs/content/A-05_통화위치좁히기.md`](docs/content/A-05_통화위치좁히기.md) |
