@@ -3,7 +3,7 @@
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
-<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from main 08bd360 (second batch #157, Korean option names; step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the README image tool in `_orch-tools` and update the place, radius, lot number, and handoff office in both captions -->
+<!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from main 08bd360 (second batch #157, Korean option names; step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the team's internal README image tool (not in the public repo) and update the place, radius, lot number, and handoff office in both captions -->
 <p align="center">
   <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="80%">
   <br>
