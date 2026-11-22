@@ -1,5 +1,5 @@
-<!-- README decision pending 2 (English name): default = "Call Locate", taken from the repository folder name call-locate. Pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph under the image and the "Ordinance engine (scored API)" section. The service name is not decided yet either (11-21): when it is, change the h1 in both versions. -->
-<h1 align="center">Call Locate (통화로 위치 좁히기)</h1>
+<!-- English name decided on 11-22: "Sound Location" (the presentation cover; the folder name stays call-locate). README decision pending 3 (what the top leads with): default = the service as the title, the scored engine in the second paragraph under the image and the "Ordinance engine (scored API)" section. The service name was decided on 11-22 (same as the presentation cover): "음성을 위치로, Sound Location". -->
+<h1 align="center">Sound Location (음성을 위치로)</h1>
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
@@ -475,7 +475,7 @@ engine/              # Ordinance Q&A engine (scoring API: engine/server.py)
 ├── flow2/           # Flow of the submitted version
 └── data/            # Ordinance text, annex results, chunks, embeddings
 eval/                # Evaluation questions, scoring tools, experiment settings (eval/configs/)
-demo/call/           # Demo screen "Call Locate"
+demo/call/           # Demo screen "Sound Location"
 ├── server.py        # Call server (reading lines, handoff office, intake card)
 ├── locate.py        # Area math and next-question choice
 ├── gaz.py           # Place list
