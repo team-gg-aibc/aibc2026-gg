@@ -454,6 +454,7 @@ All of these documents are in Korean.
 | --- | --- |
 | How to run and click through the demo, scene addresses, environment variables | [`demo/call/README.md`](demo/call/README.md) |
 | An introduction to the service and its measurements | [`docs/call-locate/README.md`](docs/call-locate/README.md) |
+| How we improved location narrowing (what went wrong → fix and PR → numbers → next hypothesis, including fixes we dropped) | [`docs/call-locate/tree.html`](docs/call-locate/tree.html) (download and open in a browser) · data [`tree.json`](docs/call-locate/tree.json) |
 | A 30-minute study guide to the whole system | [`docs/공부-자료-1120.md`](docs/공부-자료-1120.md) |
 | Evidence that the problem is real, with sources | [`docs/call-locate/근거.md`](docs/call-locate/근거.md) |
 | The words on the screen and the call scripts (the source of all screen text) | [`docs/content/A-05_통화위치좁히기.md`](docs/content/A-05_통화위치좁히기.md) |
