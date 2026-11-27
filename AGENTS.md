@@ -6,7 +6,7 @@
 ## 1. 프로젝트
 
 - 팀 GG(Grounded Generation): 동규(PM), 동욱, 종희, 건영
-- 대회: 2026 AI 부트캠프 경진대회, 업스테이지 주제 「Upstage AI Studio를 활용한 공공 법령 Q&A AI」
+- 대회: AI Bootcamp Innovation Challenger 2026(AI 부트캠프 경진대회), 업스테이지 주제 「Upstage AI Studio를 활용한 공공 법령 Q&A AI」
 - 심사 1순위: **모든 답변에 검증 가능한 근거 조항(제○조 제○항)**. 그 위에 재현성 · 관리자 승인 · 설명가능성 · 자동개선(절차형 에이전트 4요소)
 - 지금 단계와 일정: `docs/schedule.md`. 정한 것: `docs/decisions.md`
 

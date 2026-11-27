@@ -4,7 +4,7 @@
 <h3 align="center">주소를 못 대는 민원 전화도, 통화로 자리를 좁히고 조례 원문에서 근거를 찾아 접수 한 건으로 만듭니다.</h3>
 
 <p align="center">
-  <b>🏆 2026 AI 부트캠프 경진대회 업스테이지 부문 1등 · 교육부 장관상</b>
+  <b>🏆 AI Bootcamp Innovation Challenger 2026 업스테이지 부문 1등 · 교육부 장관상</b>
   <br>
   <a href="docs/presentation/GG_Upstage_presentation.pdf">발표 자료 PDF 보기</a> · <a href="https://github.com/team-gg-aibc/aibc2026-gg/raw/main/docs/presentation/GG_Upstage_presentation.pdf">내려받기</a> (24쪽, 8.3MB)
 </p>
@@ -18,7 +18,7 @@
 
 120 같은 일반 민원 전화는 건 사람의 위치를 받을 수 없어서, 상담사가 자리를 말로 듣습니다. 이 화면은 민원인의 말에서 위치 단서를 읽어 지도 위 범위를 줄이고, 다음에 물을 질문을 하나 띄웁니다. 자리가 정해지면 접수 카드에 번지수와 처리할 담당 부서를 적고, 서울특별시 조례 6종에 걸리는 일이면 조례 근거 답을 같은 화면에 붙입니다.
 
-팀 GG가 2026 AI 부트캠프 경진대회의 업스테이지 주제 「Upstage AI Studio를 활용한 공공 법령 Q&A AI」에 낸 저장소입니다. **조례 Q&A 엔진**(`engine/`, 대회 채점을 받는 API)과 그 엔진을 붙인 **시연 화면**(`demo/call/`)이 들어 있습니다. 심사위원이 써 볼 시연 화면 주소는 LMS 제출 칸에 적었고, 내 컴퓨터에서 열쇠 없이 띄우는 법은 [내 컴퓨터에서 돌리기](#내-컴퓨터에서-돌리기)에 있습니다.
+팀 GG가 AI Bootcamp Innovation Challenger 2026(AI 부트캠프 경진대회)의 업스테이지 주제 「Upstage AI Studio를 활용한 공공 법령 Q&A AI」에 낸 저장소입니다. **조례 Q&A 엔진**(`engine/`, 대회 채점을 받는 API)과 그 엔진을 붙인 **시연 화면**(`demo/call/`)이 들어 있습니다. 심사위원이 써 볼 시연 화면 주소는 LMS 제출 칸에 적었고, 내 컴퓨터에서 열쇠 없이 띄우는 법은 [내 컴퓨터에서 돌리기](#내-컴퓨터에서-돌리기)에 있습니다.
 
 [English README](README.en.md) · 쓴 것: ![Python 3.10~3.13](https://img.shields.io/badge/Python-3.10--3.13-3776AB?logo=python&logoColor=white) ![FastAPI 0.162](https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white) ![Upstage solar-pro4 · solar-embedding-2 · Document Parse](https://img.shields.io/badge/Upstage-solar--pro4%20%C2%B7%20solar--embedding--2%20%C2%B7%20Document%20Parse-5B4CF5) ![MapLibre GL 5.6](https://img.shields.io/badge/MapLibre%20GL-5.6-396CB2)
 

@@ -4,7 +4,7 @@
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
 <p align="center">
-  <b>🏆 1st place in the Upstage track of the 2026 AI Bootcamp Competition · Minister of Education Award</b>
+  <b>🏆 1st place in the Upstage track of AI Bootcamp Innovation Challenger 2026 · Minister of Education Award</b>
   <br>
   <a href="docs/presentation/GG_Upstage_presentation.pdf">View the presentation (PDF, in Korean)</a> · <a href="https://github.com/team-gg-aibc/aibc2026-gg/raw/main/docs/presentation/GG_Upstage_presentation.pdf">Download</a> (24 pages, 8.3 MB)
 </p>
@@ -18,7 +18,7 @@
 
 General complaint lines such as 120 cannot get the caller's location, so the call agent hears the place in words. This screen reads location clues from what the caller says, shrinks the area on the map, and shows one next question to ask. When the place is fixed, the intake card gets the lot number and the office in charge, and if the case falls under one of the six Seoul ordinances, the screen adds an answer based on the ordinance.
 
-This is Team GG's repository for the Upstage track, "Public law Q&A AI with Upstage AI Studio", of the 2026 AI Bootcamp Competition. It holds the **ordinance Q&A engine** (`engine/`, the API the contest scores) and the **demo screen** built on it (`demo/call/`). The address of the demo screen for judges is written in the LMS submission. How to run it on your own computer without an API key is in [Running it on your computer](#running-it-on-your-computer).
+This is Team GG's repository for the Upstage track, "Public law Q&A AI with Upstage AI Studio", of AI Bootcamp Innovation Challenger 2026. It holds the **ordinance Q&A engine** (`engine/`, the API the contest scores) and the **demo screen** built on it (`demo/call/`). The address of the demo screen for judges is written in the LMS submission. How to run it on your own computer without an API key is in [Running it on your computer](#running-it-on-your-computer).
 
 [README in Korean](README.md) · Built with: ![Python 3.10 to 3.13](https://img.shields.io/badge/Python-3.10--3.13-3776AB?logo=python&logoColor=white) ![FastAPI 0.162](https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white) ![Upstage solar-pro4 · solar-embedding-2 · Document Parse](https://img.shields.io/badge/Upstage-solar--pro4%20%C2%B7%20solar--embedding--2%20%C2%B7%20Document%20Parse-5B4CF5) ![MapLibre GL 5.6](https://img.shields.io/badge/MapLibre%20GL-5.6-396CB2)
 
