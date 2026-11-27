@@ -3,6 +3,12 @@
 
 <h3 align="center">Even when the caller cannot give an address, we narrow down the place through the call, find the basis in the ordinance text, and turn it into one intake case.</h3>
 
+<p align="center">
+  <b>🏆 1st place in the Upstage track of the 2026 AI Bootcamp Competition · Minister of Education Award</b>
+  <br>
+  <a href="docs/presentation/GG_Upstage_presentation.pdf">View the presentation (PDF, in Korean)</a> · <a href="https://github.com/team-gg-aibc/aibc2026-gg/raw/main/docs/presentation/GG_Upstage_presentation.pdf">Download</a> (24 pages, 8.3 MB)
+</p>
+
 <!-- Demo place (PM decision, 11-21): the street near Lotte World Tower → Jamsil Station Exit 1. The two images below were taken in saved-answers mode from main 08bd360 (second batch #157, Korean option names; step 2 question "who rescues it and where is it cared for?"). If the place or script changes again, retake them with the team's internal README image tool (not in the public repo) and update the place, radius, lot number, and handoff office in both captions -->
 <p align="center">
   <img src="docs/img/readme/call-narrowing.png" alt="The light agent screen during a call. The live transcript is on the left, the next question and the ordinance answer are at the top center, the map shows a blue candidate area with a radius of about 200 m and landmarks to ask about, and the intake card is on the right." width="80%">
