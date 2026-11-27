@@ -3,6 +3,12 @@
 
 <h3 align="center">주소를 못 대는 민원 전화도, 통화로 자리를 좁히고 조례 원문에서 근거를 찾아 접수 한 건으로 만듭니다.</h3>
 
+<p align="center">
+  <b>🏆 2026 AI 부트캠프 경진대회 업스테이지 부문 1등 · 교육부 장관상</b>
+  <br>
+  <a href="docs/presentation/GG_Upstage_presentation.pdf">발표 자료 PDF 보기</a> · <a href="https://github.com/team-gg-aibc/aibc2026-gg/raw/main/docs/presentation/GG_Upstage_presentation.pdf">내려받기</a> (24쪽, 8.3MB)
+</p>
+
 <!-- 시연 장소(11-21 PM 결정): 롯데월드타워 근처 길가 → 잠실역 1번 출구. 아래 두 장은 main 08bd360(둘째 묶음 #157, 보기 한글 이름)을 저장된 답으로 찍은 것이다(차례 2 물음 「누가 구조하고 어디서 보호하나요?」). 장소나 대본이 다시 바뀌면 팀 내부 README 그림 도구(공개 저장소에 두지 않음)로 다시 찍고 두 설명의 장소 · 반지름 · 번지 · 넘길 곳을 고친다 -->
 <p align="center">
   <img src="docs/img/readme/call-narrowing.png" alt="통화 중인 밝은 상담 화면. 왼쪽에 실시간 받아 적기, 가운데 위에 지금 물을 말과 조례 근거 답, 가운데 지도에 반지름 약 200m의 파란 후보 범위와 물어볼 수 있는 표지, 오른쪽에 접수 카드가 있습니다." width="80%">
